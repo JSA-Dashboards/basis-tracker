@@ -381,3 +381,95 @@ def list_locations() -> list[dict]:
         return [{"provider": r["provider"], "location": r["location"]} for r in c.fetchall()]
     finally:
         conn.close()
+
+
+# ── Data retention / pruning ───────────────────────────────────────────────────
+
+def prune_old_snapshots(dry_run: bool = False) -> dict:
+    """
+    Apply tiered data retention to snapshots (PostgreSQL only).
+
+    Policy:
+      • Current calendar month  → keep ALL  (daily granularity)
+      • 1 month – 1 year old    → keep ONE per (provider, location, ISO week)
+      • Older than 1 year       → keep ONE per (provider, location, calendar month)
+
+    The ON DELETE CASCADE on snapshot_rows handles row cleanup automatically.
+
+    Args:
+        dry_run: If True, count candidates but do not delete anything.
+
+    Returns:
+        dict with keys: candidates, deleted, snaps_after, rows_after
+    """
+    if not _use_pg():
+        # SQLite is only used for local dev — data volume is small, skip pruning.
+        return {"candidates": 0, "deleted": 0, "snaps_after": 0, "rows_after": 0}
+
+    # Sub-selects for each retention tier.  Each DISTINCT ON must be wrapped
+    # in a subquery before being combined with UNION.
+    _KEEPERS_SQL = """
+        -- Tier 1: current calendar month — keep everything
+        SELECT id FROM snapshots
+        WHERE created_at >= DATE_TRUNC('month', NOW())
+
+        UNION
+
+        -- Tier 2: 1 month to 1 year — keep one (most recent) per provider/location/week
+        SELECT id FROM (
+            SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', created_at))
+                id
+            FROM snapshots
+            WHERE created_at >= NOW() - INTERVAL '1 year'
+              AND created_at <  DATE_TRUNC('month', NOW())
+            ORDER BY provider, location, DATE_TRUNC('week', created_at), created_at DESC
+        ) weekly
+
+        UNION
+
+        -- Tier 3: older than 1 year — keep one (most recent) per provider/location/month
+        SELECT id FROM (
+            SELECT DISTINCT ON (provider, location, DATE_TRUNC('month', created_at))
+                id
+            FROM snapshots
+            WHERE created_at < NOW() - INTERVAL '1 year'
+            ORDER BY provider, location, DATE_TRUNC('month', created_at), created_at DESC
+        ) monthly
+    """
+
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        # Count how many snapshots fall outside the retention windows
+        c.execute(f"SELECT COUNT(*) AS n FROM snapshots WHERE id NOT IN ({_KEEPERS_SQL})")
+        candidates = c.fetchone()["n"]
+
+        if dry_run or candidates == 0:
+            c.execute("SELECT COUNT(*) AS n FROM snapshots")
+            snaps_after = c.fetchone()["n"]
+            c.execute("SELECT COUNT(*) AS n FROM snapshot_rows")
+            rows_after = c.fetchone()["n"]
+            return {
+                "candidates": candidates,
+                "deleted":    0,
+                "snaps_after": snaps_after,
+                "rows_after":  rows_after,
+            }
+
+        c.execute(f"DELETE FROM snapshots WHERE id NOT IN ({_KEEPERS_SQL})")
+        deleted = c.rowcount
+        conn.commit()
+
+        c.execute("SELECT COUNT(*) AS n FROM snapshots")
+        snaps_after = c.fetchone()["n"]
+        c.execute("SELECT COUNT(*) AS n FROM snapshot_rows")
+        rows_after = c.fetchone()["n"]
+
+        return {
+            "candidates": candidates,
+            "deleted":    deleted,
+            "snaps_after": snaps_after,
+            "rows_after":  rows_after,
+        }
+    finally:
+        conn.close()

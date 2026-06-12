@@ -27,6 +27,8 @@ Usage
   python auto_import.py --bunge-only      # Bunge scrape only
   python auto_import.py --no-scoular     # skip Scoular scrape
   python auto_import.py --scoular-only   # Scoular scrape only
+  python auto_import.py --no-prune       # skip automatic Monday pruning
+  python auto_import.py --prune-only     # run data retention pruning only
 
 Prerequisites
 -------------
@@ -55,7 +57,7 @@ from email_client import fetch_all_bid_emails, fetch_all_bid_emails_retroactive,
 from database import (
     init_db, upsert_snapshot,
     is_email_imported, mark_email_imported,
-    upsert_location_meta,
+    upsert_location_meta, prune_old_snapshots,
 )
 from poet_scraper import fetch_poet_bids
 from parsers.poet_parser import parse_instruments as parse_poet_instruments
@@ -735,6 +737,31 @@ def run_email_import(all_emails: bool = False, days: int = 2) -> int:
     return imported_snaps
 
 
+def run_prune() -> None:
+    """
+    Apply tiered data retention (runs automatically every Monday).
+
+    Policy:
+      • Current calendar month  → keep ALL
+      • 1 month – 1 year old    → keep ONE per (provider, location, week)
+      • Older than 1 year       → keep ONE per (provider, location, month)
+    """
+    log.info("=" * 60)
+    log.info("Data retention pruning starting…")
+    log.info("=" * 60)
+    try:
+        result = prune_old_snapshots(dry_run=False)
+        if result["deleted"] == 0:
+            log.info("Nothing to prune — all data within retention policy.")
+        else:
+            log.info(
+                "Pruned %d snapshot(s) — database now has %d snapshot(s) / %d row(s)",
+                result["deleted"], result["snaps_after"], result["rows_after"],
+            )
+    except Exception as exc:
+        log.error("Pruning failed: %s", exc)
+
+
 def run(
     all_emails: bool = False,
     days: int = 2,
@@ -747,11 +774,12 @@ def run(
     run_andersons_scrape: bool = True,
     run_bunge_scrape: bool = True,
     run_scoular_scrape: bool = True,
+    run_pruning: bool = True,
 ) -> int:
     """
-    Main daily routine — email import + ADM, POET, CHS, CGB, Cargill, GPRE,
-    The Andersons, Bunge, and Scoular web scrapes.
+    Main daily routine — email import + all web scrapes + weekly auto-prune.
     Email auth failure does NOT prevent the web scrapes from running.
+    Pruning runs automatically on Mondays (or when run_pruning=True explicitly).
     Returns total snapshot rows imported.
     """
     init_db()
@@ -775,6 +803,11 @@ def run(
         total += run_bunge()
     if run_scoular_scrape:
         total += run_scoular()
+
+    # Auto-prune every Monday (weekday 0), or if explicitly requested
+    if run_pruning and datetime.now().weekday() == 0:
+        run_prune()
+
     return total
 
 
@@ -881,9 +914,22 @@ if __name__ == "__main__":
         help="Run Scoular scrape only — skip everything else",
     )
 
+    prune_group = parser.add_mutually_exclusive_group()
+    prune_group.add_argument(
+        "--no-prune", dest="no_prune", action="store_true",
+        help="Skip the automatic Monday data-retention pruning",
+    )
+    prune_group.add_argument(
+        "--prune-only", dest="prune_only", action="store_true",
+        help="Run data-retention pruning only — skip all scrapes and email import",
+    )
+
     args = parser.parse_args()
 
-    if args.poet_only:
+    if args.prune_only:
+        init_db()
+        run_prune()
+    elif args.poet_only:
         init_db()
         run_poet()
     elif args.chs_only:
@@ -923,4 +969,5 @@ if __name__ == "__main__":
             run_andersons_scrape=not args.no_andersons,
             run_bunge_scrape=not args.no_bunge,
             run_scoular_scrape=not args.no_scoular,
+            run_pruning=not args.no_prune,
         )
