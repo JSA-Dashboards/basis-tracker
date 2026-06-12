@@ -199,8 +199,52 @@ def _write_coords(provider: str, location: str, lat: float, lon: float):
         conn.close()
 
 
-def run(reset: bool = False, dry_run: bool = False):
+def _bootstrap_missing():
+    """
+    Create bare location_meta rows (no state, no coords) for any (provider, location)
+    that has snapshots but is not yet in location_meta.  Safe to re-run.
+    """
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute("""
+            SELECT DISTINCT s.provider, s.location
+            FROM snapshots s
+            WHERE NOT EXISTS (
+                SELECT 1 FROM location_meta lm
+                WHERE lm.provider = s.provider AND lm.location = s.location
+            )
+            ORDER BY s.provider, s.location
+        """)
+        missing = c.fetchall()
+        if not missing:
+            log.info("Bootstrap: nothing to add")
+            return
+        log.info("Bootstrap: inserting %d missing location_meta rows", len(missing))
+        if _use_pg():
+            for row in missing:
+                c.execute(
+                    "INSERT INTO location_meta (provider, location) VALUES (%s, %s)"
+                    " ON CONFLICT DO NOTHING",
+                    (row["provider"], row["location"]),
+                )
+        else:
+            for row in missing:
+                c.execute(
+                    "INSERT OR IGNORE INTO location_meta (provider, location) VALUES (?, ?)",
+                    (row["provider"], row["location"]),
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def run(reset: bool = False, dry_run: bool = False, bootstrap: bool = False):
     init_db()
+
+    if bootstrap and not dry_run:
+        _bootstrap_missing()
 
     if reset and not dry_run:
         _clear_coords()
@@ -256,8 +300,9 @@ if __name__ == "__main__":
     )
 
     ap = argparse.ArgumentParser(description="Geocode location_meta rows using Nominatim")
-    ap.add_argument("--reset",   action="store_true", help="Clear all coords and re-geocode everything")
-    ap.add_argument("--dry-run", action="store_true", help="Print queries without writing")
+    ap.add_argument("--reset",     action="store_true", help="Clear all coords and re-geocode everything")
+    ap.add_argument("--dry-run",   action="store_true", help="Print queries without writing")
+    ap.add_argument("--bootstrap", action="store_true", help="Create location_meta rows for providers not yet registered")
     args = ap.parse_args()
 
-    run(reset=args.reset, dry_run=args.dry_run)
+    run(reset=args.reset, dry_run=args.dry_run, bootstrap=args.bootstrap)
