@@ -1433,7 +1433,7 @@ with tab_map:
             layers=[layer],
             initial_view_state=view,
             tooltip={"text": "{tooltip}"},
-            map_style="mapbox://styles/mapbox/dark-v11",
+            map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
         )
 
         st.pydeck_chart(deck, use_container_width=True)
@@ -1445,7 +1445,7 @@ with tab_map:
             hex_c = "#{:02x}{:02x}{:02x}".format(*c)
             legend_parts.append(
                 f'<span style="display:inline-flex;align-items:center;gap:5px;'
-                f'margin-right:14px;font-size:11px;color:#94a3b8">'
+                f'margin-right:14px;font-size:11px;color:#374151">'
                 f'<span style="width:10px;height:10px;border-radius:50%;'
                 f'background:{hex_c};display:inline-block"></span>{p}</span>'
             )
