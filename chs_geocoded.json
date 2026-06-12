@@ -1,0 +1,726 @@
+{
+  "ADM Clinton": {
+    "state": "IL",
+    "city": "Clinton"
+  },
+  "AGP - Hastings": {
+    "state": "NE",
+    "city": "Hastings"
+  },
+  "AGP Aberdeen": {
+    "state": "SD",
+    "city": "Aberdeen"
+  },
+  "Absolute Energy": {
+    "state": "?",
+    "city": "Absolute Energy"
+  },
+  "Ada": {
+    "state": "OH",
+    "city": "Ada"
+  },
+  "Akron": {
+    "state": "OH",
+    "city": "Akron"
+  },
+  "Alma": {
+    "state": "KS",
+    "city": "Alma"
+  },
+  "Amherst": {
+    "state": "MA",
+    "city": "Amherst"
+  },
+  "Annawan": {
+    "state": "IL",
+    "city": "Annawan"
+  },
+  "Ashley": {
+    "state": "ND",
+    "city": "Ashley"
+  },
+  "Baltic": {
+    "state": "SD",
+    "city": "Baltic"
+  },
+  "Beltrami": {
+    "state": "MN",
+    "city": "Beltrami"
+  },
+  "Bertrand": {
+    "state": "MO",
+    "city": "Bertrand"
+  },
+  "Blunt": {
+    "state": "SD",
+    "city": "Blunt"
+  },
+  "Bowbells": {
+    "state": "ND",
+    "city": "Bowbells"
+  },
+  "Boyle Terminal": {
+    "state": "MS",
+    "city": "Boyle"
+  },
+  "Brandon": {
+    "state": "MS",
+    "city": "Brandon"
+  },
+  "Bridgeport Ethanol": {
+    "state": "CT",
+    "city": "Bridgeport"
+  },
+  "Bruce Elevator": {
+    "state": "MS",
+    "city": "Bruce"
+  },
+  "Brule": {
+    "state": "SD",
+    "city": "Brule"
+  },
+  "Brush": {
+    "state": "CO",
+    "city": "Brush"
+  },
+  "Byers": {
+    "state": "KS",
+    "city": "Byers"
+  },
+  "CHS Cahokia": {
+    "state": "IL",
+    "city": "Cahokia"
+  },
+  "CHS Primeland": {
+    "state": "WA",
+    "city": "Primeland"
+  },
+  "Callaway": {
+    "state": "MO",
+    "city": "Callaway"
+  },
+  "Calvin": {
+    "state": "ND",
+    "city": "Calvin"
+  },
+  "Canton": {
+    "state": "OH",
+    "city": "Canton"
+  },
+  "Carrollton/White Hal": {
+    "state": "MO",
+    "city": "Carrollton"
+  },
+  "Cavalier": {
+    "state": "ND",
+    "city": "Cavalier"
+  },
+  "Chamberlain": {
+    "state": "SD",
+    "city": "Chamberlain"
+  },
+  "Cheyenne Wells": {
+    "state": "CO",
+    "city": "Cheyenne Wells"
+  },
+  "Chokio": {
+    "state": "MN",
+    "city": "Chokio"
+  },
+  "Circle": {
+    "state": "MT",
+    "city": "Circle"
+  },
+  "Claire City": {
+    "state": "SD",
+    "city": "Claire City"
+  },
+  "Collins, Mississippi": {
+    "state": "MS",
+    "city": "Collins"
+  },
+  "Connell Elevator": {
+    "state": "WA",
+    "city": "Connell"
+  },
+  "Corn Inc": {
+    "state": "IL",
+    "city": "Corn Inc"
+  },
+  "Corsica": {
+    "state": "SD",
+    "city": "Corsica"
+  },
+  "County Line": {
+    "state": "WI",
+    "city": "County Line"
+  },
+  "Crookston Terminal": {
+    "state": "MN",
+    "city": "Crookston"
+  },
+  "Darien": {
+    "state": "IL",
+    "city": "Darien"
+  },
+  "Davenport": {
+    "state": "IA",
+    "city": "Davenport"
+  },
+  "Davidson": {
+    "state": "OK",
+    "city": "Davidson"
+  },
+  "Delivered Tharaldson": {
+    "state": "?",
+    "city": "Delivered Tharaldson"
+  },
+  "Devils Lake": {
+    "state": "ND",
+    "city": "Devils Lake"
+  },
+  "Drayton": {
+    "state": "ND",
+    "city": "Drayton"
+  },
+  "Dupree": {
+    "state": "SD",
+    "city": "Dupree"
+  },
+  "Edgeley": {
+    "state": "ND",
+    "city": "Edgeley"
+  },
+  "Edmore": {
+    "state": "ND",
+    "city": "Edmore"
+  },
+  "Elkton": {
+    "state": "MD",
+    "city": "Elkton"
+  },
+  "Elm Creek": {
+    "state": "NE",
+    "city": "Elm Creek"
+  },
+  "Erskine": {
+    "state": "MN",
+    "city": "Erskine"
+  },
+  "Fairfax": {
+    "state": "IA",
+    "city": "Fairfax"
+  },
+  "Fairmont": {
+    "state": "MN",
+    "city": "Fairmont"
+  },
+  "Fergus Falls South (8¢ Dump fee)": {
+    "state": "MN",
+    "city": "Fergus Falls South"
+  },
+  "Fleming": {
+    "state": "?",
+    "city": "Flemi"
+  },
+  "Frederick": {
+    "state": "OK",
+    "city": "Frederick"
+  },
+  "French": {
+    "state": "MN",
+    "city": "French"
+  },
+  "Futures-Only": {
+    "state": "N/A",
+    "city": "Futures-Only"
+  },
+  "GPC Muscatine": {
+    "state": "IA",
+    "city": "Muscatine"
+  },
+  "Galchutt": {
+    "state": "ND",
+    "city": "Galchutt"
+  },
+  "Garrison": {
+    "state": "IA",
+    "city": "Garrison"
+  },
+  "Gettysburg": {
+    "state": "SD",
+    "city": "Gettysburg"
+  },
+  "Glasgow": {
+    "state": "IL",
+    "city": "Glasgow"
+  },
+  "Glasston": {
+    "state": "ND",
+    "city": "Glasston"
+  },
+  "Glendive": {
+    "state": "MT",
+    "city": "Glendive"
+  },
+  "Glenwood": {
+    "state": "IL",
+    "city": "Glenwood"
+  },
+  "Greenbush": {
+    "state": "MI",
+    "city": "Greenbush"
+  },
+  "Grygla": {
+    "state": "MN",
+    "city": "Grygla"
+  },
+  "Gwinner": {
+    "state": "ND",
+    "city": "Gwinner"
+  },
+  "Hallock - Devils Lake": {
+    "state": "MN",
+    "city": "Hallock"
+  },
+  "Hallock Drayton": {
+    "state": "MN",
+    "city": "Hallock"
+  },
+  "Hallock NG": {
+    "state": "MN",
+    "city": "Hallock"
+  },
+  "Hannaford": {
+    "state": "ND",
+    "city": "Hannaford"
+  },
+  "Harwood": {
+    "state": "ND",
+    "city": "Harwood"
+  },
+  "Havana/Beardstown": {
+    "state": "IL",
+    "city": "Havana"
+  },
+  "Havre": {
+    "state": "MT",
+    "city": "Havre"
+  },
+  "Haxtun": {
+    "state": "CO",
+    "city": "Haxtun"
+  },
+  "Hazel": {
+    "state": "SD",
+    "city": "Hazel"
+  },
+  "Hennessey": {
+    "state": "OK",
+    "city": "Hennessey"
+  },
+  "Herman": {
+    "state": "NE",
+    "city": "Herman"
+  },
+  "Hinton": {
+    "state": "IA",
+    "city": "Hinton"
+  },
+  "Holdrege Shuttle": {
+    "state": "NE",
+    "city": "Holdrege"
+  },
+  "Holdrege West": {
+    "state": "NE",
+    "city": "Holdrege"
+  },
+  "Holyoke": {
+    "state": "CO",
+    "city": "Holyoke"
+  },
+  "Holyoke Shuttle": {
+    "state": "CO",
+    "city": "Holyoke"
+  },
+  "Hyde": {
+    "state": "SD",
+    "city": "Hyde"
+  },
+  "Idalia": {
+    "state": "CO",
+    "city": "Idalia"
+  },
+  "Idalia West": {
+    "state": "CO",
+    "city": "Idalia"
+  },
+  "Ingredion": {
+    "state": "IN",
+    "city": "Ingredion"
+  },
+  "Isabel": {
+    "state": "KS",
+    "city": "Isabel"
+  },
+  "Joliet Container Mkt": {
+    "state": "IL",
+    "city": "Joliet"
+  },
+  "Julesburg": {
+    "state": "CO",
+    "city": "Julesburg"
+  },
+  "Kalispell": {
+    "state": "MT",
+    "city": "Kalispell"
+  },
+  "Kanaranzi": {
+    "state": "MN",
+    "city": "Kanaranzi"
+  },
+  "Kanco": {
+    "state": "KS",
+    "city": "Kanco"
+  },
+  "Kasson": {
+    "state": "MN",
+    "city": "Kasson"
+  },
+  "Kennedy": {
+    "state": "MN",
+    "city": "Kennedy"
+  },
+  "Kennewick/LoMo": {
+    "state": "WA",
+    "city": "Kennewick"
+  },
+  "Kershaw": {
+    "state": "SC",
+    "city": "Kershaw"
+  },
+  "Kindred Terminal": {
+    "state": "ND",
+    "city": "Kindred"
+  },
+  "Kingfisher": {
+    "state": "OK",
+    "city": "Kingfisher"
+  },
+  "Lakota": {
+    "state": "IA",
+    "city": "Lakota"
+  },
+  "Langdon": {
+    "state": "ND",
+    "city": "Langdon"
+  },
+  "Lankin": {
+    "state": "ND",
+    "city": "Lankin"
+  },
+  "Lemmon Terminal": {
+    "state": "SD",
+    "city": "Lemmon"
+  },
+  "Long Prairie": {
+    "state": "MN",
+    "city": "Long Prairie"
+  },
+  "Loomis": {
+    "state": "WA",
+    "city": "Loomis"
+  },
+  "Lowder": {
+    "state": "IL",
+    "city": "Lowder"
+  },
+  "Lowry": {
+    "state": "SD",
+    "city": "Lowry"
+  },
+  "Luverne": {
+    "state": "MN",
+    "city": "Luverne"
+  },
+  "Macon": {
+    "state": "IL",
+    "city": "Macon"
+  },
+  "Magnolia": {
+    "state": "IA",
+    "city": "Magnolia"
+  },
+  "Mahnomen": {
+    "state": "MN",
+    "city": "Mahnomen"
+  },
+  "Malta": {
+    "state": "IL",
+    "city": "Malta"
+  },
+  "Mankato": {
+    "state": "MN",
+    "city": "Mankato"
+  },
+  "Manvel": {
+    "state": "ND",
+    "city": "Manvel"
+  },
+  "Marshall": {
+    "state": "IL",
+    "city": "Marshall"
+  },
+  "Meredith Rd Elburn": {
+    "state": "?",
+    "city": "Meredith Elburn"
+  },
+  "Merritt Bunker": {
+    "state": "MO",
+    "city": "Merritt"
+  },
+  "Milton": {
+    "state": "WA",
+    "city": "Milton"
+  },
+  "Minot": {
+    "state": "ND",
+    "city": "Minot"
+  },
+  "Mitchell": {
+    "state": "IA",
+    "city": "Mitchell"
+  },
+  "Mohall": {
+    "state": "ND",
+    "city": "Mohall"
+  },
+  "Mooreton": {
+    "state": "ND",
+    "city": "Mooreton"
+  },
+  "Morris": {
+    "state": "KS",
+    "city": "Morris"
+  },
+  "Napoleon": {
+    "state": "OH",
+    "city": "Napoleon"
+  },
+  "Nestle Davenport": {
+    "state": "?",
+    "city": "Nestle Davenport"
+  },
+  "New Haven": {
+    "state": "MI",
+    "city": "New Haven"
+  },
+  "New Salem": {
+    "state": "IL",
+    "city": "New Salem"
+  },
+  "Newark": {
+    "state": "OH",
+    "city": "Newark"
+  },
+  "Norma": {
+    "state": "WI",
+    "city": "Norma"
+  },
+  "Okarche": {
+    "state": "OK",
+    "city": "Okarche"
+  },
+  "Oklee": {
+    "state": "MN",
+    "city": "Oklee"
+  },
+  "Omega": {
+    "state": "IN",
+    "city": "Omega"
+  },
+  "Onida": {
+    "state": "SD",
+    "city": "Onida"
+  },
+  "Ostrander": {
+    "state": "MN",
+    "city": "Ostrander"
+  },
+  "Otis": {
+    "state": "KS",
+    "city": "Otis"
+  },
+  "Ottawa River Mkt": {
+    "state": "OH",
+    "city": "Ottawa River"
+  },
+  "Overton": {
+    "state": "NE",
+    "city": "Overton"
+  },
+  "Peru Marketstreet": {
+    "state": "IL",
+    "city": "Peru"
+  },
+  "Philip": {
+    "state": "SD",
+    "city": "Philip"
+  },
+  "Pierre": {
+    "state": "SD",
+    "city": "Pierre"
+  },
+  "Pipestone": {
+    "state": "MN",
+    "city": "Pipestone"
+  },
+  "Quincy Elevator": {
+    "state": "IL",
+    "city": "Quincy"
+  },
+  "Richey": {
+    "state": "MT",
+    "city": "Richey"
+  },
+  "Rochelle": {
+    "state": "IL",
+    "city": "Rochelle"
+  },
+  "Roseau": {
+    "state": "MN",
+    "city": "Roseau"
+  },
+  "Rt. 47 Terminal": {
+    "state": "IL",
+    "city": "Rt. 47"
+  },
+  "Ruthton": {
+    "state": "MN",
+    "city": "Ruthton"
+  },
+  "Sarles": {
+    "state": "ND",
+    "city": "Sarles"
+  },
+  "Savage": {
+    "state": "MN",
+    "city": "Savage"
+  },
+  "Selby": {
+    "state": "SD",
+    "city": "Selby"
+  },
+  "Selkirk": {
+    "state": "MI",
+    "city": "Selkirk"
+  },
+  "Seneca": {
+    "state": "IL",
+    "city": "Seneca"
+  },
+  "Sharon Springs": {
+    "state": "KS",
+    "city": "Sharon Springs"
+  },
+  "Shelby": {
+    "state": "IL",
+    "city": "Shelby"
+  },
+  "Shipman": {
+    "state": "IL",
+    "city": "Shipman"
+  },
+  "Smithfield": {
+    "state": "IL",
+    "city": "Smithfield"
+  },
+  "Stateline": {
+    "state": "WA",
+    "city": "Stateline"
+  },
+  "Sterling": {
+    "state": "?",
+    "city": "Sterli"
+  },
+  "Steward": {
+    "state": "IL",
+    "city": "Steward"
+  },
+  "Strasburg": {
+    "state": "IL",
+    "city": "Strasburg"
+  },
+  "Tracy": {
+    "state": "MN",
+    "city": "Tracy"
+  },
+  "Tribune": {
+    "state": "KS",
+    "city": "Tribune"
+  },
+  "Ulen": {
+    "state": "MN",
+    "city": "Ulen"
+  },
+  "Underwood (13¢ Dump fee)": {
+    "state": "IA",
+    "city": "Underwood"
+  },
+  "Wagner": {
+    "state": "SD",
+    "city": "Wagner"
+  },
+  "Wallace": {
+    "state": "KS",
+    "city": "Wallace"
+  },
+  "Warren": {
+    "state": "IL",
+    "city": "Warren"
+  },
+  "Weskan": {
+    "state": "KS",
+    "city": "Weskan"
+  },
+  "Wheeler Elevator ML": {
+    "state": "TX",
+    "city": "Wheeler Elevator"
+  },
+  "Wiley": {
+    "state": "CO",
+    "city": "Wiley"
+  },
+  "Wilmot": {
+    "state": "OH",
+    "city": "Wilmot"
+  },
+  "Winner": {
+    "state": "SD",
+    "city": "Winner"
+  },
+  "Winona": {
+    "state": "MN",
+    "city": "Winona"
+  },
+  "Wolf Point": {
+    "state": "MT",
+    "city": "Wolf Point"
+  },
+  "Worthing Ag Grain": {
+    "state": "SD",
+    "city": "Worthing"
+  },
+  "Wykoff": {
+    "state": "MN",
+    "city": "Wykoff"
+  },
+  "Yuma": {
+    "state": "CO",
+    "city": "Yuma"
+  },
+  "Yuma Shuttle": {
+    "state": "CO",
+    "city": "Yuma"
+  }
+}
