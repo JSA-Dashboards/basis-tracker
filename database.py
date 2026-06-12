@@ -391,8 +391,7 @@ def prune_old_snapshots(dry_run: bool = False) -> dict:
 
     Policy:
       • Current calendar month  → keep ALL  (daily granularity)
-      • 1 month – 1 year old    → keep ONE per (provider, location, ISO week)
-      • Older than 1 year       → keep ONE per (provider, location, calendar month)
+      • Anything older          → keep ONE per (provider, location, ISO week) — forever
 
     The ON DELETE CASCADE on snapshot_rows handles row cleanup automatically.
 
@@ -406,8 +405,10 @@ def prune_old_snapshots(dry_run: bool = False) -> dict:
         # SQLite is only used for local dev — data volume is small, skip pruning.
         return {"candidates": 0, "deleted": 0, "snaps_after": 0, "rows_after": 0}
 
-    # Sub-selects for each retention tier.  Each DISTINCT ON must be wrapped
-    # in a subquery before being combined with UNION.
+    # Two-tier retention:
+    #   Tier 1 — current month: keep everything
+    #   Tier 2 — anything older: keep one (most recent) per provider/location/ISO week
+    #            Weekly resolution is preserved forever — no monthly rollup.
     _KEEPERS_SQL = """
         -- Tier 1: current calendar month — keep everything
         SELECT id FROM snapshots
@@ -415,26 +416,14 @@ def prune_old_snapshots(dry_run: bool = False) -> dict:
 
         UNION
 
-        -- Tier 2: 1 month to 1 year — keep one (most recent) per provider/location/week
+        -- Tier 2: anything older than current month — one per provider/location/week (forever)
         SELECT id FROM (
             SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', created_at))
                 id
             FROM snapshots
-            WHERE created_at >= NOW() - INTERVAL '1 year'
-              AND created_at <  DATE_TRUNC('month', NOW())
+            WHERE created_at < DATE_TRUNC('month', NOW())
             ORDER BY provider, location, DATE_TRUNC('week', created_at), created_at DESC
         ) weekly
-
-        UNION
-
-        -- Tier 3: older than 1 year — keep one (most recent) per provider/location/month
-        SELECT id FROM (
-            SELECT DISTINCT ON (provider, location, DATE_TRUNC('month', created_at))
-                id
-            FROM snapshots
-            WHERE created_at < NOW() - INTERVAL '1 year'
-            ORDER BY provider, location, DATE_TRUNC('month', created_at), created_at DESC
-        ) monthly
     """
 
     conn = get_conn()

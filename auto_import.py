@@ -743,8 +743,7 @@ def run_prune() -> None:
 
     Policy:
       • Current calendar month  → keep ALL
-      • 1 month – 1 year old    → keep ONE per (provider, location, week)
-      • Older than 1 year       → keep ONE per (provider, location, month)
+      • Anything older          → keep ONE per (provider, location, week) — forever
     """
     log.info("=" * 60)
     log.info("Data retention pruning starting…")

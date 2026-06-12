@@ -1,11 +1,11 @@
 """
-prune_snapshots.py — Tiered data retention for basis_tracker.
+prune_snapshots.py — Data retention for basis_tracker.
 
 Retention policy:
   • Current calendar month  → keep ALL snapshots (daily granularity)
-  • 1 month – 1 year old    → keep ONE per (provider, location, ISO week)
-  • Older than 1 year       → keep ONE per (provider, location, calendar month)
+  • Anything older          → keep ONE per (provider, location, ISO week) — forever
 
+Weekly resolution is preserved indefinitely — no monthly rollup.
 The ON DELETE CASCADE on snapshot_rows means pruning snapshots automatically
 removes their rows — no separate cleanup needed.
 
@@ -56,28 +56,20 @@ print()
 # For each tier, pick the MOST RECENT snapshot in that window.
 
 KEEPERS_SQL = """
-    -- Tier 1: current month — keep all
+    -- Tier 1: current calendar month — keep everything
     SELECT id FROM snapshots
     WHERE created_at >= DATE_TRUNC('month', NOW())
 
     UNION
 
-    -- Tier 2: 1 month to 1 year — keep one per (provider, location, ISO week)
-    SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', created_at))
-        id
-    FROM snapshots
-    WHERE created_at >= NOW() - INTERVAL '1 year'
-      AND created_at <  DATE_TRUNC('month', NOW())
-    ORDER BY provider, location, DATE_TRUNC('week', created_at), created_at DESC
-
-    UNION
-
-    -- Tier 3: older than 1 year — keep one per (provider, location, calendar month)
-    SELECT DISTINCT ON (provider, location, DATE_TRUNC('month', created_at))
-        id
-    FROM snapshots
-    WHERE created_at < NOW() - INTERVAL '1 year'
-    ORDER BY provider, location, DATE_TRUNC('month', created_at), created_at DESC
+    -- Tier 2: anything older — one (most recent) per provider/location/ISO week, forever
+    SELECT id FROM (
+        SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', created_at))
+            id
+        FROM snapshots
+        WHERE created_at < DATE_TRUNC('month', NOW())
+        ORDER BY provider, location, DATE_TRUNC('week', created_at), created_at DESC
+    ) weekly
 """
 
 # ── Count what would be deleted ───────────────────────────────────────────────
