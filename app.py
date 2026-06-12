@@ -1342,6 +1342,28 @@ with tab_map:
             unsafe_allow_html=True,
         )
     else:
+        # ── Commodity toggles ─────────────────────────────────────────────────
+        all_grains_map = sorted({g for r in map_rows for g in r["grains"]})
+        # Default: all selected
+        if "map_grain_sel" not in st.session_state:
+            st.session_state["map_grain_sel"] = set(all_grains_map)
+
+        grain_cols = st.columns(len(all_grains_map))
+        for idx, g in enumerate(all_grains_map):
+            with grain_cols[idx]:
+                active = g in st.session_state["map_grain_sel"]
+                label  = f"{'✓ ' if active else ''}{g}"
+                if st.button(label, key=f"map_grain_{g}", use_container_width=True):
+                    sel = st.session_state["map_grain_sel"]
+                    if g in sel:
+                        sel.discard(g)
+                    else:
+                        sel.add(g)
+                    st.session_state["map_grain_sel"] = sel
+                    st.rerun()
+
+        sel_grains = st.session_state["map_grain_sel"]
+
         # ── Provider filter ───────────────────────────────────────────────────
         all_providers_map = sorted({r["provider"] for r in map_rows})
         sel_provs = st.multiselect(
@@ -1351,7 +1373,13 @@ with tab_map:
             key="map_prov_filter",
             label_visibility="collapsed",
         )
-        filtered = [r for r in map_rows if r["provider"] in sel_provs]
+
+        # Keep only locations that carry at least one selected commodity
+        filtered = [
+            r for r in map_rows
+            if r["provider"] in sel_provs
+            and any(g in r["grains"] for g in sel_grains)
+        ]
 
         # ── Build DataFrame ───────────────────────────────────────────────────
         def _fmt_basis(cents):
@@ -1363,7 +1391,8 @@ with tab_map:
         def _tooltip_text(row):
             grains_str = "  ".join(
                 f"{g}: {_fmt_basis(row['grains'].get(g))}"
-                for g in sorted(row["grains"])
+                for g in sorted(sel_grains)
+                if g in row["grains"]
             )
             state_str = f", {row['state']}" if row["state"] else ""
             return f"{row['location']}{state_str} [{row['provider']}]  |  {grains_str}"
