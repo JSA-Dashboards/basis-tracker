@@ -9,9 +9,8 @@ import streamlit as st
 
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
-    is_email_imported, mark_email_imported, list_locations, get_location_meta,
+    list_locations, get_location_meta,
 )
-import email_client as ec
 
 load_dotenv()
 
@@ -19,7 +18,7 @@ load_dotenv()
 # Inject any secrets that weren't already set by load_dotenv() into os.environ
 # so that database.py and other modules can read them via os.getenv().
 try:
-    for _secret_key in ("DATABASE_URL", "AZURE_CLIENT_ID", "AZURE_TENANT_ID"):
+    for _secret_key in ("DATABASE_URL",):
         if _secret_key in st.secrets and not os.environ.get(_secret_key):
             os.environ[_secret_key] = st.secrets[_secret_key]
 except Exception:
@@ -34,20 +33,11 @@ st.set_page_config(
 # ── On-startup init ───────────────────────────────────────────────────────────
 init_db()
 
-AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "")
-AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID", "common")
-
 # ── Location config ───────────────────────────────────────────────────────────
 LOCATIONS = [
-    {"provider": "ADM",     "key": "ADM Decatur",      "label": "Decatur",             "grains": ["Corn","Soybeans"],          "color": "#3b82f6"},
-    {"provider": "ADM",     "key": "ADM Cedar Rapids",  "label": "Cedar Rapids",        "grains": ["Corn"],                     "color": "#22c55e"},
-    {"provider": "ADM",     "key": "ADM St. Louis",     "label": "St. Louis",           "grains": ["Corn","Soybeans","Wheat"],   "color": "#a78bfa"},
-    {"provider": "Mendota", "key": "Ottawa",             "label": "Ottawa",              "grains": ["Corn","Soybeans"],          "color": "#3b82f6"},
-    {"provider": "Mendota", "key": "Havana",             "label": "Havana",              "grains": ["Corn","Soybeans"],          "color": "#22c55e"},
-    {"provider": "Mendota", "key": "Burlington",         "label": "Burlington/Gulfport", "grains": ["Corn","Soybeans"],          "color": "#f59e0b"},
-    {"provider": "Mendota", "key": "Clinton Proc",       "label": "Clinton Processor",   "grains": ["Corn"],                     "color": "#ef4444"},
-    {"provider": "Mendota", "key": "Mendota Mill",       "label": "Mendota Mill",         "grains": ["Wheat"],                    "color": "#a78bfa"},
-    {"provider": "Mendota", "key": "Mendota BN Rail",    "label": "Mendota BN Rail",      "grains": ["Corn"],                     "color": "#06b6d4"},
+    {"provider": "ADM", "key": "ADM Decatur",     "label": "Decatur",     "grains": ["Corn","Soybeans"],        "color": "#3b82f6"},
+    {"provider": "ADM", "key": "ADM Cedar Rapids", "label": "Cedar Rapids", "grains": ["Corn"],                  "color": "#22c55e"},
+    {"provider": "ADM", "key": "ADM St. Louis",   "label": "St. Louis",   "grains": ["Corn","Soybeans","Wheat"], "color": "#a78bfa"},
 ]
 
 ROLL_ADJ = [
@@ -258,18 +248,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ── Session state defaults ────────────────────────────────────────────────────
-if "device_flow"    not in st.session_state: st.session_state.device_flow    = None
-if "email_authed"   not in st.session_state: st.session_state.email_authed   = False
-if "fetched_emails" not in st.session_state: st.session_state.fetched_emails = []
-if "email_msg"      not in st.session_state: st.session_state.email_msg      = ""
-
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### ✉ Email / Outlook")
-    show_email = st.toggle("Show email panel", key="show_email")
-
-    st.markdown("---")
     st.markdown("### 🌽 ADM / POET / CHS")
     if st.button("Scrape ADM now", key="adm_scrape_btn"):
         from adm_scraper import fetch_adm_bids
@@ -568,214 +548,13 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Email Panel ───────────────────────────────────────────────────────────────
-if show_email:
-    with st.container(border=True):
-        st.markdown('<div style="font-size:9px;color:#1e3a5f;letter-spacing:.15em;'
-                    'text-transform:uppercase;font-weight:700;margin-bottom:8px">'
-                    'EMAIL · OUTLOOK INTEGRATION</div>', unsafe_allow_html=True)
-
-        authed = ec.is_authenticated(AZURE_CLIENT_ID, AZURE_TENANT_ID)
-        acct   = ec.get_account_name(AZURE_CLIENT_ID, AZURE_TENANT_ID) if authed else None
-        st.session_state.email_authed = authed
-
-        if authed:
-            st.markdown(f'<span style="color:#4ade80">● Connected — {acct}</span>',
-                        unsafe_allow_html=True)
-            col_fetch, col_bulk, col_retro = st.columns([2, 2, 3])
-            with col_fetch:
-                if st.button("Fetch bid emails", type="primary"):
-                    with st.spinner("Scanning inbox…"):
-                        try:
-                            all_emails, bid_emails = ec.fetch_bid_emails_debug(
-                                AZURE_CLIENT_ID, AZURE_TENANT_ID, max_results=50)
-                            st.session_state.fetched_emails = bid_emails
-                            if not bid_emails:
-                                subjects = [e["subject"] for e in all_emails[:10]]
-                                st.session_state.email_msg = (
-                                    f"No bid-sheet emails matched. "
-                                    f"Last {len(all_emails)} email subjects fetched:\n\n" +
-                                    "\n".join(f"• {s}" for s in subjects)
-                                )
-                            else:
-                                new_count = sum(
-                                    1 for e in bid_emails
-                                    if not is_email_imported(e["id"]))
-                                st.session_state.email_msg = (
-                                    f"{len(bid_emails)} email(s) found "
-                                    f"({new_count} new, not yet imported)."
-                                )
-                        except Exception as e:
-                            st.session_state.email_msg = f"Error: {e}"
-
-            with col_bulk:
-                new_emails = [e for e in st.session_state.fetched_emails
-                              if not is_email_imported(e["id"])]
-                if st.button(
-                    f"Import All New ({len(new_emails)})",
-                    type="primary",
-                    disabled=not new_emails,
-                ):
-                    total_snaps = 0
-                    review_needed = []
-                    errors_bulk = []
-                    with st.spinner(f"Importing {len(new_emails)} email(s)…"):
-                        for em in new_emails:
-                            try:
-                                parsed = ec.parse_email(
-                                    AZURE_CLIENT_ID, AZURE_TENANT_ID,
-                                    em["id"], em["provider"])
-                                for snap in parsed.snapshots:
-                                    upsert_snapshot(snap.dict())
-                                mark_email_imported(em["id"], em["subject"])
-                                total_snaps += len(parsed.snapshots)
-                                if parsed.needsReview:
-                                    review_needed.append(em["subject"])
-                            except Exception as exc:
-                                errors_bulk.append(f"{em['subject']}: {exc}")
-                    msg = f"✓ Imported {total_snaps} snapshot(s) from {len(new_emails)} email(s)."
-                    if review_needed:
-                        msg += f"\n⚠ {len(review_needed)} email(s) flagged for review."
-                    if errors_bulk:
-                        msg += f"\n✗ {len(errors_bulk)} error(s): " + "; ".join(errors_bulk)
-                    st.session_state.email_msg = msg
-                    st.session_state.fetched_emails = []
-                    st.rerun()
-
-            with col_retro:
-                st.markdown(
-                    '<div style="font-size:9px;color:#334155;padding-top:8px">'
-                    'For historical import run:<br>'
-                    '<code style="color:#60a5fa">python auto_import.py --all</code>'
-                    '</div>',
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.markdown('<span style="color:#f87171">○ Not connected</span>',
-                        unsafe_allow_html=True)
-            if not AZURE_CLIENT_ID:
-                st.warning("Set AZURE_CLIENT_ID in your .env file first.")
-            elif st.session_state.device_flow is None:
-                if st.button("Sign in with Microsoft", type="primary"):
-                    flow = ec.start_device_flow(AZURE_CLIENT_ID, AZURE_TENANT_ID)
-                    st.session_state.device_flow = flow
-                    st.rerun()
-            else:
-                flow = st.session_state.device_flow
-                if flow.get("error"):
-                    st.error(flow["error"])
-                else:
-                    st.markdown(
-                        f'**Step 1:** Go to '
-                        f'[{flow["verification_uri"]}]({flow["verification_uri"]})',
-                        unsafe_allow_html=False,
-                    )
-                    st.markdown(
-                        f'**Step 2:** Enter code: '
-                        f'`{flow["user_code"]}`'
-                    )
-                    if st.button("Step 3: I've signed in — continue", type="primary"):
-                        with st.spinner("Verifying…"):
-                            ok = ec.complete_device_flow(
-                                AZURE_CLIENT_ID, AZURE_TENANT_ID, flow)
-                        st.session_state.device_flow = None
-                        if ok:
-                            st.success("✓ Signed in successfully!")
-                            st.rerun()
-                        else:
-                            st.error("Not yet authenticated — try again.")
-
-        # Email list
-        if st.session_state.fetched_emails:
-            st.markdown(f"**{len(st.session_state.fetched_emails)} bid-sheet email(s) found:**")
-            for em in st.session_state.fetched_emails:
-                c1, c2 = st.columns([6, 1])
-                with c1:
-                    recv = datetime.fromisoformat(
-                        em["receivedAt"].replace("Z", "+00:00")
-                    ).strftime("%b %d %Y %I:%M %p")
-                    pdf_icon = " 📎 PDF" if em["hasAttachment"] else ""
-                    prov_color = "#3b82f6" if em["provider"] == "ADM" else "#a78bfa"
-                    st.markdown(
-                        f'<div style="font-size:11px;color:#cbd5e1;font-weight:600">'
-                        f'{em["subject"]}</div>'
-                        f'<div style="font-size:9px;color:#475569">'
-                        f'{recv} · <span style="color:{prov_color}">{em["provider"]}</span>'
-                        f'{pdf_icon}</div>',
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    if st.button("Preview", key=f"prevbtn_{em['id']}"):
-                        with st.spinner("Loading…"):
-                            try:
-                                body = ec.get_email_body(AZURE_CLIENT_ID, AZURE_TENANT_ID, em["id"])
-                                st.session_state[f"prevbody_{em['id']}"] = body
-                            except Exception as e:
-                                st.session_state[f"prevbody_{em['id']}"] = f"Error: {e}"
-                    if f"prevbody_{em['id']}" in st.session_state:
-                        with st.expander("Raw email content", expanded=True):
-                            st.code(st.session_state[f"prevbody_{em['id']}"])
-                    col_parse, col_imp = st.columns(2)
-                    with col_parse:
-                        if st.button("Test parse", key=f"test_{em['id']}"):
-                            with st.spinner("Parsing…"):
-                                try:
-                                    parsed = ec.parse_email(
-                                        AZURE_CLIENT_ID, AZURE_TENANT_ID,
-                                        em["id"], em["provider"])
-                                    debug = f"Location(s): {[s.location for s in parsed.snapshots]}\n"
-                                    debug += f"Error: {parsed.parseError}\n"
-                                    for s in parsed.snapshots:
-                                        grains = {}
-                                        for r in s.rows:
-                                            if not r.isSpot:
-                                                grains.setdefault(r.grain, []).append(
-                                                    f"{r.deliveryMonth} {r.futuresSymbol} {'+' if (r.basisCents or 0)>=0 else ''}{r.basisCents}¢")
-                                        debug += f"\n--- {s.location} ---\n"
-                                        for g, rows in grains.items():
-                                            debug += f"{g}: {', '.join(rows)}\n"
-                                    st.session_state[f"debug_{em['id']}"] = debug
-                                except Exception as e:
-                                    st.session_state[f"debug_{em['id']}"] = f"Error: {e}"
-                    with col_imp:
-                        already_done = is_email_imported(em["id"])
-                        if already_done:
-                            st.markdown(
-                                '<span style="color:#4ade80;font-size:10px">✓ imported</span>',
-                                unsafe_allow_html=True)
-                        elif st.button("Import", key=f"import_{em['id']}"):
-                            with st.spinner("Parsing…"):
-                                try:
-                                    parsed = ec.parse_email(
-                                        AZURE_CLIENT_ID, AZURE_TENANT_ID,
-                                        em["id"], em["provider"])
-                                    for snap in parsed.snapshots:
-                                        upsert_snapshot(snap.dict())
-                                    mark_email_imported(em["id"], em["subject"])
-                                    msg = f"✓ Imported {len(parsed.snapshots)} snapshot(s)."
-                                    if parsed.needsReview:
-                                        msg += " ⚠ Parser may need tuning — verify values."
-                                    st.session_state.email_msg = msg
-                                    st.session_state.fetched_emails = [
-                                        e for e in st.session_state.fetched_emails
-                                        if e["id"] != em["id"]]
-                                    st.rerun()
-                                except Exception as e:
-                                    st.session_state.email_msg = f"Import error: {e}"
-                    if f"debug_{em['id']}" in st.session_state:
-                        with st.expander("Parse result", expanded=True):
-                            st.code(st.session_state[f"debug_{em['id']}"])
-
-        if st.session_state.email_msg:
-            st.info(st.session_state.email_msg)
-
 st.markdown("---")
 
 # ── Provider + Location selector ─────────────────────────────────────────────
 prov_col, _ = st.columns([3, 7])
 with prov_col:
     provider = st.radio(
-        "Provider", ["ADM", "Mendota", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular"],
+        "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular"],
         horizontal=True, label_visibility="collapsed",
     )
 
@@ -1181,19 +960,6 @@ elif provider == "Scoular":
     else:
         grains = ["Corn"]
 
-else:  # Mendota
-    loc_options = [l for l in LOCATIONS if l["provider"] == provider]
-    loc_labels  = [l["label"] for l in loc_options]
-
-    sel_label = st.radio(
-        "Location", loc_labels,
-        horizontal=True, label_visibility="collapsed",
-        key=f"loc_radio_{provider}",
-    )
-    loc_cfg   = loc_options[loc_labels.index(sel_label)]
-    loc_key   = loc_cfg["key"]
-    loc_color = loc_cfg["color"]
-    grains    = loc_cfg["grains"]
 
 # ── Load snapshots ────────────────────────────────────────────────────────────
 snapshots = get_snapshots(provider, loc_key)
@@ -1234,7 +1000,7 @@ if not snapshots:
                 '<code style="color:#60a5fa">python auto_import.py --scoular-only</code>, '
                 'then refresh.')
     else:
-        hint = "Use ✉ Email above to fetch bid sheets."
+        hint = "Run the daily scraper to populate data for this provider."
     st.markdown(
         f'<div style="color:#334155;text-align:center;padding:40px;font-size:12px">'
         f'No snapshots yet for <b>{loc_key}</b>.<br><br>{hint}</div>',

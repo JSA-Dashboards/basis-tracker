@@ -1,16 +1,13 @@
 """
 Basis Tracker — Automated daily importer.
 
-Run this script daily (via Windows Task Scheduler) to pull in new ADM bid sheet
-emails AND scrape the latest web bids for POET, CHS, ADM Gradable, CGB Grain,
-and Cargill.
-Run once with --all to retroactively import every ADM email in your mailbox.
+Run this script daily (via Windows Task Scheduler) to scrape the latest web bids
+for ADM Gradable, POET, CHS, CGB Grain, Cargill, GPRE, The Andersons, Bunge,
+and Scoular.
 
 Usage
 -----
-  python auto_import.py                   # emails (last 2 days) + all web scrapers
-  python auto_import.py --all             # retroactive: ALL historical ADM emails + scrapers
-  python auto_import.py --days 7          # emails from last 7 days + scrapers
+  python auto_import.py                   # all web scrapers
   python auto_import.py --no-poet         # skip POET scrape
   python auto_import.py --poet-only       # POET scrape only
   python auto_import.py --no-chs          # skip CHS scrape
@@ -25,20 +22,16 @@ Usage
   python auto_import.py --andersons-only  # The Andersons scrape only
   python auto_import.py --no-bunge        # skip Bunge scrape
   python auto_import.py --bunge-only      # Bunge scrape only
-  python auto_import.py --no-scoular     # skip Scoular scrape
-  python auto_import.py --scoular-only   # Scoular scrape only
-  python auto_import.py --no-prune       # skip automatic Monday pruning
-  python auto_import.py --prune-only     # run data retention pruning only
+  python auto_import.py --no-scoular      # skip Scoular scrape
+  python auto_import.py --scoular-only    # Scoular scrape only
+  python auto_import.py --no-prune        # skip automatic Monday pruning
+  python auto_import.py --prune-only      # run data retention pruning only
 
 Prerequisites
 -------------
-  1. Sign in to the Streamlit app at least once (http://localhost:8501)
-     via the Email panel so the MSAL token is cached locally (for email import).
-  2. .env must contain AZURE_CLIENT_ID and AZURE_TENANT_ID.
-  3. playwright install chrome  (or: playwright install --with-deps chromium)
-     must have been run so Playwright can find Chrome for the POET scrape.
+  playwright install chrome  (or: playwright install --with-deps chromium)
+  must have been run so Playwright can find Chrome for the POET scrape.
 
-The script reuses the cached MSAL token — no browser or sign-in prompt needed.
 Results are logged to auto_import.log in this directory.
 """
 import argparse
@@ -46,17 +39,15 @@ import sys
 import os
 import logging
 from pathlib import Path
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-from email_client import fetch_all_bid_emails, fetch_all_bid_emails_retroactive, parse_email, get_token
 from database import (
     init_db, upsert_snapshot,
-    is_email_imported, mark_email_imported,
     upsert_location_meta, prune_old_snapshots,
 )
 from poet_scraper import fetch_poet_bids
@@ -79,9 +70,7 @@ from scoular_scraper import fetch_scoular_bids
 from parsers.scoular_parser import parse_scoular_location
 
 # ── Config ────────────────────────────────────────────────────────────────────
-CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "")
-TENANT_ID = os.getenv("AZURE_TENANT_ID", "common")
-LOG_FILE  = Path(__file__).parent / "auto_import.log"
+LOG_FILE = Path(__file__).parent / "auto_import.log"
 
 # Force UTF-8 on the stdout stream so Unicode chars (✓ ⚠ etc.)
 # don't raise UnicodeEncodeError on Windows (cp1252 default).
@@ -646,97 +635,6 @@ def run_poet() -> int:
     return total_rows
 
 
-def run_email_import(all_emails: bool = False, days: int = 2) -> int:
-    """
-    Import ADM bid emails from Outlook.
-    Returns number of snapshot rows imported.
-    """
-    # ── Auth check ─────────────────────────────────────────────────────────────
-    if not CLIENT_ID:
-        log.error("AZURE_CLIENT_ID not set in .env — cannot authenticate.")
-        return 0
-    if not get_token(CLIENT_ID, TENANT_ID):
-        log.error(
-            "Not authenticated. Open the Streamlit app (http://localhost:8501) "
-            "and sign in via the ✉ Email panel first, then re-run this script."
-        )
-        return 0
-
-    mode_label = "ALL historical emails" if all_emails else f"last {days} days"
-    log.info("=" * 60)
-    log.info("Basis Tracker email import — %s", mode_label)
-    log.info("=" * 60)
-
-    # ── Fetch email list ───────────────────────────────────────────────────────
-    if all_emails:
-        log.info("Retroactive mode: scanning mailbox year-by-year via receivedDateTime $filter…")
-        log.info("Scanning back to %d — this may take 1-3 minutes for large mailboxes.", 2020)
-        emails, year_counts = fetch_all_bid_emails_retroactive(
-            CLIENT_ID, TENANT_ID, adm_only=True, start_year=2020
-        )
-        log.info("Found %d ADM bid emails across full mailbox history", len(emails))
-        for yr, cnt in sorted(year_counts.items()):
-            log.info("  %s: %d email(s)", yr, cnt)
-    else:
-        log.info("Daily mode: fetching ADM bid emails (last %d days)…", days)
-        emails = fetch_all_bid_emails(CLIENT_ID, TENANT_ID, max_results=500, adm_only=True)
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        emails = [
-            e for e in emails
-            if datetime.fromisoformat(e["receivedAt"].replace("Z", "+00:00")) >= cutoff
-        ]
-        log.info("Found %d email(s) within last %d days", len(emails), days)
-
-    if not emails:
-        log.info("No new emails to import.")
-        return 0
-
-    # ── Import loop ────────────────────────────────────────────────────────────
-    imported_snaps  = 0
-    imported_emails = 0
-    skipped         = 0
-    errors          = 0
-
-    for em in emails:
-        email_id = em["id"]
-        subject  = em["subject"]
-        recv_str = em["receivedAt"][:10]
-
-        if is_email_imported(email_id):
-            skipped += 1
-            log.debug("SKIP  [%s] %s", recv_str, subject)
-            continue
-
-        log.info("PARSE [%s] %s", recv_str, subject)
-        try:
-            result = parse_email(CLIENT_ID, TENANT_ID, email_id, em["provider"])
-
-            if result.snapshots:
-                for snap in result.snapshots:
-                    upsert_snapshot(snap.model_dump())
-                    imported_snaps += 1
-                mark_email_imported(email_id, subject)
-                imported_emails += 1
-                locs = ", ".join(s.location for s in result.snapshots)
-                log.info("  ✓  %d snapshot(s)  →  %s", len(result.snapshots), locs)
-                if result.needsReview:
-                    log.warning("  ⚠  Parser flagged for review — verify values in app")
-            else:
-                errors += 1
-                log.warning("  ✗  Parse failed: %s", result.parseError or "unknown error")
-
-        except Exception as exc:
-            errors += 1
-            log.error("  ✗  Exception: %s", exc)
-
-    log.info("-" * 60)
-    log.info(
-        "Emails done: %d imported (%d snapshots)  |  %d skipped  |  %d error(s)",
-        imported_emails, imported_snaps, skipped, errors,
-    )
-    return imported_snaps
-
-
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -762,8 +660,6 @@ def run_prune() -> None:
 
 
 def run(
-    all_emails: bool = False,
-    days: int = 2,
     run_poet_scrape: bool = True,
     run_chs_scrape: bool = True,
     run_adm_scrape: bool = True,
@@ -776,14 +672,12 @@ def run(
     run_pruning: bool = True,
 ) -> int:
     """
-    Main daily routine — email import + all web scrapes + weekly auto-prune.
-    Email auth failure does NOT prevent the web scrapes from running.
+    Main daily routine — all web scrapes + weekly auto-prune.
     Pruning runs automatically on Mondays (or when run_pruning=True explicitly).
     Returns total snapshot rows imported.
     """
     init_db()
     total = 0
-    total += run_email_import(all_emails=all_emails, days=days)
     if run_adm_scrape:
         total += run_adm()
     if run_poet_scrape:
@@ -812,15 +706,7 @@ def run(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Basis Tracker — automated ADM email + POET Gradable importer"
-    )
-    parser.add_argument(
-        "--all", action="store_true",
-        help="Retroactive mode: import ALL found ADM emails (ignore date filter)",
-    )
-    parser.add_argument(
-        "--days", type=int, default=2,
-        help="Import emails from the last N days (default: 2; ignored with --all)",
+        description="Basis Tracker — automated daily web scraper"
     )
 
     poet_group = parser.add_mutually_exclusive_group()
@@ -957,8 +843,6 @@ if __name__ == "__main__":
         run_scoular()
     else:
         run(
-            all_emails=args.all,
-            days=args.days,
             run_poet_scrape=not args.no_poet,
             run_chs_scrape=not args.no_chs,
             run_adm_scrape=not args.no_adm,
