@@ -3,7 +3,7 @@ Basis Tracker — Automated daily importer.
 
 Run this script daily (via Windows Task Scheduler) to scrape the latest web bids
 for ADM Gradable, POET, CHS, CGB Grain, Cargill, GPRE, The Andersons, Bunge,
-and Scoular.
+Scoular, and AGP (Ag Processing Inc).
 
 Usage
 -----
@@ -24,6 +24,8 @@ Usage
   python auto_import.py --bunge-only      # Bunge scrape only
   python auto_import.py --no-scoular      # skip Scoular scrape
   python auto_import.py --scoular-only    # Scoular scrape only
+  python auto_import.py --no-agp          # skip AGP scrape
+  python auto_import.py --agp-only        # AGP scrape only
   python auto_import.py --no-prune        # skip automatic Monday pruning
   python auto_import.py --prune-only      # run data retention pruning only
 
@@ -39,7 +41,7 @@ import sys
 import os
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # ── Path setup ────────────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
@@ -68,6 +70,8 @@ from bunge_scraper import fetch_bunge_bids
 from parsers.bunge_parser import parse_bunge_location
 from scoular_scraper import fetch_scoular_bids
 from parsers.scoular_parser import parse_scoular_location
+from agp_scraper import fetch_agp_bids
+from parsers.agp_parser import parse_agp_location
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_FILE = Path(__file__).parent / "auto_import.log"
@@ -635,6 +639,68 @@ def run_poet() -> int:
     return total_rows
 
 
+def run_agp() -> int:
+    """
+    Scrape AGP (Ag Processing Inc) for all 16 locations and upsert bids.
+    Includes Soybeans, Soybean Meal ($/ton basis), and Corn where offered.
+    Returns the total number of snapshot rows upserted.
+    """
+    log.info("=" * 60)
+    log.info("AGP scrape starting...")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_agp_bids()
+    except Exception as exc:
+        log.error("AGP scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("AGP scrape returned no data.")
+        return 0
+
+    locations_done = 0
+    total_rows     = 0
+    errors         = 0
+    skipped        = 0
+
+    for loc in raw_locations:
+        if not loc.get("cashbids"):
+            skipped += 1
+            continue
+
+        try:
+            snap_req = parse_agp_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+
+            upsert_snapshot(snap_req.model_dump())
+            upsert_location_meta(
+                "AGP",
+                snap_req.location,
+                state         = loc.get("state") or None,
+                facility_type = None,
+            )
+            locations_done += 1
+            total_rows     += len(snap_req.rows)
+            log.info(
+                "  ✓  %-42s  %s  %d row(s)",
+                snap_req.location, loc.get("state", "--"), len(snap_req.rows),
+            )
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    log.info("-" * 60)
+    log.info(
+        "AGP done: %d location(s) updated  |  %d row(s) total"
+        "  |  %d skipped  |  %d error(s)",
+        locations_done, total_rows, skipped, errors,
+    )
+    return total_rows
+
+
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -669,6 +735,7 @@ def run(
     run_andersons_scrape: bool = True,
     run_bunge_scrape: bool = True,
     run_scoular_scrape: bool = True,
+    run_agp_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -696,6 +763,8 @@ def run(
         total += run_bunge()
     if run_scoular_scrape:
         total += run_scoular()
+    if run_agp_scrape:
+        total += run_agp()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:
@@ -799,6 +868,16 @@ if __name__ == "__main__":
         help="Run Scoular scrape only — skip everything else",
     )
 
+    agp_group = parser.add_mutually_exclusive_group()
+    agp_group.add_argument(
+        "--no-agp", dest="no_agp", action="store_true",
+        help="Skip AGP scrape",
+    )
+    agp_group.add_argument(
+        "--agp-only", dest="agp_only", action="store_true",
+        help="Run AGP scrape only — skip everything else",
+    )
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -841,6 +920,9 @@ if __name__ == "__main__":
     elif args.scoular_only:
         init_db()
         run_scoular()
+    elif args.agp_only:
+        init_db()
+        run_agp()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -852,5 +934,6 @@ if __name__ == "__main__":
             run_andersons_scrape=not args.no_andersons,
             run_bunge_scrape=not args.no_bunge,
             run_scoular_scrape=not args.no_scoular,
+            run_agp_scrape=not args.no_agp,
             run_pruning=not args.no_prune,
         )

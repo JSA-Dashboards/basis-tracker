@@ -54,9 +54,11 @@ def short_sym(s):
         return f"{MONTH_CODES.get(s[2], s[2])} '{s[3:]}"
     return s or ""
 
-def fmt_basis(c):
+def fmt_basis(c, is_meal=False):
     if c is None: return "—"
     sign = "+" if c >= 0 else "−"
+    if is_meal:
+        return f"{sign}${abs(c)/100:.2f}/t"
     return f"{sign}{abs(c)}¢"
 
 def get_adj(from_sym, to_sym):
@@ -140,7 +142,7 @@ def compute_changes(snapshots):
 
     return {"rows": row_changes, "spots": spot_changes}
 
-def delta_html(d):
+def delta_html(d, is_meal=False):
     if not d:
         return '<span style="color:#1e3a5f">—</span>'
     if d.get("unknown"):
@@ -149,16 +151,18 @@ def delta_html(d):
     if val is None:
         return '<span style="color:#1e3a5f">—</span>'
     if val == 0:
-        return '<span style="color:#334155;font-weight:600">±0¢</span>'
-    color = "#4ade80" if val > 0 else "#f87171"
-    arrow = "▲" if val > 0 else "▼"
-    sign  = "+" if val > 0 else "−"
-    adj   = ' <span style="font-size:9px;color:#64748b">adj</span>' if d.get("rolled") else ""
+        zero_str = "±$0.00/t" if is_meal else "±0¢"
+        return f'<span style="color:#334155;font-weight:600">{zero_str}</span>'
+    color  = "#4ade80" if val > 0 else "#f87171"
+    arrow  = "▲" if val > 0 else "▼"
+    sign   = "+" if val > 0 else "−"
+    adj    = ' <span style="font-size:9px;color:#64748b">adj</span>' if d.get("rolled") else ""
+    amount = f"${abs(val)/100:.2f}/t" if is_meal else f"{abs(val)}¢"
     return (f'<span style="color:{color};font-weight:700">'
             f'<span style="font-size:9px">{arrow}</span>'
-            f'{sign}{abs(val)}¢{adj}</span>')
+            f'{sign}{amount}{adj}</span>')
 
-def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label):
+def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label, is_meal=False):
     th = ("background:#070b14;color:#1e3a5f;font-size:9px;text-transform:uppercase;"
           "letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #0c1e36;"
           "font-weight:700;white-space:pre;line-height:1.3;font-family:inherit")
@@ -193,11 +197,11 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'{spot_row.futuresSymbol}</span></td>'
             f'<td style="{td_base};color:#60a5fa;font-size:11px">{short_sym(spot_row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{color};font-weight:800;font-size:16px;'
-            f'font-variant-numeric:tabular-nums">{fmt_basis(bc)}</span></td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromPrev"))}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromWeek"))}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromMonth"))}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromYear"))}</td>'
+            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal)}</span></td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromPrev"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromWeek"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromMonth"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromYear"), is_meal)}</td>'
             f'</tr>'
         )
         html += (f'<tr><td colspan="8" style="padding:2px 0">'
@@ -220,11 +224,11 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'{row.futuresSymbol}</span></td>'
             f'<td style="{td_base};color:#334155;font-size:11px">{short_sym(row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{bc_color};font-weight:800;font-size:15px;'
-            f'font-variant-numeric:tabular-nums">{fmt_basis(bc)}</span></td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromPrev"))}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromWeek"))}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromMonth"))}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromYear"))}</td>'
+            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal)}</span></td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromPrev"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromWeek"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromMonth"), is_meal)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromYear"), is_meal)}</td>'
             f'</tr>'
         )
 
@@ -510,6 +514,41 @@ with st.sidebar:
     )
 
     st.markdown("---")
+    st.markdown("### 🟢 AGP")
+    if st.button("Scrape AGP now", key="agp_scrape_btn"):
+        from agp_scraper import fetch_agp_bids as _fetch_agp
+        from parsers.agp_parser import parse_agp_location as _parse_agp
+        from database import upsert_location_meta as _ulm6
+        with st.spinner("Fetching AGP bids (16 locations — Soybeans, Meal, Corn)…"):
+            try:
+                _agplocs = _fetch_agp()
+                agp_rows = 0
+                agp_locs = 0
+                for _agploc in _agplocs:
+                    _agpsnap = _parse_agp(_agploc)
+                    if _agpsnap:
+                        upsert_snapshot(_agpsnap.model_dump())
+                        _ulm6(
+                            "AGP", _agpsnap.location,
+                            state         = _agploc.get("state") or None,
+                            facility_type = None,
+                        )
+                        agp_rows += len(_agpsnap.rows)
+                        agp_locs += 1
+                st.success(
+                    f"✓ {agp_locs} location(s) — {agp_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"AGP scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#475569;padding-top:4px">'
+        'CLI: <code style="color:#60a5fa">python auto_import.py --agp-only</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
     st.markdown("### 🌽 GPRE")
     if st.button("Scrape GPRE now", key="gpre_scrape_btn"):
         from gpre_scraper import fetch_gpre_bids as _fetch_gpre
@@ -554,7 +593,7 @@ st.markdown("---")
 prov_col, _ = st.columns([3, 7])
 with prov_col:
     provider = st.radio(
-        "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular"],
+        "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP"],
         horizontal=True, label_visibility="collapsed",
     )
 
@@ -960,6 +999,55 @@ elif provider == "Scoular":
     else:
         grains = ["Corn"]
 
+elif provider == "AGP":
+    agp_db_locs = sorted(
+        {r["location"] for r in list_locations() if r["provider"] == "AGP"}
+    )
+    if not agp_db_locs:
+        st.markdown(
+            '<div style="color:#334155;text-align:center;padding:40px;font-size:12px">'
+            'No AGP data yet.<br><br>'
+            'Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
+            '<code style="color:#60a5fa">python auto_import.py --agp-only</code>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.stop()
+
+    agp_meta         = get_location_meta("AGP")
+    agp_states_avail = sorted({
+        v["state"] for v in agp_meta.values()
+        if v.get("state") and v["state"] not in ("", "?", "N/A")
+    })
+
+    agp_state_col, agp_loc_col = st.columns([2, 6])
+    with agp_state_col:
+        sel_agp_state = st.selectbox(
+            "State", options=["All States"] + agp_states_avail,
+            key="agp_state_filter", label_visibility="collapsed",
+        )
+    with agp_loc_col:
+        if sel_agp_state == "All States":
+            agp_filtered = agp_db_locs
+        else:
+            agp_filtered = sorted([
+                n for n in agp_db_locs
+                if agp_meta.get(n, {}).get("state") == sel_agp_state
+            ])
+        if not agp_filtered:
+            agp_filtered = agp_db_locs
+        sel_agp_loc = st.selectbox(
+            "AGP Location", options=agp_filtered,
+            key="agp_loc_select", label_visibility="collapsed",
+        )
+    loc_key   = sel_agp_loc
+    loc_color = "#22c55e"   # green for AGP
+    _agp_snaps = get_snapshots("AGP", loc_key)
+    if _agp_snaps:
+        grains = sorted({r.grain for r in _agp_snaps[-1].rows if not r.isSpot})
+    else:
+        grains = ["Soybeans"]
+
 
 # ── Load snapshots ────────────────────────────────────────────────────────────
 snapshots = get_snapshots(provider, loc_key)
@@ -998,6 +1086,10 @@ if not snapshots:
     elif provider == "Scoular":
         hint = ('Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
                 '<code style="color:#60a5fa">python auto_import.py --scoular-only</code>, '
+                'then refresh.')
+    elif provider == "AGP":
+        hint = ('Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
+                '<code style="color:#60a5fa">python auto_import.py --agp-only</code>, '
                 'then refresh.')
     else:
         hint = "Run the daily scraper to populate data for this provider."
@@ -1081,7 +1173,9 @@ else:
     )
 
     table_html = render_table(
-        body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label)
+        body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label,
+        is_meal=(grain == "Soybean Meal"),
+    )
     st.markdown(table_html, unsafe_allow_html=True)
 
     # Roll adjustment legend
