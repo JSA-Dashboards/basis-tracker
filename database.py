@@ -82,6 +82,8 @@ _SQLITE_DDL = [
         location      TEXT NOT NULL,
         state         TEXT,
         facility_type TEXT,
+        lat           REAL,
+        lon           REAL,
         PRIMARY KEY (provider, location)
     )""",
 ]
@@ -121,8 +123,15 @@ _PG_DDL = [
         location      TEXT NOT NULL,
         state         TEXT,
         facility_type TEXT,
+        lat           DOUBLE PRECISION,
+        lon           DOUBLE PRECISION,
         PRIMARY KEY (provider, location)
     )""",
+]
+
+_MIGRATE_DDL = [
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lat  REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon  REAL",
 ]
 
 
@@ -134,6 +143,17 @@ def init_db():
     try:
         for stmt in ddl:
             c.execute(stmt)
+        # Add lat/lon columns to existing databases that pre-date this schema change.
+        for stmt in _MIGRATE_DDL:
+            try:
+                if _use_pg():
+                    c.execute(stmt)
+                else:
+                    # SQLite doesn't support IF NOT EXISTS on ALTER TABLE
+                    sqlite_stmt = stmt.replace(" IF NOT EXISTS", "")
+                    c.execute(sqlite_stmt)
+            except Exception:
+                pass  # column already exists
         conn.commit()
     finally:
         conn.close()
@@ -323,51 +343,141 @@ def delete_snapshot(snapshot_id: int) -> bool:
 
 def upsert_location_meta(provider: str, location: str,
                          state: str | None = None,
-                         facility_type: str | None = None):
-    """Insert or update state/facility_type metadata for a location (idempotent)."""
+                         facility_type: str | None = None,
+                         lat: float | None = None,
+                         lon: float | None = None):
+    """Insert or update metadata for a location (idempotent). lat/lon only written when provided."""
     conn = get_conn()
     c    = conn.cursor()
     try:
         if _use_pg():
             c.execute("""
-                INSERT INTO location_meta (provider, location, state, facility_type)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO location_meta (provider, location, state, facility_type, lat, lon)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (provider, location) DO UPDATE SET
                     state         = COALESCE(EXCLUDED.state,         location_meta.state),
-                    facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type)
-            """, (provider, location, state, facility_type))
+                    facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
+                    lat           = COALESCE(EXCLUDED.lat,           location_meta.lat),
+                    lon           = COALESCE(EXCLUDED.lon,           location_meta.lon)
+            """, (provider, location, state, facility_type, lat, lon))
         else:
             c.execute("""
-                INSERT INTO location_meta (provider, location, state, facility_type)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO location_meta (provider, location, state, facility_type, lat, lon)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(provider, location) DO UPDATE SET
                     state         = COALESCE(excluded.state,         location_meta.state),
-                    facility_type = COALESCE(excluded.facility_type, location_meta.facility_type)
-            """, (provider, location, state, facility_type))
+                    facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
+                    lat           = COALESCE(excluded.lat,           location_meta.lat),
+                    lon           = COALESCE(excluded.lon,           location_meta.lon)
+            """, (provider, location, state, facility_type, lat, lon))
         conn.commit()
     finally:
         conn.close()
 
 
 def get_location_meta(provider: str) -> dict[str, dict]:
-    """Return {location_name: {state, facility_type}} for a provider."""
+    """Return {location_name: {state, facility_type, lat, lon}} for a provider."""
     conn = get_conn()
     c    = conn.cursor()
     ph   = "%s" if _use_pg() else "?"
     try:
         c.execute(
-            f"SELECT location, state, facility_type FROM location_meta WHERE provider={ph}",
+            f"SELECT location, state, facility_type, lat, lon FROM location_meta WHERE provider={ph}",
             (provider,),
         )
         return {
             row["location"]: {
                 "state":         row["state"]         or "",
                 "facility_type": row["facility_type"] or "",
+                "lat":           row["lat"],
+                "lon":           row["lon"],
             }
             for row in c.fetchall()
         }
     finally:
         conn.close()
+
+
+def get_all_location_meta() -> list[dict]:
+    """Return all location_meta rows across providers as a list of dicts."""
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        c.execute("SELECT provider, location, state, facility_type, lat, lon FROM location_meta")
+        return [
+            {
+                "provider":      row["provider"],
+                "location":      row["location"],
+                "state":         row["state"]         or "",
+                "facility_type": row["facility_type"] or "",
+                "lat":           row["lat"],
+                "lon":           row["lon"],
+            }
+            for row in c.fetchall()
+        ]
+    finally:
+        conn.close()
+
+
+def get_map_data() -> list[dict]:
+    """
+    Return one dict per (provider, location) with lat/lon and latest basis by grain.
+
+    Shape:
+        [{"provider", "location", "state", "lat", "lon",
+          "grains": {"Corn": -12, "Soybeans": 45, ...}}, ...]
+
+    Only locations with known lat/lon are included.
+    """
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        c.execute("""
+            WITH latest AS (
+                SELECT provider, location, MAX(id) AS snap_id
+                FROM snapshots
+                GROUP BY provider, location
+            )
+            SELECT
+                s.provider,
+                s.location,
+                lm.state,
+                lm.lat,
+                lm.lon,
+                r.grain,
+                r.basis_cents
+            FROM latest l
+            JOIN snapshots s       ON s.id  = l.snap_id
+            JOIN snapshot_rows r   ON r.snapshot_id = s.id
+            LEFT JOIN location_meta lm
+                ON lm.provider = s.provider AND lm.location = s.location
+            WHERE r.is_spot = 0
+              AND lm.lat IS NOT NULL
+              AND lm.lon IS NOT NULL
+            ORDER BY s.provider, s.location, r.grain
+        """)
+        rows = c.fetchall()
+    finally:
+        conn.close()
+
+    # Group grain rows into per-location dicts
+    from collections import defaultdict
+    locs: dict[tuple, dict] = {}
+    for row in rows:
+        key = (row["provider"], row["location"])
+        if key not in locs:
+            locs[key] = {
+                "provider": row["provider"],
+                "location": row["location"],
+                "state":    row["state"] or "",
+                "lat":      row["lat"],
+                "lon":      row["lon"],
+                "grains":   {},
+            }
+        if row["basis_cents"] is not None:
+            locs[key]["grains"][row["grain"]] = row["basis_cents"]
+
+    return list(locs.values())
 
 
 def list_locations() -> list[dict]:

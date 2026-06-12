@@ -9,7 +9,7 @@ import streamlit as st
 
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
-    list_locations, get_location_meta,
+    list_locations, get_location_meta, get_all_location_meta, get_map_data,
 )
 
 load_dotenv()
@@ -1133,173 +1133,295 @@ elif provider == "LDC":
         grains = ["Corn"]
 
 
-# ── Load snapshots ────────────────────────────────────────────────────────────
-snapshots = get_snapshots(provider, loc_key)
+tab_bids, tab_map = st.tabs(["📋 Bids", "🗺️ Map"])
 
-if not snapshots:
-    if provider == "POET":
-        hint = ('Run <code style="color:#60a5fa">python auto_import.py --poet-only</code> '
-                'to scrape this location, then refresh.')
-    elif provider == "ADM":
-        hint = ('Run <code style="color:#60a5fa">python auto_import.py --adm-only</code> '
-                'or click <b>Scrape ADM now</b> in the sidebar, then refresh.')
-    elif provider == "CGB":
-        hint = ('Click <b>Scrape CGB now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --cgb-only</code>, '
-                'then refresh.')
-    elif provider == "CHS":
-        hint = ('Click <b>Scrape CHS now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --chs-only</code>, '
-                'then refresh.')
-    elif provider == "Cargill":
-        hint = ('Click <b>Scrape Cargill now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --cargill-only</code>, '
-                'then refresh.')
-    elif provider == "GPRE":
-        hint = ('Click <b>Scrape GPRE now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --gpre-only</code>, '
-                'then refresh.')
-    elif provider == "Andersons":
-        hint = ('Click <b>Scrape Andersons now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --andersons-only</code>, '
-                'then refresh.')
-    elif provider == "Bunge":
-        hint = ('Click <b>Scrape Bunge now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --bunge-only</code>, '
-                'then refresh.')
-    elif provider == "Scoular":
-        hint = ('Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --scoular-only</code>, '
-                'then refresh.')
-    elif provider == "AGP":
-        hint = ('Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --agp-only</code>, '
-                'then refresh.')
-    elif provider == "LDC":
-        hint = ('Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
-                '<code style="color:#60a5fa">python auto_import.py --ldc-only</code>, '
-                'then refresh.')
-    else:
-        hint = "Run the daily scraper to populate data for this provider."
-    st.markdown(
-        f'<div style="color:#334155;text-align:center;padding:40px;font-size:12px">'
-        f'No snapshots yet for <b>{loc_key}</b>.<br><br>{hint}</div>',
-        unsafe_allow_html=True,
-    )
-else:
-    # ── Date picker + grain selector ──────────────────────────────────────────
-    snap_labels = []
-    for s in snapshots:
-        d = datetime.fromisoformat(s.timestamp.replace("Z","+00:00"))
-        lbl = d.strftime("%b %d, %Y") + (" ★ latest" if s is snapshots[-1] else "")
-        snap_labels.append(lbl)
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: BIDS
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_bids:
+    # ── Load snapshots ────────────────────────────────────────────────────────
+    snapshots = get_snapshots(provider, loc_key)
 
-    pick_col, grain_col = st.columns([3, 4])
-    with pick_col:
-        sel_label_snap = st.selectbox(
-            "Viewing snapshot",
-            options=snap_labels[::-1],   # newest first
-            index=0,
-            key=f"snap_pick_{loc_key}",
-            label_visibility="visible",
-        )
-        sel_idx = snap_labels[::-1].index(sel_label_snap)
-        viewing = snapshots[::-1][sel_idx]   # the selected snapshot
-        # For changes, only use snapshots up to and including the selected one
-        snaps_up_to = snapshots[: snapshots.index(viewing) + 1]
-        changes = compute_changes(snaps_up_to)
-
-    with grain_col:
-        if len(grains) > 1:
-            grain = st.radio("Grain", grains, horizontal=True,
-                             label_visibility="collapsed", key=f"grain_{loc_key}")
+    if not snapshots:
+        if provider == "POET":
+            hint = ('Run <code style="color:#60a5fa">python auto_import.py --poet-only</code> '
+                    'to scrape this location, then refresh.')
+        elif provider == "ADM":
+            hint = ('Run <code style="color:#60a5fa">python auto_import.py --adm-only</code> '
+                    'or click <b>Scrape ADM now</b> in the sidebar, then refresh.')
+        elif provider == "CGB":
+            hint = ('Click <b>Scrape CGB now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --cgb-only</code>, '
+                    'then refresh.')
+        elif provider == "CHS":
+            hint = ('Click <b>Scrape CHS now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --chs-only</code>, '
+                    'then refresh.')
+        elif provider == "Cargill":
+            hint = ('Click <b>Scrape Cargill now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --cargill-only</code>, '
+                    'then refresh.')
+        elif provider == "GPRE":
+            hint = ('Click <b>Scrape GPRE now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --gpre-only</code>, '
+                    'then refresh.')
+        elif provider == "Andersons":
+            hint = ('Click <b>Scrape Andersons now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --andersons-only</code>, '
+                    'then refresh.')
+        elif provider == "Bunge":
+            hint = ('Click <b>Scrape Bunge now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --bunge-only</code>, '
+                    'then refresh.')
+        elif provider == "Scoular":
+            hint = ('Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --scoular-only</code>, '
+                    'then refresh.')
+        elif provider == "AGP":
+            hint = ('Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --agp-only</code>, '
+                    'then refresh.')
+        elif provider == "LDC":
+            hint = ('Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
+                    '<code style="color:#60a5fa">python auto_import.py --ldc-only</code>, '
+                    'then refresh.')
         else:
-            grain = grains[0]
-
-    body_rows = [r for r in viewing.rows if not r.isSpot and r.grain == grain]
-    spot_row  = next((r for r in viewing.rows
-                      if r.isSpot and (r.spotGrain or r.grain) == grain), None)
-    spot_chg  = changes["spots"].get(grain)
-
-    moved = sum(1 for r in body_rows
-                if changes["rows"].get(r.id, {}).get("fromPrev", {}).get("val") not in (None, 0))
-
-    # Status bar
-    latest_label = datetime.fromisoformat(
-        viewing.timestamp.replace("Z", "+00:00")
-    ).strftime("%a %b %d, %Y")
-    s_col1, s_col2 = st.columns([3, 7])
-    with s_col1:
-        if moved:
-            st.markdown(
-                f'<span style="color:#fbbf24;font-size:11px;font-weight:600">'
-                f'● {moved} changed vs prior</span>', unsafe_allow_html=True)
-        else:
-            st.markdown(
-                '<span style="color:#1e3a5f;font-size:11px">No changes vs prior</span>',
-                unsafe_allow_html=True)
-    with s_col2:
+            hint = "Run the daily scraper to populate data for this provider."
         st.markdown(
-            f'<span style="color:#334155;font-size:10px">as of '
-            f'<span style="color:#60a5fa;font-weight:700">{latest_label}</span></span>',
-            unsafe_allow_html=True)
+            f'<div style="color:#334155;text-align:center;padding:40px;font-size:12px">'
+            f'No snapshots yet for <b>{loc_key}</b>.<br><br>{hint}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # ── Date picker + grain selector ──────────────────────────────────────
+        snap_labels = []
+        for s in snapshots:
+            d = datetime.fromisoformat(s.timestamp.replace("Z","+00:00"))
+            lbl = d.strftime("%b %d, %Y") + (" ★ latest" if s is snapshots[-1] else "")
+            snap_labels.append(lbl)
 
-    # Year-ago label for header
-    now_ms = datetime.fromisoformat(
-        viewing.timestamp.replace("Z", "+00:00")).timestamp() * 1000
-    YEAR = 365 * 864e5
-    year_ago_ts = None
-    for snap in reversed(snaps_up_to):
-        ts_ms = datetime.fromisoformat(
-            snap.timestamp.replace("Z", "+00:00")).timestamp() * 1000
-        if abs(ts_ms - (now_ms - YEAR)) <= 5 * 864e5:
-            year_ago_ts = snap.timestamp
-            break
-    year_ago_label = (
-        datetime.fromisoformat(year_ago_ts.replace("Z", "+00:00")).strftime("%b %d '%y")
-        if year_ago_ts else "~1 yr"
-    )
+        pick_col, grain_col = st.columns([3, 4])
+        with pick_col:
+            sel_label_snap = st.selectbox(
+                "Viewing snapshot",
+                options=snap_labels[::-1],   # newest first
+                index=0,
+                key=f"snap_pick_{loc_key}",
+                label_visibility="visible",
+            )
+            sel_idx = snap_labels[::-1].index(sel_label_snap)
+            viewing = snapshots[::-1][sel_idx]   # the selected snapshot
+            snaps_up_to = snapshots[: snapshots.index(viewing) + 1]
+            changes = compute_changes(snaps_up_to)
 
-    table_html = render_table(
-        body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label,
-        is_meal=(grain == "Soybean Meal"),
-    )
-    st.markdown(table_html, unsafe_allow_html=True)
+        with grain_col:
+            if len(grains) > 1:
+                grain = st.radio("Grain", grains, horizontal=True,
+                                 label_visibility="collapsed", key=f"grain_{loc_key}")
+            else:
+                grain = grains[0]
 
-    # Roll adjustment legend
-    roll_parts = " &nbsp;|&nbsp; ".join(
-        f'<span style="color:#60a5fa">{r["from"]}→{r["to"]}</span>'
-        f' {r["adj"]}¢' for r in ROLL_ADJ)
-    st.markdown(
-        f'<div style="margin-top:8px;padding:8px 14px;background:#08111e;'
-        f'border:1px solid #0c1e36;border-radius:6px;font-size:10px;color:#334155">'
-        f'<span style="color:#1e3a5f;font-weight:700;text-transform:uppercase;'
-        f'letter-spacing:.1em">Roll adj:</span> {roll_parts}'
-        f' &nbsp;|&nbsp; <span style="font-size:9px">Same letter diff year = no adj'
-        f' | ⚠ = unknown roll</span></div>',
-        unsafe_allow_html=True,
-    )
+        body_rows = [r for r in viewing.rows if not r.isSpot and r.grain == grain]
+        spot_row  = next((r for r in viewing.rows
+                          if r.isSpot and (r.spotGrain or r.grain) == grain), None)
+        spot_chg  = changes["spots"].get(grain)
 
-# ── Snapshot history ──────────────────────────────────────────────────────────
-if snapshots:
-    with st.expander(f"📅 Snapshot history — {loc_key} ({len(snapshots)} records)", expanded=False):
-        for snap in reversed(snapshots):
-            is_latest  = snap is snapshots[-1]
-            is_viewing = snap is viewing
-            d_label    = datetime.fromisoformat(
-                snap.timestamp.replace("Z", "+00:00")).strftime("%b %d '%y")
-            src_icon    = " ✉" if snap.source == "email" else ""
-            badge_color = loc_color if is_viewing else "#1e3a5f"
-            c1, c2 = st.columns([9, 1])
-            with c1:
+        moved = sum(1 for r in body_rows
+                    if changes["rows"].get(r.id, {}).get("fromPrev", {}).get("val") not in (None, 0))
+
+        # Status bar
+        latest_label = datetime.fromisoformat(
+            viewing.timestamp.replace("Z", "+00:00")
+        ).strftime("%a %b %d, %Y")
+        s_col1, s_col2 = st.columns([3, 7])
+        with s_col1:
+            if moved:
                 st.markdown(
-                    f'<span style="background:#08111e;border:1px solid {badge_color};'
-                    f'color:{badge_color};padding:3px 10px;border-radius:3px;'
-                    f'font-size:10px;font-weight:{"700" if is_latest else "400"}">'
-                    f'{d_label}{src_icon}{"  ● latest" if is_latest else ""}{"  👁" if is_viewing and not is_latest else ""}</span>',
+                    f'<span style="color:#fbbf24;font-size:11px;font-weight:600">'
+                    f'● {moved} changed vs prior</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(
+                    '<span style="color:#1e3a5f;font-size:11px">No changes vs prior</span>',
                     unsafe_allow_html=True)
-            with c2:
-                if not is_latest:
-                    if st.button("✕", key=f"del_{snap.id}", help="Delete snapshot"):
-                        delete_snapshot(snap.id)
-                        st.rerun()
+        with s_col2:
+            st.markdown(
+                f'<span style="color:#334155;font-size:10px">as of '
+                f'<span style="color:#60a5fa;font-weight:700">{latest_label}</span></span>',
+                unsafe_allow_html=True)
+
+        # Year-ago label for header
+        now_ms = datetime.fromisoformat(
+            viewing.timestamp.replace("Z", "+00:00")).timestamp() * 1000
+        YEAR = 365 * 864e5
+        year_ago_ts = None
+        for snap in reversed(snaps_up_to):
+            ts_ms = datetime.fromisoformat(
+                snap.timestamp.replace("Z", "+00:00")).timestamp() * 1000
+            if abs(ts_ms - (now_ms - YEAR)) <= 5 * 864e5:
+                year_ago_ts = snap.timestamp
+                break
+        year_ago_label = (
+            datetime.fromisoformat(year_ago_ts.replace("Z", "+00:00")).strftime("%b %d '%y")
+            if year_ago_ts else "~1 yr"
+        )
+
+        table_html = render_table(
+            body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label,
+            is_meal=(grain == "Soybean Meal"),
+        )
+        st.markdown(table_html, unsafe_allow_html=True)
+
+        # Roll adjustment legend
+        roll_parts = " &nbsp;|&nbsp; ".join(
+            f'<span style="color:#60a5fa">{r["from"]}->{r["to"]}</span>'
+            f' {r["adj"]}c' for r in ROLL_ADJ)
+        st.markdown(
+            f'<div style="margin-top:8px;padding:8px 14px;background:#08111e;'
+            f'border:1px solid #0c1e36;border-radius:6px;font-size:10px;color:#334155">'
+            f'<span style="color:#1e3a5f;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:.1em">Roll adj:</span> {roll_parts}'
+            f' &nbsp;|&nbsp; <span style="font-size:9px">Same letter diff year = no adj'
+            f' | ? = unknown roll</span></div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Snapshot history ──────────────────────────────────────────────────────
+    if snapshots:
+        with st.expander(f"Snapshot history — {loc_key} ({len(snapshots)} records)", expanded=False):
+            for snap in reversed(snapshots):
+                is_latest  = snap is snapshots[-1]
+                is_viewing = snap is viewing
+                d_label    = datetime.fromisoformat(
+                    snap.timestamp.replace("Z", "+00:00")).strftime("%b %d '%y")
+                src_icon    = " [email]" if snap.source == "email" else ""
+                badge_color = loc_color if is_viewing else "#1e3a5f"
+                c1, c2 = st.columns([9, 1])
+                with c1:
+                    st.markdown(
+                        f'<span style="background:#08111e;border:1px solid {badge_color};'
+                        f'color:{badge_color};padding:3px 10px;border-radius:3px;'
+                        f'font-size:10px;font-weight:{"700" if is_latest else "400"}">'
+                        f'{d_label}{src_icon}{"  latest" if is_latest else ""}{"  viewing" if is_viewing and not is_latest else ""}</span>',
+                        unsafe_allow_html=True)
+                with c2:
+                    if not is_latest:
+                        if st.button("X", key=f"del_{snap.id}", help="Delete snapshot"):
+                            delete_snapshot(snap.id)
+                            st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: MAP
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_map:
+    import pydeck as pdk
+    import pandas as pd
+
+    _MAP_COLORS = {
+        "ADM":       [59,  130, 246],
+        "POET":      [249, 115, 22],
+        "CHS":       [22,  163, 74],
+        "CGB":       [139, 92,  246],
+        "Cargill":   [239, 68,  68],
+        "GPRE":      [6,   182, 212],
+        "Andersons": [234, 179, 8],
+        "Bunge":     [244, 63,  94],
+        "Scoular":   [132, 204, 22],
+        "AGP":       [34,  197, 94],
+        "LDC":       [96,  165, 250],
+    }
+    _DEFAULT_COLOR = [148, 163, 184]
+
+    map_rows = get_map_data()
+
+    if not map_rows:
+        st.markdown(
+            '<div style="color:#334155;text-align:center;padding:60px;font-size:12px">'
+            'No geocoded locations yet.<br><br>'
+            'Run <code style="color:#60a5fa">python geocode_locations.py</code> '
+            'to populate coordinates, then refresh.</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        # ── Provider filter ───────────────────────────────────────────────────
+        all_providers_map = sorted({r["provider"] for r in map_rows})
+        sel_provs = st.multiselect(
+            "Filter providers",
+            options=all_providers_map,
+            default=all_providers_map,
+            key="map_prov_filter",
+            label_visibility="collapsed",
+        )
+        filtered = [r for r in map_rows if r["provider"] in sel_provs]
+
+        # ── Build DataFrame ───────────────────────────────────────────────────
+        def _fmt_basis(cents):
+            if cents is None:
+                return "—"
+            sign = "+" if cents >= 0 else ""
+            return f"{sign}{cents}c"
+
+        def _tooltip_text(row):
+            grains_str = "  ".join(
+                f"{g}: {_fmt_basis(row['grains'].get(g))}"
+                for g in sorted(row["grains"])
+            )
+            state_str = f", {row['state']}" if row["state"] else ""
+            return f"{row['location']}{state_str} [{row['provider']}]  |  {grains_str}"
+
+        df = pd.DataFrame([
+            {
+                "lat":      r["lat"],
+                "lon":      r["lon"],
+                "location": r["location"],
+                "provider": r["provider"],
+                "state":    r["state"],
+                "tooltip":  _tooltip_text(r),
+                "color":    _MAP_COLORS.get(r["provider"], _DEFAULT_COLOR),
+            }
+            for r in filtered
+        ])
+
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=df,
+            get_position=["lon", "lat"],
+            get_fill_color="color",
+            get_radius=8000,
+            radius_min_pixels=4,
+            radius_max_pixels=18,
+            pickable=True,
+            auto_highlight=True,
+        )
+
+        view = pdk.ViewState(
+            latitude=39.5,
+            longitude=-98.35,
+            zoom=3.8,
+            pitch=0,
+        )
+
+        deck = pdk.Deck(
+            layers=[layer],
+            initial_view_state=view,
+            tooltip={"text": "{tooltip}"},
+            map_style="mapbox://styles/mapbox/dark-v11",
+        )
+
+        st.pydeck_chart(deck, use_container_width=True)
+
+        # ── Legend ────────────────────────────────────────────────────────────
+        legend_parts = []
+        for p in all_providers_map:
+            c = _MAP_COLORS.get(p, _DEFAULT_COLOR)
+            hex_c = "#{:02x}{:02x}{:02x}".format(*c)
+            legend_parts.append(
+                f'<span style="display:inline-flex;align-items:center;gap:5px;'
+                f'margin-right:14px;font-size:11px;color:#94a3b8">'
+                f'<span style="width:10px;height:10px;border-radius:50%;'
+                f'background:{hex_c};display:inline-block"></span>{p}</span>'
+            )
+        st.markdown(
+            '<div style="padding:8px 0;margin-top:4px">' + "".join(legend_parts) + "</div>",
+            unsafe_allow_html=True,
+        )
+        st.caption(f"{len(filtered)} locations shown  •  geocoding may be incomplete — run `python geocode_locations.py` to fill gaps")
