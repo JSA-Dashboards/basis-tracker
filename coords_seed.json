@@ -1,0 +1,3796 @@
+[
+  {
+    "provider": "ADM",
+    "location": "ADM Cedar Rapids",
+    "state": "",
+    "lat": 41.975887,
+    "lon": -91.670405
+  },
+  {
+    "provider": "ADM",
+    "location": "ADM Decatur",
+    "state": "",
+    "lat": 39.845416,
+    "lon": -88.952415
+  },
+  {
+    "provider": "ADM",
+    "location": "ADM St. Louis",
+    "state": "",
+    "lat": 38.625406,
+    "lon": -90.190009
+  },
+  {
+    "provider": "ADM",
+    "location": "Abilene, KS",
+    "state": "",
+    "lat": 38.917252,
+    "lon": -97.21377
+  },
+  {
+    "provider": "ADM",
+    "location": "Altamont, IL",
+    "state": "",
+    "lat": 39.062036,
+    "lon": -88.748122
+  },
+  {
+    "provider": "ADM",
+    "location": "Arkansas City, KS (East)",
+    "state": "",
+    "lat": 37.062256,
+    "lon": -97.038834
+  },
+  {
+    "provider": "ADM",
+    "location": "Arkansas City, KS (West)",
+    "state": "",
+    "lat": 37.062256,
+    "lon": -97.038834
+  },
+  {
+    "provider": "ADM",
+    "location": "Attica, IN",
+    "state": "",
+    "lat": 40.294156,
+    "lon": -87.248811
+  },
+  {
+    "provider": "ADM",
+    "location": "Beech Grove (Elevator)",
+    "state": "",
+    "lat": 39.722191,
+    "lon": -86.089416
+  },
+  {
+    "provider": "ADM",
+    "location": "Beech Grove, IN (Wheat Milling)",
+    "state": "",
+    "lat": 39.722191,
+    "lon": -86.089416
+  },
+  {
+    "provider": "ADM",
+    "location": "Buffalo, NY (Wheat Milling)",
+    "state": "",
+    "lat": 42.886416,
+    "lon": -78.878149
+  },
+  {
+    "provider": "ADM",
+    "location": "Burlington, IA",
+    "state": "",
+    "lat": 40.812692,
+    "lon": -91.10202
+  },
+  {
+    "provider": "ADM",
+    "location": "Carthage, MO",
+    "state": "",
+    "lat": 37.176514,
+    "lon": -94.310341
+  },
+  {
+    "provider": "ADM",
+    "location": "Cedar Rapids, IA",
+    "state": "",
+    "lat": 41.975887,
+    "lon": -91.670405
+  },
+  {
+    "provider": "ADM",
+    "location": "Center, MO",
+    "state": "",
+    "lat": 39.508098,
+    "lon": -91.528766
+  },
+  {
+    "provider": "ADM",
+    "location": "Charleston, MO",
+    "state": "",
+    "lat": 36.923303,
+    "lon": -89.350117
+  },
+  {
+    "provider": "ADM",
+    "location": "Charlotte, NC",
+    "state": "",
+    "lat": 35.227209,
+    "lon": -80.843083
+  },
+  {
+    "provider": "ADM",
+    "location": "Cleveland, TN (Wheat Milling)",
+    "state": "",
+    "lat": 35.159518,
+    "lon": -84.876611
+  },
+  {
+    "provider": "ADM",
+    "location": "Clinton, IA (Corn Processing)",
+    "state": "",
+    "lat": 41.90547,
+    "lon": -90.559997
+  },
+  {
+    "provider": "ADM",
+    "location": "Clinton, IA (Elevator)",
+    "state": "",
+    "lat": 41.90547,
+    "lon": -90.559997
+  },
+  {
+    "provider": "ADM",
+    "location": "Columbus, NE (Corn Processing)",
+    "state": "",
+    "lat": 41.429299,
+    "lon": -97.358144
+  },
+  {
+    "provider": "ADM",
+    "location": "Columbus, OH",
+    "state": "",
+    "lat": 39.96226,
+    "lon": -83.000707
+  },
+  {
+    "provider": "ADM",
+    "location": "Copeland, KS",
+    "state": "",
+    "lat": 37.541969,
+    "lon": -100.6296
+  },
+  {
+    "provider": "ADM",
+    "location": "Country Store, KS",
+    "state": "",
+    "lat": 37.956436,
+    "lon": -98.966756
+  },
+  {
+    "provider": "ADM",
+    "location": "Creve Coeur, IL",
+    "state": "",
+    "lat": 40.64726,
+    "lon": -89.59121
+  },
+  {
+    "provider": "ADM",
+    "location": "Curran, IL",
+    "state": "",
+    "lat": 39.742274,
+    "lon": -89.772048
+  },
+  {
+    "provider": "ADM",
+    "location": "Decatur, IL (Corn Processing)",
+    "state": "",
+    "lat": 39.845416,
+    "lon": -88.952415
+  },
+  {
+    "provider": "ADM",
+    "location": "Decatur, IL (Soy Processing)",
+    "state": "",
+    "lat": 39.845416,
+    "lon": -88.952415
+  },
+  {
+    "provider": "ADM",
+    "location": "Deerfield, MO",
+    "state": "",
+    "lat": 37.838381,
+    "lon": -94.507987
+  },
+  {
+    "provider": "ADM",
+    "location": "Des Moines, IA",
+    "state": "",
+    "lat": 41.586865,
+    "lon": -93.624949
+  },
+  {
+    "provider": "ADM",
+    "location": "Enderlin, ND",
+    "state": "",
+    "lat": 46.623028,
+    "lon": -97.601486
+  },
+  {
+    "provider": "ADM",
+    "location": "Enid, OK (Elevator)",
+    "state": "",
+    "lat": 36.396762,
+    "lon": -97.879134
+  },
+  {
+    "provider": "ADM",
+    "location": "Enola, NE",
+    "state": "",
+    "lat": 41.903895,
+    "lon": -97.462828
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (1st Ave.)",
+    "state": "",
+    "lat": 37.970495,
+    "lon": -87.571564
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (Broadway)",
+    "state": "",
+    "lat": 37.970495,
+    "lon": -87.571564
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (Ohio St.)",
+    "state": "",
+    "lat": 37.970495,
+    "lon": -87.571564
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (River South)",
+    "state": "",
+    "lat": 37.970495,
+    "lon": -87.571564
+  },
+  {
+    "provider": "ADM",
+    "location": "Farina, IL",
+    "state": "",
+    "lat": 38.834213,
+    "lon": -88.772276
+  },
+  {
+    "provider": "ADM",
+    "location": "Fostoria, OH",
+    "state": "",
+    "lat": 41.15743,
+    "lon": -83.414106
+  },
+  {
+    "provider": "ADM",
+    "location": "Frankfort, IN",
+    "state": "",
+    "lat": 40.279766,
+    "lon": -86.510824
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Elevator)",
+    "state": "",
+    "lat": 41.433836,
+    "lon": -96.496045
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Lincoln Premium Poultry)",
+    "state": "",
+    "lat": 41.433836,
+    "lon": -96.496045
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Soy Processing)",
+    "state": "",
+    "lat": 41.433836,
+    "lon": -96.496045
+  },
+  {
+    "provider": "ADM",
+    "location": "Fullerton, NE",
+    "state": "",
+    "lat": 41.363384,
+    "lon": -97.968862
+  },
+  {
+    "provider": "ADM",
+    "location": "Grand Ledge, MI",
+    "state": "",
+    "lat": 42.75244,
+    "lon": -84.746357
+  },
+  {
+    "provider": "ADM",
+    "location": "Gulfport, IL",
+    "state": "",
+    "lat": 40.813928,
+    "lon": -91.086256
+  },
+  {
+    "provider": "ADM",
+    "location": "Havana, IL",
+    "state": "",
+    "lat": 40.301432,
+    "lon": -90.063362
+  },
+  {
+    "provider": "ADM",
+    "location": "Hebron, ND",
+    "state": "",
+    "lat": 46.900563,
+    "lon": -102.045442
+  },
+  {
+    "provider": "ADM",
+    "location": "Helena, AR",
+    "state": "",
+    "lat": 34.526675,
+    "lon": -90.586274
+  },
+  {
+    "provider": "ADM",
+    "location": "Heloise, TN",
+    "state": "",
+    "lat": 36.052129,
+    "lon": -89.668638
+  },
+  {
+    "provider": "ADM",
+    "location": "Henderson, KY",
+    "state": "",
+    "lat": 37.76721,
+    "lon": -87.557374
+  },
+  {
+    "provider": "ADM",
+    "location": "Hennepin, IL",
+    "state": "",
+    "lat": 41.254203,
+    "lon": -89.342311
+  },
+  {
+    "provider": "ADM",
+    "location": "Hensler, ND",
+    "state": "",
+    "lat": 47.260271,
+    "lon": -101.08487
+  },
+  {
+    "provider": "ADM",
+    "location": "Holland, MN",
+    "state": "",
+    "lat": 44.091626,
+    "lon": -96.188563
+  },
+  {
+    "provider": "ADM",
+    "location": "Hoopeston, IL",
+    "state": "",
+    "lat": 40.467259,
+    "lon": -87.668357
+  },
+  {
+    "provider": "ADM",
+    "location": "Hume, IL",
+    "state": "",
+    "lat": 39.796701,
+    "lon": -87.868641
+  },
+  {
+    "provider": "ADM",
+    "location": "Hutchinson, KS",
+    "state": "",
+    "lat": 38.060844,
+    "lon": -97.929774
+  },
+  {
+    "provider": "ADM",
+    "location": "Jackson, TN",
+    "state": "",
+    "lat": 35.614445,
+    "lon": -88.817742
+  },
+  {
+    "provider": "ADM",
+    "location": "Lacon, IL",
+    "state": "",
+    "lat": 41.024758,
+    "lon": -89.411201
+  },
+  {
+    "provider": "ADM",
+    "location": "Laotto, IN",
+    "state": "",
+    "lat": 41.289762,
+    "lon": -85.197971
+  },
+  {
+    "provider": "ADM",
+    "location": "Leoti, KS",
+    "state": "",
+    "lat": 38.479741,
+    "lon": -101.358771
+  },
+  {
+    "provider": "ADM",
+    "location": "Lincoln, NE (Elevator)",
+    "state": "",
+    "lat": 40.808886,
+    "lon": -96.707775
+  },
+  {
+    "provider": "ADM",
+    "location": "Lincoln, NE (Soy Processing)",
+    "state": "",
+    "lat": 40.808886,
+    "lon": -96.707775
+  },
+  {
+    "provider": "ADM",
+    "location": "Livingston Point, KY",
+    "state": "",
+    "lat": 35.258616,
+    "lon": -80.087145
+  },
+  {
+    "provider": "ADM",
+    "location": "Logansport, IN",
+    "state": "",
+    "lat": 40.754238,
+    "lon": -86.362519
+  },
+  {
+    "provider": "ADM",
+    "location": "Macon, IL",
+    "state": "",
+    "lat": 39.845521,
+    "lon": -88.960238
+  },
+  {
+    "provider": "ADM",
+    "location": "Mankato, MN (Soy Processing)",
+    "state": "",
+    "lat": 44.165853,
+    "lon": -94.002801
+  },
+  {
+    "provider": "ADM",
+    "location": "Marshall, MN (Corn Processing)",
+    "state": "",
+    "lat": 48.360534,
+    "lon": -96.381968
+  },
+  {
+    "provider": "ADM",
+    "location": "Marshall, MN (South House)",
+    "state": "",
+    "lat": 48.360534,
+    "lon": -96.381968
+  },
+  {
+    "provider": "ADM",
+    "location": "Memphis, TN",
+    "state": "",
+    "lat": 35.146026,
+    "lon": -90.051779
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota (Wheat Milling)",
+    "state": "",
+    "lat": 36.753549,
+    "lon": -120.381557
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota, IL (In Town)",
+    "state": "",
+    "lat": 41.547255,
+    "lon": -89.117585
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota, IL (Northern Crossing Rail)",
+    "state": "",
+    "lat": 41.547255,
+    "lon": -89.117585
+  },
+  {
+    "provider": "ADM",
+    "location": "Mexico, MO",
+    "state": "",
+    "lat": 39.169763,
+    "lon": -91.882948
+  },
+  {
+    "provider": "ADM",
+    "location": "Montezuma, KS",
+    "state": "",
+    "lat": 37.597822,
+    "lon": -100.442849
+  },
+  {
+    "provider": "ADM",
+    "location": "Montgomery City, MO",
+    "state": "",
+    "lat": 38.977541,
+    "lon": -91.504884
+  },
+  {
+    "provider": "ADM",
+    "location": "Montpelier, IN",
+    "state": "",
+    "lat": 40.553934,
+    "lon": -85.277472
+  },
+  {
+    "provider": "ADM",
+    "location": "Morris, IL",
+    "state": "",
+    "lat": 41.357413,
+    "lon": -88.421523
+  },
+  {
+    "provider": "ADM",
+    "location": "Mound City, IL",
+    "state": "",
+    "lat": 37.085329,
+    "lon": -89.162573
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Auburn, IL",
+    "state": "",
+    "lat": 39.766154,
+    "lon": -89.261749
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Vernon, IN (Elevator)",
+    "state": "",
+    "lat": 37.931802,
+    "lon": -87.894785
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Vernon, IN (Wheat Milling)",
+    "state": "",
+    "lat": 37.931802,
+    "lon": -87.894785
+  },
+  {
+    "provider": "ADM",
+    "location": "New Haven, IN",
+    "state": "",
+    "lat": 41.073306,
+    "lon": -85.017313
+  },
+  {
+    "provider": "ADM",
+    "location": "New Madrid, MO",
+    "state": "",
+    "lat": 36.574961,
+    "lon": -89.678095
+  },
+  {
+    "provider": "ADM",
+    "location": "Newburgh, IN",
+    "state": "",
+    "lat": 37.945682,
+    "lon": -87.404657
+  },
+  {
+    "provider": "ADM",
+    "location": "Newman Grove, NE",
+    "state": "",
+    "lat": 41.746725,
+    "lon": -97.776732
+  },
+  {
+    "provider": "ADM",
+    "location": "Niantic, IL",
+    "state": "",
+    "lat": 39.85556,
+    "lon": -89.166454
+  },
+  {
+    "provider": "ADM",
+    "location": "Novelty, MO",
+    "state": "",
+    "lat": 40.012539,
+    "lon": -92.208238
+  },
+  {
+    "provider": "ADM",
+    "location": "Oakland, IL",
+    "state": "",
+    "lat": 41.823614,
+    "lon": -87.605635
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa Lake, MI",
+    "state": "",
+    "lat": 41.764152,
+    "lon": -83.749387
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa, IL (North Side)",
+    "state": "",
+    "lat": 41.351663,
+    "lon": -88.845436
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa, IL (South)",
+    "state": "",
+    "lat": 41.351663,
+    "lon": -88.845436
+  },
+  {
+    "provider": "ADM",
+    "location": "Paducah, KY",
+    "state": "",
+    "lat": 37.083389,
+    "lon": -88.600048
+  },
+  {
+    "provider": "ADM",
+    "location": "Panhandle, OK",
+    "state": "",
+    "lat": 36.592886,
+    "lon": -101.605323
+  },
+  {
+    "provider": "ADM",
+    "location": "Parr, IN",
+    "state": "",
+    "lat": 41.027259,
+    "lon": -87.218637
+  },
+  {
+    "provider": "ADM",
+    "location": "Patoka, IL",
+    "state": "",
+    "lat": 38.755326,
+    "lon": -89.095342
+  },
+  {
+    "provider": "ADM",
+    "location": "Plains, KS",
+    "state": "",
+    "lat": 37.263963,
+    "lon": -100.589819
+  },
+  {
+    "provider": "ADM",
+    "location": "Quincy, IL (Barge Dock)",
+    "state": "",
+    "lat": 39.935602,
+    "lon": -91.409873
+  },
+  {
+    "provider": "ADM",
+    "location": "Quincy, IL (Soy Processing)",
+    "state": "",
+    "lat": 39.935602,
+    "lon": -91.409873
+  },
+  {
+    "provider": "ADM",
+    "location": "Rockport, IN",
+    "state": "",
+    "lat": 37.883105,
+    "lon": -87.049441
+  },
+  {
+    "provider": "ADM",
+    "location": "Sauget, IL",
+    "state": "",
+    "lat": 38.590186,
+    "lon": -90.169275
+  },
+  {
+    "provider": "ADM",
+    "location": "Shelbina, MO",
+    "state": "",
+    "lat": 39.693928,
+    "lon": -92.04295
+  },
+  {
+    "provider": "ADM",
+    "location": "Shobonier, IL",
+    "state": "",
+    "lat": 38.869491,
+    "lon": -89.088676
+  },
+  {
+    "provider": "ADM",
+    "location": "Silver Grove, KY",
+    "state": "",
+    "lat": 39.034506,
+    "lon": -84.390217
+  },
+  {
+    "provider": "ADM",
+    "location": "Snover, MI",
+    "state": "",
+    "lat": 43.461131,
+    "lon": -82.970773
+  },
+  {
+    "provider": "ADM",
+    "location": "Spokane, WA",
+    "state": "",
+    "lat": 47.657193,
+    "lon": -117.42351
+  },
+  {
+    "provider": "ADM",
+    "location": "Spring Valley, IL",
+    "state": "",
+    "lat": 41.327535,
+    "lon": -89.199808
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Cloud, MN",
+    "state": "",
+    "lat": 45.561608,
+    "lon": -94.1642
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Louis, MO (Elevator)",
+    "state": "",
+    "lat": 38.625406,
+    "lon": -90.190009
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Louis, MO (Wheat Milling)",
+    "state": "",
+    "lat": 38.625406,
+    "lon": -90.190009
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Paul, MN (Elevator D)",
+    "state": "",
+    "lat": 44.949749,
+    "lon": -93.093103
+  },
+  {
+    "provider": "ADM",
+    "location": "State Line, OK",
+    "state": "",
+    "lat": 31.436189,
+    "lon": -88.474121
+  },
+  {
+    "provider": "ADM",
+    "location": "Sullivan, IL",
+    "state": "",
+    "lat": 39.599479,
+    "lon": -88.607839
+  },
+  {
+    "provider": "ADM",
+    "location": "Swanington, IN",
+    "state": "",
+    "lat": 40.583371,
+    "lon": -87.277239
+  },
+  {
+    "provider": "ADM",
+    "location": "Taylorville, IL",
+    "state": "",
+    "lat": 39.548745,
+    "lon": -89.294155
+  },
+  {
+    "provider": "ADM",
+    "location": "Toledo, OH",
+    "state": "",
+    "lat": 41.652914,
+    "lon": -83.537817
+  },
+  {
+    "provider": "ADM",
+    "location": "Tuscola, IL",
+    "state": "",
+    "lat": 39.799858,
+    "lon": -88.288455
+  },
+  {
+    "provider": "ADM",
+    "location": "Valdosta, GA",
+    "state": "",
+    "lat": 30.832702,
+    "lon": -83.278485
+  },
+  {
+    "provider": "ADM",
+    "location": "Velva, ND",
+    "state": "",
+    "lat": 48.05612,
+    "lon": -100.929317
+  },
+  {
+    "provider": "ADM",
+    "location": "Vidalia, LA",
+    "state": "",
+    "lat": 31.565444,
+    "lon": -91.42595
+  },
+  {
+    "provider": "ADM",
+    "location": "Webberville, MI",
+    "state": "",
+    "lat": 42.666826,
+    "lon": -84.174432
+  },
+  {
+    "provider": "ADM",
+    "location": "Winona, MN",
+    "state": "",
+    "lat": 44.050005,
+    "lon": -91.639229
+  },
+  {
+    "provider": "ADM",
+    "location": "Wisner, NE",
+    "state": "",
+    "lat": 41.987372,
+    "lon": -96.914286
+  },
+  {
+    "provider": "Andersons",
+    "location": "Albion",
+    "state": "MI",
+    "lat": 42.243097,
+    "lon": -84.75303
+  },
+  {
+    "provider": "Andersons",
+    "location": "Auburn",
+    "state": "IN",
+    "lat": 41.36699,
+    "lon": -85.058863
+  },
+  {
+    "provider": "Andersons",
+    "location": "Clymers",
+    "state": "IN",
+    "lat": 40.707539,
+    "lon": -86.44889
+  },
+  {
+    "provider": "Andersons",
+    "location": "Delphi",
+    "state": "IN",
+    "lat": 40.587537,
+    "lon": -86.675006
+  },
+  {
+    "provider": "Andersons",
+    "location": "Denison",
+    "state": "IA",
+    "lat": 42.017772,
+    "lon": -95.355329
+  },
+  {
+    "provider": "Andersons",
+    "location": "Dunkirk",
+    "state": "OH",
+    "lat": 40.78922,
+    "lon": -83.643264
+  },
+  {
+    "provider": "Andersons",
+    "location": "Greenville",
+    "state": "OH",
+    "lat": 40.102391,
+    "lon": -84.633299
+  },
+  {
+    "provider": "Andersons",
+    "location": "Hemlock",
+    "state": "MI",
+    "lat": 43.414738,
+    "lon": -84.229942
+  },
+  {
+    "provider": "Andersons",
+    "location": "Maumee",
+    "state": "OH",
+    "lat": 41.562829,
+    "lon": -83.653824
+  },
+  {
+    "provider": "Andersons",
+    "location": "Metamora",
+    "state": "OH",
+    "lat": 41.711822,
+    "lon": -83.910246
+  },
+  {
+    "provider": "Andersons",
+    "location": "Oakley",
+    "state": "MI",
+    "lat": 43.14083,
+    "lon": -84.168293
+  },
+  {
+    "provider": "Andersons",
+    "location": "Oakville",
+    "state": "MI",
+    "lat": 42.081432,
+    "lon": -83.58077
+  },
+  {
+    "provider": "Andersons",
+    "location": "Port William",
+    "state": "OH",
+    "lat": 39.552006,
+    "lon": -83.786314
+  },
+  {
+    "provider": "Andersons",
+    "location": "Reading",
+    "state": "MI",
+    "lat": 41.839493,
+    "lon": -84.748013
+  },
+  {
+    "provider": "Andersons",
+    "location": "Standish",
+    "state": "MI",
+    "lat": 43.983076,
+    "lon": -83.95888
+  },
+  {
+    "provider": "Andersons",
+    "location": "Toledo - Edwin Dr",
+    "state": "OH",
+    "lat": 41.652914,
+    "lon": -83.537817
+  },
+  {
+    "provider": "Andersons",
+    "location": "Toledo - Kuhlman Dr",
+    "state": "OH",
+    "lat": 41.652914,
+    "lon": -83.537817
+  },
+  {
+    "provider": "Andersons",
+    "location": "White Pigeon",
+    "state": "MI",
+    "lat": 41.798106,
+    "lon": -85.643323
+  },
+  {
+    "provider": "Bunge",
+    "location": "Bellevue, OH",
+    "state": "OH",
+    "lat": 41.274207,
+    "lon": -82.840981
+  },
+  {
+    "provider": "Bunge",
+    "location": "Cairo, IL",
+    "state": "IL",
+    "lat": 37.005796,
+    "lon": -89.177245
+  },
+  {
+    "provider": "Bunge",
+    "location": "Chester, MT",
+    "state": "MT",
+    "lat": 48.510308,
+    "lon": -110.967315
+  },
+  {
+    "provider": "Bunge",
+    "location": "Council Bluffs, IA",
+    "state": "IA",
+    "lat": 41.258841,
+    "lon": -95.851948
+  },
+  {
+    "provider": "Bunge",
+    "location": "Decatur, AL",
+    "state": "AL",
+    "lat": 34.60602,
+    "lon": -86.983817
+  },
+  {
+    "provider": "Bunge",
+    "location": "Decatur, IN",
+    "state": "IN",
+    "lat": 39.286213,
+    "lon": -85.494306
+  },
+  {
+    "provider": "Bunge",
+    "location": "Delphos, OH",
+    "state": "OH",
+    "lat": 40.843746,
+    "lon": -84.339766
+  },
+  {
+    "provider": "Bunge",
+    "location": "Emporia, KS",
+    "state": "KS",
+    "lat": 38.404005,
+    "lon": -96.181623
+  },
+  {
+    "provider": "Bunge",
+    "location": "Fairmont City, IL",
+    "state": "IL",
+    "lat": 38.649772,
+    "lon": -90.093163
+  },
+  {
+    "provider": "Bunge",
+    "location": "Griggsville, IL",
+    "state": "IL",
+    "lat": 39.708936,
+    "lon": -90.724572
+  },
+  {
+    "provider": "Bunge",
+    "location": "Indianapolis, IN",
+    "state": "IN",
+    "lat": 39.768333,
+    "lon": -86.15835
+  },
+  {
+    "provider": "Bunge",
+    "location": "Maschhoff's",
+    "state": "IL",
+    "lat": 39.297743,
+    "lon": -87.992573
+  },
+  {
+    "provider": "Bunge",
+    "location": "McLeansboro, IL",
+    "state": "IL",
+    "lat": 38.093381,
+    "lon": -88.535608
+  },
+  {
+    "provider": "Bunge",
+    "location": "Morristown, IN - Bean Plant",
+    "state": "IN",
+    "lat": 39.673206,
+    "lon": -85.698971
+  },
+  {
+    "provider": "Bunge",
+    "location": "Morristown, IN - Grain Elev",
+    "state": "IN",
+    "lat": 39.673206,
+    "lon": -85.698971
+  },
+  {
+    "provider": "Bunge",
+    "location": "Sidney, MT",
+    "state": "MT",
+    "lat": 47.716735,
+    "lon": -104.155973
+  },
+  {
+    "provider": "Bunge",
+    "location": "Tunis, MT",
+    "state": "MT",
+    "lat": 47.806912,
+    "lon": -110.842721
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Billings",
+    "state": "OK",
+    "lat": 36.528924,
+    "lon": -97.443936
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Burnside",
+    "state": "IL",
+    "lat": 41.730035,
+    "lon": -87.596714
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Cahokia",
+    "state": "IL",
+    "lat": 38.566161,
+    "lon": -90.179424
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Carnegie",
+    "state": "OK",
+    "lat": 35.106113,
+    "lon": -98.603351
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Colusa",
+    "state": "IL",
+    "lat": 40.570876,
+    "lon": -91.167923
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Dallas City",
+    "state": "IL",
+    "lat": 40.636328,
+    "lon": -91.167556
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Desoto Landing",
+    "state": "AR",
+    "lat": 34.157883,
+    "lon": -90.806067
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - East Hannibal",
+    "state": "IL",
+    "lat": 39.729768,
+    "lon": -91.350981
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Enid",
+    "state": "OK",
+    "lat": 36.396762,
+    "lon": -97.879134
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Falls City",
+    "state": "",
+    "lat": 28.98147,
+    "lon": -98.018322
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Ferris",
+    "state": "IL",
+    "lat": 40.468933,
+    "lon": -91.170423
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Friars Point",
+    "state": "MS",
+    "lat": 34.370889,
+    "lon": -90.637589
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Greenville",
+    "state": "MS",
+    "lat": 33.411105,
+    "lon": -91.063586
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Helena North (River)",
+    "state": "AR",
+    "lat": 34.544477,
+    "lon": -90.645621
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Jonesville",
+    "state": "LA",
+    "lat": 31.626142,
+    "lon": -91.813587
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Lagrange",
+    "state": "MO",
+    "lat": 39.73158,
+    "lon": -91.391019
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Louisiana",
+    "state": "LA",
+    "lat": 30.406201,
+    "lon": -91.185413
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Mayersville",
+    "state": "MS",
+    "lat": 32.902072,
+    "lon": -91.051217
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Meekers Landing",
+    "state": "IA",
+    "lat": 40.985993,
+    "lon": -90.997528
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Naples",
+    "state": "IL",
+    "lat": 39.757269,
+    "lon": -90.607349
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Nauvoo",
+    "state": "IL",
+    "lat": 40.549762,
+    "lon": -91.382325
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Old Town",
+    "state": "AR",
+    "lat": 33.384846,
+    "lon": -93.575733
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Oquawka",
+    "state": "IL",
+    "lat": 40.931982,
+    "lon": -90.947086
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Orienta",
+    "state": "OK",
+    "lat": 36.360035,
+    "lon": -98.473967
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Pine Bluff",
+    "state": "AR",
+    "lat": 34.222888,
+    "lon": -92.004334
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Port 33",
+    "state": "OK",
+    "lat": 35.204497,
+    "lon": -99.307306
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Renfrow",
+    "state": "OK",
+    "lat": 36.925342,
+    "lon": -97.656121
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - River Landing",
+    "state": "IL",
+    "lat": 41.455865,
+    "lon": -88.750353
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Rosedale",
+    "state": "MS",
+    "lat": 33.8551,
+    "lon": -91.026611
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Shattuck",
+    "state": "OK",
+    "lat": 36.273961,
+    "lon": -99.87796
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Smithshire",
+    "state": "IL",
+    "lat": 40.792435,
+    "lon": -90.778325
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Tallulah Port",
+    "state": "LA",
+    "lat": 32.841509,
+    "lon": -97.404186
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Tunica",
+    "state": "MS",
+    "lat": 34.639878,
+    "lon": -90.362383
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Van Buren",
+    "state": "AR",
+    "lat": 35.575909,
+    "lon": -92.491614
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Vicksburg",
+    "state": "MS",
+    "lat": 32.352806,
+    "lon": -90.877734
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Vidalia",
+    "state": "LA",
+    "lat": 31.565444,
+    "lon": -91.42595
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Wagoner",
+    "state": "OK",
+    "lat": 35.954222,
+    "lon": -95.563624
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Waka",
+    "state": "TX",
+    "lat": 36.281353,
+    "lon": -101.046367
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Wakita",
+    "state": "OK",
+    "lat": 36.88336,
+    "lon": -97.922003
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Webbers Falls",
+    "state": "OK",
+    "lat": 35.51093,
+    "lon": -95.12996
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Yazoo City",
+    "state": "MS",
+    "lat": 32.847268,
+    "lon": -90.413671
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ALBANY",
+    "state": "IL",
+    "lat": 41.789475,
+    "lon": -90.219294
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB AURORA",
+    "state": "IN",
+    "lat": 39.057002,
+    "lon": -84.90134
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB BENTON",
+    "state": "IL",
+    "lat": 37.996716,
+    "lon": -88.920068
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB BIRDS POINT",
+    "state": "MO",
+    "lat": 36.965857,
+    "lon": -89.156558
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CARUTHERSVILLE",
+    "state": "MO",
+    "lat": 36.191663,
+    "lon": -89.654845
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CLAYTON",
+    "state": "IA",
+    "lat": 42.854771,
+    "lon": -91.366715
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CONNERSVILLE",
+    "state": "IN",
+    "lat": 39.641159,
+    "lon": -85.141075
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DORENA",
+    "state": "MO",
+    "lat": 36.616257,
+    "lon": -89.237292
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DWIGHT",
+    "state": "IL",
+    "lat": 41.094477,
+    "lon": -88.42506
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DYERSBURG",
+    "state": "TN",
+    "lat": 36.032522,
+    "lon": -89.386638
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ELIZABETHTOWN",
+    "state": "IN",
+    "lat": 39.135052,
+    "lon": -85.813315
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ENFIELD",
+    "state": "IL",
+    "lat": 38.099491,
+    "lon": -88.337545
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FAYETTE",
+    "state": "IA",
+    "lat": 42.842077,
+    "lon": -91.850265
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FITHIAN",
+    "state": "IL",
+    "lat": 40.113924,
+    "lon": -87.873086
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FLAGG",
+    "state": "IL",
+    "lat": 41.895863,
+    "lon": -89.14093
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FREEPORT",
+    "state": "IL",
+    "lat": 42.296686,
+    "lon": -89.621227
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FULTON",
+    "state": "LA",
+    "lat": 30.512699,
+    "lon": -93.200714
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB GRAND TOWER",
+    "state": "IL",
+    "lat": 37.626439,
+    "lon": -89.497874
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HENNEPIN",
+    "state": "IL",
+    "lat": 41.254203,
+    "lon": -89.342311
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HICKMAN",
+    "state": "KY",
+    "lat": 36.690353,
+    "lon": -88.958721
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HOMER",
+    "state": "IL",
+    "lat": 40.034757,
+    "lon": -87.958089
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB JEFFERSONVILLE",
+    "state": "IN",
+    "lat": 38.277023,
+    "lon": -85.73716
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB JOLIET",
+    "state": "IL",
+    "lat": 41.52636,
+    "lon": -88.084021
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LINDA",
+    "state": "MO",
+    "lat": 36.410897,
+    "lon": -89.547021
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LOUISVILLE",
+    "state": "KY",
+    "lat": 38.254238,
+    "lon": -85.759407
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LYLES STATION",
+    "state": "IN",
+    "lat": 38.370324,
+    "lon": -87.659192
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MOUND CITY",
+    "state": "IL",
+    "lat": 37.085329,
+    "lon": -89.162573
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MT CARROLL",
+    "state": "",
+    "lat": 42.094858,
+    "lon": -89.977704
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MT VERNON",
+    "state": "IN",
+    "lat": 37.931802,
+    "lon": -87.894785
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OLNEY",
+    "state": "IL",
+    "lat": 38.729654,
+    "lon": -88.084689
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OSCEOLA",
+    "state": "AR",
+    "lat": 35.705078,
+    "lon": -89.969532
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OWENSBORO",
+    "state": "KY",
+    "lat": 37.774215,
+    "lon": -87.11333
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB PINCKNEYVILLE",
+    "state": "IL",
+    "lat": 38.080329,
+    "lon": -89.382032
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB QTI",
+    "state": "",
+    "lat": 43.084337,
+    "lon": -89.371026
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB RIVERSIDE",
+    "state": "OH",
+    "lat": 39.779398,
+    "lon": -84.124636
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB SAVAGE",
+    "state": "MN",
+    "lat": 44.777904,
+    "lon": -93.33562
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB SCOTT CITY",
+    "state": "MO",
+    "lat": 37.21635,
+    "lon": -89.526124
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB UNIONTOWN",
+    "state": "KY",
+    "lat": 37.775321,
+    "lon": -87.930583
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WALTON",
+    "state": "IL",
+    "lat": 41.715033,
+    "lon": -89.438431
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WATERLOO",
+    "state": "IN",
+    "lat": 41.431836,
+    "lon": -85.02139
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WEST MEMPHIS",
+    "state": "AR",
+    "lat": 35.14648,
+    "lon": -90.184539
+  },
+  {
+    "provider": "CHS",
+    "location": "ADM Cedar Rapids",
+    "state": "",
+    "lat": 41.975887,
+    "lon": -91.670405
+  },
+  {
+    "provider": "CHS",
+    "location": "ADM Clinton",
+    "state": "IA",
+    "lat": 41.90547,
+    "lon": -90.559997
+  },
+  {
+    "provider": "CHS",
+    "location": "AGP - Hastings",
+    "state": "NE",
+    "lat": 40.586132,
+    "lon": -98.389888
+  },
+  {
+    "provider": "CHS",
+    "location": "AGP Aberdeen",
+    "state": "SD",
+    "lat": 45.464981,
+    "lon": -98.487813
+  },
+  {
+    "provider": "CHS",
+    "location": "Ada",
+    "state": "MN",
+    "lat": 47.299689,
+    "lon": -96.515346
+  },
+  {
+    "provider": "CHS",
+    "location": "Akron",
+    "state": "CO",
+    "lat": 40.160537,
+    "lon": -103.214384
+  },
+  {
+    "provider": "CHS",
+    "location": "Alma",
+    "state": "NE",
+    "lat": 40.097511,
+    "lon": -99.362043
+  },
+  {
+    "provider": "CHS",
+    "location": "Amherst",
+    "state": "NE",
+    "lat": 40.838337,
+    "lon": -99.270191
+  },
+  {
+    "provider": "CHS",
+    "location": "Annawan",
+    "state": "IL",
+    "lat": 41.397257,
+    "lon": -89.904552
+  },
+  {
+    "provider": "CHS",
+    "location": "Ashley",
+    "state": "ND",
+    "lat": 46.034141,
+    "lon": -99.371503
+  },
+  {
+    "provider": "CHS",
+    "location": "Baltic",
+    "state": "SD",
+    "lat": 43.760461,
+    "lon": -96.74041
+  },
+  {
+    "provider": "CHS",
+    "location": "Beltrami",
+    "state": "MN",
+    "lat": 47.997854,
+    "lon": -94.879901
+  },
+  {
+    "provider": "CHS",
+    "location": "Bertrand",
+    "state": "NE",
+    "lat": 40.526672,
+    "lon": -99.633923
+  },
+  {
+    "provider": "CHS",
+    "location": "Blunt",
+    "state": "SD",
+    "lat": 44.513039,
+    "lon": -99.985967
+  },
+  {
+    "provider": "CHS",
+    "location": "Bowbells",
+    "state": "ND",
+    "lat": 48.803083,
+    "lon": -102.246001
+  },
+  {
+    "provider": "CHS",
+    "location": "Boyle Terminal",
+    "state": "MN",
+    "lat": 33.704003,
+    "lon": -90.726485
+  },
+  {
+    "provider": "CHS",
+    "location": "Brandon",
+    "state": "SD",
+    "lat": 43.590929,
+    "lon": -96.587454
+  },
+  {
+    "provider": "CHS",
+    "location": "Bridgeport Ethanol",
+    "state": "NE",
+    "lat": 41.644318,
+    "lon": -103.078303
+  },
+  {
+    "provider": "CHS",
+    "location": "Bruce Elevator",
+    "state": "SD",
+    "lat": 44.438023,
+    "lon": -96.890059
+  },
+  {
+    "provider": "CHS",
+    "location": "Brule",
+    "state": "SD",
+    "lat": 43.68483,
+    "lon": -99.053888
+  },
+  {
+    "provider": "CHS",
+    "location": "Brush",
+    "state": "CO",
+    "lat": 40.258491,
+    "lon": -103.623473
+  },
+  {
+    "provider": "CHS",
+    "location": "Byers",
+    "state": "CO",
+    "lat": 39.709183,
+    "lon": -104.221853
+  },
+  {
+    "provider": "CHS",
+    "location": "CHS Cahokia",
+    "state": "IL",
+    "lat": 38.566161,
+    "lon": -90.179424
+  },
+  {
+    "provider": "CHS",
+    "location": "CHS Primeland",
+    "state": "WA",
+    "lat": 47.45242,
+    "lon": -117.13879
+  },
+  {
+    "provider": "CHS",
+    "location": "Callaway",
+    "state": "NE",
+    "lat": 41.290857,
+    "lon": -99.925413
+  },
+  {
+    "provider": "CHS",
+    "location": "Calvin",
+    "state": "ND",
+    "lat": 48.851458,
+    "lon": -98.93757
+  },
+  {
+    "provider": "CHS",
+    "location": "Canton",
+    "state": "SD",
+    "lat": 43.300916,
+    "lon": -96.592641
+  },
+  {
+    "provider": "CHS",
+    "location": "Carrollton/White Hal",
+    "state": "IL",
+    "lat": 39.302269,
+    "lon": -90.407063
+  },
+  {
+    "provider": "CHS",
+    "location": "Cavalier",
+    "state": "ND",
+    "lat": 48.766438,
+    "lon": -98.500139
+  },
+  {
+    "provider": "CHS",
+    "location": "Chamberlain",
+    "state": "SD",
+    "lat": 43.810817,
+    "lon": -99.330178
+  },
+  {
+    "provider": "CHS",
+    "location": "Cheyenne Wells",
+    "state": "CO",
+    "lat": 38.821395,
+    "lon": -102.353243
+  },
+  {
+    "provider": "CHS",
+    "location": "Chokio",
+    "state": "MN",
+    "lat": 45.571458,
+    "lon": -96.17298
+  },
+  {
+    "provider": "CHS",
+    "location": "Circle",
+    "state": "MT",
+    "lat": 47.416675,
+    "lon": -105.592222
+  },
+  {
+    "provider": "CHS",
+    "location": "Claire City",
+    "state": "SD",
+    "lat": 45.857181,
+    "lon": -97.103697
+  },
+  {
+    "provider": "CHS",
+    "location": "Collins, Mississippi",
+    "state": "MS",
+    "lat": 31.645794,
+    "lon": -89.55533
+  },
+  {
+    "provider": "CHS",
+    "location": "Connell Elevator",
+    "state": "WA",
+    "lat": 46.660395,
+    "lon": -118.861197
+  },
+  {
+    "provider": "CHS",
+    "location": "Corn Inc",
+    "state": "IL",
+    "lat": 38.306173,
+    "lon": -90.282501
+  },
+  {
+    "provider": "CHS",
+    "location": "Corsica",
+    "state": "SD",
+    "lat": 43.425268,
+    "lon": -98.407302
+  },
+  {
+    "provider": "CHS",
+    "location": "County Line",
+    "state": "SD",
+    "lat": 43.478319,
+    "lon": -103.00214
+  },
+  {
+    "provider": "CHS",
+    "location": "Crookston Terminal",
+    "state": "MN",
+    "lat": 47.773999,
+    "lon": -96.608117
+  },
+  {
+    "provider": "CHS",
+    "location": "Darien",
+    "state": "IL",
+    "lat": 41.750871,
+    "lon": -87.973959
+  },
+  {
+    "provider": "CHS",
+    "location": "Davenport",
+    "state": "IA",
+    "lat": 41.522469,
+    "lon": -90.57564
+  },
+  {
+    "provider": "CHS",
+    "location": "Davidson",
+    "state": "ND",
+    "lat": 48.159575,
+    "lon": -103.639464
+  },
+  {
+    "provider": "CHS",
+    "location": "Devils Lake",
+    "state": "ND",
+    "lat": 48.112779,
+    "lon": -98.86512
+  },
+  {
+    "provider": "CHS",
+    "location": "Drayton",
+    "state": "ND",
+    "lat": 48.571128,
+    "lon": -97.178015
+  },
+  {
+    "provider": "CHS",
+    "location": "Dupree",
+    "state": "SD",
+    "lat": 45.047482,
+    "lon": -101.60099
+  },
+  {
+    "provider": "CHS",
+    "location": "Edgeley",
+    "state": "ND",
+    "lat": 46.360359,
+    "lon": -98.712049
+  },
+  {
+    "provider": "CHS",
+    "location": "Edmore",
+    "state": "ND",
+    "lat": 48.413337,
+    "lon": -98.45428
+  },
+  {
+    "provider": "CHS",
+    "location": "Elkton",
+    "state": "SD",
+    "lat": 44.236079,
+    "lon": -96.481155
+  },
+  {
+    "provider": "CHS",
+    "location": "Elm Creek",
+    "state": "NE",
+    "lat": 40.717418,
+    "lon": -99.373296
+  },
+  {
+    "provider": "CHS",
+    "location": "Erskine",
+    "state": "MN",
+    "lat": 47.666983,
+    "lon": -96.00996
+  },
+  {
+    "provider": "CHS",
+    "location": "Fairfax",
+    "state": "SD",
+    "lat": 43.027497,
+    "lon": -98.888423
+  },
+  {
+    "provider": "CHS",
+    "location": "Fairmont",
+    "state": "MN",
+    "lat": 43.652178,
+    "lon": -94.461083
+  },
+  {
+    "provider": "CHS",
+    "location": "Fergus Falls South (8\u00a2 Dump fee)",
+    "state": "MN",
+    "lat": 46.279816,
+    "lon": -96.073749
+  },
+  {
+    "provider": "CHS",
+    "location": "Fleming",
+    "state": "CO",
+    "lat": 40.679991,
+    "lon": -102.839362
+  },
+  {
+    "provider": "CHS",
+    "location": "Frederick",
+    "state": "OK",
+    "lat": 34.391436,
+    "lon": -99.015156
+  },
+  {
+    "provider": "CHS",
+    "location": "French",
+    "state": "MN",
+    "lat": 46.288015,
+    "lon": -96.201729
+  },
+  {
+    "provider": "CHS",
+    "location": "GPC Muscatine",
+    "state": "IA",
+    "lat": 41.398309,
+    "lon": -91.060744
+  },
+  {
+    "provider": "CHS",
+    "location": "Galchutt",
+    "state": "ND",
+    "lat": 46.38746,
+    "lon": -96.809524
+  },
+  {
+    "provider": "CHS",
+    "location": "Garrison",
+    "state": "ND",
+    "lat": 47.652223,
+    "lon": -101.415717
+  },
+  {
+    "provider": "CHS",
+    "location": "Gettysburg",
+    "state": "SD",
+    "lat": 45.011647,
+    "lon": -99.955673
+  },
+  {
+    "provider": "CHS",
+    "location": "Glasgow",
+    "state": "MT",
+    "lat": 48.195591,
+    "lon": -106.635556
+  },
+  {
+    "provider": "CHS",
+    "location": "Glasston",
+    "state": "ND",
+    "lat": 48.705823,
+    "lon": -97.447582
+  },
+  {
+    "provider": "CHS",
+    "location": "Glendive",
+    "state": "MT",
+    "lat": 47.10529,
+    "lon": -104.71246
+  },
+  {
+    "provider": "CHS",
+    "location": "Glenwood",
+    "state": "MN",
+    "lat": 45.650239,
+    "lon": -95.389758
+  },
+  {
+    "provider": "CHS",
+    "location": "Greenbush",
+    "state": "MN",
+    "lat": 48.700122,
+    "lon": -96.181298
+  },
+  {
+    "provider": "CHS",
+    "location": "Grygla",
+    "state": "MN",
+    "lat": 48.300546,
+    "lon": -95.617732
+  },
+  {
+    "provider": "CHS",
+    "location": "Gwinner",
+    "state": "ND",
+    "lat": 46.225796,
+    "lon": -97.662596
+  },
+  {
+    "provider": "CHS",
+    "location": "Hallock - Devils Lake",
+    "state": "MN",
+    "lat": 48.774426,
+    "lon": -96.946447
+  },
+  {
+    "provider": "CHS",
+    "location": "Hallock NG",
+    "state": "MN",
+    "lat": 48.774426,
+    "lon": -96.946447
+  },
+  {
+    "provider": "CHS",
+    "location": "Hannaford",
+    "state": "ND",
+    "lat": 47.313325,
+    "lon": -98.186485
+  },
+  {
+    "provider": "CHS",
+    "location": "Harwood",
+    "state": "ND",
+    "lat": 46.979412,
+    "lon": -96.880638
+  },
+  {
+    "provider": "CHS",
+    "location": "Havana/Beardstown",
+    "state": "IL",
+    "lat": 40.301432,
+    "lon": -90.063362
+  },
+  {
+    "provider": "CHS",
+    "location": "Havre",
+    "state": "MT",
+    "lat": 48.553697,
+    "lon": -109.677802
+  },
+  {
+    "provider": "CHS",
+    "location": "Haxtun",
+    "state": "CO",
+    "lat": 40.641102,
+    "lon": -102.626858
+  },
+  {
+    "provider": "CHS",
+    "location": "Hazel",
+    "state": "SD",
+    "lat": 44.759885,
+    "lon": -97.37961
+  },
+  {
+    "provider": "CHS",
+    "location": "Hennessey",
+    "state": "OK",
+    "lat": 36.109868,
+    "lon": -97.898657
+  },
+  {
+    "provider": "CHS",
+    "location": "Herman",
+    "state": "MN",
+    "lat": 45.808561,
+    "lon": -96.143416
+  },
+  {
+    "provider": "CHS",
+    "location": "Hinton",
+    "state": "IA",
+    "lat": 42.626701,
+    "lon": -96.293925
+  },
+  {
+    "provider": "CHS",
+    "location": "Holdrege Shuttle",
+    "state": "NE",
+    "lat": 40.437996,
+    "lon": -99.3699
+  },
+  {
+    "provider": "CHS",
+    "location": "Holdrege West",
+    "state": "NE",
+    "lat": 40.828229,
+    "lon": -96.785724
+  },
+  {
+    "provider": "CHS",
+    "location": "Holyoke",
+    "state": "CO",
+    "lat": 40.584437,
+    "lon": -102.30241
+  },
+  {
+    "provider": "CHS",
+    "location": "Holyoke Shuttle",
+    "state": "CO",
+    "lat": 40.584437,
+    "lon": -102.30241
+  },
+  {
+    "provider": "CHS",
+    "location": "Hyde",
+    "state": "SD",
+    "lat": 44.51034,
+    "lon": -99.493672
+  },
+  {
+    "provider": "CHS",
+    "location": "Idalia",
+    "state": "CO",
+    "lat": 39.703881,
+    "lon": -102.293805
+  },
+  {
+    "provider": "CHS",
+    "location": "Idalia West",
+    "state": "CO",
+    "lat": 32.759264,
+    "lon": -111.684018
+  },
+  {
+    "provider": "CHS",
+    "location": "Ingredion",
+    "state": "IN",
+    "lat": 39.744812,
+    "lon": -86.174416
+  },
+  {
+    "provider": "CHS",
+    "location": "Isabel",
+    "state": "SD",
+    "lat": 45.394148,
+    "lon": -101.429593
+  },
+  {
+    "provider": "CHS",
+    "location": "Joliet Container Mkt",
+    "state": "IL",
+    "lat": 41.52636,
+    "lon": -88.084021
+  },
+  {
+    "provider": "CHS",
+    "location": "Julesburg",
+    "state": "CO",
+    "lat": 40.988326,
+    "lon": -102.264352
+  },
+  {
+    "provider": "CHS",
+    "location": "Kalispell",
+    "state": "MT",
+    "lat": 48.202158,
+    "lon": -114.315321
+  },
+  {
+    "provider": "CHS",
+    "location": "Kanaranzi",
+    "state": "MN",
+    "lat": 43.575802,
+    "lon": -96.094469
+  },
+  {
+    "provider": "CHS",
+    "location": "Kanco",
+    "state": "KS",
+    "lat": 38.472238,
+    "lon": -102.04268
+  },
+  {
+    "provider": "CHS",
+    "location": "Kasson",
+    "state": "MN",
+    "lat": 44.029705,
+    "lon": -92.750345
+  },
+  {
+    "provider": "CHS",
+    "location": "Kennedy",
+    "state": "MN",
+    "lat": 48.641925,
+    "lon": -96.908948
+  },
+  {
+    "provider": "CHS",
+    "location": "Kennewick/LoMo",
+    "state": "WA",
+    "lat": 46.208707,
+    "lon": -119.119919
+  },
+  {
+    "provider": "CHS",
+    "location": "Kershaw",
+    "state": "MN",
+    "lat": 45.185154,
+    "lon": -93.668554
+  },
+  {
+    "provider": "CHS",
+    "location": "Kindred Terminal",
+    "state": "ND",
+    "lat": 46.648578,
+    "lon": -97.017032
+  },
+  {
+    "provider": "CHS",
+    "location": "Kingfisher",
+    "state": "OK",
+    "lat": 35.947193,
+    "lon": -97.964124
+  },
+  {
+    "provider": "CHS",
+    "location": "Lakota",
+    "state": "ND",
+    "lat": 48.043054,
+    "lon": -98.344358
+  },
+  {
+    "provider": "CHS",
+    "location": "Langdon",
+    "state": "ND",
+    "lat": 48.76059,
+    "lon": -98.367824
+  },
+  {
+    "provider": "CHS",
+    "location": "Lankin",
+    "state": "ND",
+    "lat": 48.311873,
+    "lon": -97.924316
+  },
+  {
+    "provider": "CHS",
+    "location": "Lemmon Terminal",
+    "state": "SD",
+    "lat": 45.940834,
+    "lon": -102.15932
+  },
+  {
+    "provider": "CHS",
+    "location": "Long Prairie",
+    "state": "MN",
+    "lat": 45.974113,
+    "lon": -94.865264
+  },
+  {
+    "provider": "CHS",
+    "location": "Loomis",
+    "state": "NE",
+    "lat": 40.477363,
+    "lon": -99.507096
+  },
+  {
+    "provider": "CHS",
+    "location": "Lowder",
+    "state": "IL",
+    "lat": 39.550885,
+    "lon": -89.845935
+  },
+  {
+    "provider": "CHS",
+    "location": "Lowry",
+    "state": "MN",
+    "lat": 45.704889,
+    "lon": -95.519095
+  },
+  {
+    "provider": "CHS",
+    "location": "Luverne",
+    "state": "MN",
+    "lat": 43.654234,
+    "lon": -96.212781
+  },
+  {
+    "provider": "CHS",
+    "location": "Macon",
+    "state": "MO",
+    "lat": 39.841625,
+    "lon": -92.567512
+  },
+  {
+    "provider": "CHS",
+    "location": "Magnolia",
+    "state": "MN",
+    "lat": 43.645171,
+    "lon": -96.079559
+  },
+  {
+    "provider": "CHS",
+    "location": "Mahnomen",
+    "state": "MN",
+    "lat": 47.33136,
+    "lon": -95.814291
+  },
+  {
+    "provider": "CHS",
+    "location": "Malta",
+    "state": "IL",
+    "lat": 41.929221,
+    "lon": -88.862314
+  },
+  {
+    "provider": "CHS",
+    "location": "Mankato",
+    "state": "MN",
+    "lat": 44.165853,
+    "lon": -94.002801
+  },
+  {
+    "provider": "CHS",
+    "location": "Manvel",
+    "state": "ND",
+    "lat": 48.077762,
+    "lon": -97.176465
+  },
+  {
+    "provider": "CHS",
+    "location": "Marshall",
+    "state": "MN",
+    "lat": 48.360534,
+    "lon": -96.381968
+  },
+  {
+    "provider": "CHS",
+    "location": "Merritt Bunker",
+    "state": "NE",
+    "lat": 42.607755,
+    "lon": -100.883603
+  },
+  {
+    "provider": "CHS",
+    "location": "Milton",
+    "state": "ND",
+    "lat": 48.626384,
+    "lon": -98.042602
+  },
+  {
+    "provider": "CHS",
+    "location": "Minot",
+    "state": "ND",
+    "lat": 48.23251,
+    "lon": -101.296273
+  },
+  {
+    "provider": "CHS",
+    "location": "Mitchell",
+    "state": "SD",
+    "lat": 43.70953,
+    "lon": -98.025379
+  },
+  {
+    "provider": "CHS",
+    "location": "Mohall",
+    "state": "ND",
+    "lat": 48.763356,
+    "lon": -101.513217
+  },
+  {
+    "provider": "CHS",
+    "location": "Mooreton",
+    "state": "ND",
+    "lat": 46.26857,
+    "lon": -96.876192
+  },
+  {
+    "provider": "CHS",
+    "location": "Morris",
+    "state": "MN",
+    "lat": 45.586072,
+    "lon": -95.913941
+  },
+  {
+    "provider": "CHS",
+    "location": "Napoleon",
+    "state": "ND",
+    "lat": 46.50454,
+    "lon": -99.766778
+  },
+  {
+    "provider": "CHS",
+    "location": "New Haven",
+    "state": "ND",
+    "lat": 41.308214,
+    "lon": -72.925052
+  },
+  {
+    "provider": "CHS",
+    "location": "New Salem",
+    "state": "ND",
+    "lat": 46.845259,
+    "lon": -101.408359
+  },
+  {
+    "provider": "CHS",
+    "location": "Newark",
+    "state": "IL",
+    "lat": 41.537494,
+    "lon": -88.582967
+  },
+  {
+    "provider": "CHS",
+    "location": "Norma",
+    "state": "ND",
+    "lat": 48.728913,
+    "lon": -101.973218
+  },
+  {
+    "provider": "CHS",
+    "location": "Okarche",
+    "state": "OK",
+    "lat": 35.725912,
+    "lon": -97.97701
+  },
+  {
+    "provider": "CHS",
+    "location": "Oklee",
+    "state": "MN",
+    "lat": 47.838748,
+    "lon": -95.854789
+  },
+  {
+    "provider": "CHS",
+    "location": "Omega",
+    "state": "IN",
+    "lat": 40.198371,
+    "lon": -85.939149
+  },
+  {
+    "provider": "CHS",
+    "location": "Onida",
+    "state": "SD",
+    "lat": 44.70564,
+    "lon": -100.065472
+  },
+  {
+    "provider": "CHS",
+    "location": "Ostrander",
+    "state": "MN",
+    "lat": 43.61356,
+    "lon": -92.427999
+  },
+  {
+    "provider": "CHS",
+    "location": "Otis",
+    "state": "CO",
+    "lat": 40.149388,
+    "lon": -102.961375
+  },
+  {
+    "provider": "CHS",
+    "location": "Ottawa River Mkt",
+    "state": "IL",
+    "lat": 41.716025,
+    "lon": -83.713579
+  },
+  {
+    "provider": "CHS",
+    "location": "Overton",
+    "state": "NE",
+    "lat": 40.739009,
+    "lon": -99.537717
+  },
+  {
+    "provider": "CHS",
+    "location": "Peru Marketstreet",
+    "state": "IL",
+    "lat": 41.327292,
+    "lon": -89.128764
+  },
+  {
+    "provider": "CHS",
+    "location": "Philip",
+    "state": "SD",
+    "lat": 44.039433,
+    "lon": -101.665144
+  },
+  {
+    "provider": "CHS",
+    "location": "Pierre",
+    "state": "SD",
+    "lat": 44.368364,
+    "lon": -100.351136
+  },
+  {
+    "provider": "CHS",
+    "location": "Pipestone",
+    "state": "MN",
+    "lat": 44.027001,
+    "lon": -96.256658
+  },
+  {
+    "provider": "CHS",
+    "location": "Quincy Elevator",
+    "state": "IL",
+    "lat": 38.936793,
+    "lon": -77.024617
+  },
+  {
+    "provider": "CHS",
+    "location": "Richey",
+    "state": "MT",
+    "lat": 47.644075,
+    "lon": -105.069566
+  },
+  {
+    "provider": "CHS",
+    "location": "Rochelle",
+    "state": "IL",
+    "lat": 41.923918,
+    "lon": -89.068707
+  },
+  {
+    "provider": "CHS",
+    "location": "Roseau",
+    "state": "MN",
+    "lat": 48.771037,
+    "lon": -95.769788
+  },
+  {
+    "provider": "CHS",
+    "location": "Rt. 47 Terminal",
+    "state": "IL",
+    "lat": 34.033723,
+    "lon": -118.265353
+  },
+  {
+    "provider": "CHS",
+    "location": "Ruthton",
+    "state": "MN",
+    "lat": 44.176633,
+    "lon": -96.103918
+  },
+  {
+    "provider": "CHS",
+    "location": "Sarles",
+    "state": "ND",
+    "lat": 48.94584,
+    "lon": -98.995961
+  },
+  {
+    "provider": "CHS",
+    "location": "Savage",
+    "state": "MN",
+    "lat": 44.777904,
+    "lon": -93.33562
+  },
+  {
+    "provider": "CHS",
+    "location": "Selby",
+    "state": "SD",
+    "lat": 45.506379,
+    "lon": -100.032066
+  },
+  {
+    "provider": "CHS",
+    "location": "Selkirk",
+    "state": "ND",
+    "lat": 47.929904,
+    "lon": -97.10536
+  },
+  {
+    "provider": "CHS",
+    "location": "Seneca",
+    "state": "IL",
+    "lat": 41.310716,
+    "lon": -88.609086
+  },
+  {
+    "provider": "CHS",
+    "location": "Sharon Springs",
+    "state": "KS",
+    "lat": 38.897787,
+    "lon": -101.752116
+  },
+  {
+    "provider": "CHS",
+    "location": "Shelby",
+    "state": "MT",
+    "lat": 48.5055,
+    "lon": -111.856872
+  },
+  {
+    "provider": "CHS",
+    "location": "Shipman",
+    "state": "IL",
+    "lat": 39.117546,
+    "lon": -90.044273
+  },
+  {
+    "provider": "CHS",
+    "location": "Smithfield",
+    "state": "NE",
+    "lat": 40.572506,
+    "lon": -99.742339
+  },
+  {
+    "provider": "CHS",
+    "location": "Stateline",
+    "state": "CO",
+    "lat": 38.966774,
+    "lon": -119.944275
+  },
+  {
+    "provider": "CHS",
+    "location": "Sterling",
+    "state": "CO",
+    "lat": 40.625541,
+    "lon": -103.207709
+  },
+  {
+    "provider": "CHS",
+    "location": "Steward",
+    "state": "IL",
+    "lat": 41.847939,
+    "lon": -89.019476
+  },
+  {
+    "provider": "CHS",
+    "location": "Strasburg",
+    "state": "ND",
+    "lat": 46.133601,
+    "lon": -100.161504
+  },
+  {
+    "provider": "CHS",
+    "location": "Tracy",
+    "state": "MN",
+    "lat": 44.233291,
+    "lon": -95.619177
+  },
+  {
+    "provider": "CHS",
+    "location": "Tribune",
+    "state": "KS",
+    "lat": 38.469738,
+    "lon": -101.752672
+  },
+  {
+    "provider": "CHS",
+    "location": "Ulen",
+    "state": "MN",
+    "lat": 47.07885,
+    "lon": -96.258949
+  },
+  {
+    "provider": "CHS",
+    "location": "Underwood (13\u00a2 Dump fee)",
+    "state": "ND",
+    "lat": 47.456386,
+    "lon": -101.137096
+  },
+  {
+    "provider": "CHS",
+    "location": "Wagner",
+    "state": "SD",
+    "lat": 43.079716,
+    "lon": -98.293134
+  },
+  {
+    "provider": "CHS",
+    "location": "Wallace",
+    "state": "KS",
+    "lat": 38.907385,
+    "lon": -101.75651
+  },
+  {
+    "provider": "CHS",
+    "location": "Warren",
+    "state": "MN",
+    "lat": 48.196591,
+    "lon": -96.772705
+  },
+  {
+    "provider": "CHS",
+    "location": "Weskan",
+    "state": "KS",
+    "lat": 38.866675,
+    "lon": -101.964343
+  },
+  {
+    "provider": "CHS",
+    "location": "Wiley",
+    "state": "CO",
+    "lat": 38.154175,
+    "lon": -102.71964
+  },
+  {
+    "provider": "CHS",
+    "location": "Wilmot",
+    "state": "SD",
+    "lat": 45.409853,
+    "lon": -96.857506
+  },
+  {
+    "provider": "CHS",
+    "location": "Winner",
+    "state": "SD",
+    "lat": 43.376667,
+    "lon": -99.859007
+  },
+  {
+    "provider": "CHS",
+    "location": "Winona",
+    "state": "MN",
+    "lat": 44.050005,
+    "lon": -91.639229
+  },
+  {
+    "provider": "CHS",
+    "location": "Wolf Point",
+    "state": "MT",
+    "lat": 48.090574,
+    "lon": -105.640557
+  },
+  {
+    "provider": "CHS",
+    "location": "Wykoff",
+    "state": "MN",
+    "lat": 43.707186,
+    "lon": -92.268221
+  },
+  {
+    "provider": "CHS",
+    "location": "Yuma",
+    "state": "CO",
+    "lat": 40.016349,
+    "lon": -102.458253
+  },
+  {
+    "provider": "CHS",
+    "location": "Yuma Shuttle",
+    "state": "CO",
+    "lat": 40.016349,
+    "lon": -102.458253
+  },
+  {
+    "provider": "Cargill",
+    "location": "Alberta",
+    "state": "MN",
+    "lat": 45.573249,
+    "lon": -96.047609
+  },
+  {
+    "provider": "Cargill",
+    "location": "Albion",
+    "state": "NE",
+    "lat": 41.692935,
+    "lon": -98.001227
+  },
+  {
+    "provider": "Cargill",
+    "location": "Atchison",
+    "state": "KS",
+    "lat": 39.545816,
+    "lon": -95.332605
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bailey",
+    "state": "NC",
+    "lat": 35.778958,
+    "lon": -78.115104
+  },
+  {
+    "provider": "Cargill",
+    "location": "Barber, GOS",
+    "state": "NC",
+    "lat": 36.122659,
+    "lon": -76.592444
+  },
+  {
+    "provider": "Cargill",
+    "location": "Beardsley",
+    "state": "SD",
+    "lat": 43.298322,
+    "lon": -97.982294
+  },
+  {
+    "provider": "Cargill",
+    "location": "Beardstown",
+    "state": "IL",
+    "lat": 40.016793,
+    "lon": -90.434542
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bettendorf",
+    "state": "IA",
+    "lat": 41.525379,
+    "lon": -90.509864
+  },
+  {
+    "provider": "Cargill",
+    "location": "Blair",
+    "state": "NE",
+    "lat": 41.543804,
+    "lon": -96.136001
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bloomingburg",
+    "state": "OH",
+    "lat": 39.605062,
+    "lon": -83.395473
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bloomington",
+    "state": "IL",
+    "lat": 40.479783,
+    "lon": -88.993915
+  },
+  {
+    "provider": "Cargill",
+    "location": "Buffalo Island",
+    "state": "MO",
+    "lat": 39.43338,
+    "lon": -91.02458
+  },
+  {
+    "provider": "Cargill",
+    "location": "Carleton (NE)",
+    "state": "NE",
+    "lat": 40.299799,
+    "lon": -97.678563
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cedar Rapids East",
+    "state": "IA",
+    "lat": 41.979705,
+    "lon": -91.668476
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cedar Rapids Mill",
+    "state": "IA",
+    "lat": 41.975887,
+    "lon": -91.670405
+  },
+  {
+    "provider": "Cargill",
+    "location": "Chillicothe",
+    "state": "OH",
+    "lat": 39.33312,
+    "lon": -82.982402
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cincinnati Kellogg",
+    "state": "OH",
+    "lat": 39.052889,
+    "lon": -84.411532
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cincinnati River Road",
+    "state": "OH",
+    "lat": 39.265471,
+    "lon": -84.266395
+  },
+  {
+    "provider": "Cargill",
+    "location": "Circleville",
+    "state": "OH",
+    "lat": 39.600618,
+    "lon": -82.946013
+  },
+  {
+    "provider": "Cargill",
+    "location": "Dana (dlvd AC Grain, LLC)",
+    "state": "IN",
+    "lat": 39.807814,
+    "lon": -87.495019
+  },
+  {
+    "provider": "Cargill",
+    "location": "Dayton",
+    "state": "OH",
+    "lat": 39.758948,
+    "lon": -84.191607
+  },
+  {
+    "provider": "Cargill",
+    "location": "Decatur",
+    "state": "MI",
+    "lat": 42.108098,
+    "lon": -85.974457
+  },
+  {
+    "provider": "Cargill",
+    "location": "East St. Louis",
+    "state": "IL",
+    "lat": 38.626867,
+    "lon": -90.159707
+  },
+  {
+    "provider": "Cargill",
+    "location": "Eddyville",
+    "state": "IA",
+    "lat": 41.15615,
+    "lon": -92.638166
+  },
+  {
+    "provider": "Cargill",
+    "location": "Emery",
+    "state": "SD",
+    "lat": 43.601648,
+    "lon": -97.622567
+  },
+  {
+    "provider": "Cargill",
+    "location": "Fayetteville",
+    "state": "NC",
+    "lat": 35.052576,
+    "lon": -78.878292
+  },
+  {
+    "provider": "Cargill",
+    "location": "Florence",
+    "state": "IL",
+    "lat": 39.627269,
+    "lon": -90.610682
+  },
+  {
+    "provider": "Cargill",
+    "location": "Forest City (MO)",
+    "state": "MO",
+    "lat": 39.982497,
+    "lon": -95.19192
+  },
+  {
+    "provider": "Cargill",
+    "location": "Frederick",
+    "state": "IL",
+    "lat": 40.070048,
+    "lon": -90.429014
+  },
+  {
+    "provider": "Cargill",
+    "location": "Gainesville",
+    "state": "GA",
+    "lat": 34.297879,
+    "lon": -83.824066
+  },
+  {
+    "provider": "Cargill",
+    "location": "Gibbon",
+    "state": "NE",
+    "lat": 40.749069,
+    "lon": -98.845653
+  },
+  {
+    "provider": "Cargill",
+    "location": "Gibson City",
+    "state": "IL",
+    "lat": 40.465312,
+    "lon": -88.375888
+  },
+  {
+    "provider": "Cargill",
+    "location": "Gilman",
+    "state": "IL",
+    "lat": 40.766702,
+    "lon": -87.992262
+  },
+  {
+    "provider": "Cargill",
+    "location": "Guntersville",
+    "state": "AL",
+    "lat": 34.358147,
+    "lon": -86.294704
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hales Point",
+    "state": "TN",
+    "lat": 35.915198,
+    "lon": -89.627998
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hammond",
+    "state": "IN",
+    "lat": 41.617396,
+    "lon": -87.522011
+  },
+  {
+    "provider": "Cargill",
+    "location": "Harrisonburg, TRKY",
+    "state": "VA",
+    "lat": 38.449331,
+    "lon": -78.868883
+  },
+  {
+    "provider": "Cargill",
+    "location": "Havana",
+    "state": "IL",
+    "lat": 40.301432,
+    "lon": -90.063362
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hickman (Ashland)",
+    "state": "KY",
+    "lat": 36.690353,
+    "lon": -88.958721
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hutchinson East",
+    "state": "KS",
+    "lat": 38.070852,
+    "lon": -97.894314
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hutchinson West",
+    "state": "KS",
+    "lat": 38.069145,
+    "lon": -97.936141
+  },
+  {
+    "provider": "Cargill",
+    "location": "Indianapolis Mill",
+    "state": "IN",
+    "lat": 39.768333,
+    "lon": -86.15835
+  },
+  {
+    "provider": "Cargill",
+    "location": "Iowa Falls",
+    "state": "IA",
+    "lat": 42.520792,
+    "lon": -93.264759
+  },
+  {
+    "provider": "Cargill",
+    "location": "Kansas City",
+    "state": "MO",
+    "lat": 39.100105,
+    "lon": -94.578142
+  },
+  {
+    "provider": "Cargill",
+    "location": "Keithsburg",
+    "state": "IL",
+    "lat": 41.099479,
+    "lon": -90.942643
+  },
+  {
+    "provider": "Cargill",
+    "location": "LaCrosse",
+    "state": "WI",
+    "lat": 43.435153,
+    "lon": -89.729583
+  },
+  {
+    "provider": "Cargill",
+    "location": "Lacon",
+    "state": "IL",
+    "lat": 41.024758,
+    "lon": -89.411201
+  },
+  {
+    "provider": "Cargill",
+    "location": "Lafayette",
+    "state": "IN",
+    "lat": 40.419123,
+    "lon": -86.891901
+  },
+  {
+    "provider": "Cargill",
+    "location": "Lima",
+    "state": "OH",
+    "lat": 40.739978,
+    "lon": -84.105006
+  },
+  {
+    "provider": "Cargill",
+    "location": "Linden",
+    "state": "IN",
+    "lat": 40.188094,
+    "lon": -86.903896
+  },
+  {
+    "provider": "Cargill",
+    "location": "Madison",
+    "state": "MN",
+    "lat": 45.009685,
+    "lon": -96.195877
+  },
+  {
+    "provider": "Cargill",
+    "location": "Meredosia",
+    "state": "IL",
+    "lat": 39.831158,
+    "lon": -90.559571
+  },
+  {
+    "provider": "Cargill",
+    "location": "Milford",
+    "state": "IN",
+    "lat": 41.40977,
+    "lon": -85.845548
+  },
+  {
+    "provider": "Cargill",
+    "location": "Muscatine",
+    "state": "IA",
+    "lat": 41.477612,
+    "lon": -91.121005
+  },
+  {
+    "provider": "Cargill",
+    "location": "Napa Junction",
+    "state": "SD",
+    "lat": 42.94072,
+    "lon": -97.452863
+  },
+  {
+    "provider": "Cargill",
+    "location": "New Boston",
+    "state": "IL",
+    "lat": 41.170311,
+    "lon": -90.996811
+  },
+  {
+    "provider": "Cargill",
+    "location": "New Madrid",
+    "state": "MO",
+    "lat": 36.574961,
+    "lon": -89.678095
+  },
+  {
+    "provider": "Cargill",
+    "location": "O'Neill",
+    "state": "NE",
+    "lat": 42.457793,
+    "lon": -98.647782
+  },
+  {
+    "provider": "Cargill",
+    "location": "Ogallah",
+    "state": "KS",
+    "lat": 38.991398,
+    "lon": -99.732339
+  },
+  {
+    "provider": "Cargill",
+    "location": "Ord (NE)",
+    "state": "NE",
+    "lat": 41.603338,
+    "lon": -98.926213
+  },
+  {
+    "provider": "Cargill",
+    "location": "Owensboro",
+    "state": "KY",
+    "lat": 37.774215,
+    "lon": -87.11333
+  },
+  {
+    "provider": "Cargill",
+    "location": "Paris Mill",
+    "state": "IL",
+    "lat": 30.270861,
+    "lon": -81.827728
+  },
+  {
+    "provider": "Cargill",
+    "location": "Salina",
+    "state": "KS",
+    "lat": 38.84028,
+    "lon": -97.611424
+  },
+  {
+    "provider": "Cargill",
+    "location": "Savage",
+    "state": "MN",
+    "lat": 44.777904,
+    "lon": -93.33562
+  },
+  {
+    "provider": "Cargill",
+    "location": "Shelton",
+    "state": "NE",
+    "lat": 40.780661,
+    "lon": -98.734127
+  },
+  {
+    "provider": "Cargill",
+    "location": "Sidney",
+    "state": "OH",
+    "lat": 40.284241,
+    "lon": -84.155527
+  },
+  {
+    "provider": "Cargill",
+    "location": "Sioux City",
+    "state": "IA",
+    "lat": 42.496682,
+    "lon": -96.405878
+  },
+  {
+    "provider": "Cargill",
+    "location": "Spring Valley South",
+    "state": "IL",
+    "lat": 41.323952,
+    "lon": -89.19912
+  },
+  {
+    "provider": "Cargill",
+    "location": "Tipton",
+    "state": "IN",
+    "lat": 40.289915,
+    "lon": -86.058442
+  },
+  {
+    "provider": "Cargill",
+    "location": "Topeka - Crossroads",
+    "state": "KS",
+    "lat": 39.049011,
+    "lon": -95.677556
+  },
+  {
+    "provider": "Cargill",
+    "location": "Topeka - Gordon",
+    "state": "KS",
+    "lat": 39.070457,
+    "lon": -95.671171
+  },
+  {
+    "provider": "Cargill",
+    "location": "Wahpeton",
+    "state": "ND",
+    "lat": 46.265879,
+    "lon": -96.608863
+  },
+  {
+    "provider": "Cargill",
+    "location": "Wakeeney",
+    "state": "KS",
+    "lat": 39.023631,
+    "lon": -99.883729
+  },
+  {
+    "provider": "Cargill",
+    "location": "West Fargo",
+    "state": "ND",
+    "lat": 46.874967,
+    "lon": -96.900362
+  },
+  {
+    "provider": "Cargill",
+    "location": "West Memphis",
+    "state": "AR",
+    "lat": 35.14648,
+    "lon": -90.184539
+  },
+  {
+    "provider": "Cargill",
+    "location": "Wichita",
+    "state": "KS",
+    "lat": 37.692236,
+    "lon": -97.337545
+  },
+  {
+    "provider": "Scoular",
+    "location": "AGP - Manning",
+    "state": "IA",
+    "lat": 41.909229,
+    "lon": -95.065057
+  },
+  {
+    "provider": "Scoular",
+    "location": "Ada, KS",
+    "state": "NE",
+    "lat": 39.151392,
+    "lon": -97.889209
+  },
+  {
+    "provider": "Scoular",
+    "location": "Brewster, KS",
+    "state": "KS",
+    "lat": 39.363444,
+    "lon": -101.3764
+  },
+  {
+    "provider": "Scoular",
+    "location": "Bunge - Council Bluffs",
+    "state": "IA",
+    "lat": 41.258841,
+    "lon": -95.851948
+  },
+  {
+    "provider": "Scoular",
+    "location": "Coolidge Cash Bids",
+    "state": "KS",
+    "lat": 38.04168,
+    "lon": -102.008792
+  },
+  {
+    "provider": "Scoular",
+    "location": "Corley, IA",
+    "state": "IA",
+    "lat": 41.57823,
+    "lon": -95.32988
+  },
+  {
+    "provider": "Scoular",
+    "location": "Covington, OH",
+    "state": "OH",
+    "lat": 40.117273,
+    "lon": -84.353837
+  },
+  {
+    "provider": "Scoular",
+    "location": "Cullison, KS",
+    "state": "KS",
+    "lat": 37.630574,
+    "lon": -98.905376
+  },
+  {
+    "provider": "Scoular",
+    "location": "Emerson, IA",
+    "state": "IA",
+    "lat": 41.017241,
+    "lon": -95.40214
+  },
+  {
+    "provider": "Scoular",
+    "location": "Fremont, NE",
+    "state": "NE",
+    "lat": 41.433836,
+    "lon": -96.496045
+  },
+  {
+    "provider": "Scoular",
+    "location": "Grainton Cash Bids",
+    "state": "NE",
+    "lat": 40.822886,
+    "lon": -101.286267
+  },
+  {
+    "provider": "Scoular",
+    "location": "Greensburg, KS",
+    "state": "KS",
+    "lat": 37.603188,
+    "lon": -99.292964
+  },
+  {
+    "provider": "Scoular",
+    "location": "Griswold, IA",
+    "state": "IA",
+    "lat": 41.234787,
+    "lon": -95.1415
+  },
+  {
+    "provider": "Scoular",
+    "location": "Hancock, IA",
+    "state": "IA",
+    "lat": 43.08477,
+    "lon": -93.736367
+  },
+  {
+    "provider": "Scoular",
+    "location": "Haswell Cash Bids",
+    "state": "CO",
+    "lat": 38.452225,
+    "lon": -103.162984
+  },
+  {
+    "provider": "Scoular",
+    "location": "Jerome, ID",
+    "state": "ID",
+    "lat": 42.702266,
+    "lon": -114.286704
+  },
+  {
+    "provider": "Scoular",
+    "location": "Lake City, FL",
+    "state": "FL",
+    "lat": 30.189425,
+    "lon": -82.63948
+  },
+  {
+    "provider": "Scoular",
+    "location": "Lamar, NE",
+    "state": "NE",
+    "lat": 40.572012,
+    "lon": -101.978441
+  },
+  {
+    "provider": "Scoular",
+    "location": "Lincoln, KS",
+    "state": "KS",
+    "lat": 39.034361,
+    "lon": -98.21555
+  },
+  {
+    "provider": "Scoular",
+    "location": "Madrid, NE",
+    "state": "NE",
+    "lat": 40.850206,
+    "lon": -101.54374
+  },
+  {
+    "provider": "Scoular",
+    "location": "Madrid, NE Ethanol",
+    "state": "NE",
+    "lat": 40.850206,
+    "lon": -101.54374
+  },
+  {
+    "provider": "Scoular",
+    "location": "Minneapolis, KS",
+    "state": "KS",
+    "lat": 39.122397,
+    "lon": -97.708708
+  },
+  {
+    "provider": "Scoular",
+    "location": "Monument, KS",
+    "state": "KS",
+    "lat": 39.105922,
+    "lon": -101.010958
+  },
+  {
+    "provider": "Scoular",
+    "location": "North Grant, NE",
+    "state": "NE",
+    "lat": 40.915547,
+    "lon": -98.362365
+  },
+  {
+    "provider": "Scoular",
+    "location": "Oakley, KS",
+    "state": "KS",
+    "lat": 39.126385,
+    "lon": -100.855611
+  },
+  {
+    "provider": "Scoular",
+    "location": "Palmyra, IL - Elevator",
+    "state": "IL",
+    "lat": 39.43477,
+    "lon": -89.99594
+  },
+  {
+    "provider": "Scoular",
+    "location": "Pisgah, IL - Elevator",
+    "state": "IL",
+    "lat": 39.668659,
+    "lon": -90.125671
+  },
+  {
+    "provider": "Scoular",
+    "location": "Portsmouth, IA",
+    "state": "IA",
+    "lat": 41.650096,
+    "lon": -95.518713
+  },
+  {
+    "provider": "Scoular",
+    "location": "Pratt, KS",
+    "state": "KS",
+    "lat": 37.62806,
+    "lon": -98.748531
+  },
+  {
+    "provider": "Scoular",
+    "location": "Salina, KS",
+    "state": "KS",
+    "lat": 38.84028,
+    "lon": -97.611424
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular - Butte, MT",
+    "state": "MT",
+    "lat": 46.013151,
+    "lon": -112.536508
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular - Walnut Grove Farms / Schochoh",
+    "state": "KY",
+    "lat": 35.720559,
+    "lon": -86.427479
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Adrian Cash Bids",
+    "state": "MO",
+    "lat": 38.397518,
+    "lon": -94.351616
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Butterfield Cash Bids",
+    "state": "MO",
+    "lat": 36.750066,
+    "lon": -93.907702
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Charleston Cash Bids",
+    "state": "SC",
+    "lat": 32.788436,
+    "lon": -79.939931
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Cheyenne",
+    "state": "KS",
+    "lat": 39.79558,
+    "lon": -101.757549
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Goodland",
+    "state": "KS",
+    "lat": 39.350833,
+    "lon": -101.710172
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Harrisonville Cash Bids",
+    "state": "MO",
+    "lat": 38.655124,
+    "lon": -94.347107
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Idalia",
+    "state": "CO",
+    "lat": 39.703881,
+    "lon": -102.293805
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Julesburg Cash Bids",
+    "state": "CO",
+    "lat": 40.988326,
+    "lon": -102.264352
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Paxton, NE Bids",
+    "state": "NE",
+    "lat": 41.12416,
+    "lon": -101.356276
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Pittsburg Cash Bids",
+    "state": "KS",
+    "lat": 37.410884,
+    "lon": -94.70496
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Windsor Cash Bids",
+    "state": "VA",
+    "lat": 36.808483,
+    "lon": -76.744125
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Winona",
+    "state": "KS",
+    "lat": 39.063341,
+    "lon": -101.244325
+  },
+  {
+    "provider": "Scoular",
+    "location": "Sidney, NE",
+    "state": "NE",
+    "lat": 41.144868,
+    "lon": -102.976738
+  },
+  {
+    "provider": "Scoular",
+    "location": "South Grant, NE",
+    "state": "NE",
+    "lat": 40.911424,
+    "lon": -98.359409
+  },
+  {
+    "provider": "Scoular",
+    "location": "Tribune - Main / NW / Horace / Inland",
+    "state": "KS",
+    "lat": 38.469738,
+    "lon": -101.752672
+  },
+  {
+    "provider": "Scoular",
+    "location": "Trousdale, KS",
+    "state": "KS",
+    "lat": 37.815294,
+    "lon": -99.085661
+  },
+  {
+    "provider": "Scoular",
+    "location": "Venango, NE",
+    "state": "NE",
+    "lat": 40.764252,
+    "lon": -102.040474
+  },
+  {
+    "provider": "Scoular",
+    "location": "Wallace, NE",
+    "state": "NE",
+    "lat": 40.838337,
+    "lon": -101.164955
+  },
+  {
+    "provider": "Scoular",
+    "location": "Waverly, IL - Elevator",
+    "state": "IL",
+    "lat": 39.591716,
+    "lon": -89.952885
+  },
+  {
+    "provider": "Scoular",
+    "location": "Waverly, IL - Shuttle",
+    "state": "IL",
+    "lat": 39.591716,
+    "lon": -89.952885
+  }
+]

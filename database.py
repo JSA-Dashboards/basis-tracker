@@ -157,6 +157,56 @@ def init_db():
         conn.commit()
     finally:
         conn.close()
+    # Populate lat/lon on a fresh cloud DB from the committed seed file.
+    seed_geocoding()
+
+
+def seed_geocoding(seed_path: str | None = None) -> int:
+    """
+    Load coords_seed.json and upsert lat/lon into location_meta for any rows
+    that are still missing coordinates.  Safe to call repeatedly; only writes
+    when a row is missing coords.  Returns number of rows written.
+    """
+    import json, os
+    if seed_path is None:
+        seed_path = os.path.join(os.path.dirname(__file__), "coords_seed.json")
+    if not os.path.exists(seed_path):
+        return 0
+
+    with open(seed_path, encoding="utf-8") as f:
+        seed = json.load(f)
+
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    written = 0
+    try:
+        for row in seed:
+            if row.get("lat") is None or row.get("lon") is None:
+                continue
+            if _use_pg():
+                c.execute(f"""
+                    INSERT INTO location_meta (provider, location, state, lat, lon)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    ON CONFLICT (provider, location) DO UPDATE SET
+                        state = COALESCE(EXCLUDED.state, location_meta.state),
+                        lat   = COALESCE(location_meta.lat,  EXCLUDED.lat),
+                        lon   = COALESCE(location_meta.lon,  EXCLUDED.lon)
+                """, (row["provider"], row["location"], row["state"], row["lat"], row["lon"]))
+            else:
+                c.execute(f"""
+                    INSERT INTO location_meta (provider, location, state, lat, lon)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    ON CONFLICT(provider, location) DO UPDATE SET
+                        state = COALESCE(excluded.state, location_meta.state),
+                        lat   = COALESCE(location_meta.lat,  excluded.lat),
+                        lon   = COALESCE(location_meta.lon,  excluded.lon)
+                """, (row["provider"], row["location"], row["state"], row["lat"], row["lon"]))
+            written += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return written
 
 
 # ── Email dedup ────────────────────────────────────────────────────────────────
