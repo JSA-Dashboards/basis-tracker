@@ -514,6 +514,41 @@ with st.sidebar:
     )
 
     st.markdown("---")
+    st.markdown("### 🔵 LDC")
+    if st.button("Scrape LDC now", key="ldc_scrape_btn"):
+        from ldc_scraper import fetch_ldc_bids as _fetch_ldc
+        from parsers.ldc_parser import parse_ldc_location as _parse_ldc
+        from database import upsert_location_meta as _ulm7
+        with st.spinner("Fetching LDC bids (8 US facilities)…"):
+            try:
+                _ldclocs = _fetch_ldc()
+                ldc_rows = 0
+                ldc_locs = 0
+                for _ldcloc in _ldclocs:
+                    _ldcsnap = _parse_ldc(_ldcloc)
+                    if _ldcsnap:
+                        upsert_snapshot(_ldcsnap.model_dump())
+                        _ulm7(
+                            "LDC", _ldcsnap.location,
+                            state         = _ldcloc.get("state") or None,
+                            facility_type = None,
+                        )
+                        ldc_rows += len(_ldcsnap.rows)
+                        ldc_locs += 1
+                st.success(
+                    f"✓ {ldc_locs} location(s) — {ldc_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"LDC scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#475569;padding-top:4px">'
+        'CLI: <code style="color:#60a5fa">python auto_import.py --ldc-only</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("---")
     st.markdown("### 🟢 AGP")
     if st.button("Scrape AGP now", key="agp_scrape_btn"):
         from agp_scraper import fetch_agp_bids as _fetch_agp
@@ -593,7 +628,7 @@ st.markdown("---")
 prov_col, _ = st.columns([3, 7])
 with prov_col:
     provider = st.radio(
-        "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP"],
+        "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC"],
         horizontal=True, label_visibility="collapsed",
     )
 
@@ -1048,6 +1083,55 @@ elif provider == "AGP":
     else:
         grains = ["Soybeans"]
 
+elif provider == "LDC":
+    ldc_db_locs = sorted(
+        {r["location"] for r in list_locations() if r["provider"] == "LDC"}
+    )
+    if not ldc_db_locs:
+        st.markdown(
+            '<div style="color:#334155;text-align:center;padding:40px;font-size:12px">'
+            'No LDC data yet.<br><br>'
+            'Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
+            '<code style="color:#60a5fa">python auto_import.py --ldc-only</code>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.stop()
+
+    ldc_meta         = get_location_meta("LDC")
+    ldc_states_avail = sorted({
+        v["state"] for v in ldc_meta.values()
+        if v.get("state") and v["state"] not in ("", "?", "N/A")
+    })
+
+    ldc_state_col, ldc_loc_col = st.columns([2, 6])
+    with ldc_state_col:
+        sel_ldc_state = st.selectbox(
+            "State", options=["All States"] + ldc_states_avail,
+            key="ldc_state_filter", label_visibility="collapsed",
+        )
+    with ldc_loc_col:
+        if sel_ldc_state == "All States":
+            ldc_filtered = ldc_db_locs
+        else:
+            ldc_filtered = sorted([
+                n for n in ldc_db_locs
+                if ldc_meta.get(n, {}).get("state") == sel_ldc_state
+            ])
+        if not ldc_filtered:
+            ldc_filtered = ldc_db_locs
+        sel_ldc_loc = st.selectbox(
+            "LDC Location", options=ldc_filtered,
+            key="ldc_loc_select", label_visibility="collapsed",
+        )
+    loc_key   = sel_ldc_loc
+    loc_color = "#3b82f6"   # blue for LDC
+    _ldc_snaps = get_snapshots("LDC", loc_key)
+    if _ldc_snaps:
+        grains = sorted({r.grain for r in _ldc_snaps[-1].rows if not r.isSpot})
+    else:
+        grains = ["Corn"]
+
 
 # ── Load snapshots ────────────────────────────────────────────────────────────
 snapshots = get_snapshots(provider, loc_key)
@@ -1090,6 +1174,10 @@ if not snapshots:
     elif provider == "AGP":
         hint = ('Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
                 '<code style="color:#60a5fa">python auto_import.py --agp-only</code>, '
+                'then refresh.')
+    elif provider == "LDC":
+        hint = ('Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
+                '<code style="color:#60a5fa">python auto_import.py --ldc-only</code>, '
                 'then refresh.')
     else:
         hint = "Run the daily scraper to populate data for this provider."
