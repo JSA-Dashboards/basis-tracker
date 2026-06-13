@@ -1944,5 +1944,11 @@
   {"provider": "ADM",       "location": "Mendota, IL (Northern Crossing Rail)", "facility_type": "Rail Terminal",   "region": null},
 
   {"provider": "Andersons", "location": "Denison",                             "facility_type": "Corn Processing", "region": null},
-  {"provider": "Andersons", "location": "Greenville",                          "facility_type": "Corn Processing", "region": null}
+  {"provider": "Andersons", "location": "Greenville",                          "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "Scoular",   "location": "Jerome, ID",                          "facility_type": "Feed Mill",       "region": null},
+  {"provider": "Scoular",   "location": "Lake City, FL",                       "facility_type": "Feed Mill",       "region": null},
+  {"provider": "Scoular",   "location": "Scoular Harrisonville Cash Bids",     "facility_type": "Feed Mill",       "region": null},
+
+  {"provider": "Scoular",   "location": "Waverly, IL - Shuttle",               "facility_type": "Rail Terminal",   "region": null}
 ]
