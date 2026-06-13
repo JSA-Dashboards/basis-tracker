@@ -1407,8 +1407,8 @@ with tab_map:
                 key="map_prov_filter",
             )
 
-        # Pre-filter by location type, state, and provider; commodity options
-        # are then derived from this subset so the dropdown stays relevant.
+        # Pre-filter by location type, state, and provider; downstream dropdowns
+        # derive their options from this subset so they stay relevant.
         pre_filtered = [
             r for r in map_rows
             if r["provider"] in sel_provs
@@ -1416,10 +1416,45 @@ with tab_map:
             and (not sel_states or r.get("state") in sel_states)
         ]
 
+        # ── Delivery Zone sub-filter (River Terminals only) ───────────────────
+        rt_in_set = [r for r in pre_filtered if r.get("facility_type") == "River Terminal"]
+        avail_zones = sorted({r["delivery_zone"] for r in rt_in_set if r.get("delivery_zone")})
+        has_unzoned = any(not r.get("delivery_zone") for r in rt_in_set)
+        zone_opts   = avail_zones + (["(No Zone)"] if has_unzoned else [])
+
+        if zone_opts:
+            sel_zones_list = st.multiselect(
+                "Delivery Zone (River Terminals)",
+                options=zone_opts,
+                default=zone_opts,
+                key="map_zone_filter",
+                help=(
+                    "Illinois Waterway CBOT delivery zones:\n"
+                    "Zone 1 — Chicago / Burns Harbor (≥ mile 304)\n"
+                    "Zone 2 — Lockport to Seneca (mile 244.6–304)\n"
+                    "Zone 3 — Ottawa to Chillicothe (mile 170–244.6)\n"
+                    "Zone 4 — Peoria to Pekin (mile 151–170)\n"
+                    "Zone 5 — Havana to Grafton + St. Louis district\n"
+                    "(No Zone) — Upper/Lower Mississippi and other rivers"
+                ),
+            )
+            sel_zones = set(sel_zones_list)
+
+            def _zone_matches(r: dict) -> bool:
+                if r.get("facility_type") != "River Terminal":
+                    return True
+                rz = r.get("delivery_zone") or "(No Zone)"
+                return rz in sel_zones
+
+            zone_filtered = [r for r in pre_filtered if _zone_matches(r)]
+        else:
+            zone_filtered = pre_filtered
+
+        # ── Commodity dropdown (options from zone-filtered set) ───────────────
         def _base_commodity(g: str) -> str:
             return "Wheat" if (g == "Wheat" or g.startswith("Wheat (")) else g
 
-        avail_base = sorted({_base_commodity(g) for r in pre_filtered for g in r["grains"]})
+        avail_base = sorted({_base_commodity(g) for r in zone_filtered for g in r["grains"]})
 
         sel_commodities_list = st.multiselect(
             "Commodity",
@@ -1434,7 +1469,7 @@ with tab_map:
         sel_wheat_classes: set | None = None
         if "Wheat" in sel_base_commodities:
             avail_wheat_classes: set[str] = set()
-            for r in pre_filtered:
+            for r in zone_filtered:
                 for g in r["grains"]:
                     if g == "Wheat":
                         avail_wheat_classes.add("(unclassified)")
@@ -1467,7 +1502,7 @@ with tab_map:
                         return True
             return False
 
-        filtered = [r for r in pre_filtered if _pin_matches(r)]
+        filtered = [r for r in zone_filtered if _pin_matches(r)]
 
         # ── Build DataFrame ───────────────────────────────────────────────────
         def _fmt_basis(cents):
@@ -1483,7 +1518,8 @@ with tab_map:
             )
             state_str = f", {row['state']}" if row["state"] else ""
             ft_str    = f" · {row['facility_type']}" if row.get("facility_type") else ""
-            return f"{row['location']}{state_str} [{row['provider']}]{ft_str}  |  {grains_str}"
+            dz_str    = f" · {row['delivery_zone']}" if row.get("delivery_zone") else ""
+            return f"{row['location']}{state_str} [{row['provider']}]{ft_str}{dz_str}  |  {grains_str}"
 
         df = pd.DataFrame([
             {

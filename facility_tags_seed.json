@@ -51,7 +51,8 @@
     "provider": "CGB",
     "location": "CGB - Naples",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 5"
   },
   {
     "provider": "CGB",
@@ -1227,7 +1228,8 @@
     "provider": "CGB",
     "location": "CGB - Cahokia",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 5"
   },
   {
     "provider": "CGB",
@@ -1323,7 +1325,8 @@
     "provider": "CGB",
     "location": "CGB - River Landing",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 2"
   },
   {
     "provider": "CGB",
@@ -1407,7 +1410,8 @@
     "provider": "CGB",
     "location": "CGB HENNEPIN",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 3"
   },
   {
     "provider": "CGB",
@@ -1461,13 +1465,15 @@
     "provider": "CHS",
     "location": "Boyle Terminal",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 1"
   },
   {
     "provider": "CHS",
     "location": "CHS Cahokia",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 5"
   },
   {
     "provider": "CHS",
@@ -1485,7 +1491,8 @@
     "provider": "CHS",
     "location": "Havana/Beardstown",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 5"
   },
   {
     "provider": "CHS",
@@ -1509,19 +1516,22 @@
     "provider": "CHS",
     "location": "Morris",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 2"
   },
   {
     "provider": "CHS",
     "location": "Ottawa River Mkt",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 3"
   },
   {
     "provider": "CHS",
     "location": "Peru Marketstreet",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 3"
   },
   {
     "provider": "CHS",
@@ -1545,7 +1555,8 @@
     "provider": "CHS",
     "location": "Seneca",
     "facility_type": "River Terminal",
-    "region": null
+    "region": null,
+    "delivery_zone": "Zone 2"
   },
   {
     "provider": "ADM",
@@ -1824,11 +1835,11 @@
     "region": "East"
   },
 
-  {"provider": "Cargill", "location": "Spring Valley South", "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Lacon",               "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Havana",              "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Beardstown",          "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Meredosia",           "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Spring Valley South", "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 3"},
+  {"provider": "Cargill", "location": "Lacon",               "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 3"},
+  {"provider": "Cargill", "location": "Havana",              "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
+  {"provider": "Cargill", "location": "Beardstown",          "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
+  {"provider": "Cargill", "location": "Meredosia",           "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
 
   {"provider": "Cargill", "location": "Savage",              "facility_type": "River Terminal", "region": null},
   {"provider": "ADM",     "location": "Burlington, IA",      "facility_type": "River Terminal", "region": null},
@@ -1838,8 +1849,8 @@
   {"provider": "Cargill", "location": "Keithsburg",          "facility_type": "River Terminal", "region": null},
   {"provider": "ADM",     "location": "Center, MO",          "facility_type": "River Terminal", "region": null},
   {"provider": "Cargill", "location": "Buffalo Island",      "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "East St. Louis",      "facility_type": "River Terminal", "region": null},
-  {"provider": "Bunge",   "location": "Fairmont City",       "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "East St. Louis",      "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
+  {"provider": "Bunge",   "location": "Fairmont City",       "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
   {"provider": "Cargill", "location": "New Madrid",          "facility_type": "River Terminal", "region": null},
   {"provider": "Cargill", "location": "Hickman (Ashland)",   "facility_type": "River Terminal", "region": null},
   {"provider": "Cargill", "location": "Hales Point",         "facility_type": "River Terminal", "region": null},

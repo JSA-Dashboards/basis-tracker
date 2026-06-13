@@ -85,6 +85,7 @@ _SQLITE_DDL = [
         region        TEXT,
         lat           REAL,
         lon           REAL,
+        delivery_zone TEXT,
         PRIMARY KEY (provider, location)
     )""",
     """CREATE TABLE IF NOT EXISTS grain_map (
@@ -134,6 +135,7 @@ _PG_DDL = [
         region        TEXT,
         lat           DOUBLE PRECISION,
         lon           DOUBLE PRECISION,
+        delivery_zone TEXT,
         PRIMARY KEY (provider, location)
     )""",
     """CREATE TABLE IF NOT EXISTS grain_map (
@@ -146,9 +148,10 @@ _PG_DDL = [
 ]
 
 _MIGRATE_DDL = [
-    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lat    REAL",
-    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon    REAL",
-    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS region TEXT",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lat           REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon           REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS region        TEXT",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS delivery_zone TEXT",
 ]
 
 
@@ -253,24 +256,27 @@ def seed_facility_types(seed_path: str | None = None) -> int:
             loc  = row.get("location")
             ft   = row.get("facility_type")
             reg  = row.get("region")
+            dz   = row.get("delivery_zone")
             if not prov or not loc:
                 continue
             if _use_pg():
                 c.execute(f"""
-                    INSERT INTO location_meta (provider, location, facility_type, region)
-                    VALUES ({ph},{ph},{ph},{ph})
+                    INSERT INTO location_meta (provider, location, facility_type, region, delivery_zone)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
                     ON CONFLICT (provider, location) DO UPDATE SET
                         facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
-                        region        = COALESCE(EXCLUDED.region,        location_meta.region)
-                """, (prov, loc, ft, reg))
+                        region        = COALESCE(EXCLUDED.region,        location_meta.region),
+                        delivery_zone = COALESCE(EXCLUDED.delivery_zone, location_meta.delivery_zone)
+                """, (prov, loc, ft, reg, dz))
             else:
                 c.execute(f"""
-                    INSERT INTO location_meta (provider, location, facility_type, region)
-                    VALUES ({ph},{ph},{ph},{ph})
+                    INSERT INTO location_meta (provider, location, facility_type, region, delivery_zone)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
                     ON CONFLICT(provider, location) DO UPDATE SET
                         facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
-                        region        = COALESCE(excluded.region,        location_meta.region)
-                """, (prov, loc, ft, reg))
+                        region        = COALESCE(excluded.region,        location_meta.region),
+                        delivery_zone = COALESCE(excluded.delivery_zone, location_meta.delivery_zone)
+                """, (prov, loc, ft, reg, dz))
             written += 1
         conn.commit()
     finally:
@@ -647,6 +653,7 @@ def get_map_data() -> list[dict]:
                 lm.region,
                 lm.lat,
                 lm.lon,
+                lm.delivery_zone,
                 r.grain,
                 r.basis_cents
             FROM latest l
@@ -695,6 +702,7 @@ def get_map_data() -> list[dict]:
                 "state":         row["state"]         or "",
                 "facility_type": row["facility_type"] or "",
                 "region":        row["region"]        or "",
+                "delivery_zone": row["delivery_zone"] or "",
                 "lat":           row["lat"],
                 "lon":           row["lon"],
                 "grains":        {},
