@@ -1,0 +1,1766 @@
+[
+  {
+    "provider": "CHS",
+    "location": "Nestle Davenport",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Billings",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Burnside",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Carnegie",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Colusa",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Enid",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Ferris",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Gladstone Bluff",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Naples",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Oquawka",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Orienta",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Renfrow",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Shattuck",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Smithshire",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Tunica",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Waka",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Wakita",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB AURORA",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB BENTON",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB BOCKER RUFF LLC",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CARUTHERSVILLE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CONNERSVILLE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DORENA",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DWIGHT",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ELIZABETHTOWN",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ENFIELD",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FAYETTE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FITHIAN",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FLAGG",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FREEPORT",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HOMER",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB JEFFERSONVILLE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LOUISVILLE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LYLES STATION",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OLNEY",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB PINCKNEYVILLE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB RIVERSIDE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB UNIONTOWN",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WALTON",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WATERLOO",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB WEST MEMPHIS",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "NORTH DAKOTA SOYBEAN PROCESSORS LLC",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ada",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Akron",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Alma",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Amherst",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ashley",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Baltic",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Beltrami",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Bertrand",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Blunt",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Bowbells",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Brandon",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Bruce Elevator",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Brule",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Brush",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Byers",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Callaway",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Calvin",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Canton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Carrollton/White Hal",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Cavalier",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Chamberlain",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Cheyenne Wells",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Chokio",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Circle",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Claire City",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Corsica",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "County Line",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Darien",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Davidson",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Devils Lake",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Drayton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Dupree",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Edgeley",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Edmore",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Elkton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Elm Creek",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Erskine",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Fairfax",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Fergus Falls South (8\u00a2 Dump fee)",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Fleming",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Frederick",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "French",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Futures-Only",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Galchutt",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Garrison",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Gettysburg",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Glasgow",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Glasston",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Glendive",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Glenwood",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Greenbush",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Grygla",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Gwinner",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hallock - Devils Lake",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hallock Drayton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hallock NG",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hannaford",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Harwood",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Havre",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Haxtun",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hazel",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hennessey",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Herman",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hinton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Holdrege West",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Holyoke",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Hyde",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Idalia",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Idalia West",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Isabel",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Julesburg",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kalispell",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kanaranzi",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kanco",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kasson",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kennedy",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kershaw",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kingfisher",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Lakota",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Langdon",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Lankin",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Long Prairie",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Loomis",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Lowder",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Lowry",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Luverne",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Magnolia",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Mahnomen",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Malta",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Manvel",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Meredith Rd Elburn",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Merritt Bunker",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Milton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Minot",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Mitchell",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Mohall",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Mooreton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Napoleon",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "New Haven",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "New Salem",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Newark",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Norma",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Okarche",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Oklee",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Omega",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Onida",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ostrander",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Otis",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Overton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Philip",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Pierre",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Pipestone",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Richey",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Roseau",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ruthton",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Sarles",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Selby",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Selkirk",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Sharon Springs",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Shelby",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Shipman",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Smithfield",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Stateline",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Sterling",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Steward",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Strasburg",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Tracy",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Tribune",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ulen",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Underwood (13\u00a2 Dump fee)",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wagner",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wallace",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Warren",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Weskan",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wheeler Elevator ML",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wiley",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wilmot",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Winner",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Winona",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wolf Point",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Worthing Ag Grain",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Wykoff",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Yuma",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB FULTON",
+    "facility_type": "Direct Ship",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "ADM Clinton",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Absolute Energy",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Annawan",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Bridgeport Ethanol",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Corn Inc",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Delivered Tharaldson",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "GPC Muscatine",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ingredion",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Marshall",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Rochelle",
+    "facility_type": "Ethanol",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "CHS Primeland",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Connell Elevator",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Crookston Terminal",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Holdrege Shuttle",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Holyoke Shuttle",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kindred Terminal",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Lemmon Terminal",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Yuma Shuttle",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Cahokia",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Dallas City",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Desoto Landing",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - East Hannibal",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Friars Point",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Greenville",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Helena North (River)",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Jonesville",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Lagrange",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Louisiana",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Mayersville",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Meekers Landing",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Nauvoo",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Old Town",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Pine Bluff",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Port 33",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - River Landing",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Rosedale",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Tallulah Port",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Van Buren",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Vicksburg",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Vidalia",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Wagoner",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Webbers Falls",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Yazoo City",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB ALBANY",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB BIRDS POINT",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB CLAYTON",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB DYERSBURG",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB GRAND TOWER",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HENNEPIN",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB HICKMAN",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB JOLIET",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB LINDA",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MOUND CITY",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OSCEOLA",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB OWENSBORO",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB SAVAGE",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB SCOTT CITY",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Boyle Terminal",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "CHS Cahokia",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Collins, Mississippi",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Davenport",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Havana/Beardstown",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Joliet Container Mkt",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Kennewick/LoMo",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Macon",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Morris",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Ottawa River Mkt",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Peru Marketstreet",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Quincy Elevator",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Rt. 47 Terminal",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Savage",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Seneca",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Decatur, IL (Soy Processing)",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "ADM",
+    "location": "Deerfield, MO",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Des Moines, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Fostoria, OH",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "ADM",
+    "location": "Frankfort, IN",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Soy Processing)",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Green Bison Soy Processing",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Lincoln, NE (Soy Processing)",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Mankato, MN (Soy Processing)",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Mexico, MO",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "ADM",
+    "location": "Quincy, IL (Soy Processing)",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Bellevue, OH",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Cairo, IL",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Council Bluffs, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Decatur, AL",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Decatur, IN",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Delphos, OH",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Emporia, KS",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Morristown, IN - Bean Plant",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MT VERNON",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "CHS",
+    "location": "AGP - Hastings",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "CHS",
+    "location": "AGP Aberdeen",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "CHS",
+    "location": "Fairmont",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "CHS",
+    "location": "Mankato",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bloomington",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cedar Rapids East",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Cedar Rapids Mill",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Gibson City",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Guntersville",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Iowa Falls",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Kansas City",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Lafayette",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Owensboro",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Sidney",
+    "facility_type": "Soy Processing",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Sioux City",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Wichita",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  }
+]

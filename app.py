@@ -1364,21 +1364,33 @@ with tab_map:
 
         sel_grains = st.session_state["map_grain_sel"]
 
-        # ── Provider filter ───────────────────────────────────────────────────
+        # ── Facility type & provider filters ──────────────────────────────────
+        all_ftypes_map    = sorted({r["facility_type"] for r in map_rows if r.get("facility_type")})
         all_providers_map = sorted({r["provider"] for r in map_rows})
-        sel_provs = st.multiselect(
-            "Filter providers",
-            options=all_providers_map,
-            default=all_providers_map,
-            key="map_prov_filter",
-            label_visibility="collapsed",
-        )
+
+        fc1, fc2 = st.columns([2, 3])
+        with fc1:
+            sel_ftypes = st.multiselect(
+                "Facility type",
+                options=all_ftypes_map,
+                default=[],
+                placeholder="All facility types",
+                key="map_ftype_filter",
+            )
+        with fc2:
+            sel_provs = st.multiselect(
+                "Providers",
+                options=all_providers_map,
+                default=all_providers_map,
+                key="map_prov_filter",
+            )
 
         # Keep only locations that carry at least one selected commodity
         filtered = [
             r for r in map_rows
             if r["provider"] in sel_provs
             and any(g in r["grains"] for g in sel_grains)
+            and (not sel_ftypes or r.get("facility_type") in sel_ftypes)
         ]
 
         # ── Build DataFrame ───────────────────────────────────────────────────
@@ -1395,7 +1407,8 @@ with tab_map:
                 if g in row["grains"]
             )
             state_str = f", {row['state']}" if row["state"] else ""
-            return f"{row['location']}{state_str} [{row['provider']}]  |  {grains_str}"
+            ft_str    = f" · {row['facility_type']}" if row.get("facility_type") else ""
+            return f"{row['location']}{state_str} [{row['provider']}]{ft_str}  |  {grains_str}"
 
         df = pd.DataFrame([
             {

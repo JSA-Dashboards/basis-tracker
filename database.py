@@ -82,6 +82,7 @@ _SQLITE_DDL = [
         location      TEXT NOT NULL,
         state         TEXT,
         facility_type TEXT,
+        region        TEXT,
         lat           REAL,
         lon           REAL,
         PRIMARY KEY (provider, location)
@@ -123,6 +124,7 @@ _PG_DDL = [
         location      TEXT NOT NULL,
         state         TEXT,
         facility_type TEXT,
+        region        TEXT,
         lat           DOUBLE PRECISION,
         lon           DOUBLE PRECISION,
         PRIMARY KEY (provider, location)
@@ -130,8 +132,9 @@ _PG_DDL = [
 ]
 
 _MIGRATE_DDL = [
-    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lat  REAL",
-    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon  REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lat    REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon    REAL",
+    "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS region TEXT",
 ]
 
 
@@ -157,8 +160,9 @@ def init_db():
         conn.commit()
     finally:
         conn.close()
-    # Populate lat/lon on a fresh cloud DB from the committed seed file.
+    # Populate lat/lon and facility tags from committed seed files.
     seed_geocoding()
+    seed_facility_types()
 
 
 def seed_geocoding(seed_path: str | None = None) -> int:
@@ -202,6 +206,56 @@ def seed_geocoding(seed_path: str | None = None) -> int:
                         lat   = COALESCE(location_meta.lat,  excluded.lat),
                         lon   = COALESCE(location_meta.lon,  excluded.lon)
                 """, (row["provider"], row["location"], row["state"], row["lat"], row["lon"]))
+            written += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return written
+
+
+def seed_facility_types(seed_path: str | None = None) -> int:
+    """
+    Load facility_tags_seed.json and upsert facility_type/region into location_meta.
+    Only overwrites when the existing value is NULL.  Safe to call repeatedly.
+    Returns number of rows written.
+    """
+    import json, os
+    if seed_path is None:
+        seed_path = os.path.join(os.path.dirname(__file__), "facility_tags_seed.json")
+    if not os.path.exists(seed_path):
+        return 0
+
+    with open(seed_path, encoding="utf-8") as f:
+        seed = json.load(f)
+
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    written = 0
+    try:
+        for row in seed:
+            prov = row.get("provider")
+            loc  = row.get("location")
+            ft   = row.get("facility_type")
+            reg  = row.get("region")
+            if not prov or not loc:
+                continue
+            if _use_pg():
+                c.execute(f"""
+                    INSERT INTO location_meta (provider, location, facility_type, region)
+                    VALUES ({ph},{ph},{ph},{ph})
+                    ON CONFLICT (provider, location) DO UPDATE SET
+                        facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
+                        region        = COALESCE(EXCLUDED.region,        location_meta.region)
+                """, (prov, loc, ft, reg))
+            else:
+                c.execute(f"""
+                    INSERT INTO location_meta (provider, location, facility_type, region)
+                    VALUES ({ph},{ph},{ph},{ph})
+                    ON CONFLICT(provider, location) DO UPDATE SET
+                        facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
+                        region        = COALESCE(excluded.region,        location_meta.region)
+                """, (prov, loc, ft, reg))
             written += 1
         conn.commit()
     finally:
@@ -394,51 +448,55 @@ def delete_snapshot(snapshot_id: int) -> bool:
 def upsert_location_meta(provider: str, location: str,
                          state: str | None = None,
                          facility_type: str | None = None,
+                         region: str | None = None,
                          lat: float | None = None,
                          lon: float | None = None):
-    """Insert or update metadata for a location (idempotent). lat/lon only written when provided."""
+    """Insert or update metadata for a location (idempotent). Only non-None fields overwrite."""
     conn = get_conn()
     c    = conn.cursor()
     try:
         if _use_pg():
             c.execute("""
-                INSERT INTO location_meta (provider, location, state, facility_type, lat, lon)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO location_meta (provider, location, state, facility_type, region, lat, lon)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (provider, location) DO UPDATE SET
                     state         = COALESCE(EXCLUDED.state,         location_meta.state),
                     facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
+                    region        = COALESCE(EXCLUDED.region,        location_meta.region),
                     lat           = COALESCE(EXCLUDED.lat,           location_meta.lat),
                     lon           = COALESCE(EXCLUDED.lon,           location_meta.lon)
-            """, (provider, location, state, facility_type, lat, lon))
+            """, (provider, location, state, facility_type, region, lat, lon))
         else:
             c.execute("""
-                INSERT INTO location_meta (provider, location, state, facility_type, lat, lon)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO location_meta (provider, location, state, facility_type, region, lat, lon)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(provider, location) DO UPDATE SET
                     state         = COALESCE(excluded.state,         location_meta.state),
                     facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
+                    region        = COALESCE(excluded.region,        location_meta.region),
                     lat           = COALESCE(excluded.lat,           location_meta.lat),
                     lon           = COALESCE(excluded.lon,           location_meta.lon)
-            """, (provider, location, state, facility_type, lat, lon))
+            """, (provider, location, state, facility_type, region, lat, lon))
         conn.commit()
     finally:
         conn.close()
 
 
 def get_location_meta(provider: str) -> dict[str, dict]:
-    """Return {location_name: {state, facility_type, lat, lon}} for a provider."""
+    """Return {location_name: {state, facility_type, region, lat, lon}} for a provider."""
     conn = get_conn()
     c    = conn.cursor()
     ph   = "%s" if _use_pg() else "?"
     try:
         c.execute(
-            f"SELECT location, state, facility_type, lat, lon FROM location_meta WHERE provider={ph}",
+            f"SELECT location, state, facility_type, region, lat, lon FROM location_meta WHERE provider={ph}",
             (provider,),
         )
         return {
             row["location"]: {
                 "state":         row["state"]         or "",
                 "facility_type": row["facility_type"] or "",
+                "region":        row["region"]        or "",
                 "lat":           row["lat"],
                 "lon":           row["lon"],
             }
@@ -453,13 +511,14 @@ def get_all_location_meta() -> list[dict]:
     conn = get_conn()
     c    = conn.cursor()
     try:
-        c.execute("SELECT provider, location, state, facility_type, lat, lon FROM location_meta")
+        c.execute("SELECT provider, location, state, facility_type, region, lat, lon FROM location_meta")
         return [
             {
                 "provider":      row["provider"],
                 "location":      row["location"],
                 "state":         row["state"]         or "",
                 "facility_type": row["facility_type"] or "",
+                "region":        row["region"]        or "",
                 "lat":           row["lat"],
                 "lon":           row["lon"],
             }
@@ -492,6 +551,8 @@ def get_map_data() -> list[dict]:
                 s.provider,
                 s.location,
                 lm.state,
+                lm.facility_type,
+                lm.region,
                 lm.lat,
                 lm.lon,
                 r.grain,
@@ -511,18 +572,19 @@ def get_map_data() -> list[dict]:
         conn.close()
 
     # Group grain rows into per-location dicts
-    from collections import defaultdict
     locs: dict[tuple, dict] = {}
     for row in rows:
         key = (row["provider"], row["location"])
         if key not in locs:
             locs[key] = {
-                "provider": row["provider"],
-                "location": row["location"],
-                "state":    row["state"] or "",
-                "lat":      row["lat"],
-                "lon":      row["lon"],
-                "grains":   {},
+                "provider":      row["provider"],
+                "location":      row["location"],
+                "state":         row["state"]         or "",
+                "facility_type": row["facility_type"] or "",
+                "region":        row["region"]        or "",
+                "lat":           row["lat"],
+                "lon":           row["lon"],
+                "grains":        {},
             }
         if row["basis_cents"] is not None:
             locs[key]["grains"][row["grain"]] = row["basis_cents"]
