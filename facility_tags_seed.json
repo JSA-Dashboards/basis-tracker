@@ -1119,61 +1119,61 @@
   {
     "provider": "CHS",
     "location": "ADM Clinton",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Absolute Energy",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Annawan",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Bridgeport Ethanol",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Corn Inc",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Delivered Tharaldson",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "GPC Muscatine",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Ingredion",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Marshall",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
     "provider": "CHS",
     "location": "Rochelle",
-    "facility_type": "Ethanol",
+    "facility_type": "Corn Processing",
     "region": null
   },
   {
@@ -1771,7 +1771,7 @@
   {
     "provider": "Cargill",
     "location": "Cedar Rapids Mill",
-    "facility_type": "Soy Processing",
+    "facility_type": "Corn Processing",
     "region": "West"
   },
   {
@@ -1864,5 +1864,80 @@
   {"provider": "Cargill", "location": "Hutchinson East",     "facility_type": "Rail Terminal",  "region": null},
   {"provider": "Cargill", "location": "Hutchinson West",     "facility_type": "Rail Terminal",  "region": null},
 
-  {"provider": "Cargill", "location": "Blair",               "facility_type": "Ethanol",        "region": null}
+  {"provider": "Cargill", "location": "Blair",               "facility_type": "Corn Processing",        "region": null},
+
+  {"provider": "Andersons", "location": "Albion",                              "facility_type": "Corn Processing", "region": null},
+  {"provider": "Andersons", "location": "Clymers",                             "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "LDC",       "location": "Grand Junction",                      "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "Cargill",   "location": "Indianapolis Mill",                   "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Paris Mill",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Hammond",                             "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Harrisonburg, TRKY",                  "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Eddyville",                           "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Dayton",                              "facility_type": "Corn Processing", "region": null},
+  {"provider": "Cargill",   "location": "Wahpeton",                            "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "ADM",       "location": "ADM Cedar Rapids",                    "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Cedar Rapids, IA",                    "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Clinton, IA (Corn Processing)",       "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Columbus, NE (Corn Processing)",      "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Decatur, IL (Corn Processing)",       "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Fremont, NE (Lincoln Premium Poultry)","facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Jackson, TN",                         "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Marshall, MN (Corn Processing)",      "facility_type": "Corn Processing", "region": null},
+  {"provider": "ADM",       "location": "Quincy, IL (Barge Dock)",             "facility_type": "River Terminal",  "region": null},
+
+  {"provider": "Bunge",     "location": "Maschhoff's",                         "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "CGB",       "location": "CGB SEMO MILLING",                    "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "GPRE",      "location": "Central City",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Madison",                             "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Mount Vernon",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Otter Tail",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Shenandoah",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Superior",                            "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "Wood River",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "GPRE",      "location": "York",                                "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "POET",      "location": "Albert Lea, MN",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Alexandria, IN",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Arthur, IA",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Ashton, IA",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Big Stone City, SD",                  "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Caro, MI",                            "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Chancellor, SD",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Cloverdale, IN",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Coon Rapids, IA",                     "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Corning, IA",                         "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Emmetsburg, IA",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Fairbank, IA",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Fairmont, NE",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Fostoria, OH",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Gowrie, IA",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Groton, SD",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Hanlontown, IA",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Hudson, SD",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Iowa Falls, IA",                      "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Jewell, IA",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Laddonia, MO",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Leipsic, OH",                         "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Macon, MO",                           "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Marion, OH",                          "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Menlo, IA",                           "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Mitchell, SD",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "North Manchester, IN",                "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Obion, TN",                           "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Portland, IN",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Preston, MN",                         "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Scotland, SD",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Shelbyville, IN",                     "facility_type": "Corn Processing", "region": null},
+  {"provider": "POET",      "location": "Shell Rock, IA",                      "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "Scoular",   "location": "Madrid, NE Ethanol",                  "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "Mendota",   "location": "Clinton Proc",                        "facility_type": "Corn Processing", "region": null},
+  {"provider": "Mendota",   "location": "Mendota BN Rail",                     "facility_type": "Corn Processing", "region": null}
 ]
