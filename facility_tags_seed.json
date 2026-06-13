@@ -1950,5 +1950,7 @@
   {"provider": "Scoular",   "location": "Lake City, FL",                       "facility_type": "Feed Mill",       "region": null},
   {"provider": "Scoular",   "location": "Scoular Harrisonville Cash Bids",     "facility_type": "Feed Mill",       "region": null},
 
-  {"provider": "Scoular",   "location": "Waverly, IL - Shuttle",               "facility_type": "Rail Terminal",   "region": null}
+  {"provider": "Scoular",   "location": "Waverly, IL - Shuttle",               "facility_type": "Rail Terminal",   "region": null},
+
+  {"provider": "Scoular",   "location": "Corley, IA",                          "facility_type": "Rail Terminal",   "region": "Texas"}
 ]
