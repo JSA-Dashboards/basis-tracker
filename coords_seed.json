@@ -861,6 +861,118 @@
     "lon": -96.914286
   },
   {
+    "provider": "AGP",
+    "location": "AGP Aberdeen, SD",
+    "state": "SD",
+    "lat": 45.464981,
+    "lon": -98.487813
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP David City, NE",
+    "state": "NE",
+    "lat": 41.252736,
+    "lon": -97.130067
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Dawson, MN",
+    "state": "MN",
+    "lat": 44.932738,
+    "lon": -96.054481
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Eagle Grove, IA",
+    "state": "IA",
+    "lat": 42.664142,
+    "lon": -93.904623
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Emmetsburg, IA",
+    "state": "IA",
+    "lat": 43.110808,
+    "lon": -94.67819
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Hastings, NE - Soy Plant",
+    "state": "NE",
+    "lat": 40.586132,
+    "lon": -98.389888
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Manning, IA",
+    "state": "IA",
+    "lat": 41.909229,
+    "lon": -95.065057
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Mason City, IA",
+    "state": "IA",
+    "lat": 43.152457,
+    "lon": -93.201794
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Sergeant Bluff, IA",
+    "state": "IA",
+    "lat": 42.40392,
+    "lon": -96.35898
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Sheldon, IA",
+    "state": "IA",
+    "lat": 43.180134,
+    "lon": -95.852519
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP St. Joseph, MO",
+    "state": "MO",
+    "lat": 39.768605,
+    "lon": -94.846632
+  },
+  {
+    "provider": "AGP",
+    "location": "Chester, NE",
+    "state": "NE",
+    "lat": 40.010285,
+    "lon": -97.618376
+  },
+  {
+    "provider": "AGP",
+    "location": "Cowles, NE",
+    "state": "NE",
+    "lat": 40.171495,
+    "lon": -98.447682
+  },
+  {
+    "provider": "AGP",
+    "location": "Fairfield, NE",
+    "state": "NE",
+    "lat": 40.430499,
+    "lon": -98.105687
+  },
+  {
+    "provider": "AGP",
+    "location": "Hastings, NE - Grain (Terminal)",
+    "state": "NE",
+    "lat": 40.586132,
+    "lon": -98.389888
+  },
+  {
+    "provider": "AGP",
+    "location": "Rosemont, NE",
+    "state": "NE",
+    "lat": 40.286957,
+    "lon": -98.364221
+  },
+  {
     "provider": "Andersons",
     "location": "Albion",
     "state": "MI",
@@ -3445,6 +3557,20 @@
   },
   {
     "provider": "GPRE",
+    "location": "Mount Vernon",
+    "state": "",
+    "lat": 37.931802,
+    "lon": -87.894785
+  },
+  {
+    "provider": "GPRE",
+    "location": "Otter Tail",
+    "state": "",
+    "lat": 46.41842,
+    "lon": -95.713142
+  },
+  {
+    "provider": "GPRE",
     "location": "Shenandoah",
     "state": "",
     "lat": 40.765547,
@@ -3470,6 +3596,62 @@
     "state": "",
     "lat": 40.871617,
     "lon": -97.60014
+  },
+  {
+    "provider": "LDC",
+    "location": "Burns Harbor",
+    "state": "IN",
+    "lat": 41.625871,
+    "lon": -87.133368
+  },
+  {
+    "provider": "LDC",
+    "location": "Cahokia",
+    "state": "IL",
+    "lat": 38.566161,
+    "lon": -90.179424
+  },
+  {
+    "provider": "LDC",
+    "location": "Claypool",
+    "state": "IN",
+    "lat": 41.129211,
+    "lon": -85.880547
+  },
+  {
+    "provider": "LDC",
+    "location": "Grand Junction",
+    "state": "IA",
+    "lat": 42.03162,
+    "lon": -94.23802
+  },
+  {
+    "provider": "LDC",
+    "location": "Port Allen",
+    "state": "LA",
+    "lat": 30.45335,
+    "lon": -91.210057
+  },
+  {
+    "provider": "LDC",
+    "location": "Rosedale",
+    "state": "MS",
+    "lat": 33.8551,
+    "lon": -91.026611
+  },
+  {
+    "provider": "LDC",
+    "location": "Upper Sandusky",
+    "state": "OH",
+    "lat": 40.827278,
+    "lon": -83.281309
+  },
+  {
+    "provider": "LDC",
+    "location": "West Memphis",
+    "state": "AR",
+    "lat": 35.14648,
+    "lon": -90.184539
   },
   {
     "provider": "Mendota",

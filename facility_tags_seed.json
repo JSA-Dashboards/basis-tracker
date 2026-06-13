@@ -1614,6 +1614,72 @@
     "region": "East"
   },
   {
+    "provider": "AGP",
+    "location": "AGP Aberdeen, SD",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP David City, NE",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Dawson, MN",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Eagle Grove, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Emmetsburg, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Hastings, NE - Soy Plant",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Manning, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Mason City, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Sergeant Bluff, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP Sheldon, IA",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
+    "provider": "AGP",
+    "location": "AGP St. Joseph, MO",
+    "facility_type": "Soy Processing",
+    "region": "West"
+  },
+  {
     "provider": "Bunge",
     "location": "Bellevue, OH",
     "facility_type": "Soy Processing",
@@ -1666,18 +1732,6 @@
     "location": "CGB MT VERNON",
     "facility_type": "Soy Processing",
     "region": "East"
-  },
-  {
-    "provider": "CHS",
-    "location": "AGP - Hastings",
-    "facility_type": "Soy Processing",
-    "region": "West"
-  },
-  {
-    "provider": "CHS",
-    "location": "AGP Aberdeen",
-    "facility_type": "Soy Processing",
-    "region": "West"
   },
   {
     "provider": "CHS",
@@ -1762,5 +1816,11 @@
     "location": "Wichita",
     "facility_type": "Soy Processing",
     "region": "West"
+  },
+  {
+    "provider": "LDC",
+    "location": "Claypool",
+    "facility_type": "Soy Processing",
+    "region": "East"
   }
 ]
