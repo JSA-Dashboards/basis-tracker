@@ -50,13 +50,13 @@
   {
     "provider": "CGB",
     "location": "CGB - Naples",
-    "facility_type": "Country Elevator",
+    "facility_type": "River Terminal",
     "region": null
   },
   {
     "provider": "CGB",
     "location": "CGB - Oquawka",
-    "facility_type": "Country Elevator",
+    "facility_type": "River Terminal",
     "region": null
   },
   {
@@ -1082,7 +1082,7 @@
   {
     "provider": "CHS",
     "location": "Winona",
-    "facility_type": "Country Elevator",
+    "facility_type": "River Terminal",
     "region": null
   },
   {
@@ -1418,7 +1418,7 @@
   {
     "provider": "CGB",
     "location": "CGB JOLIET",
-    "facility_type": "River Terminal",
+    "facility_type": "Container Loader",
     "region": null
   },
   {
@@ -1472,7 +1472,7 @@
   {
     "provider": "CHS",
     "location": "Collins, Mississippi",
-    "facility_type": "River Terminal",
+    "facility_type": "Rail Terminal",
     "region": null
   },
   {
@@ -1490,7 +1490,7 @@
   {
     "provider": "CHS",
     "location": "Joliet Container Mkt",
-    "facility_type": "River Terminal",
+    "facility_type": "Container Loader",
     "region": null
   },
   {
@@ -1532,7 +1532,7 @@
   {
     "provider": "CHS",
     "location": "Rt. 47 Terminal",
-    "facility_type": "River Terminal",
+    "facility_type": "Country Elevator",
     "region": null
   },
   {
@@ -1822,5 +1822,36 @@
     "location": "Claypool",
     "facility_type": "Soy Processing",
     "region": "East"
-  }
+  },
+
+  {"provider": "Cargill", "location": "Spring Valley South", "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Lacon",               "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Havana",              "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Beardstown",          "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Meredosia",           "facility_type": "River Terminal", "region": null},
+
+  {"provider": "Cargill", "location": "Savage",              "facility_type": "River Terminal", "region": null},
+  {"provider": "ADM",     "location": "Burlington, IA",      "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Bettendorf",          "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Muscatine",           "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "New Boston",          "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Keithsburg",          "facility_type": "River Terminal", "region": null},
+  {"provider": "ADM",     "location": "Center, MO",          "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Buffalo Island",      "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "East St. Louis",      "facility_type": "River Terminal", "region": null},
+  {"provider": "Bunge",   "location": "Fairmont City",       "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "New Madrid",          "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Hickman (Ashland)",   "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "Hales Point",         "facility_type": "River Terminal", "region": null},
+  {"provider": "Cargill", "location": "West Memphis",        "facility_type": "River Terminal", "region": null},
+  {"provider": "LDC",     "location": "West Memphis",        "facility_type": "River Terminal", "region": null},
+  {"provider": "LDC",     "location": "Rosedale",            "facility_type": "River Terminal", "region": null},
+  {"provider": "LDC",     "location": "Port Allen",          "facility_type": "River Terminal", "region": null},
+
+  {"provider": "Cargill", "location": "Forest City",         "facility_type": "Rail Terminal",  "region": null},
+  {"provider": "Cargill", "location": "Atchison",            "facility_type": "Rail Terminal",  "region": null},
+  {"provider": "Cargill", "location": "Hutchinson East",     "facility_type": "Rail Terminal",  "region": null},
+  {"provider": "Cargill", "location": "Hutchinson West",     "facility_type": "Rail Terminal",  "region": null},
+
+  {"provider": "Cargill", "location": "Blair",               "facility_type": "Ethanol",        "region": null}
 ]
