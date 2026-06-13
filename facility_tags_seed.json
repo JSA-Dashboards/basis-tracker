@@ -69,7 +69,7 @@
   {
     "provider": "CGB",
     "location": "CGB - Renfrow",
-    "facility_type": "Country Elevator",
+    "facility_type": "Rail Terminal",
     "region": null
   },
   {
@@ -93,7 +93,7 @@
   {
     "provider": "CGB",
     "location": "CGB - Waka",
-    "facility_type": "Country Elevator",
+    "facility_type": "Rail Terminal",
     "region": null
   },
   {
@@ -231,7 +231,7 @@
   {
     "provider": "CGB",
     "location": "CGB WALTON",
-    "facility_type": "Country Elevator",
+    "facility_type": "Rail Terminal",
     "region": null
   },
   {
