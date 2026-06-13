@@ -1952,5 +1952,8 @@
 
   {"provider": "Scoular",   "location": "Waverly, IL - Shuttle",               "facility_type": "Rail Terminal",   "region": null},
 
-  {"provider": "Scoular",   "location": "Corley, IA",                          "facility_type": "Rail Terminal",   "region": "Texas"}
+  {"provider": "Scoular",   "location": "Corley, IA",                          "facility_type": "Rail Terminal",   "region": "Texas"},
+
+  {"provider": "Scoular",   "location": "South Grant, NE",                     "facility_type": "Country Elevator", "region": null},
+  {"provider": "Scoular",   "location": "Scoular - Walnut Grove Farms / Schochoh", "facility_type": "Country Elevator", "region": null}
 ]
