@@ -1377,59 +1377,58 @@ with tab_map:
             unsafe_allow_html=True,
         )
     else:
-        # ── Facility type & provider filters ──────────────────────────────────
+        # ── Filters ───────────────────────────────────────────────────────────
         all_ftypes_map    = sorted({r["facility_type"] for r in map_rows if r.get("facility_type")})
         all_providers_map = sorted({r["provider"] for r in map_rows})
+        all_states_map    = sorted({r["state"] for r in map_rows if r.get("state")})
 
-        fc1, fc2 = st.columns([2, 3])
+        fc1, fc2, fc3 = st.columns(3)
         with fc1:
             sel_ftypes = st.multiselect(
-                "Facility type",
+                "Location Type",
                 options=all_ftypes_map,
                 default=[],
-                placeholder="All facility types",
+                placeholder="All types",
                 key="map_ftype_filter",
             )
         with fc2:
+            sel_states = st.multiselect(
+                "State",
+                options=all_states_map,
+                default=[],
+                placeholder="All states",
+                key="map_state_filter",
+            )
+        with fc3:
             sel_provs = st.multiselect(
-                "Providers",
+                "Provider",
                 options=all_providers_map,
                 default=all_providers_map,
                 key="map_prov_filter",
             )
 
-        # Pre-filter by facility type & provider so commodity toggles reflect
-        # only what's available in the current subset.
+        # Pre-filter by location type, state, and provider; commodity options
+        # are then derived from this subset so the dropdown stays relevant.
         pre_filtered = [
             r for r in map_rows
             if r["provider"] in sel_provs
             and (not sel_ftypes or r.get("facility_type") in sel_ftypes)
+            and (not sel_states or r.get("state") in sel_states)
         ]
 
-        # ── Commodity toggles (base-level, Wheat variants collapse) ───────────
         def _base_commodity(g: str) -> str:
             return "Wheat" if (g == "Wheat" or g.startswith("Wheat (")) else g
 
         avail_base = sorted({_base_commodity(g) for r in pre_filtered for g in r["grains"]})
 
-        if "map_grain_sel" not in st.session_state:
-            st.session_state["map_grain_sel"] = set(avail_base)
-
-        grain_cols = st.columns(max(1, len(avail_base))) if avail_base else []
-        for idx, g in enumerate(avail_base):
-            with grain_cols[idx]:
-                active = g in st.session_state["map_grain_sel"]
-                label  = f"{'✓ ' if active else ''}{g}"
-                if st.button(label, key=f"map_grain_{g}", use_container_width=True):
-                    sel = st.session_state["map_grain_sel"]
-                    if g in sel:
-                        sel.discard(g)
-                    else:
-                        sel.add(g)
-                    st.session_state["map_grain_sel"] = sel
-                    st.rerun()
-
-        sel_base_commodities = st.session_state["map_grain_sel"]
+        sel_commodities_list = st.multiselect(
+            "Commodity",
+            options=avail_base,
+            default=avail_base,
+            placeholder="All commodities",
+            key="map_grain_filter",
+        )
+        sel_base_commodities = set(sel_commodities_list)
 
         # ── Wheat class sub-filter (shown only when Wheat is selected) ────────
         sel_wheat_classes: set | None = None
@@ -1444,30 +1443,13 @@ with tab_map:
 
             if len(avail_wheat_classes) > 1:
                 avail_wc_sorted = sorted(avail_wheat_classes)
-                if "map_wheat_class" not in st.session_state:
-                    st.session_state["map_wheat_class"] = set(avail_wc_sorted)
-
-                wc_cols = st.columns([1] + [1] * len(avail_wc_sorted))
-                with wc_cols[0]:
-                    st.markdown(
-                        '<div style="font-size:10px;color:#64748b;padding-top:10px">'
-                        'Wheat class:</div>',
-                        unsafe_allow_html=True,
-                    )
-                for idx, cls in enumerate(avail_wc_sorted):
-                    with wc_cols[idx + 1]:
-                        active = cls in st.session_state["map_wheat_class"]
-                        label  = f"{'✓ ' if active else ''}{cls}"
-                        if st.button(label, key=f"map_wclass_{cls}", use_container_width=True):
-                            sel = st.session_state["map_wheat_class"]
-                            if cls in sel:
-                                sel.discard(cls)
-                            else:
-                                sel.add(cls)
-                            st.session_state["map_wheat_class"] = sel
-                            st.rerun()
-
-                sel_wheat_classes = st.session_state["map_wheat_class"]
+                sel_wc_list = st.multiselect(
+                    "Wheat class",
+                    options=avail_wc_sorted,
+                    default=avail_wc_sorted,
+                    key="map_wheat_class_filter",
+                )
+                sel_wheat_classes = set(sel_wc_list)
 
         # ── Apply commodity + wheat class filter ──────────────────────────────
         def _pin_matches(r: dict) -> bool:
