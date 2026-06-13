@@ -10,6 +10,7 @@ import streamlit as st
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
     list_locations, get_location_meta, get_all_location_meta, get_map_data,
+    get_grain_map,
 )
 
 load_dotenv()
@@ -32,6 +33,40 @@ st.set_page_config(
 
 # ── On-startup init ───────────────────────────────────────────────────────────
 init_db()
+
+# ── Grain normalization helpers ───────────────────────────────────────────────
+@st.cache_data(ttl=3600)
+def _cached_grain_map() -> dict:
+    return get_grain_map()
+
+_GM: dict = _cached_grain_map()
+
+def _grain_disp(raw: str) -> str | None:
+    """Return canonical display name for a raw grain, or None if inactive."""
+    entry = _GM.get(raw)
+    if entry is None:
+        return raw  # unknown: pass through
+    if not entry["is_active"]:
+        return None
+    cls  = entry.get("wheat_class")
+    prot = entry.get("protein")
+    base = entry["canonical_grain"]
+    if cls:
+        return f"{base} ({cls} {prot})" if prot else f"{base} ({cls})"
+    return base
+
+def _build_grains(rows) -> list[str]:
+    """Build a sorted deduplicated list of canonical grain display names from snapshot rows."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for r in rows:
+        if r.isSpot:
+            continue
+        disp = _grain_disp(r.grain)
+        if disp and disp not in seen:
+            seen.add(disp)
+            result.append(disp)
+    return sorted(result)
 
 # ── Location config ───────────────────────────────────────────────────────────
 LOCATIONS = [
@@ -101,8 +136,8 @@ def compute_changes(snapshots):
     MONTH   = 30 * 864e5
     YEAR    = 365 * 864e5
 
-    row_lookup  = {}
-    spot_lookup = {"Soybeans": [], "Corn": [], "Wheat": []}
+    row_lookup:  dict = {}
+    spot_lookup: dict = {}  # canonical_grain -> list of entries
 
     for snap in snapshots:
         ts_ms = datetime.fromisoformat(
@@ -110,9 +145,9 @@ def compute_changes(snapshots):
         for r in snap.rows:
             entry = {"ts_ms": ts_ms, "b": r.basisCents, "sym": r.futuresSymbol}
             if r.isSpot:
-                g = r.spotGrain or r.grain
-                if g in spot_lookup:
-                    spot_lookup[g].append(entry)
+                g = _grain_disp(r.spotGrain or r.grain)
+                if g:
+                    spot_lookup.setdefault(g, []).append(entry)
             else:
                 if r.id not in row_lookup:
                     row_lookup[r.id] = []
@@ -134,11 +169,11 @@ def compute_changes(snapshots):
                 row_lookup.get(r.id, []), r.basisCents, r.futuresSymbol)
 
     spot_changes = {}
-    for g in ["Soybeans", "Corn", "Wheat"]:
-        sp = next((r for r in latest.rows
-                   if r.isSpot and (r.spotGrain or r.grain) == g), None)
-        if sp and spot_lookup[g]:
-            spot_changes[g] = calc(spot_lookup[g], sp.basisCents, sp.futuresSymbol)
+    for r in latest.rows:
+        if r.isSpot:
+            g = _grain_disp(r.spotGrain or r.grain)
+            if g and spot_lookup.get(g):
+                spot_changes[g] = calc(spot_lookup[g], r.basisCents, r.futuresSymbol)
 
     return {"rows": row_changes, "spots": spot_changes}
 
@@ -701,7 +736,7 @@ if provider == "CHS":
     loc_color = "#16a34a"   # green for CHS
     _chs_snaps = get_snapshots("CHS", loc_key)
     if _chs_snaps:
-        grains = sorted({r.grain for r in _chs_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_chs_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -732,7 +767,7 @@ elif provider == "POET":
     # Detect available grains from the latest snapshot for this location
     _poet_snaps = get_snapshots("POET", loc_key)
     if _poet_snaps:
-        grains = sorted({r.grain for r in _poet_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_poet_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -757,7 +792,7 @@ elif provider == "ADM":
     loc_color = "#3b82f6"   # blue for ADM
     _adm_snaps = get_snapshots("ADM", loc_key)
     if _adm_snaps:
-        grains = sorted({r.grain for r in _adm_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_adm_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -807,7 +842,7 @@ elif provider == "CGB":
     loc_color = "#8b5cf6"   # purple for CGB
     _cgb_snaps = get_snapshots("CGB", loc_key)
     if _cgb_snaps:
-        grains = sorted({r.grain for r in _cgb_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_cgb_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -880,7 +915,7 @@ elif provider == "Cargill":
     loc_color = "#0ea5e9"   # sky blue for Cargill
     _cargill_snaps = get_snapshots("Cargill", loc_key)  # noqa: F841
     if _cargill_snaps:
-        grains = sorted({r.grain for r in _cargill_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_cargill_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -930,7 +965,7 @@ elif provider == "Andersons":
     loc_color = "#f59e0b"   # amber for The Andersons
     _andersons_snaps = get_snapshots("Andersons", loc_key)
     if _andersons_snaps:
-        grains = sorted({r.grain for r in _andersons_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_andersons_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -980,7 +1015,7 @@ elif provider == "Bunge":
     loc_color = "#dc2626"   # red for Bunge
     _bunge_snaps = get_snapshots("Bunge", loc_key)
     if _bunge_snaps:
-        grains = sorted({r.grain for r in _bunge_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_bunge_snaps[-1].rows)
     else:
         grains = ["Soybeans"]
 
@@ -1030,7 +1065,7 @@ elif provider == "Scoular":
     loc_color = "#f97316"   # orange for Scoular
     _scoular_snaps = get_snapshots("Scoular", loc_key)
     if _scoular_snaps:
-        grains = sorted({r.grain for r in _scoular_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_scoular_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -1079,7 +1114,7 @@ elif provider == "AGP":
     loc_color = "#22c55e"   # green for AGP
     _agp_snaps = get_snapshots("AGP", loc_key)
     if _agp_snaps:
-        grains = sorted({r.grain for r in _agp_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_agp_snaps[-1].rows)
     else:
         grains = ["Soybeans"]
 
@@ -1128,7 +1163,7 @@ elif provider == "LDC":
     loc_color = "#3b82f6"   # blue for LDC
     _ldc_snaps = get_snapshots("LDC", loc_key)
     if _ldc_snaps:
-        grains = sorted({r.grain for r in _ldc_snaps[-1].rows if not r.isSpot})
+        grains = _build_grains(_ldc_snaps[-1].rows)
     else:
         grains = ["Corn"]
 
@@ -1221,9 +1256,9 @@ with tab_bids:
             else:
                 grain = grains[0]
 
-        body_rows = [r for r in viewing.rows if not r.isSpot and r.grain == grain]
+        body_rows = [r for r in viewing.rows if not r.isSpot and _grain_disp(r.grain) == grain]
         spot_row  = next((r for r in viewing.rows
-                          if r.isSpot and (r.spotGrain or r.grain) == grain), None)
+                          if r.isSpot and _grain_disp(r.spotGrain or r.grain) == grain), None)
         spot_chg  = changes["spots"].get(grain)
 
         moved = sum(1 for r in body_rows
@@ -1342,28 +1377,6 @@ with tab_map:
             unsafe_allow_html=True,
         )
     else:
-        # ── Commodity toggles ─────────────────────────────────────────────────
-        all_grains_map = sorted({g for r in map_rows for g in r["grains"]})
-        # Default: all selected
-        if "map_grain_sel" not in st.session_state:
-            st.session_state["map_grain_sel"] = set(all_grains_map)
-
-        grain_cols = st.columns(len(all_grains_map))
-        for idx, g in enumerate(all_grains_map):
-            with grain_cols[idx]:
-                active = g in st.session_state["map_grain_sel"]
-                label  = f"{'✓ ' if active else ''}{g}"
-                if st.button(label, key=f"map_grain_{g}", use_container_width=True):
-                    sel = st.session_state["map_grain_sel"]
-                    if g in sel:
-                        sel.discard(g)
-                    else:
-                        sel.add(g)
-                    st.session_state["map_grain_sel"] = sel
-                    st.rerun()
-
-        sel_grains = st.session_state["map_grain_sel"]
-
         # ── Facility type & provider filters ──────────────────────────────────
         all_ftypes_map    = sorted({r["facility_type"] for r in map_rows if r.get("facility_type")})
         all_providers_map = sorted({r["provider"] for r in map_rows})
@@ -1385,13 +1398,94 @@ with tab_map:
                 key="map_prov_filter",
             )
 
-        # Keep only locations that carry at least one selected commodity
-        filtered = [
+        # Pre-filter by facility type & provider so commodity toggles reflect
+        # only what's available in the current subset.
+        pre_filtered = [
             r for r in map_rows
             if r["provider"] in sel_provs
-            and any(g in r["grains"] for g in sel_grains)
             and (not sel_ftypes or r.get("facility_type") in sel_ftypes)
         ]
+
+        # ── Commodity toggles (base-level, Wheat variants collapse) ───────────
+        def _base_commodity(g: str) -> str:
+            return "Wheat" if (g == "Wheat" or g.startswith("Wheat (")) else g
+
+        avail_base = sorted({_base_commodity(g) for r in pre_filtered for g in r["grains"]})
+
+        if "map_grain_sel" not in st.session_state:
+            st.session_state["map_grain_sel"] = set(avail_base)
+
+        grain_cols = st.columns(max(1, len(avail_base))) if avail_base else []
+        for idx, g in enumerate(avail_base):
+            with grain_cols[idx]:
+                active = g in st.session_state["map_grain_sel"]
+                label  = f"{'✓ ' if active else ''}{g}"
+                if st.button(label, key=f"map_grain_{g}", use_container_width=True):
+                    sel = st.session_state["map_grain_sel"]
+                    if g in sel:
+                        sel.discard(g)
+                    else:
+                        sel.add(g)
+                    st.session_state["map_grain_sel"] = sel
+                    st.rerun()
+
+        sel_base_commodities = st.session_state["map_grain_sel"]
+
+        # ── Wheat class sub-filter (shown only when Wheat is selected) ────────
+        sel_wheat_classes: set | None = None
+        if "Wheat" in sel_base_commodities:
+            avail_wheat_classes: set[str] = set()
+            for r in pre_filtered:
+                for g in r["grains"]:
+                    if g == "Wheat":
+                        avail_wheat_classes.add("(unclassified)")
+                    elif g.startswith("Wheat ("):
+                        avail_wheat_classes.add(g[7:g.index(")")].split()[0])
+
+            if len(avail_wheat_classes) > 1:
+                avail_wc_sorted = sorted(avail_wheat_classes)
+                if "map_wheat_class" not in st.session_state:
+                    st.session_state["map_wheat_class"] = set(avail_wc_sorted)
+
+                wc_cols = st.columns([1] + [1] * len(avail_wc_sorted))
+                with wc_cols[0]:
+                    st.markdown(
+                        '<div style="font-size:10px;color:#64748b;padding-top:10px">'
+                        'Wheat class:</div>',
+                        unsafe_allow_html=True,
+                    )
+                for idx, cls in enumerate(avail_wc_sorted):
+                    with wc_cols[idx + 1]:
+                        active = cls in st.session_state["map_wheat_class"]
+                        label  = f"{'✓ ' if active else ''}{cls}"
+                        if st.button(label, key=f"map_wclass_{cls}", use_container_width=True):
+                            sel = st.session_state["map_wheat_class"]
+                            if cls in sel:
+                                sel.discard(cls)
+                            else:
+                                sel.add(cls)
+                            st.session_state["map_wheat_class"] = sel
+                            st.rerun()
+
+                sel_wheat_classes = st.session_state["map_wheat_class"]
+
+        # ── Apply commodity + wheat class filter ──────────────────────────────
+        def _pin_matches(r: dict) -> bool:
+            for g in r["grains"]:
+                base = _base_commodity(g)
+                if base not in sel_base_commodities:
+                    continue
+                if base != "Wheat" or sel_wheat_classes is None:
+                    return True
+                if g == "Wheat":
+                    return "(unclassified)" in sel_wheat_classes
+                if g.startswith("Wheat ("):
+                    cls = g[7:g.index(")")].split()[0]
+                    if cls in sel_wheat_classes:
+                        return True
+            return False
+
+        filtered = [r for r in pre_filtered if _pin_matches(r)]
 
         # ── Build DataFrame ───────────────────────────────────────────────────
         def _fmt_basis(cents):
@@ -1402,9 +1496,8 @@ with tab_map:
 
         def _tooltip_text(row):
             grains_str = "  ".join(
-                f"{g}: {_fmt_basis(row['grains'].get(g))}"
-                for g in sorted(sel_grains)
-                if g in row["grains"]
+                f"{g}: {_fmt_basis(v)}"
+                for g, v in sorted(row["grains"].items())
             )
             state_str = f", {row['state']}" if row["state"] else ""
             ft_str    = f" · {row['facility_type']}" if row.get("facility_type") else ""

@@ -1,0 +1,76 @@
+[
+  {"raw_grain": "Corn",                                       "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Yellow Corn",                                "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Corn (White)",                               "canonical_grain": "Corn (White)",      "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Corn (Canadian)",                            "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 0},
+
+  {"raw_grain": "Soybeans",                                   "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Soybeans (Canadian)",                        "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "IP Soybeans",                                "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Hi-Oleic Soy",                               "canonical_grain": "Hi-Oleic Soybeans", "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "High Oleic Beans",                           "canonical_grain": "Hi-Oleic Soybeans", "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Soy Meal",                                   "canonical_grain": "Soybean Meal",      "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Soybean Meal",                               "canonical_grain": "Soybean Meal",      "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Soy Hulls",                                  "canonical_grain": "Soy Hulls",         "wheat_class": null,    "protein": null,   "is_active": 1},
+
+  {"raw_grain": "Wheat",                                      "canonical_grain": "Wheat",             "wheat_class": null,    "protein": null,   "is_active": 1},
+
+  {"raw_grain": "SRW Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Soft Red Winter)",                    "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Northern Canadian Soft Red Winter)",  "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+
+  {"raw_grain": "Wheat Sww",                                  "canonical_grain": "Wheat",             "wheat_class": "SWW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "White Wheat",                                "canonical_grain": "Wheat",             "wheat_class": "SWW",   "protein": null,   "is_active": 1},
+
+  {"raw_grain": "HRW Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Hard Red Winter)",                    "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Hrw-Winter Wheat",                           "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat, Hrw",                                 "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Winter Wheat",                               "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat, Hrw 11.5%",                          "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": "11.5%", "is_active": 1},
+  {"raw_grain": "Winter Wheat 12%",                           "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": "12%",  "is_active": 1},
+  {"raw_grain": "Canadian Eastern Hrww",                      "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 0},
+
+  {"raw_grain": "DNS Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Dns -Spring Wheat",                          "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Hard Red Spring Wheat",                      "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Hrs",                                        "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Spring Wheat",                               "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Spring Wheat, Hrs",                          "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Hard Red Spring)",                    "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat, Hrs",                                 "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Canadian Western Red Spring Wheat",          "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Spring Wheat 13%",                           "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": "13%",  "is_active": 1},
+  {"raw_grain": "Spring Wheat 14%",                           "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": "14%",  "is_active": 1},
+  {"raw_grain": "Wheat, Hrs 14%",                             "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": "14%",  "is_active": 1},
+  {"raw_grain": "Spring Wheat 15%",                           "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": "15%",  "is_active": 1},
+
+  {"raw_grain": "Durum",                                      "canonical_grain": "Wheat",             "wheat_class": "Durum", "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat, Durum",                               "canonical_grain": "Wheat",             "wheat_class": "Durum", "protein": null,   "is_active": 1},
+
+  {"raw_grain": "Canola",                                     "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Canola (Us)",                                "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Canola Usd/Cwt",                             "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Canola (Canadian)",                          "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 0},
+
+  {"raw_grain": "Milo",                                       "canonical_grain": "Sorghum",           "wheat_class": null,    "protein": null,   "is_active": 1},
+  {"raw_grain": "Sorghum",                                    "canonical_grain": "Sorghum",           "wheat_class": null,    "protein": null,   "is_active": 1},
+
+  {"raw_grain": "Hi Oleic Sunflowers",                        "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Hi-Oleic Sunflower",                         "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Hioleic Sunflower Seed",                     "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Sunflower",                                  "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Sunflower, Birdfood",                        "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Sunflower, Oil",                             "canonical_grain": "Sunflower",         "wheat_class": null,    "protein": null,   "is_active": 0},
+
+  {"raw_grain": "Barley, Feed",                               "canonical_grain": "Barley",            "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Flax",                                       "canonical_grain": "Flax",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Flaxseed",                                   "canonical_grain": "Flax",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Lentils",                                    "canonical_grain": "Lentils",           "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Oats",                                       "canonical_grain": "Oats",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Peas",                                       "canonical_grain": "Peas",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Peas, Green",                                "canonical_grain": "Peas",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Peas, Yellow",                               "canonical_grain": "Peas",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Yellow Peas",                                "canonical_grain": "Peas",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Rice (Long Grain)",                          "canonical_grain": "Rice",              "wheat_class": null,    "protein": null,   "is_active": 0}
+]

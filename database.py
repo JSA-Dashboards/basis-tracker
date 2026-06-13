@@ -87,6 +87,13 @@ _SQLITE_DDL = [
         lon           REAL,
         PRIMARY KEY (provider, location)
     )""",
+    """CREATE TABLE IF NOT EXISTS grain_map (
+        raw_grain        TEXT PRIMARY KEY,
+        canonical_grain  TEXT NOT NULL,
+        wheat_class      TEXT,
+        protein          TEXT,
+        is_active        INTEGER NOT NULL DEFAULT 1
+    )""",
 ]
 
 _PG_DDL = [
@@ -129,6 +136,13 @@ _PG_DDL = [
         lon           DOUBLE PRECISION,
         PRIMARY KEY (provider, location)
     )""",
+    """CREATE TABLE IF NOT EXISTS grain_map (
+        raw_grain        TEXT PRIMARY KEY,
+        canonical_grain  TEXT NOT NULL,
+        wheat_class      TEXT,
+        protein          TEXT,
+        is_active        SMALLINT NOT NULL DEFAULT 1
+    )""",
 ]
 
 _MIGRATE_DDL = [
@@ -160,9 +174,10 @@ def init_db():
         conn.commit()
     finally:
         conn.close()
-    # Populate lat/lon and facility tags from committed seed files.
+    # Populate lat/lon, facility tags, and grain map from committed seed files.
     seed_geocoding()
     seed_facility_types()
+    seed_grain_map()
 
 
 def seed_geocoding(seed_path: str | None = None) -> int:
@@ -261,6 +276,82 @@ def seed_facility_types(seed_path: str | None = None) -> int:
     finally:
         conn.close()
     return written
+
+
+def seed_grain_map(seed_path: str | None = None) -> int:
+    """
+    Load grain_seed.json and upsert all rows into grain_map.
+    Mappings are authoritative — always overwrites existing values.
+    Returns number of rows written.
+    """
+    import json, os
+    if seed_path is None:
+        seed_path = os.path.join(os.path.dirname(__file__), "grain_seed.json")
+    if not os.path.exists(seed_path):
+        return 0
+
+    with open(seed_path, encoding="utf-8") as f:
+        seed = json.load(f)
+
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    written = 0
+    try:
+        for row in seed:
+            raw = row.get("raw_grain")
+            if not raw:
+                continue
+            if _use_pg():
+                c.execute(f"""
+                    INSERT INTO grain_map (raw_grain, canonical_grain, wheat_class, protein, is_active)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    ON CONFLICT (raw_grain) DO UPDATE SET
+                        canonical_grain = EXCLUDED.canonical_grain,
+                        wheat_class     = EXCLUDED.wheat_class,
+                        protein         = EXCLUDED.protein,
+                        is_active       = EXCLUDED.is_active
+                """, (raw, row["canonical_grain"], row.get("wheat_class"),
+                      row.get("protein"), row.get("is_active", 1)))
+            else:
+                c.execute(f"""
+                    INSERT INTO grain_map (raw_grain, canonical_grain, wheat_class, protein, is_active)
+                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    ON CONFLICT(raw_grain) DO UPDATE SET
+                        canonical_grain = excluded.canonical_grain,
+                        wheat_class     = excluded.wheat_class,
+                        protein         = excluded.protein,
+                        is_active       = excluded.is_active
+                """, (raw, row["canonical_grain"], row.get("wheat_class"),
+                      row.get("protein"), row.get("is_active", 1)))
+            written += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return written
+
+
+def get_grain_map() -> dict[str, dict]:
+    """Return {raw_grain: {canonical_grain, wheat_class, protein, is_active}} from grain_map table."""
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        c.execute(
+            "SELECT raw_grain, canonical_grain, wheat_class, protein, is_active FROM grain_map"
+        )
+        return {
+            r["raw_grain"]: {
+                "canonical_grain": r["canonical_grain"],
+                "wheat_class":     r["wheat_class"],
+                "protein":         r["protein"],
+                "is_active":       bool(r["is_active"]),
+            }
+            for r in c.fetchall()
+        }
+    except Exception:
+        return {}
+    finally:
+        conn.close()
 
 
 # ── Email dedup ────────────────────────────────────────────────────────────────
@@ -530,13 +621,14 @@ def get_all_location_meta() -> list[dict]:
 
 def get_map_data() -> list[dict]:
     """
-    Return one dict per (provider, location) with lat/lon and latest basis by grain.
+    Return one dict per (provider, location) with lat/lon and latest basis by canonical grain.
 
     Shape:
         [{"provider", "location", "state", "lat", "lon",
-          "grains": {"Corn": -12, "Soybeans": 45, ...}}, ...]
+          "grains": {"Corn": -12, "Soybeans": 45, "Wheat (HRS)": 30, ...}}, ...]
 
-    Only locations with known lat/lon are included.
+    Only locations with known lat/lon are included. Inactive grains are excluded.
+    Raw grains are normalized to canonical display names via the grain_map table.
     """
     conn = get_conn()
     c    = conn.cursor()
@@ -568,8 +660,29 @@ def get_map_data() -> list[dict]:
             ORDER BY s.provider, s.location, r.grain
         """)
         rows = c.fetchall()
+        # Load grain map for normalization
+        try:
+            c.execute(
+                "SELECT raw_grain, canonical_grain, wheat_class, protein, is_active FROM grain_map"
+            )
+            gm = {r["raw_grain"]: dict(r) for r in c.fetchall()}
+        except Exception:
+            gm = {}
     finally:
         conn.close()
+
+    def _canonical(raw: str) -> str | None:
+        entry = gm.get(raw)
+        if entry is None:
+            return raw  # unknown grain: pass through
+        if not entry["is_active"]:
+            return None  # explicitly inactive — drop
+        cls  = entry.get("wheat_class")
+        prot = entry.get("protein")
+        base = entry["canonical_grain"]
+        if cls:
+            return f"{base} ({cls} {prot})" if prot else f"{base} ({cls})"
+        return base
 
     # Group grain rows into per-location dicts
     locs: dict[tuple, dict] = {}
@@ -587,7 +700,9 @@ def get_map_data() -> list[dict]:
                 "grains":        {},
             }
         if row["basis_cents"] is not None:
-            locs[key]["grains"][row["grain"]] = row["basis_cents"]
+            canon = _canonical(row["grain"])
+            if canon and canon not in locs[key]["grains"]:
+                locs[key]["grains"][canon] = row["basis_cents"]
 
     return list(locs.values())
 
