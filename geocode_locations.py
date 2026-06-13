@@ -28,7 +28,8 @@ log = logging.getLogger(__name__)
 
 # One user-agent string required by Nominatim ToS
 _UA     = "basis-tracker-geocoder/1.0 (kpostin@jpsi.com)"
-_DELAY  = 1.1   # seconds between requests (Nominatim ToS: max 1/sec)
+_DELAY       = 1.2   # seconds between requests (Nominatim ToS: max 1/sec)
+_BACKOFF_429 = 15.0  # extra sleep after a 429 response
 
 # ── Name-cleaning patterns ─────────────────────────────────────────────────────
 
@@ -67,6 +68,26 @@ _CITY_STATE_RE = re.compile(r"^(.+?),\s*([A-Z]{2})\s*$")
 
 # Canadian province codes — skip geocoding these
 _CA_PROVINCES  = {"AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT"}
+
+# State overrides for providers whose metadata has no state column populated
+_PROVIDER_STATE: dict[tuple[str, str], str] = {
+    # GPRE (Green Plains Renewable Energy)
+    ("GPRE", "Wood River"):   "NE",
+    ("GPRE", "York"):         "NE",
+    ("GPRE", "Superior"):     "NE",
+    ("GPRE", "Central City"): "NE",
+    ("GPRE", "Madison"):      "NE",
+    ("GPRE", "Shenandoah"):   "IA",
+    ("GPRE", "Otter Tail"):   "MN",
+    ("GPRE", "Mount Vernon"): "IN",
+    # Mendota (IL-area ADM/JPSI locations)
+    ("Mendota", "Burlington"):      "IA",
+    ("Mendota", "Havana"):          "IL",
+    ("Mendota", "Ottawa"):          "IL",
+    ("Mendota", "Clinton Proc"):    "IA",
+    ("Mendota", "Mendota BN Rail"): "IL",
+    ("Mendota", "Mendota Mill"):    "IL",
+}
 
 
 def _parse_city_state(location: str, meta_state: str) -> tuple[str, str] | None:
@@ -146,7 +167,14 @@ def _geocode_one(geocoder: Nominatim, city: str, state: str, retries: int = 2) -
                 time.sleep(2)
             continue
         except GeocoderServiceError as exc:
-            log.warning("Geocoder error for %r: %s", query, exc)
+            msg = str(exc)
+            if "429" in msg:
+                log.warning("Rate-limited (429) for %r — sleeping %.0fs", query, _BACKOFF_429)
+                time.sleep(_BACKOFF_429)
+                if attempt < retries:
+                    continue
+            else:
+                log.warning("Geocoder error for %r: %s", query, exc)
             return None
     return None
 
@@ -271,6 +299,12 @@ def run(reset: bool = False, dry_run: bool = False, bootstrap: bool = False):
             continue
 
         city, st = parsed
+
+        # Apply provider-level state override when metadata has no state
+        if not st:
+            override = _PROVIDER_STATE.get((provider, city)) or _PROVIDER_STATE.get((provider, location))
+            if override:
+                st = override
         if dry_run:
             query = f"{city}, {st}, USA" if st else f"{city}, USA"
             print(f"  WOULD  {provider:10s}  {location:45s}  ->  {query}")

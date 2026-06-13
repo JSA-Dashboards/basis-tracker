@@ -3430,6 +3430,321 @@
     "lon": -97.337545
   },
   {
+    "provider": "GPRE",
+    "location": "Central City",
+    "state": "",
+    "lat": 41.115848,
+    "lon": -98.001725
+  },
+  {
+    "provider": "GPRE",
+    "location": "Madison",
+    "state": "",
+    "lat": 41.906494,
+    "lon": -97.596151
+  },
+  {
+    "provider": "GPRE",
+    "location": "Shenandoah",
+    "state": "",
+    "lat": 40.765547,
+    "lon": -95.372354
+  },
+  {
+    "provider": "GPRE",
+    "location": "Superior",
+    "state": "",
+    "lat": 40.020847,
+    "lon": -98.070044
+  },
+  {
+    "provider": "GPRE",
+    "location": "Wood River",
+    "state": "",
+    "lat": 40.821054,
+    "lon": -98.600621
+  },
+  {
+    "provider": "GPRE",
+    "location": "York",
+    "state": "",
+    "lat": 40.871617,
+    "lon": -97.60014
+  },
+  {
+    "provider": "Mendota",
+    "location": "Burlington",
+    "state": "",
+    "lat": 40.812692,
+    "lon": -91.10202
+  },
+  {
+    "provider": "Mendota",
+    "location": "Havana",
+    "state": "",
+    "lat": 40.301432,
+    "lon": -90.063362
+  },
+  {
+    "provider": "Mendota",
+    "location": "Mendota Mill",
+    "state": "",
+    "lat": 41.547255,
+    "lon": -89.117585
+  },
+  {
+    "provider": "Mendota",
+    "location": "Ottawa",
+    "state": "",
+    "lat": 41.351663,
+    "lon": -88.845436
+  },
+  {
+    "provider": "POET",
+    "location": "Albert Lea, MN",
+    "state": "",
+    "lat": 43.648013,
+    "lon": -93.368266
+  },
+  {
+    "provider": "POET",
+    "location": "Alexandria, IN",
+    "state": "",
+    "lat": 40.263547,
+    "lon": -85.674481
+  },
+  {
+    "provider": "POET",
+    "location": "Arthur, IA",
+    "state": "",
+    "lat": 42.3353,
+    "lon": -95.347565
+  },
+  {
+    "provider": "POET",
+    "location": "Ashton, IA",
+    "state": "",
+    "lat": 43.311289,
+    "lon": -95.790947
+  },
+  {
+    "provider": "POET",
+    "location": "Big Stone City, SD",
+    "state": "",
+    "lat": 45.291632,
+    "lon": -96.462834
+  },
+  {
+    "provider": "POET",
+    "location": "Bingham Lake, MN",
+    "state": "",
+    "lat": 43.906624,
+    "lon": -95.046379
+  },
+  {
+    "provider": "POET",
+    "location": "Caro, MI",
+    "state": "",
+    "lat": 43.491132,
+    "lon": -83.396897
+  },
+  {
+    "provider": "POET",
+    "location": "Chancellor, SD",
+    "state": "",
+    "lat": 43.372118,
+    "lon": -96.987179
+  },
+  {
+    "provider": "POET",
+    "location": "Cloverdale, IN",
+    "state": "",
+    "lat": 39.514768,
+    "lon": -86.793897
+  },
+  {
+    "provider": "POET",
+    "location": "Coon Rapids, IA",
+    "state": "",
+    "lat": 41.870856,
+    "lon": -94.678176
+  },
+  {
+    "provider": "POET",
+    "location": "Corning, IA",
+    "state": "",
+    "lat": 40.990162,
+    "lon": -94.734783
+  },
+  {
+    "provider": "POET",
+    "location": "Emmetsburg, IA",
+    "state": "",
+    "lat": 43.110808,
+    "lon": -94.67819
+  },
+  {
+    "provider": "POET",
+    "location": "Fairbank, IA",
+    "state": "",
+    "lat": 42.639211,
+    "lon": -92.048876
+  },
+  {
+    "provider": "POET",
+    "location": "Fairmont, NE",
+    "state": "",
+    "lat": 40.636136,
+    "lon": -97.585282
+  },
+  {
+    "provider": "POET",
+    "location": "Fostoria, OH",
+    "state": "",
+    "lat": 41.15743,
+    "lon": -83.414106
+  },
+  {
+    "provider": "POET",
+    "location": "Gowrie, IA",
+    "state": "",
+    "lat": 42.2805,
+    "lon": -94.29083
+  },
+  {
+    "provider": "POET",
+    "location": "Groton, SD",
+    "state": "",
+    "lat": 45.447313,
+    "lon": -98.098779
+  },
+  {
+    "provider": "POET",
+    "location": "Hanlontown, IA",
+    "state": "",
+    "lat": 43.281286,
+    "lon": -93.378786
+  },
+  {
+    "provider": "POET",
+    "location": "Hudson, SD",
+    "state": "",
+    "lat": 43.130193,
+    "lon": -96.454281
+  },
+  {
+    "provider": "POET",
+    "location": "Iowa Falls, IA",
+    "state": "",
+    "lat": 42.520792,
+    "lon": -93.264759
+  },
+  {
+    "provider": "POET",
+    "location": "Jewell, IA",
+    "state": "",
+    "lat": 42.306925,
+    "lon": -93.640216
+  },
+  {
+    "provider": "POET",
+    "location": "Laddonia, MO",
+    "state": "",
+    "lat": 39.24254,
+    "lon": -91.645438
+  },
+  {
+    "provider": "POET",
+    "location": "Lake Crystal, MN",
+    "state": "",
+    "lat": 44.105797,
+    "lon": -94.218849
+  },
+  {
+    "provider": "POET",
+    "location": "Leipsic, OH",
+    "state": "",
+    "lat": 41.098385,
+    "lon": -83.984666
+  },
+  {
+    "provider": "POET",
+    "location": "Macon, MO",
+    "state": "",
+    "lat": 39.841625,
+    "lon": -92.567512
+  },
+  {
+    "provider": "POET",
+    "location": "Marion, OH",
+    "state": "",
+    "lat": 40.588527,
+    "lon": -83.189525
+  },
+  {
+    "provider": "POET",
+    "location": "Menlo, IA",
+    "state": "",
+    "lat": 41.519939,
+    "lon": -94.4048
+  },
+  {
+    "provider": "POET",
+    "location": "Mitchell, SD",
+    "state": "",
+    "lat": 43.70953,
+    "lon": -98.025379
+  },
+  {
+    "provider": "POET",
+    "location": "North Manchester, IN",
+    "state": "",
+    "lat": 41.0006,
+    "lon": -85.768597
+  },
+  {
+    "provider": "POET",
+    "location": "Obion, TN",
+    "state": "",
+    "lat": 36.355603,
+    "lon": -89.174882
+  },
+  {
+    "provider": "POET",
+    "location": "Portland, IN",
+    "state": "",
+    "lat": 40.434489,
+    "lon": -84.977745
+  },
+  {
+    "provider": "POET",
+    "location": "Preston, MN",
+    "state": "",
+    "lat": 43.670242,
+    "lon": -92.083216
+  },
+  {
+    "provider": "POET",
+    "location": "Scotland, SD",
+    "state": "",
+    "lat": 43.149715,
+    "lon": -97.717567
+  },
+  {
+    "provider": "POET",
+    "location": "Shelbyville, IN",
+    "state": "",
+    "lat": 39.521437,
+    "lon": -85.776924
+  },
+  {
+    "provider": "POET",
+    "location": "Shell Rock, IA",
+    "state": "",
+    "lat": 42.711082,
+    "lon": -92.582096
+  },
+  {
     "provider": "Scoular",
     "location": "AGP - Manning",
     "state": "IA",
