@@ -1939,5 +1939,10 @@
   {"provider": "Scoular",   "location": "Madrid, NE Ethanol",                  "facility_type": "Corn Processing", "region": null},
 
   {"provider": "Mendota",   "location": "Clinton Proc",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "Mendota",   "location": "Mendota BN Rail",                     "facility_type": "Corn Processing", "region": null}
+  {"provider": "Mendota",   "location": "Mendota BN Rail",                     "facility_type": "Corn Processing", "region": null},
+
+  {"provider": "ADM",       "location": "Mendota, IL (Northern Crossing Rail)", "facility_type": "Rail Terminal",   "region": null},
+
+  {"provider": "Andersons", "location": "Denison",                             "facility_type": "Corn Processing", "region": null},
+  {"provider": "Andersons", "location": "Greenville",                          "facility_type": "Corn Processing", "region": null}
 ]
