@@ -3,14 +3,14 @@ Basis Tracker · JPSI
 Streamlit app — run with: streamlit run app.py
 """
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from dotenv import load_dotenv
 import streamlit as st
 
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
     list_locations, get_location_meta, get_all_location_meta, get_map_data,
-    get_grain_map,
+    get_grain_map, get_bids_filter_data, get_snapshots_bulk,
 )
 
 load_dotenv()
@@ -80,6 +80,22 @@ ROLL_ADJ = [
     {"from": "ZCK26", "to": "ZCN26", "adj": -10},
 ]
 
+_PROVIDER_COLOR: dict[str, str] = {
+    "ADM":       "#3b82f6",
+    "CHS":       "#16a34a",
+    "POET":      "#f97316",
+    "CGB":       "#8b5cf6",
+    "GPRE":      "#16a34a",
+    "Cargill":   "#0ea5e9",
+    "Andersons": "#f59e0b",
+    "Bunge":     "#dc2626",
+    "Scoular":   "#f97316",
+    "AGP":       "#22c55e",
+    "LDC":       "#3b82f6",
+    "Tyson":     "#6b7280",
+    "GPC":       "#10b981",
+}
+
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
                "N":"Jul","Q":"Aug","U":"Sep","V":"Oct","X":"Nov","Z":"Dec"}
 
@@ -125,9 +141,43 @@ def closest(series, target_ms, tol_ms):
             best = s
     return best
 
+# Maps CME month letter codes to calendar month numbers
+_CME_MONTH_TO_INT = {
+    "F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+    "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12,
+}
+
+def _front_month_row(rows, grain):
+    """
+    Return the row with the nearest (smallest expiration) futures symbol for `grain`.
+    This is the "spot" bid — the front-month contract currently being traded.
+    Skips explicit isSpot rows and any rows with unparseable symbols.
+    """
+    candidates = []
+    for r in rows:
+        if r.isSpot or _grain_disp(r.grain) != grain:
+            continue
+        sym = r.futuresSymbol or ""
+        if len(sym) < 5:
+            continue
+        month_code = sym[-3]
+        yr2 = sym[-2:]
+        if not yr2.isdigit():
+            continue
+        mon = _CME_MONTH_TO_INT.get(month_code)
+        if not mon:
+            continue
+        year = 2000 + int(yr2)
+        candidates.append(((year, mon), r))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    return candidates[0][1]
+
+
 def compute_changes(snapshots):
     if not snapshots:
-        return {"rows": {}, "spots": {}}
+        return {"rows": {}, "spots": {}, "derived_spots": {}}
 
     latest  = snapshots[-1]
     now_ms  = datetime.fromisoformat(
@@ -136,8 +186,9 @@ def compute_changes(snapshots):
     MONTH   = 30 * 864e5
     YEAR    = 365 * 864e5
 
-    row_lookup:  dict = {}
-    spot_lookup: dict = {}  # canonical_grain -> list of entries
+    row_lookup:          dict = {}
+    spot_lookup:         dict = {}  # canonical_grain -> list of entries
+    derived_spot_lookup: dict = {}  # canonical_grain -> list of entries (front-month per snap)
 
     for snap in snapshots:
         ts_ms = datetime.fromisoformat(
@@ -152,6 +203,16 @@ def compute_changes(snapshots):
                 if r.id not in row_lookup:
                     row_lookup[r.id] = []
                 row_lookup[r.id].append(entry)
+        # Build derived spot history: front-month row for each grain in this snapshot
+        snap_grains = {_grain_disp(r.grain) for r in snap.rows if not r.isSpot}
+        for g in snap_grains:
+            if not g:
+                continue
+            fr = _front_month_row(snap.rows, g)
+            if fr and fr.basisCents is not None:
+                derived_spot_lookup.setdefault(g, []).append(
+                    {"ts_ms": ts_ms, "b": fr.basisCents, "sym": fr.futuresSymbol}
+                )
 
     def calc(series, cur, cur_sym):
         prev = series[-2] if len(series) >= 2 else None
@@ -175,7 +236,18 @@ def compute_changes(snapshots):
             if g and spot_lookup.get(g):
                 spot_changes[g] = calc(spot_lookup[g], r.basisCents, r.futuresSymbol)
 
-    return {"rows": row_changes, "spots": spot_changes}
+    derived_spot_changes = {}
+    latest_grains = {_grain_disp(r.grain) for r in latest.rows if not r.isSpot}
+    for g in latest_grains:
+        if not g or g in spot_changes:
+            continue  # already have explicit spot change for this grain
+        fr = _front_month_row(latest.rows, g)
+        if fr and fr.basisCents is not None and derived_spot_lookup.get(g):
+            derived_spot_changes[g] = calc(
+                derived_spot_lookup[g], fr.basisCents, fr.futuresSymbol
+            )
+
+    return {"rows": row_changes, "spots": spot_changes, "derived_spots": derived_spot_changes}
 
 def delta_html(d, is_meal=False):
     if not d:
@@ -275,7 +347,11 @@ st.markdown("""
 <style>
   @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700;800&display=swap');
   html, body, [class*="css"] { font-family: 'IBM Plex Mono', monospace !important; }
-  .block-container { padding-top: 1rem !important; }
+  /* Hide Streamlit's fixed header so it doesn't overlap content */
+  header[data-testid="stHeader"] { display: none !important; }
+  #MainMenu { visibility: hidden !important; }
+  footer { visibility: hidden !important; }
+  .block-container { padding-top: 0.75rem !important; padding-bottom: 1rem !important; }
   div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
   button[kind="secondary"] { font-family: 'IBM Plex Mono', monospace !important; }
   .stTabs [data-baseweb="tab-list"] { gap: 0; background: #ffffff; border-bottom: 1px solid #e2e8f0; }
@@ -283,7 +359,7 @@ st.markdown("""
     font-family: 'IBM Plex Mono', monospace; border-radius: 0; }
   .stTabs [aria-selected="true"] { color: #2563eb !important; font-weight: 700 !important;
     border-bottom: 2px solid #2563eb !important; }
-  .stTabs [data-baseweb="tab-panel"] { padding-top: 0 !important; }
+  .stTabs [data-baseweb="tab-panel"] { padding-top: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -643,6 +719,222 @@ with st.sidebar:
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
         'CLI: <code style="color:#2563eb">python auto_import.py --gpre-only</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape ZFS now", key="zfs_scrape_btn"):
+        from zfs_scraper import fetch_zfs_bids as _fetch_zfs
+        from parsers.zfs_parser import parse_zfs_location as _parse_zfs
+        with st.spinner("Fetching ZFS soybean bids (Zeeland + Ithaca)…"):
+            try:
+                _zlocs = _fetch_zfs()
+                zfs_rows = 0
+                zfs_locs = 0
+                for _zloc in _zlocs:
+                    _zsnap = _parse_zfs(_zloc)
+                    if _zsnap:
+                        upsert_snapshot(_zsnap.model_dump())
+                        zfs_rows += len(_zsnap.rows)
+                        zfs_locs += 1
+                st.success(
+                    f"✓ {zfs_locs} location(s) — {zfs_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"ZFS scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python zfs_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape MNSP now", key="mnsp_scrape_btn"):
+        from mnsoy_scraper import fetch_mnsoy_bids as _fetch_mnsp
+        from parsers.mnsoy_parser import parse_mnsoy_location as _parse_mnsp
+        with st.spinner("Fetching MNSP soybean bids (Brewster)…"):
+            try:
+                _mlocs = _fetch_mnsp()
+                mnsp_rows = 0
+                mnsp_locs = 0
+                for _mloc in _mlocs:
+                    _msnap = _parse_mnsp(_mloc)
+                    if _msnap:
+                        upsert_snapshot(_msnap.model_dump())
+                        mnsp_rows += len(_msnap.rows)
+                        mnsp_locs += 1
+                st.success(
+                    f"✓ {mnsp_locs} location(s) — {mnsp_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"MNSP scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python mnsoy_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape Primient now", key="primient_scrape_btn"):
+        from primient_scraper import fetch_primient_bids as _fetch_pri
+        from parsers.primient_parser import parse_primient_location as _parse_pri
+        with st.spinner("Fetching Primient bids (17 locations)…"):
+            try:
+                _plocs = _fetch_pri()
+                pri_rows = 0
+                pri_locs = 0
+                for _ploc in _plocs:
+                    _psnap = _parse_pri(_ploc)
+                    if _psnap:
+                        upsert_snapshot(_psnap.model_dump())
+                        pri_rows += len(_psnap.rows)
+                        pri_locs += 1
+                st.success(
+                    f"✓ {pri_locs} location(s) — {pri_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Primient scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python primient_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape Platinum now", key="platinum_scrape_btn"):
+        from platinum_scraper import fetch_platinum_bids as _fetch_plat
+        from parsers.platinum_parser import parse_platinum_location as _parse_plat
+        with st.spinner("Fetching Platinum Crush soybean bids (Alta)…"):
+            try:
+                _ptlocs = _fetch_plat()
+                plat_rows = 0
+                plat_locs = 0
+                for _ptloc in _ptlocs:
+                    _ptsnap = _parse_plat(_ptloc)
+                    if _ptsnap:
+                        upsert_snapshot(_ptsnap.model_dump())
+                        plat_rows += len(_ptsnap.rows)
+                        plat_locs += 1
+                st.success(
+                    f"✓ {plat_locs} location(s) — {plat_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Platinum scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python platinum_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape Shell Rock now", key="shellrock_scrape_btn"):
+        from shellrock_scraper import fetch_shellrock_bids as _fetch_sr
+        from parsers.shellrock_parser import parse_shellrock_location as _parse_sr
+        with st.spinner("Fetching Shell Rock soybean bids…"):
+            try:
+                _srlocs = _fetch_sr()
+                sr_rows = 0
+                sr_locs = 0
+                for _srloc in _srlocs:
+                    _srsnap = _parse_sr(_srloc)
+                    if _srsnap:
+                        upsert_snapshot(_srsnap.model_dump())
+                        sr_rows += len(_srsnap.rows)
+                        sr_locs += 1
+                st.success(
+                    f"✓ {sr_locs} location(s) — {sr_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Shell Rock scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python shellrock_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape White River now", key="whiteriver_scrape_btn"):
+        from whiteriver_scraper import fetch_whiteriver_bids as _fetch_wr
+        from parsers.whiteriver_parser import parse_whiteriver_location as _parse_wr
+        with st.spinner("Fetching White River Soy bids (Seymour)…"):
+            try:
+                _wrlocs = _fetch_wr()
+                wr_rows = 0
+                wr_locs = 0
+                for _wrloc in _wrlocs:
+                    _wrsnap = _parse_wr(_wrloc)
+                    if _wrsnap:
+                        upsert_snapshot(_wrsnap.model_dump())
+                        wr_rows += len(_wrsnap.rows)
+                        wr_locs += 1
+                st.success(
+                    f"✓ {wr_locs} location(s) — {wr_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"White River scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python whiteriver_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape HPPSD now", key="hppsd_scrape_btn"):
+        from hppsd_scraper import fetch_hppsd_bids as _fetch_hpp
+        from parsers.hppsd_parser import parse_hppsd_location as _parse_hpp
+        with st.spinner("Fetching HPPSD soybean bids (Mitchell)…"):
+            try:
+                _hplocs = _fetch_hpp()
+                hpp_rows = 0
+                hpp_locs = 0
+                for _hploc in _hplocs:
+                    _hpsnap = _parse_hpp(_hploc)
+                    if _hpsnap:
+                        upsert_snapshot(_hpsnap.model_dump())
+                        hpp_rows += len(_hpsnap.rows)
+                        hpp_locs += 1
+                st.success(
+                    f"✓ {hpp_locs} location(s) — {hpp_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"HPPSD scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python hppsd_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape Bartlett now", key="bartlett_scrape_btn"):
+        from bartlett_scraper import fetch_bartlett_bids as _fetch_brt
+        from parsers.bartlett_parser import parse_bartlett_location as _parse_brt
+        with st.spinner("Fetching Bartlett Grain bids (17 locations)..."):
+            try:
+                _brtlocs = _fetch_brt()
+                brt_rows = 0
+                brt_locs = 0
+                for _brtloc in _brtlocs:
+                    _brtsnap = _parse_brt(_brtloc)
+                    if _brtsnap:
+                        upsert_snapshot(_brtsnap.model_dump())
+                        brt_rows += len(_brtsnap.rows)
+                        brt_locs += 1
+                st.success(
+                    f"✓ {brt_locs} location(s) — {brt_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Bartlett scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python bartlett_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -1168,98 +1460,118 @@ elif provider == "LDC":
         grains = ["Corn"]
 
 
-tab_bids, tab_map = st.tabs(["📋 Bids", "🗺️ Map"])
+tab_bids, tab_map, tab_summary = st.tabs(["📋 Bids", "🗺️ Map", "📊 Summary"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: BIDS
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_bids:
-    # ── Load snapshots ────────────────────────────────────────────────────────
-    snapshots = get_snapshots(provider, loc_key)
+    # ── Cascade filters ───────────────────────────────────────────────────────
+    _all_bids_locs = get_bids_filter_data()
 
-    if not snapshots:
-        if provider == "POET":
-            hint = ('Run <code style="color:#2563eb">python auto_import.py --poet-only</code> '
-                    'to scrape this location, then refresh.')
-        elif provider == "ADM":
-            hint = ('Run <code style="color:#2563eb">python auto_import.py --adm-only</code> '
-                    'or click <b>Scrape ADM now</b> in the sidebar, then refresh.')
-        elif provider == "CGB":
-            hint = ('Click <b>Scrape CGB now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --cgb-only</code>, '
-                    'then refresh.')
-        elif provider == "CHS":
-            hint = ('Click <b>Scrape CHS now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --chs-only</code>, '
-                    'then refresh.')
-        elif provider == "Cargill":
-            hint = ('Click <b>Scrape Cargill now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --cargill-only</code>, '
-                    'then refresh.')
-        elif provider == "GPRE":
-            hint = ('Click <b>Scrape GPRE now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --gpre-only</code>, '
-                    'then refresh.')
-        elif provider == "Andersons":
-            hint = ('Click <b>Scrape Andersons now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --andersons-only</code>, '
-                    'then refresh.')
-        elif provider == "Bunge":
-            hint = ('Click <b>Scrape Bunge now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --bunge-only</code>, '
-                    'then refresh.')
-        elif provider == "Scoular":
-            hint = ('Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --scoular-only</code>, '
-                    'then refresh.')
-        elif provider == "AGP":
-            hint = ('Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --agp-only</code>, '
-                    'then refresh.')
-        elif provider == "LDC":
-            hint = ('Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
-                    '<code style="color:#2563eb">python auto_import.py --ldc-only</code>, '
-                    'then refresh.')
+    _flt1, _flt2, _flt3, _flt4 = st.columns([2, 1, 3, 2])
+
+    with _flt1:
+        _fac_types = sorted({l["facility_type"] for l in _all_bids_locs if l["facility_type"]})
+        _sel_type  = st.selectbox("Location Type", ["All"] + _fac_types, key="bids_flt_type")
+
+    _locs_by_type = [l for l in _all_bids_locs
+                     if _sel_type == "All" or l["facility_type"] == _sel_type]
+
+    with _flt2:
+        _states    = sorted({l["state"] for l in _locs_by_type if l["state"]})
+        _sel_state = st.selectbox("State", ["All"] + _states, key="bids_flt_state")
+
+    _locs_filtered = [l for l in _locs_by_type
+                      if _sel_state == "All" or l["state"] == _sel_state]
+
+    # Location picker — default to current sidebar selection when it matches
+    bids_provider = provider
+    bids_loc_key  = loc_key
+    with _flt3:
+        if _locs_filtered:
+            _loc_opts  = [f"{l['location']} ({l['provider']})" for l in _locs_filtered]
+            _def_label = f"{loc_key} ({provider})"
+            _def_idx   = _loc_opts.index(_def_label) if _def_label in _loc_opts else 0
+            _sel_loc_label = st.selectbox("Location", _loc_opts, index=_def_idx, key="bids_flt_loc")
+            _sel_loc_data  = _locs_filtered[_loc_opts.index(_sel_loc_label)]
+            bids_provider  = _sel_loc_data["provider"]
+            bids_loc_key   = _sel_loc_data["location"]
         else:
-            hint = "Run the daily scraper to populate data for this provider."
+            st.caption("No locations match.")
+
+    bids_loc_color = _PROVIDER_COLOR.get(bids_provider, "#64748b")
+
+    # ── Load snapshots ────────────────────────────────────────────────────────
+    snapshots = get_snapshots(bids_provider, bids_loc_key)
+
+    # ── Commodity filter (populated from latest snapshot) ─────────────────────
+    with _flt4:
+        _avail_grains = _build_grains(snapshots[-1].rows) if snapshots else []
+        grain = st.selectbox(
+            "Commodity",
+            _avail_grains if _avail_grains else ["—"],
+            key="bids_flt_grain",
+        )
+
+    # ── No-data message ───────────────────────────────────────────────────────
+    if not snapshots:
+        _p = bids_provider
+        if _p == "POET":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --poet-only</code> to scrape this location, then refresh.'
+        elif _p == "ADM":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --adm-only</code> or click <b>Scrape ADM now</b> in the sidebar, then refresh.'
+        elif _p == "CGB":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --cgb-only</code> or click <b>Scrape CGB now</b> in the sidebar, then refresh.'
+        elif _p == "CHS":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --chs-only</code> or click <b>Scrape CHS now</b> in the sidebar, then refresh.'
+        elif _p == "Cargill":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --cargill-only</code>, then refresh.'
+        elif _p == "GPRE":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --gpre-only</code>, then refresh.'
+        elif _p == "Andersons":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --andersons-only</code>, then refresh.'
+        elif _p == "Bunge":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --bunge-only</code>, then refresh.'
+        elif _p == "Scoular":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --scoular-only</code>, then refresh.'
+        elif _p == "AGP":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --agp-only</code>, then refresh.'
+        elif _p == "LDC":
+            hint = 'Run <code style="color:#2563eb">python auto_import.py --ldc-only</code>, then refresh.'
+        else:
+            hint = "Run the daily scraper to populate data for this location."
         st.markdown(
             f'<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
-            f'No snapshots yet for <b>{loc_key}</b>.<br><br>{hint}</div>',
+            f'No snapshots yet for <b>{bids_loc_key}</b>.<br><br>{hint}</div>',
             unsafe_allow_html=True,
         )
     else:
-        # ── Date picker + grain selector ──────────────────────────────────────
+        # ── Date picker ───────────────────────────────────────────────────────
         snap_labels = []
         for s in snapshots:
-            d = datetime.fromisoformat(s.timestamp.replace("Z","+00:00"))
+            d = datetime.fromisoformat(s.timestamp.replace("Z", "+00:00"))
             lbl = d.strftime("%b %d, %Y") + (" ★ latest" if s is snapshots[-1] else "")
             snap_labels.append(lbl)
 
-        pick_col, grain_col = st.columns([3, 4])
-        with pick_col:
-            sel_label_snap = st.selectbox(
-                "Viewing snapshot",
-                options=snap_labels[::-1],   # newest first
-                index=0,
-                key=f"snap_pick_{loc_key}",
-                label_visibility="visible",
-            )
-            sel_idx = snap_labels[::-1].index(sel_label_snap)
-            viewing = snapshots[::-1][sel_idx]   # the selected snapshot
-            snaps_up_to = snapshots[: snapshots.index(viewing) + 1]
-            changes = compute_changes(snaps_up_to)
+        sel_label_snap = st.selectbox(
+            "Viewing snapshot",
+            options=snap_labels[::-1],
+            index=0,
+            key=f"snap_pick_{bids_loc_key}",
+            label_visibility="visible",
+        )
+        sel_idx     = snap_labels[::-1].index(sel_label_snap)
+        viewing     = snapshots[::-1][sel_idx]
+        snaps_up_to = snapshots[: snapshots.index(viewing) + 1]
+        changes     = compute_changes(snaps_up_to)
 
-        with grain_col:
-            if len(grains) > 1:
-                grain = st.radio("Grain", grains, horizontal=True,
-                                 label_visibility="collapsed", key=f"grain_{loc_key}")
-            else:
-                grain = grains[0]
-
-        body_rows = [r for r in viewing.rows if not r.isSpot and _grain_disp(r.grain) == grain]
-        spot_row  = next((r for r in viewing.rows
-                          if r.isSpot and _grain_disp(r.spotGrain or r.grain) == grain), None)
-        spot_chg  = changes["spots"].get(grain)
+        body_rows      = [r for r in viewing.rows if not r.isSpot and _grain_disp(r.grain) == grain]
+        explicit_spot  = next((r for r in viewing.rows
+                               if r.isSpot and _grain_disp(r.spotGrain or r.grain) == grain), None)
+        derived_spot   = _front_month_row(viewing.rows, grain)
+        spot_row       = explicit_spot or derived_spot
+        spot_chg       = changes["spots"].get(grain) or changes.get("derived_spots", {}).get(grain)
 
         moved = sum(1 for r in body_rows
                     if changes["rows"].get(r.id, {}).get("fromPrev", {}).get("val") not in (None, 0))
@@ -1301,7 +1613,7 @@ with tab_bids:
         )
 
         table_html = render_table(
-            body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label,
+            body_rows, spot_row, changes, spot_chg, bids_loc_color, year_ago_label,
             is_meal=(grain == "Soybean Meal"),
         )
         st.markdown(table_html, unsafe_allow_html=True)
@@ -1320,16 +1632,65 @@ with tab_bids:
             unsafe_allow_html=True,
         )
 
+        # ── Spot basis history chart ──────────────────────────────────────────
+        _spot_pts = []
+        for _snap in snapshots:
+            _fr = _front_month_row(_snap.rows, grain)
+            if _fr and _fr.basisCents is not None:
+                _dt = datetime.fromisoformat(_snap.timestamp.replace("Z", "+00:00"))
+                _spot_pts.append({
+                    "Date":     _dt,
+                    "Basis":    _fr.basisCents,
+                    "Contract": _fr.futuresSymbol,
+                    "Delivery": _fr.deliveryMonth,
+                })
+
+        if len(_spot_pts) >= 2:
+            import pandas as _pd
+            import altair as _alt
+            _df_spot = _pd.DataFrame(_spot_pts)
+            _spot_color = bids_loc_color
+            _zero_rule  = _alt.Chart(_pd.DataFrame({"y": [0]})).mark_rule(
+                color="#94a3b8", strokeDash=[4, 4], strokeWidth=1
+            ).encode(y="y:Q")
+            _spot_line = (
+                _alt.Chart(_df_spot)
+                .mark_line(point=True, color=_spot_color, strokeWidth=2)
+                .encode(
+                    x=_alt.X("Date:T", title=None,
+                              axis=_alt.Axis(format="%b %d '%y", labelAngle=-30, labelFontSize=10)),
+                    y=_alt.Y("Basis:Q", title="Spot Basis (¢)",
+                             scale=_alt.Scale(zero=False),
+                             axis=_alt.Axis(labelFontSize=10)),
+                    tooltip=[
+                        _alt.Tooltip("Date:T",     format="%b %d, %Y", title="Date"),
+                        _alt.Tooltip("Basis:Q",    title="Basis (¢)"),
+                        _alt.Tooltip("Contract:N", title="Futures"),
+                        _alt.Tooltip("Delivery:N", title="Delivery"),
+                    ],
+                )
+            )
+            st.markdown(
+                '<div style="margin-top:16px;margin-bottom:4px;font-size:10px;color:#64748b;'
+                'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
+                'Spot Basis History (front-month)</div>',
+                unsafe_allow_html=True,
+            )
+            st.altair_chart((_zero_rule + _spot_line).properties(height=200),
+                            use_container_width=True)
+        elif len(_spot_pts) == 1:
+            st.caption("Only 1 snapshot — scrape more data to see spot history chart.")
+
     # ── Snapshot history ──────────────────────────────────────────────────────
     if snapshots:
-        with st.expander(f"Snapshot history — {loc_key} ({len(snapshots)} records)", expanded=False):
+        with st.expander(f"Snapshot history — {bids_loc_key} ({len(snapshots)} records)", expanded=False):
             for snap in reversed(snapshots):
                 is_latest  = snap is snapshots[-1]
                 is_viewing = snap is viewing
                 d_label    = datetime.fromisoformat(
                     snap.timestamp.replace("Z", "+00:00")).strftime("%b %d '%y")
                 src_icon    = " [email]" if snap.source == "email" else ""
-                badge_color = loc_color if is_viewing else "#e2e8f0"
+                badge_color = bids_loc_color if is_viewing else "#e2e8f0"
                 c1, c2 = st.columns([9, 1])
                 with c1:
                     st.markdown(
@@ -1456,18 +1817,17 @@ with tab_map:
 
         avail_base = sorted({_base_commodity(g) for r in zone_filtered for g in r["grains"]})
 
-        sel_commodities_list = st.multiselect(
+        sel_commodity = st.selectbox(
             "Commodity",
-            options=avail_base,
-            default=avail_base,
-            placeholder="All commodities",
+            options=["All"] + avail_base,
+            index=0,
             key="map_grain_filter",
         )
-        sel_base_commodities = set(sel_commodities_list)
+        sel_base_commodities = set(avail_base) if sel_commodity == "All" else {sel_commodity}
 
         # ── Wheat class sub-filter (shown only when Wheat is selected) ────────
         sel_wheat_classes: set | None = None
-        if "Wheat" in sel_base_commodities:
+        if sel_commodity == "Wheat":
             avail_wheat_classes: set[str] = set()
             for r in zone_filtered:
                 for g in r["grains"]:
@@ -1578,3 +1938,299 @@ with tab_map:
             unsafe_allow_html=True,
         )
         st.caption(f"{len(filtered)} locations shown  •  geocoding may be incomplete — run `python geocode_locations.py` to fill gaps")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_summary:
+    from datetime import timedelta
+    from collections import Counter as _Counter
+
+    # ── Timestamp helpers ─────────────────────────────────────────────────────
+    def _sum_ts(ts: str) -> datetime:
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
+        except Exception:
+            return datetime.min
+
+    def _sum_closest(snaps: list, target: datetime, max_days: int):
+        if not snaps:
+            return None
+        best = min(snaps, key=lambda s: abs((_sum_ts(s.timestamp) - target).total_seconds()))
+        if abs((_sum_ts(best.timestamp) - target).days) > max_days:
+            return None
+        return best
+
+    def _sum_extract(snap, grain: str, mode: str):
+        """Return (basis_cents, futures_symbol) from a snapshot. mode='spot' or a futures symbol."""
+        if snap is None:
+            return None, None
+        if mode == "spot":
+            row = _front_month_row(snap.rows, grain)
+        else:
+            row = next(
+                (r for r in snap.rows
+                 if r.futuresSymbol == mode
+                 and _grain_disp(r.grain) == grain
+                 and not r.isSpot),
+                None,
+            )
+        if row and row.basisCents is not None:
+            return row.basisCents, row.futuresSymbol
+        return None, None
+
+    # ── Filters row ───────────────────────────────────────────────────────────
+    _sl = get_bids_filter_data()  # [{provider, location, state, facility_type, region}]
+
+    _sf1, _sf2, _sf3 = st.columns([2, 2, 2])
+    with _sf1:
+        _sfac_types = sorted({l["facility_type"] for l in _sl if l["facility_type"]})
+        _ssel_types = st.multiselect(
+            "Location Type", _sfac_types,
+            default=["Soy Processing"] if "Soy Processing" in _sfac_types else [],
+            key="sum_ftype",
+        )
+    with _sf2:
+        _slocs_by_t = [l for l in _sl if not _ssel_types or l["facility_type"] in _ssel_types]
+        _sstates    = sorted({l["state"] for l in _slocs_by_t if l["state"]})
+        _ssel_states = st.multiselect("State", _sstates, key="sum_state")
+    with _sf3:
+        _sgrains = ["Soybeans", "Corn", "Wheat", "Soybean Meal", "Soybean Oil"]
+        _sgrain  = st.selectbox("Grain", _sgrains, key="sum_grain")
+
+    # ── Apply filters ─────────────────────────────────────────────────────────
+    _sfilt = [
+        l for l in _sl
+        if (not _ssel_types  or l["facility_type"] in _ssel_types)
+        and (not _ssel_states or l["state"]         in _ssel_states)
+    ]
+
+    if not _sfilt:
+        st.info("No locations match the selected filters.")
+    else:
+        # ── Load snapshots (cached) ───────────────────────────────────────────
+        _spairs = tuple((l["provider"], l["location"]) for l in _sfilt)
+
+        @st.cache_data(ttl=300, show_spinner="Loading history…")
+        def _load_bulk(pairs):
+            return get_snapshots_bulk(list(pairs))
+
+        _sdata = _load_bulk(_spairs)  # {(prov, loc): [Snapshot, ...]}
+
+        # ── Delivery period options ───────────────────────────────────────────
+        _avail_syms: dict[str, str] = {}  # symbol → display "ZSN26 (Jul '26)"
+        for key, snaps in _sdata.items():
+            if not snaps:
+                continue
+            latest = snaps[-1]
+            for r in latest.rows:
+                if _grain_disp(r.grain) == _sgrain and not r.isSpot and r.futuresSymbol:
+                    sym = r.futuresSymbol
+                    if sym not in _avail_syms:
+                        _avail_syms[sym] = f"{sym}  ({short_sym(sym)})"
+
+        _deliv_opts = ["Spot (Front Month)"] + sorted(_avail_syms.values())
+        _sel_deliv  = st.selectbox("Delivery Period", _deliv_opts, key="sum_delivery")
+        _smode      = "spot" if _sel_deliv.startswith("Spot") else _sel_deliv.split()[0]
+
+        # ── Target dates (naive UTC noon) ─────────────────────────────────────
+        _now = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
+        _TARGETS = [
+            ("yr_ago",  _now - timedelta(days=365), 30),
+            ("mo_ago",  _now - timedelta(days=30),  15),
+            ("wk_ago",  _now - timedelta(days=7),   10),
+            ("d2_ago",  _now - timedelta(days=2),    5),
+            ("d1_ago",  _now - timedelta(days=1),    5),
+            ("current", _now,                        5),
+        ]
+
+        # ── Build one data row per location ───────────────────────────────────
+        _smeta = {(l["provider"], l["location"]): l for l in _sfilt}
+        _srows = []
+        for key in _spairs:
+            snaps  = _sdata.get(key, [])
+            meta   = _smeta.get(key, {})
+            rd: dict = {
+                "provider": key[0],
+                "location": key[1],
+                "state":    meta.get("state", ""),
+                "region":   meta.get("region", ""),
+            }
+            for lbl, tgt, max_d in _TARGETS:
+                snap = _sum_closest(snaps, tgt, max_d)
+                basis, sym = _sum_extract(snap, _sgrain, _smode)
+                rd[f"b_{lbl}"] = basis
+                rd[f"s_{lbl}"] = sym
+                rd[f"d_{lbl}"] = _sum_ts(snap.timestamp).date() if snap else None
+            _srows.append(rd)
+
+        # Keep only rows with current data
+        _srows = [r for r in _srows if r["b_current"] is not None]
+
+        # Sort: region (empty last) → provider → location
+        _srows.sort(key=lambda r: (r["region"] or "zzz", r["provider"], r["location"]))
+
+        if not _srows:
+            st.info(f"No {_sgrain} data found for the selected locations.")
+        else:
+            # ── Reference symbol (most common in current column) ──────────────
+            _sym_counts = _Counter(r["s_current"] for r in _srows if r["s_current"])
+            _ref_sym    = _sym_counts.most_common(1)[0][0] if _sym_counts else ""
+            _ref_disp   = f"{_ref_sym}  ({short_sym(_ref_sym)})" if _ref_sym else "—"
+
+            # ── Column date headers (most common actual date per column) ──────
+            def _col_date(lbl: str) -> str:
+                dates = [r[f"d_{lbl}"] for r in _srows if r.get(f"d_{lbl}")]
+                if not dates:
+                    return "—"
+                d = _Counter(dates).most_common(1)[0][0]
+                return f"{d.day} {d.strftime('%b')}"
+
+            _cdates = {lbl: _col_date(lbl) for lbl, _, _ in _TARGETS}
+
+            # ── Reference info bar ────────────────────────────────────────────
+            st.markdown(
+                f'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;'
+                f'color:#64748b;padding:6px 0 10px 0">'
+                f'Reference: <span style="color:#2563eb;font-weight:700">{_ref_disp}</span>'
+                f'&nbsp;&nbsp;·&nbsp;&nbsp;'
+                f'Grain: <span style="font-weight:700;color:#0f172a">{_sgrain}</span>'
+                f'&nbsp;&nbsp;·&nbsp;&nbsp;'
+                f'{len(_srows)} locations'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+            # ── HTML table styles ─────────────────────────────────────────────
+            _TH_BASE = (
+                "font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;"
+                "color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;"
+                "padding:5px 8px;border-bottom:2px solid #e2e8f0;"
+                "position:sticky;top:0;background:#fff;white-space:nowrap"
+            )
+            _TH_R  = _TH_BASE + ";text-align:right"
+            _TH_L  = _TH_BASE + ";text-align:left"
+            _TD_L  = ("font-family:'IBM Plex Mono',monospace;font-size:11px;"
+                      "padding:3px 8px;border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
+            _TD_R  = ("font-family:'IBM Plex Mono',monospace;font-size:11px;"
+                      "padding:3px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap")
+
+            def _bcell(basis, sym) -> str:
+                if basis is None:
+                    return f'<td style="{_TD_R};color:#cbd5e1">—</td>'
+                sign  = "+" if basis >= 0 else ""
+                badge = ""
+                if sym and sym != _ref_sym:
+                    badge = (f'<span style="font-size:9px;color:#f59e0b;'
+                             f'margin-left:2px;font-weight:700">{short_sym(sym)}</span>')
+                return f'<td style="{_TD_R}">{sign}{basis}{badge}</td>'
+
+            def _ccell(chg) -> str:
+                if chg is None:
+                    return f'<td style="{_TD_R};color:#cbd5e1">—</td>'
+                if chg == 0:
+                    return f'<td style="{_TD_R};color:#64748b">—</td>'
+                sign  = "+" if chg > 0 else ""
+                color = "#16a34a" if chg > 0 else "#dc2626"
+                fw    = "700"
+                return f'<td style="{_TD_R};color:{color};font-weight:{fw}">{sign}{chg}</td>'
+
+            # ── Build HTML ────────────────────────────────────────────────────
+            _COL_META = [
+                ("yr_ago",  "Last Year"),
+                ("mo_ago",  "Last Mo"),
+                ("wk_ago",  "Last Wk"),
+                ("d2_ago",  "−2 Days"),
+                ("d1_ago",  "Yest"),
+                ("current", "Today"),
+            ]
+
+            h = (
+                '<div style="overflow-x:auto;max-height:72vh;overflow-y:auto;'
+                'border:1px solid #e2e8f0;border-radius:6px">'
+                '<table style="border-collapse:collapse;width:100%;min-width:900px">'
+                '<thead>'
+                # Row 1 — group labels
+                '<tr style="background:#f8fafc">'
+                f'<th colspan="4" style="{_TH_L}"></th>'
+                f'<th colspan="3" style="{_TH_L};border-left:1px solid #e2e8f0;'
+                f'color:#64748b">Historical</th>'
+                f'<th colspan="3" style="{_TH_L};border-left:1px solid #e2e8f0;'
+                f'color:#0f172a">Current</th>'
+                f'<th colspan="4" style="{_TH_L};border-left:1px solid #e2e8f0;'
+                f'color:#64748b">Changes</th>'
+                '</tr>'
+                # Row 2 — column names
+                '<tr>'
+                f'<th style="{_TH_L}">Region</th>'
+                f'<th style="{_TH_L}">Company</th>'
+                f'<th style="{_TH_L}">Location</th>'
+                f'<th style="{_TH_R}">St</th>'
+            )
+            for lbl, label in _COL_META:
+                bdr = ";border-left:1px solid #e2e8f0" if lbl in ("yr_ago", "current") else ""
+                h  += f'<th style="{_TH_R}{bdr}">{label}</th>'
+            h += (
+                f'<th style="{_TH_R};border-left:1px solid #e2e8f0">Daily</th>'
+                f'<th style="{_TH_R}">Weekly</th>'
+                f'<th style="{_TH_R}">Monthly</th>'
+                f'<th style="{_TH_R}">Yearly</th>'
+                '</tr>'
+                # Row 3 — actual dates
+                '<tr style="background:#fafafa">'
+                f'<th colspan="4" style="{_TH_L};font-weight:400;color:#cbd5e1"></th>'
+            )
+            for lbl, _ in _COL_META:
+                bdr = ";border-left:1px solid #e2e8f0" if lbl in ("yr_ago", "current") else ""
+                h  += f'<th style="{_TH_R}{bdr};font-weight:400;color:#64748b">{_cdates[lbl]}</th>'
+            h += (
+                f'<th colspan="4" style="{_TH_R};border-left:1px solid #e2e8f0;'
+                f'font-weight:400;color:#cbd5e1"></th>'
+                '</tr>'
+                '</thead><tbody>'
+            )
+
+            _prev_region = object()  # sentinel
+            for r in _srows:
+                region = r.get("region") or ""
+
+                # Region divider row
+                if region != _prev_region:
+                    h += (
+                        f'<tr><td colspan="14" style="font-family:\'IBM Plex Mono\',monospace;'
+                        f'font-size:9px;font-weight:700;color:#94a3b8;text-transform:uppercase;'
+                        f'letter-spacing:.15em;background:#f8fafc;padding:4px 8px;'
+                        f'border-top:2px solid #e2e8f0">'
+                        f'{region if region else "—"}</td></tr>'
+                    )
+                    _prev_region = region
+
+                # Highlight row if using non-reference futures symbol
+                _row_bg = "background:#fffbeb" if (r["s_current"] and r["s_current"] != _ref_sym) else ""
+
+                h += f'<tr style="{_row_bg}">'
+                h += f'<td style="{_TD_L};color:#64748b;font-size:10px">{region}</td>'
+                h += f'<td style="{_TD_L};font-weight:700;color:#1e3a5f">{r["provider"]}</td>'
+                h += f'<td style="{_TD_L}">{r["location"]}</td>'
+                h += f'<td style="{_TD_R};color:#64748b">{r["state"]}</td>'
+
+                for i, (lbl, _) in enumerate(_COL_META):
+                    bdr = ";border-left:1px solid #f1f5f9" if lbl in ("yr_ago", "current") else ""
+                    cell = _bcell(r[f"b_{lbl}"], r.get(f"s_{lbl}"))
+                    # Inject border into the cell's style
+                    h += cell.replace(f'style="{_TD_R}', f'style="{_TD_R}{bdr}', 1)
+
+                # Change columns
+                _daily  = (r["b_current"] - r["b_d1_ago"])  if (r["b_current"] is not None and r["b_d1_ago"]  is not None) else None
+                _weekly = (r["b_current"] - r["b_wk_ago"])  if (r["b_current"] is not None and r["b_wk_ago"]  is not None) else None
+                _montly = (r["b_current"] - r["b_mo_ago"])  if (r["b_current"] is not None and r["b_mo_ago"]  is not None) else None
+                _yearly = (r["b_current"] - r["b_yr_ago"])  if (r["b_current"] is not None and r["b_yr_ago"]  is not None) else None
+
+                h += _ccell(_daily).replace(f'style="{_TD_R}',  f'style="{_TD_R};border-left:1px solid #f1f5f9"', 1)
+                h += _ccell(_weekly)
+                h += _ccell(_montly)
+                h += _ccell(_yearly)
+                h += '</tr>'
+
+            h += '</tbody></table></div>'
+            st.markdown(h, unsafe_allow_html=True)

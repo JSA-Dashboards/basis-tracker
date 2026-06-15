@@ -3,7 +3,8 @@ Basis Tracker — Automated daily importer.
 
 Run this script daily (via Windows Task Scheduler) to scrape the latest web bids
 for ADM Gradable, POET, CHS, CGB Grain, Cargill, GPRE, The Andersons, Bunge,
-Scoular, AGP (Ag Processing Inc), and LDC (Louis Dreyfus Company).
+Scoular, AGP (Ag Processing Inc), LDC (Louis Dreyfus Company), Tyson (LGS),
+and GPC / Kent Commodities.
 
 Usage
 -----
@@ -28,6 +29,10 @@ Usage
   python auto_import.py --agp-only        # AGP scrape only
   python auto_import.py --no-ldc          # skip LDC scrape
   python auto_import.py --ldc-only        # LDC scrape only
+  python auto_import.py --no-tyson        # skip Tyson LGS scrape
+  python auto_import.py --tyson-only      # Tyson LGS scrape only
+  python auto_import.py --no-gpc          # skip GPC / Kent scrape
+  python auto_import.py --gpc-only        # GPC / Kent scrape only
   python auto_import.py --no-prune        # skip automatic Monday pruning
   python auto_import.py --prune-only      # run data retention pruning only
 
@@ -76,6 +81,11 @@ from agp_scraper import fetch_agp_bids
 from parsers.agp_parser import parse_agp_location
 from ldc_scraper import fetch_ldc_bids
 from parsers.ldc_parser import parse_ldc_location
+from tyson_scraper import fetch_tyson_bids
+from parsers.tyson_parser import parse_tyson_location
+from gpc_scraper import fetch_gpc_bids
+from parsers.gpc_parser import parse_gpc_location
+import holidays as _holidays
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_FILE = Path(__file__).parent / "auto_import.log"
@@ -95,6 +105,22 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger(__name__)
+
+
+# ── Trading-day guard ──────────────────────────────────────────────────────────
+
+def _is_trading_day(dt: datetime = None) -> bool:
+    """
+    Return True if dt (today by default) is a US federal trading day:
+      - Monday through Friday
+      - Not a US federal holiday
+    """
+    if dt is None:
+        dt = datetime.now()
+    if dt.weekday() >= 5:  # Saturday=5, Sunday=6
+        return False
+    us_fed = _holidays.US(years=dt.year)
+    return dt.date() not in us_fed
 
 
 def run_chs() -> int:
@@ -766,6 +792,140 @@ def run_ldc() -> int:
     return total_rows
 
 
+def run_tyson() -> int:
+    """
+    Scrape Tyson Foods (LGS) for all public Elevator locations and upsert bids.
+    FeedMill locations are fetched and their metadata (lat/lon) is persisted so
+    they appear on the map, but they post no public bid data.
+    Returns the total number of snapshot rows upserted.
+    """
+    log.info("=" * 60)
+    log.info("Tyson LGS scrape starting...")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_tyson_bids()
+    except Exception as exc:
+        log.error("Tyson scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("Tyson scrape returned no data.")
+        return 0
+
+    locations_done = 0
+    total_rows     = 0
+    errors         = 0
+    skipped        = 0
+
+    for loc in raw_locations:
+        # Always persist metadata (lat/lon) so map pins appear for FeedMills too
+        if loc.get("lat") and loc.get("lon"):
+            try:
+                upsert_location_meta(
+                    "Tyson",
+                    loc["location_name"],
+                    state         = loc.get("state") or None,
+                    facility_type = None,
+                    lat           = loc["lat"],
+                    lon           = loc["lon"],
+                )
+            except Exception as exc:
+                log.warning("  meta upsert failed for %s: %s", loc["location_name"], exc)
+
+        if not loc.get("cashbids"):
+            skipped += 1
+            continue
+
+        try:
+            snap_req = parse_tyson_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+
+            upsert_snapshot(snap_req.model_dump())
+            locations_done += 1
+            total_rows     += len(snap_req.rows)
+            log.info(
+                "  ✓  %-30s  %s  %d row(s)",
+                snap_req.location, loc.get("state", "--"), len(snap_req.rows),
+            )
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    log.info("-" * 60)
+    log.info(
+        "Tyson done: %d location(s) with bids  |  %d row(s) total"
+        "  |  %d skipped  |  %d error(s)",
+        locations_done, total_rows, skipped, errors,
+    )
+    return total_rows
+
+
+def run_gpc() -> int:
+    """
+    Scrape GPC / Kent Commodities (3 locations) and upsert bids.
+    Returns total snapshot rows upserted.
+    """
+    log.info("=" * 60)
+    log.info("GPC / Kent Commodities scrape starting...")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_gpc_bids()
+    except Exception as exc:
+        log.error("GPC scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("GPC scrape returned no data.")
+        return 0
+
+    locations_done = 0
+    total_rows     = 0
+    errors         = 0
+    skipped        = 0
+
+    for loc in raw_locations:
+        if not loc.get("cashbids"):
+            skipped += 1
+            continue
+
+        try:
+            snap_req = parse_gpc_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+
+            upsert_snapshot(snap_req.model_dump())
+            upsert_location_meta(
+                "GPC",
+                snap_req.location,
+                state         = loc.get("state") or None,
+                facility_type = None,
+                lat           = loc.get("lat") or None,
+                lon           = loc.get("lon") or None,
+            )
+            locations_done += 1
+            total_rows     += len(snap_req.rows)
+            log.info(
+                "  ✓  %-24s  %s  %d row(s)",
+                snap_req.location, loc.get("state", "--"), len(snap_req.rows),
+            )
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    log.info("-" * 60)
+    log.info(
+        "GPC done: %d location(s) updated  |  %d row(s) total"
+        "  |  %d skipped  |  %d error(s)",
+        locations_done, total_rows, skipped, errors,
+    )
+    return total_rows
+
+
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -802,6 +962,8 @@ def run(
     run_scoular_scrape: bool = True,
     run_agp_scrape: bool = True,
     run_ldc_scrape: bool = True,
+    run_tyson_scrape: bool = True,
+    run_gpc_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -833,6 +995,10 @@ def run(
         total += run_agp()
     if run_ldc_scrape:
         total += run_ldc()
+    if run_tyson_scrape:
+        total += run_tyson()
+    if run_gpc_scrape:
+        total += run_gpc()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:
@@ -956,6 +1122,26 @@ if __name__ == "__main__":
         help="Run LDC scrape only — skip everything else",
     )
 
+    tyson_group = parser.add_mutually_exclusive_group()
+    tyson_group.add_argument(
+        "--no-tyson", dest="no_tyson", action="store_true",
+        help="Skip Tyson LGS scrape",
+    )
+    tyson_group.add_argument(
+        "--tyson-only", dest="tyson_only", action="store_true",
+        help="Run Tyson LGS scrape only — skip everything else",
+    )
+
+    gpc_group = parser.add_mutually_exclusive_group()
+    gpc_group.add_argument(
+        "--no-gpc", dest="no_gpc", action="store_true",
+        help="Skip GPC / Kent Commodities scrape",
+    )
+    gpc_group.add_argument(
+        "--gpc-only", dest="gpc_only", action="store_true",
+        help="Run GPC scrape only — skip everything else",
+    )
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -966,7 +1152,21 @@ if __name__ == "__main__":
         help="Run data-retention pruning only — skip all scrapes and email import",
     )
 
+    parser.add_argument(
+        "--force", dest="force", action="store_true",
+        help="Run even if today is a weekend or federal holiday (bypasses trading-day guard)",
+    )
+
     args = parser.parse_args()
+
+    # ── Trading-day guard (bypassed with --force or --prune-only) ─────────────
+    if not args.force and not getattr(args, "prune_only", False):
+        if not _is_trading_day():
+            log.info(
+                "Not a trading day (weekend or US federal holiday) — skipping. "
+                "Use --force to override."
+            )
+            sys.exit(0)
 
     if args.prune_only:
         init_db()
@@ -1004,6 +1204,12 @@ if __name__ == "__main__":
     elif args.ldc_only:
         init_db()
         run_ldc()
+    elif args.tyson_only:
+        init_db()
+        run_tyson()
+    elif args.gpc_only:
+        init_db()
+        run_gpc()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -1017,5 +1223,7 @@ if __name__ == "__main__":
             run_scoular_scrape=not args.no_scoular,
             run_agp_scrape=not args.no_agp,
             run_ldc_scrape=not args.no_ldc,
+            run_tyson_scrape=not args.no_tyson,
+            run_gpc_scrape=not args.no_gpc,
             run_pruning=not args.no_prune,
         )

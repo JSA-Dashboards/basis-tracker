@@ -1,4 +1,63 @@
 [
+  {"provider": "Bartlett", "location": "Atchison",              "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Cherryvale",            "facility_type": "Soy Processing",   "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Council Bluffs North",  "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
+  {"provider": "Bartlett", "location": "Council Bluffs South",  "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
+  {"provider": "Bartlett", "location": "Great Bend",            "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Hamburg",               "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
+  {"provider": "Bartlett", "location": "Healy",                 "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Jacksonville",          "facility_type": "Rail Terminal",    "state": "IL", "region": "East"},
+  {"provider": "Bartlett", "location": "KC - Fairfax Terminal", "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "KC - KCT Terminal",     "facility_type": "Rail Terminal",    "state": "MO", "region": "West"},
+  {"provider": "Bartlett", "location": "KC RR Terminal",        "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Scott City",            "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "Bartlett", "location": "Sheffield",             "facility_type": "Rail Terminal",    "state": "IL", "region": "East"},
+  {"provider": "Bartlett", "location": "St. Joseph",            "facility_type": "Rail Terminal",    "state": "MO", "region": "West"},
+  {"provider": "Bartlett", "location": "Stella",                "facility_type": "Rail Terminal",    "state": "NE", "region": "West"},
+  {"provider": "Bartlett", "location": "Towner",                "facility_type": "Rail Terminal",    "state": "CO", "region": "West"},
+  {"provider": "Bartlett", "location": "Wichita",               "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
+  {"provider": "HPPSD", "location": "Mitchell", "facility_type": "Soy Processing", "state": "SD", "region": "West"},
+  {"provider": "WhiteRiver", "location": "Seymour", "facility_type": "Soy Processing", "state": "IN", "region": "East"},
+  {"provider": "ShellRock", "location": "Shell Rock", "facility_type": "Soy Processing", "state": "IA", "region": "West"},
+  {"provider": "Platinum", "location": "Alta", "facility_type": "Soy Processing", "state": "IA", "region": "West"},
+  {"provider": "Primient", "location": "Decatur",      "facility_type": "Corn Processing", "state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Lafayette",    "facility_type": "Corn Processing", "state": "IN", "region": "East"},
+  {"provider": "Primient", "location": "Loudon",       "facility_type": "Corn Processing", "state": "TN", "region": "East"},
+  {"provider": "Primient", "location": "West FOB",     "facility_type": "Direct Ship",     "state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Coles",        "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Cowden",       "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Darrow",       "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Findlay",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Fowler",       "facility_type": "Country Elevator","state": "IN", "region": "East"},
+  {"provider": "Primient", "location": "Francesville", "facility_type": "Country Elevator","state": "IN", "region": "East"},
+  {"provider": "Primient", "location": "Heyworth",     "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "LeRoy",        "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Mattoon",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Parnell",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Pittwood",     "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Wapella",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {"provider": "Primient", "location": "Watseka",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {
+    "provider": "MNSP",
+    "location": "Brewster",
+    "facility_type": "Soy Processing",
+    "state": "MN",
+    "region": "West"
+  },
+  {
+    "provider": "ZFS",
+    "location": "Zeeland",
+    "facility_type": "Soy Processing",
+    "state": "MI",
+    "region": "East"
+  },
+  {
+    "provider": "ZFS",
+    "location": "ZFS Ithaca",
+    "facility_type": "Soy Processing",
+    "state": "MI",
+    "region": "East"
+  },
   {
     "provider": "CHS",
     "location": "Nestle Davenport",
@@ -482,7 +541,7 @@
   },
   {
     "provider": "CHS",
-    "location": "Fergus Falls South (8\u00a2 Dump fee)",
+    "location": "Fergus Falls South (8¢ Dump fee)",
     "facility_type": "Country Elevator",
     "region": null
   },
@@ -1028,7 +1087,7 @@
   },
   {
     "provider": "CHS",
-    "location": "Underwood (13\u00a2 Dump fee)",
+    "location": "Underwood (13¢ Dump fee)",
     "facility_type": "Country Elevator",
     "region": null
   },
@@ -1764,6 +1823,13 @@
   },
   {
     "provider": "Cargill",
+    "location": "Gainesville",
+    "facility_type": "Soy Processing",
+    "state": "GA",
+    "region": "East"
+  },
+  {
+    "provider": "Cargill",
     "location": "Cedar Rapids East",
     "facility_type": "Soy Processing",
     "region": "West"
@@ -1834,126 +1900,1697 @@
     "facility_type": "Soy Processing",
     "region": "East"
   },
-
-  {"provider": "Cargill", "location": "Spring Valley South", "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 3"},
-  {"provider": "Cargill", "location": "Lacon",               "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 3"},
-  {"provider": "Cargill", "location": "Havana",              "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
-  {"provider": "Cargill", "location": "Beardstown",          "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
-  {"provider": "Cargill", "location": "Meredosia",           "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
-
-  {"provider": "Cargill", "location": "Savage",              "facility_type": "River Terminal", "region": null},
-  {"provider": "ADM",     "location": "Burlington, IA",      "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Bettendorf",          "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Muscatine",           "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "New Boston",          "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Keithsburg",          "facility_type": "River Terminal", "region": null},
-  {"provider": "ADM",     "location": "Center, MO",          "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Buffalo Island",      "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "East St. Louis",      "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
-  {"provider": "Bunge",   "location": "Fairmont City",       "facility_type": "River Terminal", "region": null, "delivery_zone": "Zone 5"},
-  {"provider": "Cargill", "location": "New Madrid",          "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Hickman (Ashland)",   "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "Hales Point",         "facility_type": "River Terminal", "region": null},
-  {"provider": "Cargill", "location": "West Memphis",        "facility_type": "River Terminal", "region": null},
-  {"provider": "LDC",     "location": "West Memphis",        "facility_type": "River Terminal", "region": null},
-  {"provider": "LDC",     "location": "Rosedale",            "facility_type": "River Terminal", "region": null},
-  {"provider": "LDC",     "location": "Port Allen",          "facility_type": "River Terminal", "region": null},
-
-  {"provider": "Cargill", "location": "Forest City",         "facility_type": "Rail Terminal",  "region": null},
-  {"provider": "Cargill", "location": "Atchison",            "facility_type": "Rail Terminal",  "region": null},
-  {"provider": "Cargill", "location": "Hutchinson East",     "facility_type": "Rail Terminal",  "region": null},
-  {"provider": "Cargill", "location": "Hutchinson West",     "facility_type": "Rail Terminal",  "region": null},
-
-  {"provider": "Cargill", "location": "Blair",               "facility_type": "Corn Processing",        "region": null},
-
-  {"provider": "Andersons", "location": "Albion",                              "facility_type": "Corn Processing", "region": null},
-  {"provider": "Andersons", "location": "Clymers",                             "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "LDC",       "location": "Grand Junction",                      "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "Cargill",   "location": "Indianapolis Mill",                   "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Paris Mill",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Hammond",                             "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Harrisonburg, TRKY",                  "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Eddyville",                           "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Dayton",                              "facility_type": "Corn Processing", "region": null},
-  {"provider": "Cargill",   "location": "Wahpeton",                            "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "ADM",       "location": "ADM Cedar Rapids",                    "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Cedar Rapids, IA",                    "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Clinton, IA (Corn Processing)",       "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Columbus, NE (Corn Processing)",      "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Decatur, IL (Corn Processing)",       "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Fremont, NE (Lincoln Premium Poultry)","facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Jackson, TN",                         "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Marshall, MN (Corn Processing)",      "facility_type": "Corn Processing", "region": null},
-  {"provider": "ADM",       "location": "Quincy, IL (Barge Dock)",             "facility_type": "River Terminal",  "region": null},
-
-  {"provider": "Bunge",     "location": "Maschhoff's",                         "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "CGB",       "location": "CGB SEMO MILLING",                    "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "GPRE",      "location": "Central City",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Madison",                             "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Mount Vernon",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Otter Tail",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Shenandoah",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Superior",                            "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "Wood River",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "GPRE",      "location": "York",                                "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "POET",      "location": "Albert Lea, MN",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Alexandria, IN",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Arthur, IA",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Ashton, IA",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Big Stone City, SD",                  "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Caro, MI",                            "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Chancellor, SD",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Cloverdale, IN",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Coon Rapids, IA",                     "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Corning, IA",                         "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Emmetsburg, IA",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Fairbank, IA",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Fairmont, NE",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Fostoria, OH",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Gowrie, IA",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Groton, SD",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Hanlontown, IA",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Hudson, SD",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Iowa Falls, IA",                      "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Jewell, IA",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Laddonia, MO",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Leipsic, OH",                         "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Macon, MO",                           "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Marion, OH",                          "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Menlo, IA",                           "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Mitchell, SD",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "North Manchester, IN",                "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Obion, TN",                           "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Portland, IN",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Preston, MN",                         "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Scotland, SD",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Shelbyville, IN",                     "facility_type": "Corn Processing", "region": null},
-  {"provider": "POET",      "location": "Shell Rock, IA",                      "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "Scoular",   "location": "Madrid, NE Ethanol",                  "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "Mendota",   "location": "Clinton Proc",                        "facility_type": "Corn Processing", "region": null},
-  {"provider": "Mendota",   "location": "Mendota BN Rail",                     "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "ADM",       "location": "Mendota, IL (Northern Crossing Rail)", "facility_type": "Rail Terminal",   "region": null},
-
-  {"provider": "Andersons", "location": "Denison",                             "facility_type": "Corn Processing", "region": null},
-  {"provider": "Andersons", "location": "Greenville",                          "facility_type": "Corn Processing", "region": null},
-
-  {"provider": "Scoular",   "location": "Jerome, ID",                          "facility_type": "Feed Mill",       "region": null},
-  {"provider": "Scoular",   "location": "Lake City, FL",                       "facility_type": "Feed Mill",       "region": null},
-  {"provider": "Scoular",   "location": "Scoular Harrisonville Cash Bids",     "facility_type": "Feed Mill",       "region": null},
-
-  {"provider": "Scoular",   "location": "Waverly, IL - Shuttle",               "facility_type": "Rail Terminal",   "region": null},
-
-  {"provider": "Scoular",   "location": "Corley, IA",                          "facility_type": "Rail Terminal",   "region": "Texas"},
-
-  {"provider": "Scoular",   "location": "South Grant, NE",                     "facility_type": "Country Elevator", "region": null},
-  {"provider": "Scoular",   "location": "Scoular - Walnut Grove Farms / Schochoh", "facility_type": "Country Elevator", "region": null}
+  {
+    "provider": "Cargill",
+    "location": "Spring Valley South",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 3"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Lacon",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 3"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Havana",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 5"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Beardstown",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 5"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Meredosia",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 5"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Savage",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Burlington, IA",
+    "facility_type": "River Terminal",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Bettendorf",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Muscatine",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "New Boston",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Keithsburg",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Center, MO",
+    "facility_type": "Country Elevator",
+    "region": null,
+    "state": "MO"
+  },
+  {
+    "provider": "Cargill",
+    "location": "Buffalo Island",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "East St. Louis",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 5"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Fairmont City",
+    "facility_type": "River Terminal",
+    "region": null,
+    "delivery_zone": "Zone 5"
+  },
+  {
+    "provider": "Cargill",
+    "location": "New Madrid",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hickman (Ashland)",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hales Point",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "West Memphis",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "LDC",
+    "location": "West Memphis",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "LDC",
+    "location": "Rosedale",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "LDC",
+    "location": "Port Allen",
+    "facility_type": "River Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Forest City",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Atchison",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hutchinson East",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hutchinson West",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Blair",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Andersons",
+    "location": "Albion",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Andersons",
+    "location": "Clymers",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "LDC",
+    "location": "Grand Junction",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Indianapolis Mill",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Paris Mill",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Hammond",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Harrisonburg, TRKY",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Eddyville",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Dayton",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Cargill",
+    "location": "Wahpeton",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "ADM Cedar Rapids",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "ADM",
+    "location": "Cedar Rapids, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "ADM",
+    "location": "Clinton, IA (Corn Processing)",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "ADM",
+    "location": "Columbus, NE (Corn Processing)",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "ADM",
+    "location": "Decatur, IL (Corn Processing)",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IL"
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Lincoln Premium Poultry)",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "ADM",
+    "location": "Jackson, TN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "TN"
+  },
+  {
+    "provider": "ADM",
+    "location": "Marshall, MN (Corn Processing)",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MN"
+  },
+  {
+    "provider": "ADM",
+    "location": "Quincy, IL (Barge Dock)",
+    "facility_type": "River Terminal",
+    "region": null,
+    "state": "IL"
+  },
+  {
+    "provider": "Bunge",
+    "location": "Maschhoff's",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB SEMO MILLING",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "GPRE",
+    "location": "Central City",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Madison",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IL"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Mount Vernon",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Otter Tail",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MN"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Shenandoah",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Superior",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "GPRE",
+    "location": "Wood River",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "GPRE",
+    "location": "York",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "POET",
+    "location": "Albert Lea, MN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MN"
+  },
+  {
+    "provider": "POET",
+    "location": "Alexandria, IN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "POET",
+    "location": "Arthur, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Ashton, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Big Stone City, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "Caro, MI",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MI"
+  },
+  {
+    "provider": "POET",
+    "location": "Chancellor, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "Cloverdale, IN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "POET",
+    "location": "Coon Rapids, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Corning, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Emmetsburg, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Fairbank, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Fairmont, NE",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "NE"
+  },
+  {
+    "provider": "POET",
+    "location": "Fostoria, OH",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "OH"
+  },
+  {
+    "provider": "POET",
+    "location": "Gowrie, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Groton, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "Hanlontown, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Hudson, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "Iowa Falls, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Jewell, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Laddonia, MO",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MO"
+  },
+  {
+    "provider": "POET",
+    "location": "Leipsic, OH",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "OH"
+  },
+  {
+    "provider": "POET",
+    "location": "Macon, MO",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MO"
+  },
+  {
+    "provider": "POET",
+    "location": "Marion, OH",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "OH"
+  },
+  {
+    "provider": "POET",
+    "location": "Menlo, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "POET",
+    "location": "Mitchell, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "North Manchester, IN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "POET",
+    "location": "Obion, TN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "TN"
+  },
+  {
+    "provider": "POET",
+    "location": "Portland, IN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "POET",
+    "location": "Preston, MN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "MN"
+  },
+  {
+    "provider": "POET",
+    "location": "Scotland, SD",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "SD"
+  },
+  {
+    "provider": "POET",
+    "location": "Shelbyville, IN",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IN"
+  },
+  {
+    "provider": "POET",
+    "location": "Shell Rock, IA",
+    "facility_type": "Corn Processing",
+    "region": null,
+    "state": "IA"
+  },
+  {
+    "provider": "Scoular",
+    "location": "Madrid, NE Ethanol",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Mendota",
+    "location": "Clinton Proc",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Mendota",
+    "location": "Mendota BN Rail",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota, IL (Northern Crossing Rail)",
+    "facility_type": "Rail Terminal",
+    "region": null,
+    "state": "IL"
+  },
+  {
+    "provider": "Andersons",
+    "location": "Denison",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Andersons",
+    "location": "Greenville",
+    "facility_type": "Corn Processing",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Jerome, ID",
+    "facility_type": "Feed Mill",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Lake City, FL",
+    "facility_type": "Feed Mill",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular Harrisonville Cash Bids",
+    "facility_type": "Feed Mill",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Waverly, IL - Shuttle",
+    "facility_type": "Rail Terminal",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Corley, IA",
+    "facility_type": "Rail Terminal",
+    "region": "Texas"
+  },
+  {
+    "provider": "Scoular",
+    "location": "South Grant, NE",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "Scoular",
+    "location": "Scoular - Walnut Grove Farms / Schochoh",
+    "facility_type": "Country Elevator",
+    "region": null
+  },
+  {
+    "provider": "Tyson",
+    "location": "Camilla",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Dyer",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Elizabeth City",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Grayridge",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Humboldt",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Kenton",
+    "facility_type": "Elevator"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Albany",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Albertville",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Aurora",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Banks",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Bergman",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Bolivar",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Center",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Cobb Vantress",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Corydon",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Craig",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Crewe",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Dexter",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Estill Springs",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Franklin",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Fulton",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Gonzales",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Holdenville",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Hope",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Ivalee",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Joanna",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Johnson Road",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Magee",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Monroe",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Nacogdoches",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Oglethorpe",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Pine Bluff",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Pottsville",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Roaring River",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Sebree",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Sedalia",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Snow Hill",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "South Fulton",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Spadra",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Storm Lake",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Union",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Waldron",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "Tyson",
+    "location": "Westville",
+    "facility_type": "Feed Mill"
+  },
+  {
+    "provider": "GPC",
+    "location": "GPC Muscatine",
+    "facility_type": "Corn Processing"
+  },
+  {
+    "provider": "GPC",
+    "location": "GPC Washington",
+    "facility_type": "Corn Processing"
+  },
+  {
+    "provider": "GPC",
+    "location": "Kent Grain",
+    "facility_type": "Rail Terminal"
+  },
+  {
+    "provider": "POET",
+    "location": "Bingham Lake, MN",
+    "facility_type": "Corn Processing",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "POET",
+    "location": "Lake Crystal, MN",
+    "facility_type": "Corn Processing",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Beech Grove, IN (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Buffalo, NY (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "NY",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Cleveland, TN (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "TN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Vernon, IN (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Louis, MO (Wheat Milling)",
+    "facility_type": "Wheat Milling",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Clinton, IA (Elevator)",
+    "facility_type": "River Terminal",
+    "state": "IA",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Creve Coeur, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (1st Ave.)",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (Broadway)",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (Ohio St.)",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Evansville, IN (River South)",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Gulfport, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Havana, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Helena, AR",
+    "facility_type": "River Terminal",
+    "state": "AR",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Henderson, KY",
+    "facility_type": "River Terminal",
+    "state": "KY",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hennepin, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Lacon, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Livingston Point, KY",
+    "facility_type": "River Terminal",
+    "state": "KY",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Memphis, TN",
+    "facility_type": "River Terminal",
+    "state": "TN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Morris, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mound City, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Vernon, IN (Elevator)",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "New Madrid, MO",
+    "facility_type": "River Terminal",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Newburgh, IN",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Paducah, KY",
+    "facility_type": "River Terminal",
+    "state": "KY",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Rockport, IN",
+    "facility_type": "River Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Sauget, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Silver Grove, KY",
+    "facility_type": "River Terminal",
+    "state": "KY",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Louis, MO (Elevator)",
+    "facility_type": "River Terminal",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Paul, MN (Elevator D)",
+    "facility_type": "River Terminal",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Vidalia, LA",
+    "facility_type": "River Terminal",
+    "state": "LA",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Winona, MN",
+    "facility_type": "River Terminal",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "ADM Decatur",
+    "facility_type": "Corn Processing",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Valdosta, GA",
+    "facility_type": "Soy Processing",
+    "state": "GA",
+    "region": "East"
+  },
+  {
+    "provider": "ADM",
+    "location": "ADM St. Louis",
+    "facility_type": "River Terminal",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Beech Grove (Elevator)",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Charlotte, NC",
+    "facility_type": "Wheat Milling",
+    "state": "NC",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Columbus, OH",
+    "facility_type": "Rail Terminal",
+    "state": "OH",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Country Store, KS",
+    "facility_type": "Country Elevator",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Grand Ledge, MI",
+    "facility_type": "Rail Terminal",
+    "state": "MI",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Heloise, TN",
+    "facility_type": "River Terminal",
+    "state": "TN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Laddonia, MO",
+    "facility_type": "Country Elevator",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Marshall, MN (South House)",
+    "facility_type": "Corn Processing",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa, IL (North Side)",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa, IL (South)",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Ottawa Lake, MI",
+    "facility_type": "Rail Terminal",
+    "state": "MI",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Spokane, WA",
+    "facility_type": "Wheat Milling",
+    "state": "WA",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "St. Cloud, MN",
+    "facility_type": "Rail Terminal",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Toledo, OH",
+    "facility_type": "Export Terminal",
+    "state": "OH",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Farina, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Fremont, NE (Elevator)",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Fullerton, NE",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hebron, ND",
+    "facility_type": "Rail Terminal",
+    "state": "ND",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hensler, ND",
+    "facility_type": "Rail Terminal",
+    "state": "ND",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Holland, MN",
+    "facility_type": "Feed Mill",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hoopeston, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hume, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Hutchinson, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Laotto, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Leoti, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Lincoln, NE (Elevator)",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Logansport, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Macon, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mendota, IL (In Town)",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Montezuma, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Montgomery City, MO",
+    "facility_type": "Country Elevator",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Montpelier, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Mt. Auburn, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "New Haven, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Newman Grove, NE",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Niantic, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Novelty, MO",
+    "facility_type": "Country Elevator",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Oakland, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Panhandle, OK",
+    "facility_type": "Rail Terminal",
+    "state": "OK",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Parr, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Patoka, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Plains, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Shelbina, MO",
+    "facility_type": "Country Elevator",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Shobonier, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Snover, MI",
+    "facility_type": "Country Elevator",
+    "state": "MI",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Spring Valley, IL",
+    "facility_type": "River Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "State Line, OK",
+    "facility_type": "Country Elevator",
+    "state": "OK",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Sullivan, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Swanington, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Taylorville, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Tuscola, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Velva, ND",
+    "facility_type": "Rail Terminal",
+    "state": "ND",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Webberville, MI",
+    "facility_type": "Rail Terminal",
+    "state": "MI",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Wisner, NE",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Abilene, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Altamont, IL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Arkansas City, KS (East)",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Arkansas City, KS (West)",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Attica, IN",
+    "facility_type": "Rail Terminal",
+    "state": "IN",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Carthage, MO",
+    "facility_type": "Wheat Milling",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Charleston, MO",
+    "facility_type": "Country Elevator",
+    "state": "MO",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Copeland, KS",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Curran, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Enderlin, ND",
+    "facility_type": "Rail Terminal",
+    "state": "ND",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Enid, OK (Elevator)",
+    "facility_type": "Rail Terminal",
+    "state": "OK",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Enola, NE",
+    "facility_type": "Country Elevator",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Bacres Grain",
+    "facility_type": "Country Elevator",
+    "state": null,
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Windsor, ON",
+    "facility_type": "Soy Processing",
+    "state": "ON",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Lloydminster, AB",
+    "facility_type": "Soy Processing",
+    "state": "AB",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Blenheim, ON",
+    "facility_type": "Country Elevator",
+    "state": "ON",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Carberry, MB",
+    "facility_type": "Rail Terminal",
+    "state": "MB",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Maidstone, ON",
+    "facility_type": "Export Terminal",
+    "state": "ON",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Midland, ON",
+    "facility_type": "Export Terminal",
+    "state": "ON",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Port Colborne, ON",
+    "facility_type": "Export Terminal",
+    "state": "ON",
+    "region": null
+  },
+  {
+    "provider": "ADM",
+    "location": "Watson, SK",
+    "facility_type": "Rail Terminal",
+    "state": "SK",
+    "region": null
+  }
 ]

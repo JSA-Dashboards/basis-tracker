@@ -252,31 +252,34 @@ def seed_facility_types(seed_path: str | None = None) -> int:
     written = 0
     try:
         for row in seed:
-            prov = row.get("provider")
-            loc  = row.get("location")
-            ft   = row.get("facility_type")
-            reg  = row.get("region")
-            dz   = row.get("delivery_zone")
+            prov  = row.get("provider")
+            loc   = row.get("location")
+            ft    = row.get("facility_type")
+            reg   = row.get("region")
+            dz    = row.get("delivery_zone")
+            state = row.get("state")
             if not prov or not loc:
                 continue
             if _use_pg():
                 c.execute(f"""
-                    INSERT INTO location_meta (provider, location, facility_type, region, delivery_zone)
-                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    INSERT INTO location_meta (provider, location, state, facility_type, region, delivery_zone)
+                    VALUES ({ph},{ph},{ph},{ph},{ph},{ph})
                     ON CONFLICT (provider, location) DO UPDATE SET
+                        state         = COALESCE(EXCLUDED.state,         location_meta.state),
                         facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
                         region        = COALESCE(EXCLUDED.region,        location_meta.region),
                         delivery_zone = COALESCE(EXCLUDED.delivery_zone, location_meta.delivery_zone)
-                """, (prov, loc, ft, reg, dz))
+                """, (prov, loc, state, ft, reg, dz))
             else:
                 c.execute(f"""
-                    INSERT INTO location_meta (provider, location, facility_type, region, delivery_zone)
-                    VALUES ({ph},{ph},{ph},{ph},{ph})
+                    INSERT INTO location_meta (provider, location, state, facility_type, region, delivery_zone)
+                    VALUES ({ph},{ph},{ph},{ph},{ph},{ph})
                     ON CONFLICT(provider, location) DO UPDATE SET
+                        state         = COALESCE(excluded.state,         location_meta.state),
                         facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
                         region        = COALESCE(excluded.region,        location_meta.region),
                         delivery_zone = COALESCE(excluded.delivery_zone, location_meta.delivery_zone)
-                """, (prov, loc, ft, reg, dz))
+                """, (prov, loc, state, ft, reg, dz))
             written += 1
         conn.commit()
     finally:
@@ -726,6 +729,93 @@ def list_locations() -> list[dict]:
         return [{"provider": r["provider"], "location": r["location"]} for r in c.fetchall()]
     finally:
         conn.close()
+
+
+def get_bids_filter_data() -> list[dict]:
+    """
+    Return all (provider, location) pairs with snapshot data plus their metadata.
+
+    Shape: [{provider, location, state, facility_type, region}]
+    Used to populate the Bids tab cascade filters and the Summary tab.
+    """
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        c.execute("""
+            SELECT DISTINCT s.provider, s.location,
+                   COALESCE(lm.state, '')         AS state,
+                   COALESCE(lm.facility_type, '') AS facility_type,
+                   COALESCE(lm.region, '')        AS region
+            FROM snapshots s
+            LEFT JOIN location_meta lm
+                ON lm.provider = s.provider AND lm.location = s.location
+            ORDER BY s.provider, s.location
+        """)
+        return [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> dict:
+    """
+    Fetch all snapshots (with rows) for multiple (provider, location) pairs
+    within the last `since_days` days.
+    Returns: {(provider, location): [Snapshot, ...] sorted ascending by timestamp}
+    """
+    if not pairs:
+        return {}
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    cutoff     = (datetime.utcnow() - timedelta(days=since_days)).strftime("%Y-%m-%dT00:00:00")
+    conn       = get_conn()
+    c          = conn.cursor()
+    ph         = "%s" if _use_pg() else "?"
+    try:
+        pair_conds = " OR ".join(f"(s.provider={ph} AND s.location={ph})" for _ in pairs)
+        params     = [v for p in pairs for v in p] + [cutoff]
+        c.execute(f"""
+            SELECT s.id     AS snap_id,
+                   s.timestamp, s.provider, s.location, s.source,
+                   r.row_id, r.grain, r.delivery_month, r.futures_symbol,
+                   r.basis_cents, r.is_spot, r.spot_grain
+            FROM snapshots s
+            JOIN snapshot_rows r ON r.snapshot_id = s.id
+            WHERE ({pair_conds}) AND s.timestamp >= {ph}
+            ORDER BY s.provider, s.location, s.timestamp, r.id
+        """, params)
+        db_rows = c.fetchall()
+    finally:
+        conn.close()
+
+    snaps_by_id: dict = {}
+    result: dict      = defaultdict(list)
+
+    for row in db_rows:
+        sid = row["snap_id"]
+        key = (row["provider"], row["location"])
+        if sid not in snaps_by_id:
+            snap = Snapshot(
+                id        = sid,
+                timestamp = row["timestamp"],
+                provider  = row["provider"],
+                location  = row["location"],
+                source    = row["source"],
+                rows      = [],
+            )
+            snaps_by_id[sid] = snap
+            result[key].append(snap)
+        snaps_by_id[sid].rows.append(SnapshotRow(
+            id            = row["row_id"],
+            grain         = row["grain"],
+            deliveryMonth = row["delivery_month"],
+            futuresSymbol = row["futures_symbol"],
+            basisCents    = row["basis_cents"],
+            isSpot        = bool(row["is_spot"]),
+            spotGrain     = row["spot_grain"],
+        ))
+
+    return dict(result)
 
 
 # ── Data retention / pruning ───────────────────────────────────────────────────

@@ -76,7 +76,7 @@ _PROVIDER_STATE: dict[tuple[str, str], str] = {
     ("GPRE", "York"):         "NE",
     ("GPRE", "Superior"):     "NE",
     ("GPRE", "Central City"): "NE",
-    ("GPRE", "Madison"):      "NE",
+    ("GPRE", "Madison"):      "IL",
     ("GPRE", "Shenandoah"):   "IA",
     ("GPRE", "Otter Tail"):   "MN",
     ("GPRE", "Mount Vernon"): "IN",
