@@ -60,6 +60,8 @@ _SQLITE_DDL = [
     )""",
     """CREATE UNIQUE INDEX IF NOT EXISTS idx_snap_unique
        ON snapshots(timestamp, provider, location)""",
+    """CREATE INDEX IF NOT EXISTS idx_snap_prov_loc_ts
+       ON snapshots(provider, location, timestamp DESC)""",
     """CREATE TABLE IF NOT EXISTS snapshot_rows (
         id             INTEGER PRIMARY KEY AUTOINCREMENT,
         snapshot_id    INTEGER NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,
@@ -72,6 +74,8 @@ _SQLITE_DDL = [
         spot_grain     TEXT,
         UNIQUE(snapshot_id, row_id)
     )""",
+    """CREATE INDEX IF NOT EXISTS idx_snap_rows_sid
+       ON snapshot_rows(snapshot_id)""",
     """CREATE TABLE IF NOT EXISTS imported_emails (
         email_id    TEXT PRIMARY KEY,
         subject     TEXT,
@@ -110,6 +114,8 @@ _PG_DDL = [
     )""",
     """CREATE UNIQUE INDEX IF NOT EXISTS idx_snap_unique
        ON snapshots(timestamp, provider, location)""",
+    """CREATE INDEX IF NOT EXISTS idx_snap_prov_loc_ts
+       ON snapshots(provider, location, timestamp DESC)""",
     """CREATE TABLE IF NOT EXISTS snapshot_rows (
         id             BIGSERIAL PRIMARY KEY,
         snapshot_id    BIGINT NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,
@@ -122,6 +128,8 @@ _PG_DDL = [
         spot_grain     TEXT,
         UNIQUE(snapshot_id, row_id)
     )""",
+    """CREATE INDEX IF NOT EXISTS idx_snap_rows_sid
+       ON snapshot_rows(snapshot_id)""",
     """CREATE TABLE IF NOT EXISTS imported_emails (
         email_id    TEXT PRIMARY KEY,
         subject     TEXT,
@@ -152,6 +160,8 @@ _MIGRATE_DDL = [
     "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS lon           REAL",
     "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS region        TEXT",
     "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS delivery_zone TEXT",
+    "CREATE INDEX IF NOT EXISTS idx_snap_prov_loc_ts ON snapshots(provider, location, timestamp DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_snap_rows_sid ON snapshot_rows(snapshot_id)",
 ]
 
 
@@ -489,44 +499,47 @@ def get_snapshots(provider: str, location: str) -> list[Snapshot]:
     c    = conn.cursor()
     ph   = "%s" if _use_pg() else "?"
     try:
-        c.execute(
-            f"SELECT * FROM snapshots WHERE provider={ph} AND location={ph} ORDER BY timestamp",
-            (provider, location),
-        )
-        snap_rows = c.fetchall()
-        result    = []
-        for sr in snap_rows:
-            c.execute(
-                f"SELECT * FROM snapshot_rows WHERE snapshot_id={ph} ORDER BY id",
-                (sr["id"],),
-            )
-            rows = [
-                SnapshotRow(
-                    id            = r["row_id"],
-                    grain         = r["grain"],
-                    deliveryMonth = r["delivery_month"],
-                    futuresSymbol = r["futures_symbol"],
-                    basisCents    = r["basis_cents"],
-                    isSpot        = bool(r["is_spot"]),
-                    spotGrain     = r["spot_grain"],
-                )
-                for r in c.fetchall()
-            ]
-            result.append(
-                Snapshot(
-                    id           = sr["id"],
-                    timestamp    = sr["timestamp"],
-                    provider     = sr["provider"],
-                    location     = sr["location"],
-                    source       = sr["source"],
-                    emailSubject = sr["email_subject"],
-                    emailDate    = sr["email_date"],
-                    rows         = rows,
-                )
-            )
-        return result
+        c.execute(f"""
+            SELECT s.id AS snap_id, s.timestamp, s.provider, s.location,
+                   s.source, s.email_subject, s.email_date,
+                   r.row_id, r.grain, r.delivery_month, r.futures_symbol,
+                   r.basis_cents, r.is_spot, r.spot_grain
+            FROM snapshots s
+            JOIN snapshot_rows r ON r.snapshot_id = s.id
+            WHERE s.provider={ph} AND s.location={ph}
+            ORDER BY s.timestamp, r.id
+        """, (provider, location))
+        db_rows = c.fetchall()
     finally:
         conn.close()
+
+    snaps_by_id: dict = {}
+    result: list      = []
+    for row in db_rows:
+        sid = row["snap_id"]
+        if sid not in snaps_by_id:
+            snap = Snapshot(
+                id           = sid,
+                timestamp    = row["timestamp"],
+                provider     = row["provider"],
+                location     = row["location"],
+                source       = row["source"],
+                emailSubject = row["email_subject"],
+                emailDate    = row["email_date"],
+                rows         = [],
+            )
+            snaps_by_id[sid] = snap
+            result.append(snap)
+        snaps_by_id[sid].rows.append(SnapshotRow(
+            id            = row["row_id"],
+            grain         = row["grain"],
+            deliveryMonth = row["delivery_month"],
+            futuresSymbol = row["futures_symbol"],
+            basisCents    = row["basis_cents"],
+            isSpot        = bool(row["is_spot"]),
+            spotGrain     = row["spot_grain"],
+        ))
+    return result
 
 
 def delete_snapshot(snapshot_id: int) -> bool:

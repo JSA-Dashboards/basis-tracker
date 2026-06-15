@@ -41,6 +41,14 @@ def _cached_grain_map() -> dict:
 
 _GM: dict = _cached_grain_map()
 
+@st.cache_data(ttl=300)
+def _cached_get_bids_filter_data() -> list[dict]:
+    return get_bids_filter_data()
+
+@st.cache_data(ttl=300)
+def _cached_get_snapshots(provider: str, location: str):
+    return get_snapshots(provider, location)
+
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
     entry = _GM.get(raw)
@@ -1026,7 +1034,7 @@ if provider == "CHS":
     )
     loc_key   = sel_chs_loc
     loc_color = "#16a34a"   # green for CHS
-    _chs_snaps = get_snapshots("CHS", loc_key)
+    _chs_snaps = _cached_get_snapshots("CHS", loc_key)
     if _chs_snaps:
         grains = _build_grains(_chs_snaps[-1].rows)
     else:
@@ -1057,7 +1065,7 @@ elif provider == "POET":
     loc_key   = sel_poet_loc
     loc_color = "#f97316"   # orange for POET Grain
     # Detect available grains from the latest snapshot for this location
-    _poet_snaps = get_snapshots("POET", loc_key)
+    _poet_snaps = _cached_get_snapshots("POET", loc_key)
     if _poet_snaps:
         grains = _build_grains(_poet_snaps[-1].rows)
     else:
@@ -1082,7 +1090,7 @@ elif provider == "ADM":
     )
     loc_key   = sel_adm_loc
     loc_color = "#3b82f6"   # blue for ADM
-    _adm_snaps = get_snapshots("ADM", loc_key)
+    _adm_snaps = _cached_get_snapshots("ADM", loc_key)
     if _adm_snaps:
         grains = _build_grains(_adm_snaps[-1].rows)
     else:
@@ -1132,7 +1140,7 @@ elif provider == "CGB":
         )
     loc_key   = sel_cgb_loc
     loc_color = "#8b5cf6"   # purple for CGB
-    _cgb_snaps = get_snapshots("CGB", loc_key)
+    _cgb_snaps = _cached_get_snapshots("CGB", loc_key)
     if _cgb_snaps:
         grains = _build_grains(_cgb_snaps[-1].rows)
     else:
@@ -1205,7 +1213,7 @@ elif provider == "Cargill":
         )
     loc_key   = sel_cargill_loc
     loc_color = "#0ea5e9"   # sky blue for Cargill
-    _cargill_snaps = get_snapshots("Cargill", loc_key)  # noqa: F841
+    _cargill_snaps = _cached_get_snapshots("Cargill", loc_key)  # noqa: F841
     if _cargill_snaps:
         grains = _build_grains(_cargill_snaps[-1].rows)
     else:
@@ -1255,7 +1263,7 @@ elif provider == "Andersons":
         )
     loc_key   = sel_andersons_loc
     loc_color = "#f59e0b"   # amber for The Andersons
-    _andersons_snaps = get_snapshots("Andersons", loc_key)
+    _andersons_snaps = _cached_get_snapshots("Andersons", loc_key)
     if _andersons_snaps:
         grains = _build_grains(_andersons_snaps[-1].rows)
     else:
@@ -1305,7 +1313,7 @@ elif provider == "Bunge":
         )
     loc_key   = sel_bunge_loc
     loc_color = "#dc2626"   # red for Bunge
-    _bunge_snaps = get_snapshots("Bunge", loc_key)
+    _bunge_snaps = _cached_get_snapshots("Bunge", loc_key)
     if _bunge_snaps:
         grains = _build_grains(_bunge_snaps[-1].rows)
     else:
@@ -1355,7 +1363,7 @@ elif provider == "Scoular":
         )
     loc_key   = sel_scoular_loc
     loc_color = "#f97316"   # orange for Scoular
-    _scoular_snaps = get_snapshots("Scoular", loc_key)
+    _scoular_snaps = _cached_get_snapshots("Scoular", loc_key)
     if _scoular_snaps:
         grains = _build_grains(_scoular_snaps[-1].rows)
     else:
@@ -1404,7 +1412,7 @@ elif provider == "AGP":
         )
     loc_key   = sel_agp_loc
     loc_color = "#22c55e"   # green for AGP
-    _agp_snaps = get_snapshots("AGP", loc_key)
+    _agp_snaps = _cached_get_snapshots("AGP", loc_key)
     if _agp_snaps:
         grains = _build_grains(_agp_snaps[-1].rows)
     else:
@@ -1453,7 +1461,7 @@ elif provider == "LDC":
         )
     loc_key   = sel_ldc_loc
     loc_color = "#3b82f6"   # blue for LDC
-    _ldc_snaps = get_snapshots("LDC", loc_key)
+    _ldc_snaps = _cached_get_snapshots("LDC", loc_key)
     if _ldc_snaps:
         grains = _build_grains(_ldc_snaps[-1].rows)
     else:
@@ -1467,7 +1475,7 @@ tab_bids, tab_map, tab_summary = st.tabs(["📋 Bids", "🗺️ Map", "📊 Summ
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_bids:
     # ── Cascade filters ───────────────────────────────────────────────────────
-    _all_bids_locs = get_bids_filter_data()
+    _all_bids_locs = _cached_get_bids_filter_data()
 
     _flt1, _flt2, _flt3, _flt4 = st.columns([2, 1, 3, 2])
 
@@ -1503,7 +1511,7 @@ with tab_bids:
     bids_loc_color = _PROVIDER_COLOR.get(bids_provider, "#64748b")
 
     # ── Load snapshots ────────────────────────────────────────────────────────
-    snapshots = get_snapshots(bids_provider, bids_loc_key)
+    snapshots = _cached_get_snapshots(bids_provider, bids_loc_key)
 
     # ── Commodity filter (populated from latest snapshot) ─────────────────────
     with _flt4:
@@ -1980,7 +1988,7 @@ with tab_summary:
         return None, None
 
     # ── Filters row ───────────────────────────────────────────────────────────
-    _sl = get_bids_filter_data()  # [{provider, location, state, facility_type, region}]
+    _sl = _cached_get_bids_filter_data()  # [{provider, location, state, facility_type, region}]
 
     _sf1, _sf2, _sf3 = st.columns([2, 2, 2])
     with _sf1:
