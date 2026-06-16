@@ -31,8 +31,12 @@ st.set_page_config(
     layout="wide",
 )
 
-# ── On-startup init ───────────────────────────────────────────────────────────
-init_db()
+# ── On-startup init (once per Streamlit process, not per rerun) ───────────────
+@st.cache_resource
+def _init_db_once():
+    init_db()
+
+_init_db_once()
 
 # ── Grain normalization helpers ───────────────────────────────────────────────
 @st.cache_data(ttl=3600)
@@ -48,6 +52,18 @@ def _cached_get_bids_filter_data() -> list[dict]:
 @st.cache_data(ttl=300)
 def _cached_get_snapshots(provider: str, location: str):
     return get_snapshots(provider, location)
+
+@st.cache_data(ttl=300)
+def _cached_list_locations() -> list[dict]:
+    return list_locations()
+
+@st.cache_data(ttl=300)
+def _cached_get_location_meta(provider: str) -> dict:
+    return get_location_meta(provider)
+
+@st.cache_data(ttl=600)
+def _cached_get_map_data() -> list[dict]:
+    return get_map_data()
 
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
@@ -968,7 +984,7 @@ with prov_col:
     )
 
 if provider == "CHS":
-    chs_db_locs = [r for r in list_locations() if r["provider"] == "CHS"]
+    chs_db_locs = [r for r in _cached_list_locations() if r["provider"] == "CHS"]
     if not chs_db_locs:
         st.markdown(
             '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
@@ -981,7 +997,7 @@ if provider == "CHS":
         st.stop()
 
     # ── Load state / type metadata ────────────────────────────────────────────
-    chs_meta = get_location_meta("CHS")   # {location: {"state": ..., "facility_type": ...}}
+    chs_meta = _cached_get_location_meta("CHS")   # {location: {"state": ..., "facility_type": ...}}
     all_chs_names = {r["location"] for r in chs_db_locs}
 
     def _loc_state(name: str) -> str:
@@ -1043,7 +1059,7 @@ if provider == "CHS":
 elif provider == "POET":
     # Dynamically load POET locations from whatever's in the database.
     # Each row is {"provider": "POET", "location": "Alexandria, IN"}.
-    poet_db_locs = [r for r in list_locations() if r["provider"] == "POET"]
+    poet_db_locs = [r for r in _cached_list_locations() if r["provider"] == "POET"]
     if not poet_db_locs:
         st.markdown(
             '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
@@ -1072,7 +1088,7 @@ elif provider == "POET":
         grains = ["Corn"]
 
 elif provider == "ADM":
-    adm_db_locs = sorted({r["location"] for r in list_locations() if r["provider"] == "ADM"})
+    adm_db_locs = sorted({r["location"] for r in _cached_list_locations() if r["provider"] == "ADM"})
     if not adm_db_locs:
         st.markdown(
             '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
@@ -1098,7 +1114,7 @@ elif provider == "ADM":
 
 elif provider == "CGB":
     cgb_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "CGB"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "CGB"}
     )
     if not cgb_db_locs:
         st.markdown(
@@ -1112,7 +1128,7 @@ elif provider == "CGB":
         st.stop()
 
     # State filter via location_meta (populated during scrape)
-    cgb_meta        = get_location_meta("CGB")  # {name: {"state": ..., "facility_type": ...}}
+    cgb_meta        = _cached_get_location_meta("CGB")  # {name: {"state": ..., "facility_type": ...}}
     cgb_states_avail = sorted({
         v["state"] for v in cgb_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1148,7 +1164,7 @@ elif provider == "CGB":
 
 elif provider == "GPRE":
     gpre_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "GPRE"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "GPRE"}
     )
     if not gpre_db_locs:
         st.markdown(
@@ -1171,7 +1187,7 @@ elif provider == "GPRE":
 
 elif provider == "Cargill":
     cargill_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "Cargill"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "Cargill"}
     )
     if not cargill_db_locs:
         st.markdown(
@@ -1185,7 +1201,7 @@ elif provider == "Cargill":
         st.stop()
 
     # State filter via location_meta (populated during scrape)
-    cargill_meta         = get_location_meta("Cargill")
+    cargill_meta         = _cached_get_location_meta("Cargill")
     cargill_states_avail = sorted({
         v["state"] for v in cargill_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1221,7 +1237,7 @@ elif provider == "Cargill":
 
 elif provider == "Andersons":
     andersons_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "Andersons"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "Andersons"}
     )
     if not andersons_db_locs:
         st.markdown(
@@ -1235,7 +1251,7 @@ elif provider == "Andersons":
         st.stop()
 
     # State filter via location_meta (populated during scrape)
-    andersons_meta         = get_location_meta("Andersons")
+    andersons_meta         = _cached_get_location_meta("Andersons")
     andersons_states_avail = sorted({
         v["state"] for v in andersons_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1271,7 +1287,7 @@ elif provider == "Andersons":
 
 elif provider == "Bunge":
     bunge_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "Bunge"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "Bunge"}
     )
     if not bunge_db_locs:
         st.markdown(
@@ -1285,7 +1301,7 @@ elif provider == "Bunge":
         st.stop()
 
     # State filter via location_meta (populated during scrape)
-    bunge_meta         = get_location_meta("Bunge")
+    bunge_meta         = _cached_get_location_meta("Bunge")
     bunge_states_avail = sorted({
         v["state"] for v in bunge_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1321,7 +1337,7 @@ elif provider == "Bunge":
 
 elif provider == "Scoular":
     scoular_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "Scoular"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "Scoular"}
     )
     if not scoular_db_locs:
         st.markdown(
@@ -1335,7 +1351,7 @@ elif provider == "Scoular":
         st.stop()
 
     # State filter via location_meta (populated during scrape)
-    scoular_meta         = get_location_meta("Scoular")
+    scoular_meta         = _cached_get_location_meta("Scoular")
     scoular_states_avail = sorted({
         v["state"] for v in scoular_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1371,7 +1387,7 @@ elif provider == "Scoular":
 
 elif provider == "AGP":
     agp_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "AGP"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "AGP"}
     )
     if not agp_db_locs:
         st.markdown(
@@ -1384,7 +1400,7 @@ elif provider == "AGP":
         )
         st.stop()
 
-    agp_meta         = get_location_meta("AGP")
+    agp_meta         = _cached_get_location_meta("AGP")
     agp_states_avail = sorted({
         v["state"] for v in agp_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1420,7 +1436,7 @@ elif provider == "AGP":
 
 elif provider == "LDC":
     ldc_db_locs = sorted(
-        {r["location"] for r in list_locations() if r["provider"] == "LDC"}
+        {r["location"] for r in _cached_list_locations() if r["provider"] == "LDC"}
     )
     if not ldc_db_locs:
         st.markdown(
@@ -1433,7 +1449,7 @@ elif provider == "LDC":
         )
         st.stop()
 
-    ldc_meta         = get_location_meta("LDC")
+    ldc_meta         = _cached_get_location_meta("LDC")
     ldc_states_avail = sorted({
         v["state"] for v in ldc_meta.values()
         if v.get("state") and v["state"] not in ("", "?", "N/A")
@@ -1735,7 +1751,7 @@ with tab_map:
     }
     _DEFAULT_COLOR = [148, 163, 184]
 
-    map_rows = get_map_data()
+    map_rows = _cached_get_map_data()
 
     if not map_rows:
         st.markdown(
