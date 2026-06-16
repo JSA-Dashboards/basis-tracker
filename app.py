@@ -1977,11 +1977,12 @@ with tab_summary:
         except Exception:
             return datetime.min
 
-    def _sum_closest(snaps: list, target: datetime, max_days: int):
+    def _sum_closest(snaps: list, target: datetime, max_days: float):
         if not snaps:
             return None
         best = min(snaps, key=lambda s: abs((_sum_ts(s.timestamp) - target).total_seconds()))
-        if abs((_sum_ts(best.timestamp) - target).days) > max_days:
+        diff_days = abs((_sum_ts(best.timestamp) - target).total_seconds()) / 86400
+        if diff_days > max_days:
             return None
         return best
 
@@ -2063,9 +2064,12 @@ with tab_summary:
             ("yr_ago",  _now - timedelta(days=365), 30),
             ("mo_ago",  _now - timedelta(days=30),  15),
             ("wk_ago",  _now - timedelta(days=7),   10),
-            ("d2_ago",  _now - timedelta(days=2),    5),
-            ("d1_ago",  _now - timedelta(days=1),    5),
-            ("current", _now,                        5),
+            # 0.6 = within ~14 hours of target noon; matches same-day midnight
+            # snapshots (12 h away) but not next/prior day midnight (36 h away).
+            ("d2_ago",  _now - timedelta(days=2),   0.6),
+            ("d1_ago",  _now - timedelta(days=1),   0.6),
+            # 1.6 allows showing yesterday's data when today's scrape hasn't run yet.
+            ("current", _now,                       1.6),
         ]
 
         # ── Build one data row per location ───────────────────────────────────
