@@ -101,6 +101,8 @@ from bartlett_scraper import fetch_bartlett_bids
 from parsers.bartlett_parser import parse_bartlett_location
 from primient_scraper import fetch_primient_bids
 from parsers.primient_parser import parse_primient_location
+from norfolkcrush_scraper import fetch_norfolkcrush_bids
+from parsers.norfolkcrush_parser import parse_norfolkcrush_location
 import holidays as _holidays
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -1002,6 +1004,10 @@ def run_primient() -> int:
     return _run_simple("Primient", fetch_primient_bids, parse_primient_location)
 
 
+def run_norfolkcrush() -> int:
+    return _run_simple("NorfolkCrush", fetch_norfolkcrush_bids, parse_norfolkcrush_location)
+
+
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -1048,6 +1054,7 @@ def run(
     run_hppsd_scrape: bool = True,
     run_bartlett_scrape: bool = True,
     run_primient_scrape: bool = True,
+    run_norfolkcrush_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1099,6 +1106,8 @@ def run(
         total += run_bartlett()
     if run_primient_scrape:
         total += run_primient()
+    if run_norfolkcrush_scrape:
+        total += run_norfolkcrush()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:
@@ -1274,6 +1283,10 @@ if __name__ == "__main__":
     primient_group.add_argument("--no-primient", dest="no_primient", action="store_true", help="Skip Primient scrape")
     primient_group.add_argument("--primient-only", dest="primient_only", action="store_true", help="Run Primient scrape only")
 
+    norfolkcrush_group = parser.add_mutually_exclusive_group()
+    norfolkcrush_group.add_argument("--no-norfolkcrush", dest="no_norfolkcrush", action="store_true", help="Skip Norfolk Crush scrape")
+    norfolkcrush_group.add_argument("--norfolkcrush-only", dest="norfolkcrush_only", action="store_true", help="Run Norfolk Crush scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -1366,6 +1379,9 @@ if __name__ == "__main__":
     elif args.primient_only:
         init_db()
         run_primient()
+    elif args.norfolkcrush_only:
+        init_db()
+        run_norfolkcrush()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -1389,5 +1405,6 @@ if __name__ == "__main__":
             run_hppsd_scrape=not args.no_hppsd,
             run_bartlett_scrape=not args.no_bartlett,
             run_primient_scrape=not args.no_primient,
+            run_norfolkcrush_scrape=not args.no_norfolkcrush,
             run_pruning=not args.no_prune,
         )

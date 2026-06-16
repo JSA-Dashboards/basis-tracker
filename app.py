@@ -936,6 +936,33 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
+    if st.button("Scrape Norfolk Crush now", key="norfolkcrush_scrape_btn"):
+        from norfolkcrush_scraper import fetch_norfolkcrush_bids as _fetch_nfc
+        from parsers.norfolkcrush_parser import parse_norfolkcrush_location as _parse_nfc
+        with st.spinner("Fetching Norfolk Crush soybean bids (Norfolk, NE)…"):
+            try:
+                _nfclocs = _fetch_nfc()
+                nfc_rows = 0
+                nfc_locs = 0
+                for _nfcloc in _nfclocs:
+                    _nfcsnap = _parse_nfc(_nfcloc)
+                    if _nfcsnap:
+                        upsert_snapshot(_nfcsnap.model_dump())
+                        nfc_rows += len(_nfcsnap.rows)
+                        nfc_locs += 1
+                st.success(
+                    f"✓ {nfc_locs} location(s) — {nfc_rows} bid row(s) upserted."
+                )
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Norfolk Crush scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#2563eb">python norfolkcrush_scraper.py</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     if st.button("Scrape Bartlett now", key="bartlett_scrape_btn"):
         from bartlett_scraper import fetch_bartlett_bids as _fetch_brt
         from parsers.bartlett_parser import parse_bartlett_location as _parse_brt

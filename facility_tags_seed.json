@@ -1,4 +1,5 @@
 [
+  {"provider": "NorfolkCrush", "location": "Norfolk", "facility_type": "Soy Processing", "state": "NE", "region": "West"},
   {"provider": "Bartlett", "location": "Atchison",              "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
   {"provider": "Bartlett", "location": "Cherryvale",            "facility_type": "Soy Processing",   "state": "KS", "region": "West"},
   {"provider": "Bartlett", "location": "Council Bluffs North",  "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
