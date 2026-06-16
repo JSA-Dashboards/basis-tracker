@@ -85,6 +85,22 @@ from tyson_scraper import fetch_tyson_bids
 from parsers.tyson_parser import parse_tyson_location
 from gpc_scraper import fetch_gpc_bids
 from parsers.gpc_parser import parse_gpc_location
+from zfs_scraper import fetch_zfs_bids
+from parsers.zfs_parser import parse_zfs_location
+from mnsoy_scraper import fetch_mnsoy_bids
+from parsers.mnsoy_parser import parse_mnsoy_location
+from platinum_scraper import fetch_platinum_bids
+from parsers.platinum_parser import parse_platinum_location
+from shellrock_scraper import fetch_shellrock_bids
+from parsers.shellrock_parser import parse_shellrock_location
+from whiteriver_scraper import fetch_whiteriver_bids
+from parsers.whiteriver_parser import parse_whiteriver_location
+from hppsd_scraper import fetch_hppsd_bids
+from parsers.hppsd_parser import parse_hppsd_location
+from bartlett_scraper import fetch_bartlett_bids
+from parsers.bartlett_parser import parse_bartlett_location
+from primient_scraper import fetch_primient_bids
+from parsers.primient_parser import parse_primient_location
 import holidays as _holidays
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -926,6 +942,66 @@ def run_gpc() -> int:
     return total_rows
 
 
+def _run_simple(name: str, fetch_fn, parse_fn) -> int:
+    """Generic runner for fetch → parse → upsert scrapers."""
+    log.info("=" * 60)
+    log.info("%s scrape starting…", name)
+    log.info("=" * 60)
+    try:
+        locs = fetch_fn()
+    except Exception as exc:
+        log.error("%s fetch failed: %s", name, exc)
+        return 0
+    total_rows = 0
+    errors     = 0
+    for loc in locs:
+        try:
+            snap = parse_fn(loc)
+            if not snap:
+                continue
+            upsert_snapshot(snap.model_dump())
+            total_rows += len(snap.rows)
+            log.info("  ✓  %-34s  %d row(s)", snap.location, len(snap.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s", exc)
+    log.info("-" * 60)
+    log.info("%s done: %d row(s)  |  %d error(s)", name, total_rows, errors)
+    return total_rows
+
+
+def run_zfs() -> int:
+    return _run_simple("ZFS", fetch_zfs_bids, parse_zfs_location)
+
+
+def run_mnsp() -> int:
+    return _run_simple("MNSP", fetch_mnsoy_bids, parse_mnsoy_location)
+
+
+def run_platinum() -> int:
+    return _run_simple("Platinum", fetch_platinum_bids, parse_platinum_location)
+
+
+def run_shellrock() -> int:
+    return _run_simple("Shell Rock", fetch_shellrock_bids, parse_shellrock_location)
+
+
+def run_whiteriver() -> int:
+    return _run_simple("White River", fetch_whiteriver_bids, parse_whiteriver_location)
+
+
+def run_hppsd() -> int:
+    return _run_simple("HPPSD", fetch_hppsd_bids, parse_hppsd_location)
+
+
+def run_bartlett() -> int:
+    return _run_simple("Bartlett", fetch_bartlett_bids, parse_bartlett_location)
+
+
+def run_primient() -> int:
+    return _run_simple("Primient", fetch_primient_bids, parse_primient_location)
+
+
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -964,6 +1040,14 @@ def run(
     run_ldc_scrape: bool = True,
     run_tyson_scrape: bool = True,
     run_gpc_scrape: bool = True,
+    run_zfs_scrape: bool = True,
+    run_mnsp_scrape: bool = True,
+    run_platinum_scrape: bool = True,
+    run_shellrock_scrape: bool = True,
+    run_whiteriver_scrape: bool = True,
+    run_hppsd_scrape: bool = True,
+    run_bartlett_scrape: bool = True,
+    run_primient_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -999,6 +1083,22 @@ def run(
         total += run_tyson()
     if run_gpc_scrape:
         total += run_gpc()
+    if run_zfs_scrape:
+        total += run_zfs()
+    if run_mnsp_scrape:
+        total += run_mnsp()
+    if run_platinum_scrape:
+        total += run_platinum()
+    if run_shellrock_scrape:
+        total += run_shellrock()
+    if run_whiteriver_scrape:
+        total += run_whiteriver()
+    if run_hppsd_scrape:
+        total += run_hppsd()
+    if run_bartlett_scrape:
+        total += run_bartlett()
+    if run_primient_scrape:
+        total += run_primient()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:
@@ -1142,6 +1242,38 @@ if __name__ == "__main__":
         help="Run GPC scrape only — skip everything else",
     )
 
+    zfs_group = parser.add_mutually_exclusive_group()
+    zfs_group.add_argument("--no-zfs", dest="no_zfs", action="store_true", help="Skip ZFS scrape")
+    zfs_group.add_argument("--zfs-only", dest="zfs_only", action="store_true", help="Run ZFS scrape only")
+
+    mnsp_group = parser.add_mutually_exclusive_group()
+    mnsp_group.add_argument("--no-mnsp", dest="no_mnsp", action="store_true", help="Skip MNSP scrape")
+    mnsp_group.add_argument("--mnsp-only", dest="mnsp_only", action="store_true", help="Run MNSP scrape only")
+
+    platinum_group = parser.add_mutually_exclusive_group()
+    platinum_group.add_argument("--no-platinum", dest="no_platinum", action="store_true", help="Skip Platinum scrape")
+    platinum_group.add_argument("--platinum-only", dest="platinum_only", action="store_true", help="Run Platinum scrape only")
+
+    shellrock_group = parser.add_mutually_exclusive_group()
+    shellrock_group.add_argument("--no-shellrock", dest="no_shellrock", action="store_true", help="Skip Shell Rock scrape")
+    shellrock_group.add_argument("--shellrock-only", dest="shellrock_only", action="store_true", help="Run Shell Rock scrape only")
+
+    whiteriver_group = parser.add_mutually_exclusive_group()
+    whiteriver_group.add_argument("--no-whiteriver", dest="no_whiteriver", action="store_true", help="Skip White River scrape")
+    whiteriver_group.add_argument("--whiteriver-only", dest="whiteriver_only", action="store_true", help="Run White River scrape only")
+
+    hppsd_group = parser.add_mutually_exclusive_group()
+    hppsd_group.add_argument("--no-hppsd", dest="no_hppsd", action="store_true", help="Skip HPPSD scrape")
+    hppsd_group.add_argument("--hppsd-only", dest="hppsd_only", action="store_true", help="Run HPPSD scrape only")
+
+    bartlett_group = parser.add_mutually_exclusive_group()
+    bartlett_group.add_argument("--no-bartlett", dest="no_bartlett", action="store_true", help="Skip Bartlett scrape")
+    bartlett_group.add_argument("--bartlett-only", dest="bartlett_only", action="store_true", help="Run Bartlett scrape only")
+
+    primient_group = parser.add_mutually_exclusive_group()
+    primient_group.add_argument("--no-primient", dest="no_primient", action="store_true", help="Skip Primient scrape")
+    primient_group.add_argument("--primient-only", dest="primient_only", action="store_true", help="Run Primient scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -1210,6 +1342,30 @@ if __name__ == "__main__":
     elif args.gpc_only:
         init_db()
         run_gpc()
+    elif args.zfs_only:
+        init_db()
+        run_zfs()
+    elif args.mnsp_only:
+        init_db()
+        run_mnsp()
+    elif args.platinum_only:
+        init_db()
+        run_platinum()
+    elif args.shellrock_only:
+        init_db()
+        run_shellrock()
+    elif args.whiteriver_only:
+        init_db()
+        run_whiteriver()
+    elif args.hppsd_only:
+        init_db()
+        run_hppsd()
+    elif args.bartlett_only:
+        init_db()
+        run_bartlett()
+    elif args.primient_only:
+        init_db()
+        run_primient()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -1225,5 +1381,13 @@ if __name__ == "__main__":
             run_ldc_scrape=not args.no_ldc,
             run_tyson_scrape=not args.no_tyson,
             run_gpc_scrape=not args.no_gpc,
+            run_zfs_scrape=not args.no_zfs,
+            run_mnsp_scrape=not args.no_mnsp,
+            run_platinum_scrape=not args.no_platinum,
+            run_shellrock_scrape=not args.no_shellrock,
+            run_whiteriver_scrape=not args.no_whiteriver,
+            run_hppsd_scrape=not args.no_hppsd,
+            run_bartlett_scrape=not args.no_bartlett,
+            run_primient_scrape=not args.no_primient,
             run_pruning=not args.no_prune,
         )
