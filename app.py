@@ -104,7 +104,7 @@ def _build_grains(rows) -> list[str]:
 
 # ── Location config ───────────────────────────────────────────────────────────
 LOCATIONS = [
-    {"provider": "ADM", "key": "ADM Decatur",     "label": "Decatur",     "grains": ["Corn","Soybeans"],        "color": "#3b82f6"},
+    {"provider": "ADM", "key": "ADM Decatur",     "label": "Decatur",     "grains": ["Corn","Soybeans"],        "color": "#0693e3"},
     {"provider": "ADM", "key": "ADM Cedar Rapids", "label": "Cedar Rapids", "grains": ["Corn"],                  "color": "#22c55e"},
     {"provider": "ADM", "key": "ADM St. Louis",   "label": "St. Louis",   "grains": ["Corn","Soybeans","Wheat"], "color": "#a78bfa"},
 ]
@@ -115,7 +115,7 @@ ROLL_ADJ = [
 ]
 
 _PROVIDER_COLOR: dict[str, str] = {
-    "ADM":       "#3b82f6",
+    "ADM":       "#0693e3",
     "CHS":       "#16a34a",
     "POET":      "#f97316",
     "CGB":       "#8b5cf6",
@@ -125,7 +125,7 @@ _PROVIDER_COLOR: dict[str, str] = {
     "Bunge":     "#dc2626",
     "Scoular":   "#f97316",
     "AGP":       "#22c55e",
-    "LDC":       "#3b82f6",
+    "LDC":       "#0693e3",
     "Tyson":     "#6b7280",
     "GPC":       "#10b981",
 }
@@ -334,9 +334,9 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'letter-spacing:.15em;font-weight:700;margin-bottom:2px">SPOT</div>'
             f'<div style="color:#0f172a;font-weight:800">{spot_row.deliveryMonth}</div></td>'
             f'<td style="{td_base}"><span style="background:#dbeafe;border:1px solid {loc_color};'
-            f'color:#1d4ed8;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:800">'
+            f'color:#0578bd;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:800">'
             f'{spot_row.futuresSymbol}</span></td>'
-            f'<td style="{td_base};color:#2563eb;font-size:11px">{short_sym(spot_row.futuresSymbol)}</td>'
+            f'<td style="{td_base};color:#0693e3;font-size:11px">{short_sym(spot_row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{color};font-weight:800;font-size:16px;'
             f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal)}</span></td>'
             f'<td style="{td_base}">{delta_html(chgs.get("fromPrev"), is_meal)}</td>'
@@ -361,7 +361,7 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'<tr style="background:{bg}">'
             f'<td style="{td_base};color:#1e293b;font-weight:700">{row.deliveryMonth}{dot}</td>'
             f'<td style="{td_base}"><span style="background:#eff6ff;border:1px solid #bfdbfe;'
-            f'color:#1d4ed8;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:700">'
+            f'color:#0578bd;padding:2px 7px;border-radius:3px;font-size:11px;font-weight:700">'
             f'{row.futuresSymbol}</span></td>'
             f'<td style="{td_base};color:#64748b;font-size:11px">{short_sym(row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{bc_color};font-weight:800;font-size:15px;'
@@ -379,20 +379,26 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
 # ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700;800&display=swap');
-  html, body, [class*="css"] { font-family: 'IBM Plex Mono', monospace !important; }
+  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+  /* JPSI brand sans-serif everywhere (overrides inline mono); tabular figures keep
+     basis numbers aligned in the data tables. */
+  html, body, [class*="css"], .stApp, button, input, select, textarea,
+  table, td, th, .stMarkdown, [data-testid="stMetricValue"] {
+    font-family: 'Open Sans', system-ui, -apple-system, sans-serif !important; }
+  table td, table th { font-variant-numeric: tabular-nums; }
   /* Hide Streamlit's fixed header so it doesn't overlap content */
   header[data-testid="stHeader"] { display: none !important; }
   #MainMenu { visibility: hidden !important; }
   footer { visibility: hidden !important; }
   .block-container { padding-top: 0.75rem !important; padding-bottom: 1rem !important; }
   div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
-  button[kind="secondary"] { font-family: 'IBM Plex Mono', monospace !important; }
+  a { color: #0693e3; }
+  /* Tabs — JPSI blue active indicator */
   .stTabs [data-baseweb="tab-list"] { gap: 0; background: #ffffff; border-bottom: 1px solid #e2e8f0; }
-  .stTabs [data-baseweb="tab"] { color: #64748b; font-size: 12px; padding: 8px 18px;
-    font-family: 'IBM Plex Mono', monospace; border-radius: 0; }
-  .stTabs [aria-selected="true"] { color: #2563eb !important; font-weight: 700 !important;
-    border-bottom: 2px solid #2563eb !important; }
+  .stTabs [data-baseweb="tab"] { color: #5b6470; font-size: 13px; padding: 8px 18px;
+    font-weight: 600; border-radius: 0; }
+  .stTabs [aria-selected="true"] { color: #0693e3 !important; font-weight: 700 !important;
+    border-bottom: 3px solid #0693e3 !important; }
   .stTabs [data-baseweb="tab-panel"] { padding-top: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -423,7 +429,7 @@ with st.sidebar:
                 st.error(f"ADM scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --adm-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --adm-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -453,7 +459,7 @@ with st.sidebar:
                 st.error(f"POET scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --poet-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --poet-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -480,7 +486,7 @@ with st.sidebar:
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
         'Both run automatically at 3:45 PM daily.<br>'
-        'CLI: <code style="color:#2563eb">python auto_import.py --chs-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --chs-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -513,7 +519,7 @@ with st.sidebar:
                 st.error(f"CGB scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --cgb-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --cgb-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -548,7 +554,7 @@ with st.sidebar:
                 st.error(f"Cargill scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --cargill-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --cargill-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -583,7 +589,7 @@ with st.sidebar:
                 st.error(f"Bunge scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --bunge-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --bunge-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -618,7 +624,7 @@ with st.sidebar:
                 st.error(f"Andersons scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --andersons-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --andersons-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -653,7 +659,7 @@ with st.sidebar:
                 st.error(f"Scoular scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --scoular-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --scoular-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -688,7 +694,7 @@ with st.sidebar:
                 st.error(f"LDC scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --ldc-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --ldc-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -723,7 +729,7 @@ with st.sidebar:
                 st.error(f"AGP scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --agp-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --agp-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -752,7 +758,7 @@ with st.sidebar:
                 st.error(f"GPRE scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python auto_import.py --gpre-only</code>'
+        'CLI: <code style="color:#0693e3">python auto_import.py --gpre-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -779,7 +785,7 @@ with st.sidebar:
                 st.error(f"ZFS scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python zfs_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python zfs_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -806,7 +812,7 @@ with st.sidebar:
                 st.error(f"MNSP scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python mnsoy_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python mnsoy_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -833,7 +839,7 @@ with st.sidebar:
                 st.error(f"Primient scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python primient_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python primient_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -860,7 +866,7 @@ with st.sidebar:
                 st.error(f"Platinum scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python platinum_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python platinum_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -887,7 +893,7 @@ with st.sidebar:
                 st.error(f"Shell Rock scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python shellrock_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python shellrock_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -914,7 +920,7 @@ with st.sidebar:
                 st.error(f"White River scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python whiteriver_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python whiteriver_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -941,7 +947,7 @@ with st.sidebar:
                 st.error(f"HPPSD scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python hppsd_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python hppsd_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -968,7 +974,7 @@ with st.sidebar:
                 st.error(f"Norfolk Crush scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python norfolkcrush_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python norfolkcrush_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -995,22 +1001,34 @@ with st.sidebar:
                 st.error(f"Bartlett scrape failed: {_exc}")
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-        'CLI: <code style="color:#2563eb">python bartlett_scraper.py</code>'
+        'CLI: <code style="color:#0693e3">python bartlett_scraper.py</code>'
         '</div>',
         unsafe_allow_html=True,
     )
 
 # ── Header ────────────────────────────────────────────────────────────────────
-st.markdown("""
-<div style="margin-bottom:4px">
-  <div style="font-size:9px;color:#1d4ed8;letter-spacing:.2em;text-transform:uppercase;
-    font-weight:700">JPSI · Cash Grain Basis Monitor</div>
-  <div style="font-size:22px;font-weight:800;color:#0f172a;letter-spacing:-.03em;
-    line-height:1.2">Basis Tracker</div>
+# ── Branded header (JPSI / John Stewart & Associates) ────────────────────────
+import base64 as _b64
+from pathlib import Path as _Path
+_hdr_logo = _Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+_hdr_logo_img = ""
+if _hdr_logo.exists():
+    _hdr_logo_uri = "data:image/png;base64," + _b64.b64encode(_hdr_logo.read_bytes()).decode()
+    _hdr_logo_img = (f'<img src="{_hdr_logo_uri}" alt="John Stewart &amp; Associates" '
+                     f'style="height:50px;display:block">')
+
+st.markdown(f"""
+<div style="display:flex;align-items:center;gap:18px;padding:8px 2px 12px;
+     border-bottom:3px solid #0693e3;margin-bottom:12px">
+  {_hdr_logo_img}
+  <div style="line-height:1.15">
+    <div style="font-size:10px;color:#0693e3;letter-spacing:.16em;text-transform:uppercase;
+      font-weight:700">Commodity &amp; Ag Risk Management Specialists</div>
+    <div style="font-size:24px;font-weight:800;color:#32373c;letter-spacing:-.02em">
+      Cash Grain Basis Tracker</div>
+  </div>
 </div>
 """, unsafe_allow_html=True)
-
-st.markdown("---")
 
 
 # ══ Location-type trend stats (used by the Trends tab) ═══════════════════════
@@ -1166,7 +1184,7 @@ def render_trend_cards(rows, group_field, groups) -> str:
             "border-bottom:2px solid #e2e8f0;text-align:right;white-space:nowrap")
     THL  = TH.replace("text-align:right", "text-align:left")
     CARD = "background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px 6px 6px"
-    TTL  = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:800;color:#1e3a5f;"
+    TTL  = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:800;color:#32373c;"
             "text-transform:uppercase;letter-spacing:.08em;padding:4px 10px 6px")
 
     def _col(txt, v):
@@ -1427,7 +1445,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No CHS data yet.<br><br>'
-                'Run <code style="color:#2563eb">python auto_import.py --chs-only</code> '
+                'Run <code style="color:#0693e3">python auto_import.py --chs-only</code> '
                 'to scrape all CHS locations, then refresh this page.'
                 '</div>',
                 unsafe_allow_html=True,
@@ -1502,7 +1520,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No POET data yet.<br><br>'
-                'Run <code style="color:#2563eb">python auto_import.py --poet-only</code> '
+                'Run <code style="color:#0693e3">python auto_import.py --poet-only</code> '
                 'to scrape all 36 POET Gradable locations, then refresh this page.'
                 '</div>',
                 unsafe_allow_html=True,
@@ -1532,7 +1550,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No ADM data yet.<br><br>'
                 'Click <b>Scrape ADM now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --adm-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --adm-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1543,7 +1561,7 @@ with tab_bids:
             key="adm_loc_select", label_visibility="collapsed",
         )
         loc_key   = sel_adm_loc
-        loc_color = "#3b82f6"   # blue for ADM
+        loc_color = "#0693e3"   # blue for ADM
         _adm_snaps = _cached_get_snapshots("ADM", loc_key)
         if _adm_snaps:
             grains = _build_grains(_adm_snaps[-1].rows)
@@ -1559,7 +1577,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No CGB data yet.<br><br>'
                 'Click <b>Scrape CGB now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --cgb-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --cgb-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1609,7 +1627,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No GPRE data yet.<br><br>'
                 'Click <b>Scrape GPRE now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --gpre-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --gpre-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1632,7 +1650,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Cargill data yet.<br><br>'
                 'Click <b>Scrape Cargill now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --cargill-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --cargill-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1682,7 +1700,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Andersons data yet.<br><br>'
                 'Click <b>Scrape Andersons now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --andersons-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --andersons-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1732,7 +1750,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Bunge data yet.<br><br>'
                 'Click <b>Scrape Bunge now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --bunge-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --bunge-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1782,7 +1800,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Scoular data yet.<br><br>'
                 'Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --scoular-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --scoular-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1832,7 +1850,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No AGP data yet.<br><br>'
                 'Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --agp-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --agp-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1881,7 +1899,7 @@ with tab_bids:
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No LDC data yet.<br><br>'
                 'Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
-                '<code style="color:#2563eb">python auto_import.py --ldc-only</code>'
+                '<code style="color:#0693e3">python auto_import.py --ldc-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
             )
@@ -1914,7 +1932,7 @@ with tab_bids:
                 key="ldc_loc_select", label_visibility="collapsed",
             )
         loc_key   = sel_ldc_loc
-        loc_color = "#3b82f6"   # blue for LDC
+        loc_color = "#0693e3"   # blue for LDC
         _ldc_snaps = _cached_get_snapshots("LDC", loc_key)
         if _ldc_snaps:
             grains = _build_grains(_ldc_snaps[-1].rows)
@@ -1944,27 +1962,27 @@ with tab_bids:
     if not snapshots:
         _p = provider
         if _p == "POET":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --poet-only</code> to scrape this location, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --poet-only</code> to scrape this location, then refresh.'
         elif _p == "ADM":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --adm-only</code> or click <b>Scrape ADM now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --adm-only</code> or click <b>Scrape ADM now</b> in the sidebar, then refresh.'
         elif _p == "CGB":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --cgb-only</code> or click <b>Scrape CGB now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --cgb-only</code> or click <b>Scrape CGB now</b> in the sidebar, then refresh.'
         elif _p == "CHS":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --chs-only</code> or click <b>Scrape CHS now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --chs-only</code> or click <b>Scrape CHS now</b> in the sidebar, then refresh.'
         elif _p == "Cargill":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --cargill-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --cargill-only</code>, then refresh.'
         elif _p == "GPRE":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --gpre-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --gpre-only</code>, then refresh.'
         elif _p == "Andersons":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --andersons-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --andersons-only</code>, then refresh.'
         elif _p == "Bunge":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --bunge-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --bunge-only</code>, then refresh.'
         elif _p == "Scoular":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --scoular-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --scoular-only</code>, then refresh.'
         elif _p == "AGP":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --agp-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --agp-only</code>, then refresh.'
         elif _p == "LDC":
-            hint = 'Run <code style="color:#2563eb">python auto_import.py --ldc-only</code>, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --ldc-only</code>, then refresh.'
         else:
             hint = "Run the daily scraper to populate data for this location."
         st.markdown(
@@ -2019,7 +2037,7 @@ with tab_bids:
         with s_col2:
             st.markdown(
                 f'<span style="color:#64748b;font-size:10px">as of '
-                f'<span style="color:#2563eb;font-weight:700">{latest_label}</span></span>',
+                f'<span style="color:#0693e3;font-weight:700">{latest_label}</span></span>',
                 unsafe_allow_html=True)
 
         # Year-ago label for header
@@ -2046,7 +2064,7 @@ with tab_bids:
 
         # Roll adjustment legend
         roll_parts = " &nbsp;|&nbsp; ".join(
-            f'<span style="color:#2563eb">{r["from"]}->{r["to"]}</span>'
+            f'<span style="color:#0693e3">{r["from"]}->{r["to"]}</span>'
             f' {r["adj"]}c' for r in ROLL_ADJ)
         st.markdown(
             f'<div style="margin-top:8px;padding:8px 14px;background:#f8fafc;'
@@ -2334,7 +2352,7 @@ with tab_map:
         st.markdown(
             '<div style="color:#64748b;text-align:center;padding:60px;font-size:12px">'
             'No geocoded locations yet.<br><br>'
-            'Run <code style="color:#2563eb">python geocode_locations.py</code> '
+            'Run <code style="color:#0693e3">python geocode_locations.py</code> '
             'to populate coordinates, then refresh.</div>',
             unsafe_allow_html=True,
         )
@@ -2787,7 +2805,7 @@ with tab_summary:
             st.markdown(
                 f'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;'
                 f'color:#64748b;padding:6px 0 10px 0">'
-                f'Reference: <span style="color:#2563eb;font-weight:700">{_ref_disp}</span>'
+                f'Reference: <span style="color:#0693e3;font-weight:700">{_ref_disp}</span>'
                 f'&nbsp;&nbsp;·&nbsp;&nbsp;'
                 f'Grain: <span style="font-weight:700;color:#0f172a">{_sgrain}</span>'
                 f'&nbsp;&nbsp;·&nbsp;&nbsp;'
@@ -2985,7 +3003,7 @@ with tab_summary:
             _SC_CARD = ("background:#fff;border:1px solid #e2e8f0;border-radius:6px;"
                         "padding:4px 6px 6px 6px")
             _SC_TITLE = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:800;"
-                         "color:#1e3a5f;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px 6px")
+                         "color:#32373c;text-transform:uppercase;letter-spacing:.08em;padding:4px 10px 6px")
 
             def _colored(txt, v, good_pos=True):
                 if v is None or v == 0:
@@ -3168,7 +3186,7 @@ with tab_summary:
             )
             for lbl, _ in _COL_META:
                 bdr = ";border-left:1px solid #e2e8f0" if lbl in ("yr_ago", "current") else ""
-                h  += (f'<th style="{_TH_R}{bdr};font-weight:700;color:#2563eb;'
+                h  += (f'<th style="{_TH_R}{bdr};font-weight:700;color:#0693e3;'
                        f'font-size:9px;letter-spacing:0">{_csyms[lbl]}</th>')
             h += (
                 f'<th colspan="4" style="{_TH_R};border-left:1px solid #e2e8f0;'
@@ -3213,7 +3231,7 @@ with tab_summary:
 
             def _index_tr(label: str, agg: dict, region_level: bool) -> str:
                 bg     = "#eef2ff" if region_level else "#f8fafc"
-                lab_c  = "#1e3a5f" if region_level else "#475569"
+                lab_c  = "#32373c" if region_level else "#475569"
                 fw     = "800" if region_level else "700"
                 pad    = "" if region_level else "padding-left:22px;"
                 tr  = f'<tr style="background:{bg}">'
@@ -3281,7 +3299,7 @@ with tab_summary:
                 _loc_disp = (adm_city_from_name(r["location"])
                              if r["provider"] == "ADM" else r["location"])
                 h += f'<td style="{_TD_L};color:#64748b;font-size:10px">{r.get("region") or ""}</td>'
-                h += f'<td style="{_TD_L};font-weight:700;color:#1e3a5f">{r["provider"]}</td>'
+                h += f'<td style="{_TD_L};font-weight:700;color:#32373c">{r["provider"]}</td>'
                 h += f'<td style="{_TD_L}">{_loc_disp}</td>'
                 h += f'<td style="{_TD_R};color:#64748b">{r["state"]}</td>'
 

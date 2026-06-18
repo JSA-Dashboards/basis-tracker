@@ -1,10 +1,11 @@
+# JPSI brand theme (jpsi.com): dark #32373c, blue #0693e3
 [theme]
 base = "light"
 backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f8fafc"
-primaryColor = "#2563eb"
-textColor = "#0f172a"
-font = "monospace"
+secondaryBackgroundColor = "#eef4f8"
+primaryColor = "#0693e3"
+textColor = "#32373c"
+font = "sans serif"
 
 [server]
 headless = true
