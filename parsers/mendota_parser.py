@@ -28,7 +28,7 @@ GRAIN_CODE = {'Corn':'ZC','Soybeans':'ZS','Wheat':'ZW'}
 GRAIN_PFX  = {'Corn':'CN','Soybeans':'SB','Wheat':'WH'}
 
 # ── Which column group (0-based) maps to which location ──────────────────────
-CORN_LOC  = {0:'Mendota BN Rail', 2:'Ottawa', 6:'Havana', 7:'Burlington', 8:'Clinton Proc'}
+CORN_LOC  = {2:'Ottawa', 6:'Havana', 7:'Burlington', 8:'Clinton Proc'}  # col 0 (BN Rail) dropped
 BEAN_LOC  = {1:'Ottawa', 6:'Havana', 7:'Burlington'}
 WHEAT_LOC = {0:'Mendota Mill'}
 

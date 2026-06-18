@@ -643,11 +643,12 @@ def get_all_location_meta() -> list[dict]:
 
 def get_map_data() -> list[dict]:
     """
-    Return one dict per (provider, location) with lat/lon and latest basis by canonical grain.
+    Return one dict per (provider, location) with lat/lon, metadata, and the full
+    set of latest forward bids (per grain & delivery month) for the map tab.
 
     Shape:
-        [{"provider", "location", "state", "lat", "lon",
-          "grains": {"Corn": -12, "Soybeans": 45, "Wheat (HRS)": 30, ...}}, ...]
+        [{"provider", "location", "state", "facility_type", "region", "lat", "lon",
+          "bids": [{"grain", "delivery_month", "futures_symbol", "basis"}, ...]}, ...]
 
     Only locations with known lat/lon are included. Inactive grains are excluded.
     Raw grains are normalized to canonical display names via the grain_map table.
@@ -669,8 +670,9 @@ def get_map_data() -> list[dict]:
                 lm.region,
                 lm.lat,
                 lm.lon,
-                lm.delivery_zone,
                 r.grain,
+                r.delivery_month,
+                r.futures_symbol,
                 r.basis_cents
             FROM latest l
             JOIN snapshots s       ON s.id  = l.snap_id
@@ -680,7 +682,7 @@ def get_map_data() -> list[dict]:
             WHERE r.is_spot = 0
               AND lm.lat IS NOT NULL
               AND lm.lon IS NOT NULL
-            ORDER BY s.provider, s.location, r.grain
+            ORDER BY s.provider, s.location
         """)
         rows = c.fetchall()
         # Load grain map for normalization
@@ -707,7 +709,7 @@ def get_map_data() -> list[dict]:
             return f"{base} ({cls} {prot})" if prot else f"{base} ({cls})"
         return base
 
-    # Group grain rows into per-location dicts
+    # Group bid rows into per-location dicts
     locs: dict[tuple, dict] = {}
     for row in rows:
         key = (row["provider"], row["location"])
@@ -718,15 +720,19 @@ def get_map_data() -> list[dict]:
                 "state":         row["state"]         or "",
                 "facility_type": row["facility_type"] or "",
                 "region":        row["region"]        or "",
-                "delivery_zone": row["delivery_zone"] or "",
                 "lat":           row["lat"],
                 "lon":           row["lon"],
-                "grains":        {},
+                "bids":          [],
             }
         if row["basis_cents"] is not None:
             canon = _canonical(row["grain"])
-            if canon and canon not in locs[key]["grains"]:
-                locs[key]["grains"][canon] = row["basis_cents"]
+            if canon:
+                locs[key]["bids"].append({
+                    "grain":          canon,
+                    "delivery_month": row["delivery_month"] or "",
+                    "futures_symbol": row["futures_symbol"] or "",
+                    "basis":          row["basis_cents"],
+                })
 
     return list(locs.values())
 
@@ -758,13 +764,43 @@ def get_bids_filter_data() -> list[dict]:
             SELECT DISTINCT s.provider, s.location,
                    COALESCE(lm.state, '')         AS state,
                    COALESCE(lm.facility_type, '') AS facility_type,
-                   COALESCE(lm.region, '')        AS region
+                   COALESCE(lm.region, '')        AS region,
+                   lm.lat AS lat, lm.lon AS lon
             FROM snapshots s
             LEFT JOIN location_meta lm
                 ON lm.provider = s.provider AND lm.location = s.location
             ORDER BY s.provider, s.location
         """)
         return [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
+def grain_counts_by_facility(days: int = 21) -> list[tuple]:
+    """
+    Count recent (web) bid rows by (facility_type, grain).
+
+    Used to default the Summary tab's grain to whichever commodity has the most
+    bids for the selected location type. Returns [(facility_type, grain, n), …].
+    """
+    from datetime import datetime, timedelta
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00")
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""
+            SELECT lm.facility_type AS ft, r.grain AS grain, COUNT(*) AS n
+            FROM snapshots s
+            JOIN snapshot_rows r ON r.snapshot_id = s.id
+            JOIN location_meta lm
+                ON lm.provider = s.provider AND lm.location = s.location
+            WHERE s.source = 'web'
+              AND s.timestamp >= {ph}
+              AND lm.facility_type IS NOT NULL AND lm.facility_type <> ''
+            GROUP BY lm.facility_type, r.grain
+        """, (cutoff,))
+        return [(r["ft"], r["grain"], r["n"]) for r in c.fetchall()]
     finally:
         conn.close()
 

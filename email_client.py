@@ -11,7 +11,7 @@ import msal
 import httpx
 
 from parsers.adm_parser import parse_adm_email
-from parsers.mendota_parser import parse_mendota_email
+from models import ParsedSnapshot
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 SCOPES     = ["Mail.Read"]
@@ -429,7 +429,10 @@ def parse_email(client_id, tenant_id, email_id: str, provider: str):
     subject  = meta.get("subject", "")
     received = meta.get("receivedDateTime", "")
 
-    if provider == "ADM":
-        return parse_adm_email(email_id, subject, received, pdf_bytes, html_body)
-    else:
-        return parse_mendota_email(email_id, subject, received, pdf_bytes, html_body)
+    if provider == "Mendota":
+        # Mendota locations dropped — skip importing these emails entirely.
+        return ParsedSnapshot(
+            emailId=email_id, emailSubject=subject, emailDate=received,
+            provider="Mendota", snapshots=[], needsReview=False,
+            parseError="Mendota import disabled.")
+    return parse_adm_email(email_id, subject, received, pdf_bytes, html_body)

@@ -35,3 +35,9 @@ playwright/.local-browsers/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ── Local-only data / scratch ─────────────────────────────────────────────
+history/
+assets/
+_ldc_probe*.py
+_watch_*.py

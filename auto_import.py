@@ -103,6 +103,11 @@ from primient_scraper import fetch_primient_bids
 from parsers.primient_parser import parse_primient_location
 from norfolkcrush_scraper import fetch_norfolkcrush_bids
 from parsers.norfolkcrush_parser import parse_norfolkcrush_location
+from ndsp_scraper import fetch_ndsp_bids
+from parsers.ndsp_parser import parse_ndsp_location
+from sdsp_scraper import fetch_sdsp_bids
+from parsers.sdsp_parser import parse_sdsp_location
+from adm_names import adm_state_from_name
 import holidays as _holidays
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -221,11 +226,18 @@ def run_adm() -> int:
     errors         = 0
     skipped        = 0
 
+    # ADM locations to drop (e.g. Canadian sites priced in CAD → bogus basis).
+    _ADM_SKIP = {"Windsor, ON"}
+
     for item in raw_results:
         market_id        = item["market_id"]
         display_name     = item["display_name"]
         instruments_data = item["instruments_data"]
         timestamp        = item["timestamp"]
+
+        if display_name in _ADM_SKIP:
+            skipped += 1
+            continue
 
         if not instruments_data.get("instruments"):
             skipped += 1
@@ -240,6 +252,10 @@ def run_adm() -> int:
                 continue
 
             upsert_snapshot(snap_req.model_dump())
+            # Persist state parsed from the ADM name (e.g. "Decatur, IL …" → IL)
+            _adm_state = adm_state_from_name(snap_req.location)
+            if _adm_state:
+                upsert_location_meta("ADM", snap_req.location, state=_adm_state)
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-45s  %d row(s)", display_name, len(snap_req.rows))
@@ -1008,6 +1024,14 @@ def run_norfolkcrush() -> int:
     return _run_simple("NorfolkCrush", fetch_norfolkcrush_bids, parse_norfolkcrush_location)
 
 
+def run_ndsp() -> int:
+    return _run_simple("NDSP", fetch_ndsp_bids, parse_ndsp_location)
+
+
+def run_sdsp() -> int:
+    return _run_simple("SDSP", fetch_sdsp_bids, parse_sdsp_location)
+
+
 def run_prune() -> None:
     """
     Apply tiered data retention (runs automatically every Monday).
@@ -1055,6 +1079,8 @@ def run(
     run_bartlett_scrape: bool = True,
     run_primient_scrape: bool = True,
     run_norfolkcrush_scrape: bool = True,
+    run_ndsp_scrape: bool = True,
+    run_sdsp_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1108,6 +1134,10 @@ def run(
         total += run_primient()
     if run_norfolkcrush_scrape:
         total += run_norfolkcrush()
+    if run_ndsp_scrape:
+        total += run_ndsp()
+    if run_sdsp_scrape:
+        total += run_sdsp()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:
@@ -1287,6 +1317,14 @@ if __name__ == "__main__":
     norfolkcrush_group.add_argument("--no-norfolkcrush", dest="no_norfolkcrush", action="store_true", help="Skip Norfolk Crush scrape")
     norfolkcrush_group.add_argument("--norfolkcrush-only", dest="norfolkcrush_only", action="store_true", help="Run Norfolk Crush scrape only")
 
+    ndsp_group = parser.add_mutually_exclusive_group()
+    ndsp_group.add_argument("--no-ndsp", dest="no_ndsp", action="store_true", help="Skip NDSP Casselton scrape")
+    ndsp_group.add_argument("--ndsp-only", dest="ndsp_only", action="store_true", help="Run NDSP Casselton scrape only")
+
+    sdsp_group = parser.add_mutually_exclusive_group()
+    sdsp_group.add_argument("--no-sdsp", dest="no_sdsp", action="store_true", help="Skip SDSP Volga scrape")
+    sdsp_group.add_argument("--sdsp-only", dest="sdsp_only", action="store_true", help="Run SDSP Volga scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -1382,6 +1420,12 @@ if __name__ == "__main__":
     elif args.norfolkcrush_only:
         init_db()
         run_norfolkcrush()
+    elif args.ndsp_only:
+        init_db()
+        run_ndsp()
+    elif args.sdsp_only:
+        init_db()
+        run_sdsp()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -1406,5 +1450,7 @@ if __name__ == "__main__":
             run_bartlett_scrape=not args.no_bartlett,
             run_primient_scrape=not args.no_primient,
             run_norfolkcrush_scrape=not args.no_norfolkcrush,
+            run_ndsp_scrape=not args.no_ndsp,
+            run_sdsp_scrape=not args.no_sdsp,
             run_pruning=not args.no_prune,
         )

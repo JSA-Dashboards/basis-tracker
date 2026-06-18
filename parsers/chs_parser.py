@@ -25,8 +25,24 @@ GRAIN_PREFIX: dict[str, str] = {
     "Wheat":    "WH",
 }
 
-# Skip pseudo-locations that aren't real elevators
-SKIP_LOCATION_NAMES = {"futures-only"}
+# Skip pseudo-locations that aren't real elevators, plus CHS delivery points
+# named after other companies' plants that we track via their own provider
+# (e.g. ADM Clinton, GPC Muscatine) so we don't duplicate them.
+SKIP_LOCATION_NAMES = {"futures-only", "adm clinton", "gpc muscatine",
+                       "ottawa river mkt", "adm cedar rapids"}
+
+# AGP plant delivery points sometimes appear in the CHS feed. We track AGP via
+# the AGP company website instead, so drop any CHS location that is an AGP plant.
+def _is_agp_location(name: str) -> bool:
+    return name.strip().lower().startswith("agp")
+
+# Some CHS feed locations share a display name (two distinct "Morris" UUIDs —
+# Morris, IL on the Illinois River vs Morris, MN). The feed exposes no state, so
+# map their stable UUIDs to disambiguated names to keep their bids separate.
+LOCATION_ID_OVERRIDES = {
+    "8df590fd-be6a-4bef-8c61-e2684c7e2663": "Morris, IL",
+    "6f7e42d6-398c-40ea-a1a9-aa5053b20b11": "Morris, MN",
+}
 
 
 def _basis_to_cents(value_str: str) -> Optional[int]:
@@ -67,7 +83,7 @@ def parse_bids_response(
 
     for loc in bids_data.get("locations", []):
         loc_id   = loc.get("id", "")
-        loc_name = loc.get("name", "").strip()
+        loc_name = LOCATION_ID_OVERRIDES.get(loc_id, loc.get("name", "").strip())
 
         # Apply Illinois filter
         if location_ids and loc_id not in location_ids:
@@ -75,6 +91,10 @@ def parse_bids_response(
 
         # Skip pseudo-locations
         if loc_name.lower() in SKIP_LOCATION_NAMES:
+            continue
+
+        # Skip AGP plant delivery points — use AGP website bids instead
+        if _is_agp_location(loc_name):
             continue
 
         for group in loc.get("groups", []):

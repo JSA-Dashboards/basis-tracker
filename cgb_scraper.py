@@ -59,6 +59,25 @@ _HEADERS = {
 _BIDS_RE  = re.compile(r"var bids\s*=\s*(\[.*?\]);", re.DOTALL)
 REQUEST_DELAY = 0.5  # seconds between commodity requests
 
+# CGB's feed mislabels some plants. Force the correct facility_type (keyed by
+# the cleaned location_name) so they land in the right UI category.
+_FACILITY_OVERRIDES: dict[str, str] = {
+    "CGB MT VERNON":   "Soy Processing",     # Mount Vernon, IN — soybean crush plant
+    "CGB JOLIET":      "Container Terminal",  # Joliet, IL — container, not river terminal
+    "CGB - Falls City": "Rail Terminal",      # Falls City, NE
+    "CGB MT CARROLL":  "Country Elevator",   # Mt. Carroll, IL
+}
+
+# Some CGB locations have no state in the feed — supply it so region logic works.
+_STATE_OVERRIDES: dict[str, str] = {
+    "CGB SEMO MILLING": "MO",            # Southeast Missouri
+    "CGB - Falls City": "NE",
+    "CGB MT CARROLL":   "IL",
+}
+
+# CGB locations to drop entirely (FOB / direct-ship pricing points, not terminals).
+_SKIP_LOCATIONS: set = {"CGB FULTON", "CGB QTI"}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -146,12 +165,15 @@ def fetch_cgb_bids(commodity_ids: list[str] | None = None) -> list[dict]:
 
             # First time seeing this location — initialise its entry
             if loc_id not in by_loc_id:
+                _clean = _clean_name(raw_name)
+                if _clean in _SKIP_LOCATIONS:
+                    continue
                 by_loc_id[loc_id] = {
                     "location_id":   loc_id,
-                    "location_name": _clean_name(raw_name),
-                    "state":         loc.get("state") or "",
+                    "location_name": _clean,
+                    "state":         _STATE_OVERRIDES.get(_clean, loc.get("state") or ""),
                     "city":          loc.get("city") or "",
-                    "facility_type": loc.get("facility_type") or "",
+                    "facility_type": _FACILITY_OVERRIDES.get(_clean, loc.get("facility_type") or ""),
                     "timestamp":     today_utc,
                     "cashbids":      [],
                 }

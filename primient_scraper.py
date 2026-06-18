@@ -20,6 +20,9 @@ import requests
 
 log = logging.getLogger(__name__)
 
+# FOB / direct-ship pricing points to drop (not physical delivery locations)
+_SKIP_LOCATIONS = {"West FOB", "West FOB IL"}
+
 _API_URL = (
     "https://tateandlylegrain.agricharts.com/inc/cashbids/cashbids-js.php"
     "?filter=customer&customer=2175&commodity=&groupby=ccommodity"
@@ -116,6 +119,10 @@ def fetch_primient_bids() -> list[dict]:
             notes       = (bid.get("notes") or "").strip()
 
             if not loc_name or not symbol or basis is None or not delivery_s:
+                continue
+
+            # Drop FOB / direct-ship pricing points (not physical locations)
+            if loc_name in _SKIP_LOCATIONS:
                 continue
 
             if loc_name not in by_location:

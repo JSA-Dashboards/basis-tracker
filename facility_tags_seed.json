@@ -1,43 +1,291 @@
 [
-  {"provider": "NorfolkCrush", "location": "Norfolk", "facility_type": "Soy Processing", "state": "NE", "region": "West"},
-  {"provider": "Bartlett", "location": "Atchison",              "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Cherryvale",            "facility_type": "Soy Processing",   "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Council Bluffs North",  "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
-  {"provider": "Bartlett", "location": "Council Bluffs South",  "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
-  {"provider": "Bartlett", "location": "Great Bend",            "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Hamburg",               "facility_type": "Rail Terminal",    "state": "IA", "region": "West"},
-  {"provider": "Bartlett", "location": "Healy",                 "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Jacksonville",          "facility_type": "Rail Terminal",    "state": "IL", "region": "East"},
-  {"provider": "Bartlett", "location": "KC - Fairfax Terminal", "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "KC - KCT Terminal",     "facility_type": "Rail Terminal",    "state": "MO", "region": "West"},
-  {"provider": "Bartlett", "location": "KC RR Terminal",        "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Scott City",            "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "Bartlett", "location": "Sheffield",             "facility_type": "Rail Terminal",    "state": "IL", "region": "East"},
-  {"provider": "Bartlett", "location": "St. Joseph",            "facility_type": "Rail Terminal",    "state": "MO", "region": "West"},
-  {"provider": "Bartlett", "location": "Stella",                "facility_type": "Rail Terminal",    "state": "NE", "region": "West"},
-  {"provider": "Bartlett", "location": "Towner",                "facility_type": "Rail Terminal",    "state": "CO", "region": "West"},
-  {"provider": "Bartlett", "location": "Wichita",               "facility_type": "Rail Terminal",    "state": "KS", "region": "West"},
-  {"provider": "HPPSD", "location": "Mitchell", "facility_type": "Soy Processing", "state": "SD", "region": "West"},
-  {"provider": "WhiteRiver", "location": "Seymour", "facility_type": "Soy Processing", "state": "IN", "region": "East"},
-  {"provider": "ShellRock", "location": "Shell Rock", "facility_type": "Soy Processing", "state": "IA", "region": "West"},
-  {"provider": "Platinum", "location": "Alta", "facility_type": "Soy Processing", "state": "IA", "region": "West"},
-  {"provider": "Primient", "location": "Decatur",      "facility_type": "Corn Processing", "state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Lafayette",    "facility_type": "Corn Processing", "state": "IN", "region": "East"},
-  {"provider": "Primient", "location": "Loudon",       "facility_type": "Corn Processing", "state": "TN", "region": "East"},
-  {"provider": "Primient", "location": "West FOB",     "facility_type": "Direct Ship",     "state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Coles",        "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Cowden",       "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Darrow",       "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Findlay",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Fowler",       "facility_type": "Country Elevator","state": "IN", "region": "East"},
-  {"provider": "Primient", "location": "Francesville", "facility_type": "Country Elevator","state": "IN", "region": "East"},
-  {"provider": "Primient", "location": "Heyworth",     "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "LeRoy",        "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Mattoon",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Parnell",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Pittwood",     "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Wapella",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
-  {"provider": "Primient", "location": "Watseka",      "facility_type": "Country Elevator","state": "IL", "region": "East"},
+  {
+    "provider": "NorfolkCrush",
+    "location": "Norfolk",
+    "facility_type": "Soy Processing",
+    "state": "NE",
+    "region": "West"
+  },
+  {
+    "provider": "NDSP",
+    "location": "Casselton",
+    "facility_type": "Soy Processing",
+    "state": "ND",
+    "region": "West"
+  },
+  {
+    "provider": "SDSP",
+    "location": "Volga",
+    "facility_type": "Soy Processing",
+    "state": "SD",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Atchison",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Cherryvale",
+    "facility_type": "Soy Processing",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Council Bluffs North",
+    "facility_type": "Rail Terminal",
+    "state": "IA",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Council Bluffs South",
+    "facility_type": "Rail Terminal",
+    "state": "IA",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Great Bend",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Hamburg",
+    "facility_type": "Rail Terminal",
+    "state": "IA",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Healy",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Jacksonville",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "KC - Fairfax Terminal",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "KC - KCT Terminal",
+    "facility_type": "Rail Terminal",
+    "state": "MO",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "KC RR Terminal",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Scott City",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Sheffield",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "St. Joseph",
+    "facility_type": "Rail Terminal",
+    "state": "MO",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Stella",
+    "facility_type": "Rail Terminal",
+    "state": "NE",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Towner",
+    "facility_type": "Rail Terminal",
+    "state": "CO",
+    "region": "West"
+  },
+  {
+    "provider": "Bartlett",
+    "location": "Wichita",
+    "facility_type": "Rail Terminal",
+    "state": "KS",
+    "region": "West"
+  },
+  {
+    "provider": "HPPSD",
+    "location": "Mitchell",
+    "facility_type": "Soy Processing",
+    "state": "SD",
+    "region": "West"
+  },
+  {
+    "provider": "WhiteRiver",
+    "location": "Seymour",
+    "facility_type": "Soy Processing",
+    "state": "IN",
+    "region": "East"
+  },
+  {
+    "provider": "ShellRock",
+    "location": "Shell Rock",
+    "facility_type": "Soy Processing",
+    "state": "IA",
+    "region": "West"
+  },
+  {
+    "provider": "Platinum",
+    "location": "Alta",
+    "facility_type": "Soy Processing",
+    "state": "IA",
+    "region": "West"
+  },
+  {
+    "provider": "Primient",
+    "location": "Decatur",
+    "facility_type": "Corn Processing",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Lafayette",
+    "facility_type": "Corn Processing",
+    "state": "IN",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Loudon",
+    "facility_type": "Corn Processing",
+    "state": "TN",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "West FOB",
+    "facility_type": "Direct Ship",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Coles",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Cowden",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Darrow",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Findlay",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Fowler",
+    "facility_type": "Country Elevator",
+    "state": "IN",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Francesville",
+    "facility_type": "Country Elevator",
+    "state": "IN",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Heyworth",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "LeRoy",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Mattoon",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Parnell",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Pittwood",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Wapella",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
+  {
+    "provider": "Primient",
+    "location": "Watseka",
+    "facility_type": "Country Elevator",
+    "state": "IL",
+    "region": "East"
+  },
   {
     "provider": "MNSP",
     "location": "Brewster",
@@ -542,7 +790,7 @@
   },
   {
     "provider": "CHS",
-    "location": "Fergus Falls South (8¢ Dump fee)",
+    "location": "Fergus Falls South (8\u00c2\u00a2 Dump fee)",
     "facility_type": "Country Elevator",
     "region": null
   },
@@ -1088,7 +1336,7 @@
   },
   {
     "provider": "CHS",
-    "location": "Underwood (13¢ Dump fee)",
+    "location": "Underwood (13\u00c2\u00a2 Dump fee)",
     "facility_type": "Country Elevator",
     "region": null
   },
@@ -1482,7 +1730,7 @@
   {
     "provider": "CGB",
     "location": "CGB JOLIET",
-    "facility_type": "Container Loader",
+    "facility_type": "Container Terminal",
     "region": null
   },
   {
@@ -1526,7 +1774,8 @@
     "location": "Boyle Terminal",
     "facility_type": "River Terminal",
     "region": null,
-    "delivery_zone": "Zone 1"
+    "delivery_zone": "Zone 1",
+    "state": "MS"
   },
   {
     "provider": "CHS",
@@ -1557,7 +1806,7 @@
   {
     "provider": "CHS",
     "location": "Joliet Container Mkt",
-    "facility_type": "Container Loader",
+    "facility_type": "Container Terminal",
     "region": null
   },
   {
@@ -1574,10 +1823,11 @@
   },
   {
     "provider": "CHS",
-    "location": "Morris",
+    "location": "Morris, IL",
     "facility_type": "River Terminal",
     "region": null,
-    "delivery_zone": "Zone 2"
+    "delivery_zone": "Zone 2",
+    "state": "IL"
   },
   {
     "provider": "CHS",
@@ -1622,67 +1872,78 @@
     "provider": "ADM",
     "location": "Decatur, IL (Soy Processing)",
     "facility_type": "Soy Processing",
-    "region": "East"
+    "region": "East",
+    "state": "IL"
   },
   {
     "provider": "ADM",
     "location": "Deerfield, MO",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "MO"
   },
   {
     "provider": "ADM",
     "location": "Des Moines, IA",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "IA"
   },
   {
     "provider": "ADM",
     "location": "Fostoria, OH",
     "facility_type": "Soy Processing",
-    "region": "East"
+    "region": "East",
+    "state": "OH"
   },
   {
     "provider": "ADM",
     "location": "Frankfort, IN",
     "facility_type": "Soy Processing",
-    "region": "East"
+    "region": "East",
+    "state": "IN"
   },
   {
     "provider": "ADM",
     "location": "Fremont, NE (Soy Processing)",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "NE"
   },
   {
     "provider": "ADM",
     "location": "Green Bison Soy Processing",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "ND"
   },
   {
     "provider": "ADM",
     "location": "Lincoln, NE (Soy Processing)",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "NE"
   },
   {
     "provider": "ADM",
     "location": "Mankato, MN (Soy Processing)",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "MN"
   },
   {
     "provider": "ADM",
     "location": "Mexico, MO",
     "facility_type": "Soy Processing",
-    "region": "West"
+    "region": "West",
+    "state": "MO"
   },
   {
     "provider": "ADM",
     "location": "Quincy, IL (Soy Processing)",
     "facility_type": "Soy Processing",
-    "region": "East"
+    "region": "East",
+    "state": "IL"
   },
   {
     "provider": "AGP",
@@ -1995,10 +2256,11 @@
   },
   {
     "provider": "Bunge",
-    "location": "Fairmont City",
+    "location": "Fairmont City, IL",
     "facility_type": "River Terminal",
     "region": null,
-    "delivery_zone": "Zone 5"
+    "delivery_zone": "Zone 5",
+    "state": "IL"
   },
   {
     "provider": "Cargill",
@@ -2576,7 +2838,7 @@
   {
     "provider": "Tyson",
     "location": "Camilla",
-    "facility_type": "Elevator"
+    "facility_type": "Country Elevator"
   },
   {
     "provider": "Tyson",
@@ -3592,6 +3854,41 @@
     "location": "Watson, SK",
     "facility_type": "Rail Terminal",
     "state": "SK",
+    "region": null
+  },
+  {
+    "provider": "Bunge",
+    "location": "Longview, WA",
+    "facility_type": "River Terminal",
+    "state": "WA",
+    "region": null
+  },
+  {
+    "provider": "Bunge",
+    "location": "Griggsville, IL",
+    "facility_type": "Rail Terminal",
+    "state": "IL",
+    "region": null
+  },
+  {
+    "provider": "CHS",
+    "location": "Morris, MN",
+    "facility_type": "Country Elevator",
+    "state": "MN",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB - Falls City",
+    "facility_type": "Rail Terminal",
+    "state": "NE",
+    "region": null
+  },
+  {
+    "provider": "CGB",
+    "location": "CGB MT CARROLL",
+    "facility_type": "Country Elevator",
+    "state": "IL",
     "region": null
   }
 ]
