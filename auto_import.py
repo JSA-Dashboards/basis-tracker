@@ -1340,6 +1340,11 @@ if __name__ == "__main__":
         help="Run even if today is a weekend or federal holiday (bypasses trading-day guard)",
     )
 
+    parser.add_argument(
+        "--no-email", dest="no_email", action="store_true",
+        help="Skip emailing the Daily Basis Changes report after a full scrape",
+    )
+
     args = parser.parse_args()
 
     # ── Trading-day guard (bypassed with --force or --prune-only) ─────────────
@@ -1454,3 +1459,11 @@ if __name__ == "__main__":
             run_sdsp_scrape=not args.no_sdsp,
             run_pruning=not args.no_prune,
         )
+
+        # ── Email the daily Changes report via Outlook (full scheduled run) ──
+        if not args.no_email:
+            try:
+                from changes_report import send_daily_changes_email
+                send_daily_changes_email()
+            except Exception as exc:
+                log.warning("Daily Changes email failed (scrape unaffected): %s", exc)

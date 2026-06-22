@@ -6,3 +6,4 @@
 msal==1.28.0
 pdfplumber==0.11.0
 playwright>=1.44.0
+pywin32>=306 ; sys_platform == "win32"   # Outlook send for the daily Changes email
