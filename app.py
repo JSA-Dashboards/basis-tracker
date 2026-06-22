@@ -1157,7 +1157,15 @@ def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list
     return [r for r in rows if r.get("b_current") is not None]
 
 
-def render_trend_cards(rows, group_field, groups) -> str:
+def _cards_copy_layout(parts: list[str]) -> str:
+    """Lay card/table HTML side-by-side in a table so they all paste into email on
+    one row (CSS grid doesn't survive a paste; a table does)."""
+    cells = "".join(f'<td style="vertical-align:top;padding-right:10px">{p}</td>'
+                    for p in parts if p)
+    return f'<table style="border-collapse:collapse"><tr>{cells}</tr></table>'
+
+
+def render_trend_cards(rows, group_field, groups, layout: str = "grid") -> str:
     """
     Three stat tables for a category, mirroring the Summary panel:
       • Avg Basis Change (All / Firmer / Weaker)        — always (global)
@@ -1256,6 +1264,8 @@ def render_trend_cards(rows, group_field, groups) -> str:
               f'<td style="{TD};color:#0f172a;font-weight:700">{_fp(iv)}</td></tr>')
     c += '</tbody></table></div>'
 
+    if layout == "table":
+        return _cards_copy_layout([a, mid, c])
     _cols = "0.85fr 2fr 0.7fr" if is_river else "1.0fr 1.35fr 0.7fr"
     return (f'<div style="display:grid;grid-template-columns:{_cols};'
             f'gap:10px;margin:2px 0 18px 0">{a}{mid}{c}</div>')
@@ -3120,8 +3130,11 @@ with tab_summary:
 
             if _river_view:
                 _cards, _grid_cols = _hA + _hD + _hC, "0.85fr 2fr 0.7fr"
+                _stat_parts = [_hA, _hD, _hC]
             else:
                 _cards, _grid_cols = _hA + _hB + _hC, "1.15fr 1.15fr .7fr"
+                _stat_parts = [_hA, _hB, _hC]
+            copy_button(_cards_copy_layout(_stat_parts), "📋 Copy stats")
             st.markdown(
                 f'<div style="display:grid;grid-template-columns:{_grid_cols};'
                 f'gap:10px;margin:2px 0 14px 0">{_cards}</div>',
@@ -3402,4 +3415,5 @@ with tab_trends:
         else:
             _grps = [g for g in ("East", "West") if any((r.get("region") or "") == g for r in _rows)]
             _gf = "region"
+        copy_button(render_trend_cards(_rows, _gf, _grps, layout="table"), "📋 Copy tables")
         st.markdown(render_trend_cards(_rows, _gf, _grps), unsafe_allow_html=True)
