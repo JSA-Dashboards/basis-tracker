@@ -1,13 +1,10 @@
 """
-POET Gradable web scraper.
+POET Gradable web scraper — pure httpx, no browser needed.
 
-Uses Playwright with real Chrome to bypass CloudFront bot detection, then
-intercepts POET's REST API to pull bid data for all 36 locations in one pass.
-
-The site is a React SPA backed by FBN infrastructure and served via CloudFront.
-Headless Chromium is fingerprinted and blocked; real Chrome (channel='chrome')
-passes through cleanly.  API responses are CSRF-prefixed with 'while(1);' which
-we strip before JSON parsing.
+POET runs on the same Gradable platform as ADM (poet.gradable.com). Both the
+bootstrap and instruments endpoints return open JSON (CSRF-prefixed with
+'while(1);') to a normal browser User-Agent — no auth/cookies required — so this
+mirrors adm_scraper.py and runs fast (no Playwright / browser binaries).
 
 Usage (standalone test):
     python poet_scraper.py
@@ -15,10 +12,10 @@ Usage (standalone test):
 Returns a list of dicts ready for parsers/poet_parser.py:
     [
         {
-            "market_id":       int,
-            "display_name":    str,     # e.g. "Alexandria, IN"
-            "instruments_data": dict,  # raw instruments API response
-            "timestamp":       str,    # ISO-8601 UTC, date-normalized
+            "market_id":        int,
+            "display_name":     str,    # e.g. "Alexandria, IN"
+            "instruments_data": dict,   # raw instruments API response
+            "timestamp":        str,    # ISO-8601 UTC, date-normalized
         },
         ...
     ]
@@ -29,170 +26,95 @@ import time
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
+
 log = logging.getLogger(__name__)
 
-POET_BASE          = "https://poet.gradable.com"
-BOOTSTRAP_URL      = f"{POET_BASE}/api/commodities/merchandising/bootstrap"
-INSTRUMENTS_TMPL   = (
+POET_BASE         = "https://poet.gradable.com"
+BOOTSTRAP_URL     = f"{POET_BASE}/api/commodities/merchandising/bootstrap"
+INSTRUMENTS_TMPL  = (
     f"{POET_BASE}/api/commodities/v2/merchandising/instruments"
     "/market/{market_id}?offer_type=public"
 )
-# Any valid market page — we just need to load one page to get auth cookies
-ENTRY_URL          = f"{POET_BASE}/market/Alexandria--IN"
-# Delay between instruments requests to be polite (seconds)
-REQUEST_DELAY      = 0.25
+REQUEST_DELAY     = 0.25   # seconds between instruments requests
+_CSRF_PREFIX      = "while(1);"
 
-
-def _strip_csrf(text: str) -> str:
-    """Strip the 'while(1);' CSRF prefix that POET prepends to API responses."""
-    if text.startswith("while(1);"):
-        return text[9:]
-    return text
+_HEADERS = {
+    "Accept":     "application/json",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+}
 
 
 def _parse_response(text: str) -> Optional[dict]:
-    """Strip CSRF prefix and parse JSON; returns None on error."""
+    """Strip the 'while(1);' CSRF prefix and parse JSON; None on error."""
+    if text.startswith(_CSRF_PREFIX):
+        text = text[len(_CSRF_PREFIX):]
     try:
-        return json.loads(_strip_csrf(text))
+        return json.loads(text)
     except Exception:
         return None
 
 
 def fetch_poet_bids(headless: bool = True) -> list[dict]:
     """
-    Scrape all POET Gradable locations and return raw bid data.
+    Scrape all POET Gradable locations via the open JSON API (no browser).
 
     Steps:
-      1. Launch real Chrome with automation flags disabled.
-      2. Load POET entry page so CloudFront sets session cookies.
-      3. Capture the bootstrap API response (intercepted during page load).
-         If not captured, fetch it directly using page.request (uses same cookies).
-      4. For each of the 36 markets, GET the instruments endpoint.
-      5. Return list of {market_id, display_name, instruments_data, timestamp}.
+      1. GET bootstrap  → list of (market_id, display_name) pairs.
+      2. GET instruments for each market.
+      3. Return list of {market_id, display_name, instruments_data, timestamp}.
 
     Args:
-        headless: Run Chrome headlessly (default True). Set False to debug.
+        headless: accepted for backward compatibility (ignored — no browser).
 
     Returns:
-        List of location dicts.  Empty list on fatal error.
+        List of location dicts. Empty list on fatal error.
     """
-    from playwright.sync_api import sync_playwright
-
-    # Normalise timestamp to today's UTC date at midnight so duplicate
-    # daily runs produce the same (timestamp, provider, location) key
-    # and INSERT OR IGNORE deduplicates cleanly.
     today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
-
     results: list[dict] = []
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            channel="chrome",
-            headless=headless,
-            args=["--disable-blink-features=AutomationControlled"],
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            )
-        )
-        page = context.new_page()
-
-        # ── Intercept API responses during page load ───────────────────────
-        intercepted: dict[str, dict] = {}
-
-        def _on_response(response):
-            url = response.url
-            if ("commodities/merchandising/bootstrap" in url or
-                    "commodities/v2/merchandising/instruments" in url):
-                try:
-                    data = _parse_response(response.text())
-                    if data is not None:
-                        intercepted[url] = data
-                except Exception:
-                    pass
-
-        page.on("response", _on_response)
-
-        # ── Step 1: Load entry page (establishes session / cookies) ────────
-        log.info("Loading POET entry page…")
+    with httpx.Client(headers=_HEADERS, timeout=30, follow_redirects=True) as client:
+        # ── 1. Bootstrap ──────────────────────────────────────────────────────
         try:
-            page.goto(ENTRY_URL, timeout=35_000, wait_until="networkidle")
-        except Exception:
-            # Timeout from 'networkidle' is common on heavy SPAs — that's fine.
-            pass
-
-        # ── Step 2: Get bootstrap (all 36 market IDs + display names) ──────
-        bootstrap: Optional[dict] = None
-        for url, data in intercepted.items():
-            if "bootstrap" in url:
-                bootstrap = data
-                break
-
-        if bootstrap is None:
-            log.info("Bootstrap not captured during page load — fetching directly…")
-            try:
-                resp = page.request.get(
-                    BOOTSTRAP_URL,
-                    headers={"Accept": "application/json"},
-                    timeout=30_000,
-                )
-                bootstrap = _parse_response(resp.text())
-            except Exception as exc:
-                log.error("Failed to fetch POET bootstrap: %s", exc)
-                browser.close()
-                return []
+            r = client.get(BOOTSTRAP_URL)
+            r.raise_for_status()
+            bootstrap = _parse_response(r.text)
+        except Exception as exc:
+            log.error("POET bootstrap failed: %s", exc)
+            return []
 
         if not bootstrap:
-            log.error("Bootstrap is empty — cannot continue.")
-            browser.close()
+            log.error("POET bootstrap empty/invalid — cannot continue.")
             return []
 
         markets = bootstrap.get("markets", [])
-        log.info("POET bootstrap: %d markets found", len(markets))
+        log.info("POET bootstrap: %d markets", len(markets))
 
-        # Build ordered list: [(market_id, display_name), ...]
-        market_list = [
-            (m["id"], m.get("display_name", str(m["id"])))
-            for m in markets
-        ]
+        # ── 2. Instruments per market ─────────────────────────────────────────
+        for market in markets:
+            market_id    = market["id"]
+            display_name = market.get("display_name", str(market_id))
 
-        # ── Step 3: Fetch instruments for each market ──────────────────────
-        for market_id, display_name in market_list:
-            instr_url = INSTRUMENTS_TMPL.format(market_id=market_id)
-
-            # Use already-intercepted data if available (saves a request)
-            instr_data = intercepted.get(instr_url)
+            url = INSTRUMENTS_TMPL.format(market_id=market_id)
+            try:
+                r = client.get(url)
+                r.raise_for_status()
+                instr_data = _parse_response(r.text)
+            except Exception as exc:
+                log.warning("  ✗  %s (id=%s): %s", display_name, market_id, exc)
+                continue
 
             if instr_data is None:
-                try:
-                    resp = page.request.get(
-                        instr_url,
-                        headers={"Accept": "application/json"},
-                        timeout=20_000,
-                    )
-                    instr_data = _parse_response(resp.text())
-                except Exception as exc:
-                    log.warning(
-                        "  ✗  %s (id=%s): request failed — %s",
-                        display_name, market_id, exc,
-                    )
-                    continue
+                log.warning("  ✗  %s (id=%s): empty/invalid response",
+                            display_name, market_id)
+                continue
 
-                if instr_data is None:
-                    log.warning(
-                        "  ✗  %s (id=%s): empty/invalid response",
-                        display_name, market_id,
-                    )
-                    continue
-
-                # Small delay to be polite to the server
-                time.sleep(REQUEST_DELAY)
-
-            n_instr = len(instr_data.get("instruments", []))
-            log.debug("  %s → %d instrument(s)", display_name, n_instr)
+            n = len(instr_data.get("instruments", []))
+            log.debug("  %s → %d instrument(s)", display_name, n)
 
             results.append({
                 "market_id":        market_id,
@@ -201,7 +123,7 @@ def fetch_poet_bids(headless: bool = True) -> list[dict]:
                 "timestamp":        today_utc,
             })
 
-        browser.close()
+            time.sleep(REQUEST_DELAY)
 
     log.info("POET scrape complete: %d location(s) fetched", len(results))
     return results
@@ -222,7 +144,7 @@ if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent))
     from parsers.poet_parser import parse_instruments
 
-    bids = fetch_poet_bids(headless=True)
+    bids = fetch_poet_bids()
     print(f"\n{'='*60}")
     print(f"Total locations fetched: {len(bids)}")
     print(f"{'='*60}")
