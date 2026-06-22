@@ -1,12 +1,16 @@
 """
 norfolkcrush_scraper.py — Norfolk Crush (Norfolk, NE) soybean bid scraper.
 
-Page: https://norfolkcrush.com/bid-offers/soybeans/
-Live bids are rendered by JavaScript into tr.cashbid_tr rows; the static
-HTML holds stale 2024 placeholder content, so Playwright is required.
+Page: https://norfolkcrush.com/bid-offers/soybeans/ — its cash-bid table is a
+CI Hedging (cihedging.com) widget. The widget POSTs to the company endpoint and
+gets back rendered HTML, so we hit that endpoint directly with requests (no
+browser needed):
 
-Table columns per row: Delivery | Futures | Futures Price | Change | Basis | Cash Bid
-Basis is in dollar notation (0.25 = +25¢, -0.55 = -55¢).
+    POST https://www.cihedging.com/cih/api/index.cfm/origination/cashbids/132225
+
+(132225 is Norfolk Crush's CashBid_JS company id, set on the page.) The response
+is escaped HTML; columns per data row: Delivery | Futures | Futures Price |
+Change | Basis | Bid. Basis is dollar notation (0.25 = +25¢, -0.55 = -55¢).
 """
 from __future__ import annotations
 
@@ -14,9 +18,21 @@ import logging
 import re
 from datetime import datetime, timezone
 
+import requests
+
 log = logging.getLogger(__name__)
 
-_URL = "https://norfolkcrush.com/bid-offers/soybeans/"
+_COMPANY_ID = "132225"
+_API_URL    = f"https://www.cihedging.com/cih/api/index.cfm/origination/cashbids/{_COMPANY_ID}"
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://norfolkcrush.com/",
+    "Accept":  "text/html, */*",
+}
 
 _MONTH_CODES = {
     "jan": "F", "feb": "G", "mar": "H", "apr": "J",
@@ -26,25 +42,21 @@ _MONTH_CODES = {
 
 
 def _cme_symbol(futures_text: str) -> str | None:
-    """
-    Parse CME symbol from text like "Jul'26" or "Nov'27" → "ZSN26" / "ZSX27".
-    """
+    """Parse "Jul'26" / "Nov'27" → "ZSN26" / "ZSX27"."""
     txt = futures_text.replace("’", "'").replace("‘", "'").strip()
     m = re.match(r"([A-Za-z]+)'(\d{2,4})", txt)
     if not m:
         return None
-    mon  = m.group(1).lower()[:3]
-    yr   = int(m.group(2))
+    mon = m.group(1).lower()[:3]
+    yr  = int(m.group(2))
     if yr > 100:
         yr = yr % 100
     code = _MONTH_CODES.get(mon)
-    if not code:
-        return None
-    return f"ZS{code}{yr:02d}"
+    return f"ZS{code}{yr:02d}" if code else None
 
 
 def _basis_cents(text: str) -> int | None:
-    """Convert dollar-format basis string ("0.25", "-0.55") to integer cents."""
+    """Convert dollar-format basis ("0.25", "-0.55") to integer cents."""
     txt = text.strip()
     if not txt or txt.upper() in ("TBD", "N/A", ""):
         return None
@@ -59,64 +71,52 @@ def _basis_cents(text: str) -> int | None:
 
 def fetch_norfolkcrush_bids() -> list[dict]:
     """
-    Fetch Norfolk Crush soybean bids using Playwright (JS-rendered table).
+    Fetch Norfolk Crush soybean bids from the CI Hedging endpoint (no browser).
     Returns a list with one location dict for parse_norfolkcrush_location.
     """
-    from playwright.sync_api import sync_playwright
+    try:
+        resp = requests.post(_API_URL, headers=_HEADERS, timeout=30)
+        resp.raise_for_status()
+    except Exception as exc:
+        log.error("NorfolkCrush: fetch failed: %s", exc)
+        return []
+
+    # The endpoint returns JSON-style escaped HTML — unescape it.
+    html = (resp.text
+            .replace('\\"', '"').replace('\\/', '/')
+            .replace('\\t', '\t').replace('\\n', '\n').replace('\\r', ''))
 
     bids: list[dict] = []
     seen: set[str]   = set()
 
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            page    = browser.new_page()
-            page.goto(_URL, wait_until="networkidle", timeout=30000)
+    for row_html in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", row_html, re.S)  # data rows use <td>
+        if len(cells) < 6:
+            continue
+        vals = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", c)).strip() for c in cells]
+        delivery_txt, futures_txt, basis_txt = vals[0], vals[1], vals[4]
 
-            rows = page.query_selector_all("tr.cashbid_tr")
-            for row in rows:
-                tds = row.query_selector_all("td")
-                vals = [td.inner_text().strip() for td in tds]
-                # Skip header / empty rows; expect 6 columns
-                if len(vals) < 6 or not vals[0]:
-                    continue
+        sym   = _cme_symbol(futures_txt)
+        cents = _basis_cents(basis_txt)
+        if not sym or cents is None:
+            continue
 
-                delivery_txt = vals[0]   # "Jun 2026"
-                futures_txt  = vals[1]   # "Jul'26"
-                basis_txt    = vals[4]   # "0.25" or "-0.55"
+        key = f"{sym}|{delivery_txt}"
+        if key in seen:
+            continue
+        seen.add(key)
 
-                sym   = _cme_symbol(futures_txt)
-                cents = _basis_cents(basis_txt)
-
-                if not sym or cents is None:
-                    log.debug("NorfolkCrush: skip %r — sym=%s cents=%s",
-                              delivery_txt, sym, cents)
-                    continue
-
-                key = f"{sym}|{delivery_txt}"
-                if key in seen:
-                    continue
-                seen.add(key)
-
-                bids.append({
-                    "delivery":    delivery_txt,
-                    "cme_symbol":  sym,
-                    "basis_cents": cents,
-                })
-                log.debug("  NorfolkCrush: %s  %s  %+d¢", delivery_txt, sym, cents)
-
-            browser.close()
-
-    except Exception as exc:
-        log.error("NorfolkCrush: fetch failed: %s", exc)
-        return []
+        bids.append({
+            "delivery":    delivery_txt,
+            "cme_symbol":  sym,
+            "basis_cents": cents,
+        })
 
     if not bids:
         log.warning("NorfolkCrush: no bids parsed")
         return []
 
     log.info("NorfolkCrush Norfolk  %d soybean bid(s)", len(bids))
-
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
     return [{
         "location":  "Norfolk",
