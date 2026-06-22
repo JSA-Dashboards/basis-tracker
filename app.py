@@ -2119,6 +2119,67 @@ with tab_bids:
             unsafe_allow_html=True,
         )
 
+        # ── Forward basis curve (current snapshot) ─────────────────────────────
+        # Each delivery is quoted vs its own futures month; anchor them all to the
+        # front month via futures spreads (futures_spread.py) so the curve is an
+        # apples-to-apples cash-basis line. Falls back to raw basis until the
+        # futures-price API is wired up.
+        import pandas as _pd
+        import altair as _alt
+        import futures_spread as _fs
+
+        _fwd_rows = sorted(
+            [r for r in body_rows if r.basisCents is not None],
+            key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol),
+        )
+        if len(_fwd_rows) >= 2:
+            _anchor_sym = _fwd_rows[0].futuresSymbol
+            _fwd_pts, _anchored_ok = [], True
+            for _r in _fwd_rows:
+                _adj = _fs.anchor_basis(_r.basisCents, _r.futuresSymbol, _anchor_sym)
+                if _adj is None:            # no spread available → show raw basis
+                    _adj = _r.basisCents
+                    if _r.futuresSymbol != _anchor_sym:
+                        _anchored_ok = False
+                _fwd_pts.append({
+                    "Delivery": _r.deliveryMonth,
+                    "Basis":    _adj,
+                    "Raw":      _r.basisCents,
+                    "Futures":  _r.futuresSymbol,
+                })
+            _fwd_order = [p["Delivery"] for p in _fwd_pts]  # chronological
+            _df_fwd = _pd.DataFrame(_fwd_pts)
+
+            _fwd_mode = (f"anchored to {_anchor_sym} (spread-adjusted)" if _anchored_ok
+                         else "raw basis · spot-month anchoring pending futures-price API")
+            st.markdown(
+                '<div style="margin-top:16px;margin-bottom:4px;font-size:10px;color:#64748b;'
+                'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
+                f'Forward Basis Curve <span style="font-weight:400;text-transform:none;'
+                f'letter-spacing:0;color:#94a3b8">· {_fwd_mode}</span></div>',
+                unsafe_allow_html=True,
+            )
+            _fwd_zero = _alt.Chart(_pd.DataFrame({"y": [0]})).mark_rule(
+                color="#94a3b8", strokeDash=[4, 4], strokeWidth=1).encode(y="y:Q")
+            _fwd_line = (
+                _alt.Chart(_df_fwd)
+                .mark_line(point=True, color=loc_color, strokeWidth=2)
+                .encode(
+                    x=_alt.X("Delivery:N", sort=_fwd_order, title=None,
+                             axis=_alt.Axis(labelAngle=-30, labelFontSize=10)),
+                    y=_alt.Y("Basis:Q", title="Basis (¢)", scale=_alt.Scale(zero=False),
+                             axis=_alt.Axis(labelFontSize=10)),
+                    tooltip=[
+                        _alt.Tooltip("Delivery:N", title="Delivery"),
+                        _alt.Tooltip("Basis:Q",    title="Basis (¢)"),
+                        _alt.Tooltip("Raw:Q",      title="Raw basis (¢)"),
+                        _alt.Tooltip("Futures:N",  title="Futures"),
+                    ],
+                )
+            )
+            st.altair_chart((_fwd_zero + _fwd_line).properties(height=200),
+                            use_container_width=True)
+
         # ── Spot basis history chart ──────────────────────────────────────────
         _spot_pts = []
         for _snap in snapshots:
