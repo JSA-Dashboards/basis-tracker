@@ -208,6 +208,10 @@ def run(file_path: Path, apply: bool = False, pg: bool = False) -> None:
                 skipped += 1
                 continue
 
+        # Skip stray future-dated rows (e.g. an out-of-order spreadsheet row)
+        if date.date() > datetime.now().date():
+            skipped += 1
+            continue
         timestamp = date.strftime("%Y-%m-%dT00:00:00Z")
 
         opt_mo = str(row[4]).strip() if row[4] is not None else ""
