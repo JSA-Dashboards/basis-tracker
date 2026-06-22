@@ -30,69 +30,108 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import database as db
 
-# ── Column mapping (0-based index → (provider, db_location)) ─────────────────
-# Only columns we actively scrape; every other column is ignored.
-# Spreadsheet header rows: Row0=Region, Row1=Company, Row2=Location, Row3=State
+# ── Header-based mapping ─────────────────────────────────────────────────────
+# Maps the spreadsheet's own header (Company, Location, State) → the canonical
+# (provider, db_location) used by the live scrapers, so historical and live data
+# line up.  Keyed by header text (not column index) so inserting/moving columns
+# in the spreadsheet never silently mis-maps the import.
+# Spreadsheet header rows: Row0=Region, Row1=Company, Row2=Location, Row3=State.
 
-COLUMN_MAP: dict[int, tuple[str, str]] = {
+NAME_MAP: dict[tuple[str, str, str], tuple[str, str]] = {
     # ── West region ──────────────────────────────────────────────────────────
-    4:  ("AGP",       "AGP Eagle Grove, IA"),
-    5:  ("AGP",       "AGP Mason City, IA"),
-    6:  ("Cargill",   "Cedar Rapids East"),
-    7:  ("Cargill",   "Iowa Falls"),
-    8:  ("ShellRock", "Shell Rock"),
-    9:  ("ADM",       "Des Moines, IA"),
-    10: ("AGP",       "AGP Sheldon, IA"),
-    11: ("AGP",       "AGP Emmetsburg, IA"),         # E'burg = Emmetsburg
-    12: ("CHS",       "Fairmont"),
-    13: ("AGP",       "AGP Dawson, MN"),
-    14: ("CHS",       "Mankato"),
-    15: ("ADM",       "Mankato, MN (Soy Processing)"),
-    16: ("Cargill",   "Sioux City"),
-    17: ("AGP",       "AGP Sergeant Bluff, IA"),
-    18: ("AGP",       "AGP Manning, IA"),
-    19: ("Platinum",  "Alta"),
-    20: ("AGP",       "AGP St. Joseph, MO"),
-    21: ("ADM",       "Lincoln, NE (Soy Processing)"),
-    22: ("ADM",       "Fremont, NE (Soy Processing)"),
-    23: ("NorfolkCrush","Norfolk"),
-    24: ("MNSP",      "Brewster"),
-    25: ("Bunge",     "Council Bluffs, IA"),
-    26: ("AGP",       "AGP Hastings, NE - Soy Plant"),
-    27: ("AGP",       "AGP Aberdeen, SD"),
-    28: ("SDSP",      "Volga"),        # South Dakota Soybean Processors
-    29: ("NDSP",      "Casselton"),   # North Dakota Soybean Processors, via ndsoy.com
-    30: ("ADM",       "Green Bison Soy Processing"),  # ADM Spiritwood ND
-    31: ("Bunge",     "Emporia, KS"),
-    32: ("Cargill",   "Kansas City"),
-    33: ("Cargill",   "Wichita"),
-    34: ("ADM",       "Deerfield, MO"),
-    35: ("ADM",       "Mexico, MO"),
-    36: ("Bartlett",   "Cherryvale"),
+    ("AGP", "Eagle Grove", "IA"):     ("AGP",        "AGP Eagle Grove, IA"),
+    ("AGP", "Mason City", "IA"):      ("AGP",        "AGP Mason City, IA"),
+    ("Cargill", "Cedar Rapids", "IA"):("Cargill",    "Cedar Rapids East"),
+    ("Cargill", "Iowa Falls", "IA"):  ("Cargill",    "Iowa Falls"),
+    ("Shell Rock", "Shell Rock", "IA"):("ShellRock", "Shell Rock"),
+    ("ADM", "Des Moines", "IA"):      ("ADM",        "Des Moines, IA"),
+    ("AGP", "Sheldon", "IA"):         ("AGP",        "AGP Sheldon, IA"),
+    ("AGP", "E'burg", "IA"):          ("AGP",        "AGP Emmetsburg, IA"),  # E'burg = Emmetsburg
+    ("CHS", "Fairmont", "MN"):        ("CHS",        "Fairmont"),
+    ("AGP", "Dawson", "MN"):          ("AGP",        "AGP Dawson, MN"),
+    ("CHS", "Mankato", "MN"):         ("CHS",        "Mankato"),
+    ("ADM", "Mankato", "MN"):         ("ADM",        "Mankato, MN (Soy Processing)"),
+    ("Cargill", "Sioux City", "IA"):  ("Cargill",    "Sioux City"),
+    ("AGP", "SGT Bluff", "IA"):       ("AGP",        "AGP Sergeant Bluff, IA"),
+    ("AGP", "Manning", "IA"):         ("AGP",        "AGP Manning, IA"),
+    ("Platinum", "Alta", "IA"):       ("Platinum",   "Alta"),
+    ("AGP", "St Joe", "MO"):          ("AGP",        "AGP St. Joseph, MO"),
+    ("ADM", "Lincoln", "NE"):         ("ADM",        "Lincoln, NE (Soy Processing)"),
+    ("ADM", "Fremont", "NE"):         ("ADM",        "Fremont, NE (Soy Processing)"),
+    ("Norfolk", "Norfolk", "NE"):     ("NorfolkCrush","Norfolk"),
+    ("MNSP", "Brewster", "MN"):       ("MNSP",       "Brewster"),
+    ("Bunge", "Council Bluffs", "IA"):("Bunge",      "Council Bluffs, IA"),
+    ("AGP", "Hastings", "NE"):        ("AGP",        "AGP Hastings, NE - Soy Plant"),
+    ("AGP", "David City", "SD"):      ("AGP",        "AGP David City, NE"),
+    ("AGP", "Aberdeen", "SD"):        ("AGP",        "AGP Aberdeen, SD"),
+    ("SDSP", "Volga", "SD"):          ("SDSP",       "Volga"),     # South Dakota Soybean Processors
+    ("High Plains", "Mitchell", "SD"):("HPPSD",      "Mitchell"),  # High Plains Processing, Mitchell SD
+    ("CGB", "Casselton", "ND"):       ("NDSP",       "Casselton"), # North Dakota Soybean Processors
+    ("ADM", "Spiritwood", "ND"):      ("ADM",        "Green Bison Soy Processing"),
+    ("Bunge", "Emporia", "KS"):       ("Bunge",      "Emporia, KS"),
+    ("Cargill", "KC", "MO"):          ("Cargill",    "Kansas City"),
+    ("Cargill", "Wichita", "KS"):     ("Cargill",    "Wichita"),
+    ("ADM", "Deerfield", "MO"):       ("ADM",        "Deerfield, MO"),
+    ("ADM", "Mexico", "MO"):          ("ADM",        "Mexico, MO"),
+    ("Bartlett", "Cherryvale", "KS"): ("Bartlett",   "Cherryvale"),
 
     # ── East region ──────────────────────────────────────────────────────────
-    37: ("ADM",       "Quincy, IL (Soy Processing)"),
-    38: ("Cargill",   "Bloomington"),
-    # col 39: Solae/Gibson City IL — historical Solae facility; skip
-    40: ("Cargill",   "Owensboro"),
-    41: ("ADM",       "Fostoria, OH"),
-    42: ("ADM",       "Frankfort, IN"),
-    43: ("ADM",       "Decatur, IL (Soy Processing)"),
-    44: ("Cargill",   "Lafayette"),
-    45: ("Cargill",   "Sidney"),
-    46: ("Bunge",     "Morristown, IN - Bean Plant"),
-    47: ("Bunge",     "Decatur, IN"),
-    48: ("Bunge",     "Delphos, OH"),
-    49: ("Bunge",     "Bellevue, OH"),
-    50: ("CGB",       "CGB MT VERNON"),
-    51: ("LDC",       "Claypool"),
-    52: ("WhiteRiver","Seymour"),
-    53: ("Cargill",   "Gilman"),   # formerly INCO; now Cargill
-    54: ("ZFS",       "Zeeland"),
-    55: ("ZFS",       "ZFS Ithaca"),
-    56: ("Cargill",   "Guntersville"),
-    57: ("Bunge",     "Decatur, AL"),
+    ("ADM", "Quincy", "IL"):          ("ADM",        "Quincy, IL (Soy Processing)"),
+    ("Cargill", "Bloomington", "IL"): ("Cargill",    "Bloomington"),
+    ("Bunge", "Gibson City", "IL"):   ("Bunge",      "Gibson City"),  # Bunge processor (no live scrape yet)
+    ("Cargill", "Owensboro", "KY"):   ("Cargill",    "Owensboro"),
+    ("ADM", "Fostoria", "OH"):        ("ADM",        "Fostoria, OH"),
+    ("ADM", "Frankfort", "IN"):       ("ADM",        "Frankfort, IN"),
+    ("ADM", "Decatur", "IL"):         ("ADM",        "Decatur, IL (Soy Processing)"),
+    ("Cargill", "Lafayette", "IN"):   ("Cargill",    "Lafayette"),
+    ("Cargill", "Sidney", "OH"):      ("Cargill",    "Sidney"),
+    ("Bunge", "Morristown", "IN"):    ("Bunge",      "Morristown, IN - Bean Plant"),
+    ("Bunge", "Decatur", "IN"):       ("Bunge",      "Decatur, IN"),
+    ("Bunge", "Delphos", "OH"):       ("Bunge",      "Delphos, OH"),
+    ("Bunge", "Bellevue", "OH"):      ("Bunge",      "Bellevue, OH"),
+    ("CGB", "Mt Vernon", "IN"):       ("CGB",        "CGB MT VERNON"),
+    ("LDC", "Claypool", "IN"):        ("LDC",        "Claypool"),
+    ("White River", "Seymour", "IN"): ("WhiteRiver", "Seymour"),
+    ("INCO", "Gilman", "IL"):         ("Cargill",    "Gilman"),   # formerly INCO; now Cargill
+    ("Zeeland", "Zeeland", "MI"):     ("ZFS",        "Zeeland"),
+    ("ZFS", "Ithaca", "MI"):          ("ZFS",        "ZFS Ithaca"),
+    ("Cargill", "Guntersville", "AL"):("Cargill",    "Guntersville"),
+    ("Bunge", "Decatur", "AL"):       ("Bunge",      "Decatur, AL"),
 }
+
+# Normalised (case/space-insensitive) lookup so minor header-typo drift still matches.
+def _norm(s: str) -> str:
+    return " ".join(str(s).strip().lower().split())
+
+_NAME_MAP_NORM = {
+    (_norm(a), _norm(b), _norm(c)): v for (a, b, c), v in NAME_MAP.items()
+}
+
+
+def build_col_map(rows: list) -> tuple[dict[int, tuple[str, str]], list]:
+    """
+    Map current spreadsheet columns → (provider, db_location) by matching the
+    Company/Location/State header (rows 1/2/3) against NAME_MAP.  Returns
+    (col_map, unmapped) where unmapped lists (col, company, location, state) for
+    any data column we don't recognise (those are skipped, with a warning).
+    """
+    def hdr(ri: int, ci: int) -> str:
+        return (str(rows[ri][ci]).strip()
+                if ci < len(rows[ri]) and rows[ri][ci] not in (None, "") else "")
+
+    ncol = max(len(r) for r in rows[:4])
+    col_map: dict[int, tuple[str, str]] = {}
+    unmapped: list = []
+    for ci in range(4, ncol):
+        comp, loc, st = hdr(1, ci), hdr(2, ci), hdr(3, ci)
+        if not (comp or loc):
+            continue
+        canon = _NAME_MAP_NORM.get((_norm(comp), _norm(loc), _norm(st)))
+        if canon:
+            col_map[ci] = canon
+        else:
+            unmapped.append((ci, comp, loc, st))
+    return col_map, unmapped
 
 # CME month code → calendar month number
 _CME_MONTH_NUM: dict[str, int] = {
@@ -201,7 +240,15 @@ def run(file_path: Path, apply: bool = False, pg: bool = False) -> None:
     # Rows 0-3 are headers; data starts at row index 4
     data_rows = rows[4:]
 
-    counts: dict[tuple, int] = {v: 0 for v in COLUMN_MAP.values()}
+    # Build column → (provider, location) map from the header text (shift-proof).
+    col_map, unmapped = build_col_map(rows)
+    print(f"Mapped {len(col_map)} location column(s) from headers.")
+    if unmapped:
+        print("WARNING: unrecognised columns (skipped — add to NAME_MAP if needed):")
+        for ci, comp, loc, st in unmapped:
+            print(f"   col {ci}: {comp} | {loc} | {st}")
+
+    counts: dict[tuple, int] = {v: 0 for v in col_map.values()}
     skipped = 0
     total_snaps = 0
 
@@ -227,7 +274,7 @@ def run(file_path: Path, apply: bool = False, pg: bool = False) -> None:
         opt_mo = str(row[1]).strip() if row[1] is not None else ""
         futures_sym = _infer_cme_soy(opt_mo, date) if opt_mo else ""
 
-        for col_idx, (provider, location) in COLUMN_MAP.items():
+        for col_idx, (provider, location) in col_map.items():
             raw = row[col_idx] if col_idx < len(row) else None
             basis = _parse_basis(raw)
             if basis is None:

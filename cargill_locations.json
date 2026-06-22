@@ -32,7 +32,6 @@
   "frederick-cah":                      {"barchart_id": "64714", "display_name": "Frederick",                             "comm_roots": ["ZS","ZC"]},
   "gainesville-gos":                    {"barchart_id": "7339",  "display_name": "Gainesville",                           "comm_roots": ["ZS"]},
   "gibbon-cah":                         {"barchart_id": "59460", "display_name": "Gibbon",                                "comm_roots": ["ZC","ZS"]},
-  "gibson-city-cah":                    {"barchart_id": "64092", "display_name": "Gibson City",                           "comm_roots": ["ZC","ZS","ZW"]},
   "gilman-cah":                         {"barchart_id": "63684", "display_name": "Gilman",                                "comm_roots": ["ZC","ZS","ZW"]},
   "guntersville-gos":                   {"barchart_id": "60825", "display_name": "Guntersville",                          "comm_roots": ["ZS"]},
   "hales-point-cah":                    {"barchart_id": "49789", "display_name": "Hales Point",                           "comm_roots": ["ZC","ZS","ZW"]},
