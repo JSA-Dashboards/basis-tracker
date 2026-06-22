@@ -1,0 +1,8 @@
+# ── Local / full stack ────────────────────────────────────────────────────
+# For running the scrapers, email import, and the scheduled auto_import.py.
+# Install with:  pip install -r requirements-dev.txt
+# (also run `playwright install chromium` for the POET / agricharts scrapers)
+-r requirements.txt
+msal==1.28.0
+pdfplumber==0.11.0
+playwright>=1.44.0
