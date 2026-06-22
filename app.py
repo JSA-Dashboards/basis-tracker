@@ -1417,6 +1417,38 @@ def build_changes_email_html(mode: str = "spot") -> str:
     )
 
 
+def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
+    """Render a button that copies `html` to the clipboard with formatting intact
+    (rich text — pastes into Outlook/Word keeping the table styling)."""
+    import json as _json
+    import streamlit.components.v1 as _components
+    payload = _json.dumps(html).replace("</", "<\\/")
+    btn_css = ("font-family:Arial,sans-serif;font-size:12px;font-weight:600;"
+               f"background:{JPSI_BLUE};color:#fff;border:none;border-radius:6px;"
+               "padding:6px 14px;cursor:pointer")
+    _components.html(f"""
+      <button id="b" onclick="c()" style="{btn_css}">{label}</button>
+      <span id="m" style="font-family:Arial,sans-serif;font-size:12px;color:#16a34a;
+            font-weight:600;margin-left:8px"></span>
+      <script>
+        const H = {payload};
+        function c() {{
+          const d = document.createElement('div');
+          d.style.cssText = 'position:fixed;left:-99999px;top:0;';
+          d.innerHTML = H;
+          document.body.appendChild(d);
+          const rg = document.createRange(); rg.selectNodeContents(d);
+          const s = window.getSelection(); s.removeAllRanges(); s.addRange(rg);
+          let ok = false;
+          try {{ ok = document.execCommand('copy'); }} catch(e) {{}}
+          s.removeAllRanges(); document.body.removeChild(d);
+          document.getElementById('m').textContent = ok ? 'Copied!' : 'Press Ctrl+C';
+          setTimeout(() => {{ document.getElementById('m').textContent = ''; }}, 1800);
+        }}
+      </script>
+    """, height=height)
+
+
 tab_changes, tab_bids, tab_map, tab_summary, tab_trends = st.tabs(
     ["🔔 Changes", "📋 Bids", "🗺️ Map", "📊 Summary", "📈 Trends"])
 
@@ -1424,8 +1456,9 @@ tab_changes, tab_bids, tab_map, tab_summary, tab_trends = st.tabs(
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_changes:
-    st.caption("Branded daily report — select it and copy into your email (paste keeps the formatting).")
+    st.caption("Branded daily report — click Copy, then paste into your email (formatting is preserved).")
     _email_html = build_changes_email_html()
+    copy_button(_email_html, "📋 Copy report for email")
     st.markdown(_email_html, unsafe_allow_html=True)
     with st.expander("HTML source (for email automation / HTML editors)"):
         st.code(_email_html, language="html")
@@ -3323,6 +3356,7 @@ with tab_summary:
                 h += '</tr>'
 
             h += '</tbody></table></div>'
+            copy_button(h, "📋 Copy table")
             st.markdown(h, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
