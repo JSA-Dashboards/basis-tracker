@@ -334,8 +334,61 @@ def build_changes_email_html(mode: str = "spot") -> str:
     )
 
 
-def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = None) -> None:
-    """Send an HTML email through the local, logged-in Outlook desktop app."""
+_SIG_LOGO     = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "assets", "50 Year logo JSA.png")
+_SIG_LOGO_CID = "jsa50yr"
+_TEAMS_URL    = os.getenv("SIG_TEAMS_URL",
+                          "https://teams.microsoft.com/l/chat/0/0?users=kpostin@jpsi.com")
+_WHATSAPP_URL = os.getenv("SIG_WHATSAPP_URL", "https://wa.me/18776711670")
+_DISCLAIMER = (
+    "Trading commodity futures, options on futures, cash commodities, and over-the-counter "
+    "derivative products involves substantial risk of loss and may not be suitable for all "
+    "investors. This communication is provided for informational purposes only and does not "
+    "constitute investment advice, a recommendation, or an offer or solicitation to buy or sell "
+    "any futures, options, cash commodities, or derivative products. John Stewart &amp; "
+    "Associates, Inc. does not accept orders to buy or sell any financial instruments via email. "
+    "The information contained herein has been obtained from sources believed to be reliable; "
+    "however, its accuracy and completeness are not guaranteed. Any opinions expressed are solely "
+    "those of the author, are subject to change without notice, and should not be relied upon as a "
+    "basis for investment decisions. Past performance is not indicative of future results. This "
+    "message may contain confidential or proprietary information intended solely for the use of the "
+    "designated recipient. &copy; John Stewart &amp; Associates, Inc. 2026"
+)
+
+
+def signature_html() -> str:
+    """Kolten Postin's JSA email signature (logo via cid:, disclaimer included)."""
+    logo = (f'<img src="cid:{_SIG_LOGO_CID}" alt="John Stewart &amp; Associates - 50 Years" '
+            f'height="64" style="height:64px;display:block;margin:8px 0 6px">'
+            if os.path.exists(_SIG_LOGO) else "")
+    b = "font-weight:bold"
+    return (
+        f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#32373c;'
+        f'margin-top:20px;border-top:1px solid #e2e8f0;padding-top:12px">'
+        f'<div style="{b};font-size:13px">Kolten A. Postin</div>'
+        f'<div style="color:#5b6770">John Stewart &amp; Associates</div>'
+        f'<div style="{b}">Commodity Broker</div>'
+        f'<div style="{b}">Phone 877-671-1670</div>'
+        f'<div style="{b}">Email: <a href="mailto:kpostin@jpsi.com" '
+        f'style="color:{JPSI_BLUE};text-decoration:none">kpostin@jpsi.com</a></div>'
+        f'<div style="{b};margin-top:8px"><a href="{_TEAMS_URL}" '
+        f'style="color:{JPSI_BLUE};text-decoration:none">MS TEAMS: Chat with me on Microsoft Teams</a></div>'
+        f'<div style="{b}"><a href="{_WHATSAPP_URL}" '
+        f'style="color:{JPSI_BLUE};text-decoration:none">WhatsApp: Chat with me on WhatsApp Here</a></div>'
+        f'{logo}'
+        f'<div style="font-size:9px;color:#9aa0a6;line-height:1.45;margin-top:10px;'
+        f'max-width:680px">{_DISCLAIMER}</div>'
+        f'</div>'
+    )
+
+
+def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = None,
+                     inline_images: dict | None = None) -> None:
+    """Send an HTML email via the local, logged-in Outlook desktop app.
+
+    `inline_images` is an optional {content_id: filepath} map for images referenced
+    in the HTML as <img src="cid:content_id">.
+    """
     import win32com.client as win32  # pywin32 (local/dev only)
     outlook = win32.Dispatch("Outlook.Application")
     mail = outlook.CreateItem(0)  # 0 = olMailItem
@@ -344,6 +397,11 @@ def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = Non
         mail.CC = cc
     mail.Subject = subject
     mail.HTMLBody = html
+    for cid, path in (inline_images or {}).items():
+        if os.path.exists(path):
+            att = mail.Attachments.Add(path)
+            att.PropertyAccessor.SetProperty(
+                "http://schemas.microsoft.com/mapi/proptag/0x3712001F", cid)
     mail.Send()
 
 
@@ -356,9 +414,10 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
     to_addr = to_addr or DEFAULT_TO
     if cc is None:
         cc = os.getenv("CHANGES_EMAIL_CC") or None
-    html = build_changes_email_html(mode)
-    subject = f"Daily Basis Changes — {datetime.now():%b %d, %Y}"
-    send_via_outlook(subject, html, to_addr, cc=cc)
+    html = build_changes_email_html(mode) + signature_html()
+    subject = f"JSA Daily Basis Changes - {datetime.now():%b %d, %Y}"
+    imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else None
+    send_via_outlook(subject, html, to_addr, cc=cc, inline_images=imgs)
     log.info("Daily Changes email sent to %s (cc %s)", to_addr, cc or "—")
     return True
 
