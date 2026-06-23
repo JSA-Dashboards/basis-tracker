@@ -1619,6 +1619,63 @@ with tab_railfob:
                    "Bid-only markets show no offer. CSX/NS = rail carrier.")
         copy_button(_rf_html, "📋 Copy table")
 
+    # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
+    from database import get_rail_fob, get_rail_fob_dates
+    from rail_corridors import CORRIDOR_ORDER
+    st.markdown('<div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:10px;'
+                "font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;"
+                'color:#32373c">Rail Corridors · archived (corn)</div>',
+                unsafe_allow_html=True)
+    _mdates = get_rail_fob_dates("manual")
+    if not _mdates:
+        st.caption("No archived rail-corridor postings yet — these are added ~2×/week.")
+    else:
+        _mc, _ = st.columns([3, 7])
+        with _mc:
+            _msel = st.selectbox("Posting date", _mdates, key="rail_manual_date")
+        _mrows = get_rail_fob("manual", _msel)
+        _pmap = {}
+        for _r in _mrows:
+            _pmap.setdefault(_r["period"], _r.get("period_order") or 99)
+        _periods_m = sorted(_pmap, key=lambda p: (_pmap[p], p))
+        _markets = sorted({_r["market"] for _r in _mrows},
+                          key=lambda m: (CORRIDOR_ORDER.get(m, 999), m))
+        _lookup = {(_r["market"], _r["period"]): _r for _r in _mrows}
+        _MTH = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;color:#94a3b8;"
+                "text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:2px solid #e2e8f0")
+        _MTL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
+                "border-bottom:1px solid #f1f5f9;color:#32373c;white-space:nowrap")
+        _MTC = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
+                "border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap")
+        _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706", "BNSF": "#16a34a"}
+        _mh = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
+        _mh += f'<tr><td style="{_MTH}">Corridor</td>'
+        for _p in _periods_m:
+            _mh += f'<td style="{_MTH};text-align:center">{_p}</td>'
+        _mh += '</tr>'
+        for _m in _markets:
+            _rail = next((_r["rail"] for _r in _mrows if _r["market"] == _m), "") or ""
+            _rcol = _railcolors.get(_rail, "#64748b")
+            _mh += (f'<tr><td style="{_MTL}"><b>{_m}</b> '
+                    f'<span style="font-size:9px;color:#fff;background:{_rcol};'
+                    f'padding:1px 5px;border-radius:3px">{_rail}</span></td>')
+            for _p in _periods_m:
+                _cell = _lookup.get((_m, _p))
+                if not _cell or _cell.get("bid") is None:
+                    _mh += f'<td style="{_MTC};color:#cbd5e1">—</td>'
+                    continue
+                _fut = f'<span style="color:#94a3b8;font-size:10px">{_cell.get("futures") or ""}</span>'
+                _bid = f'<b style="color:#32373c">{_cell["bid"]:+d}</b>'
+                _off = (f'<span style="color:#cbd5e1">/</span>'
+                        f'<span style="color:#0693e3;font-weight:600">{_cell["offer"]:+d}</span>'
+                        if _cell.get("offer") is not None else '')
+                _mh += f'<td style="{_MTC}">{_fut}<br>{_bid}{_off}</td>'
+            _mh += '</tr>'
+        _mh += '</table></div>'
+        st.markdown(_mh, unsafe_allow_html=True)
+        st.caption(f"Archived posting · {_msel} · futures month above each cell, bid dark / offer blue.")
+        copy_button(_mh, "📋 Copy table")
+
 with tab_bids:
     # ── Provider + Location selector ─────────────────────────────────────────────
     prov_col, _ = st.columns([3, 7])

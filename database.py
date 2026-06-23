@@ -106,6 +106,20 @@ _SQLITE_DDL = [
         captured_at TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (date, symbol)
     )""",
+    """CREATE TABLE IF NOT EXISTS rail_fob (
+        date         TEXT NOT NULL,
+        source       TEXT NOT NULL DEFAULT 'manual',
+        market       TEXT NOT NULL,
+        rail         TEXT,
+        commodity    TEXT,
+        period       TEXT NOT NULL,
+        period_order INTEGER,
+        futures      TEXT,
+        bid          INTEGER,
+        offer        INTEGER,
+        captured_at  TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (date, source, market, period)
+    )""",
 ]
 
 _PG_DDL = [
@@ -166,6 +180,20 @@ _PG_DDL = [
         price_cents DOUBLE PRECISION NOT NULL,
         captured_at TEXT,
         PRIMARY KEY (date, symbol)
+    )""",
+    """CREATE TABLE IF NOT EXISTS rail_fob (
+        date         TEXT NOT NULL,
+        source       TEXT NOT NULL DEFAULT 'manual',
+        market       TEXT NOT NULL,
+        rail         TEXT,
+        commodity    TEXT,
+        period       TEXT NOT NULL,
+        period_order INTEGER,
+        futures      TEXT,
+        bid          INTEGER,
+        offer        INTEGER,
+        captured_at  TEXT,
+        PRIMARY KEY (date, source, market, period)
     )""",
 ]
 
@@ -850,6 +878,62 @@ def get_futures_curve(date: str) -> dict:
     try:
         c.execute(f"SELECT symbol, price_cents FROM futures_prices WHERE date={ph}", (date,))
         return {r["symbol"]: r["price_cents"] for r in c.fetchall()}
+    finally:
+        conn.close()
+
+
+def save_rail_fob(date: str, source: str, rows: list) -> int:
+    """Upsert a dated rail FOB posting. `rows` items:
+    {market, rail, commodity, period, period_order, futures, bid, offer}.
+    Returns the number of cells written."""
+    if not rows:
+        return 0
+    from datetime import datetime, timezone
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    now  = datetime.now(timezone.utc).isoformat()
+    sql  = (f"INSERT INTO rail_fob (date, source, market, rail, commodity, period, "
+            f"period_order, futures, bid, offer, captured_at) "
+            f"VALUES ({','.join([ph]*11)}) "
+            f"ON CONFLICT (date, source, market, period) DO UPDATE SET "
+            f"rail=EXCLUDED.rail, commodity=EXCLUDED.commodity, "
+            f"period_order=EXCLUDED.period_order, futures=EXCLUDED.futures, "
+            f"bid=EXCLUDED.bid, offer=EXCLUDED.offer, captured_at=EXCLUDED.captured_at")
+    try:
+        for r in rows:
+            c.execute(sql, (date, source, r["market"], r.get("rail"), r.get("commodity"),
+                            r["period"], r.get("period_order"), r.get("futures"),
+                            r.get("bid"), r.get("offer"), now))
+        conn.commit()
+    finally:
+        conn.close()
+    return len(rows)
+
+
+def get_rail_fob(source: str, date: str) -> list:
+    """Return all rail FOB cells for a source + date, ordered by market then period_order."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""SELECT market, rail, commodity, period, period_order, futures, bid, offer
+                      FROM rail_fob WHERE source={ph} AND date={ph}
+                      ORDER BY market, period_order, period""", (source, date))
+        return [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
+def get_rail_fob_dates(source: str) -> list:
+    """Distinct posting dates for a source, most recent first."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"SELECT DISTINCT date FROM rail_fob WHERE source={ph} ORDER BY date DESC",
+                  (source,))
+        return [r["date"] for r in c.fetchall()]
     finally:
         conn.close()
 
