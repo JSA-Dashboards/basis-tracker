@@ -334,24 +334,32 @@ def build_changes_email_html(mode: str = "spot") -> str:
     )
 
 
-def send_via_outlook(subject: str, html: str, to_addr: str) -> None:
+def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = None) -> None:
     """Send an HTML email through the local, logged-in Outlook desktop app."""
     import win32com.client as win32  # pywin32 (local/dev only)
     outlook = win32.Dispatch("Outlook.Application")
     mail = outlook.CreateItem(0)  # 0 = olMailItem
     mail.To = to_addr
+    if cc:
+        mail.CC = cc
     mail.Subject = subject
     mail.HTMLBody = html
     mail.Send()
 
 
-def send_daily_changes_email(to_addr: str | None = None, mode: str = "spot") -> bool:
-    """Build the daily Changes report and email it via Outlook. Returns True on success."""
+def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
+                             mode: str = "spot") -> bool:
+    """Build the daily Changes report and email it via Outlook. Returns True on success.
+
+    `cc` defaults to the CHANGES_EMAIL_CC env var (so a standing copy recipient can
+    be configured for the scheduled daily send)."""
     to_addr = to_addr or DEFAULT_TO
+    if cc is None:
+        cc = os.getenv("CHANGES_EMAIL_CC") or None
     html = build_changes_email_html(mode)
     subject = f"Daily Basis Changes — {datetime.now():%b %d, %Y}"
-    send_via_outlook(subject, html, to_addr)
-    log.info("Daily Changes email sent to %s", to_addr)
+    send_via_outlook(subject, html, to_addr, cc=cc)
+    log.info("Daily Changes email sent to %s (cc %s)", to_addr, cc or "—")
     return True
 
 
