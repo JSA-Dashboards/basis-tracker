@@ -2133,8 +2133,15 @@ with tab_bids:
         # the two lines is the true basis change per delivery.
         import pandas as _pd
         import altair as _alt
-        import futures_spread as _fs
-        _fs.set_curve(_cached_futures_curve())   # ADM-harvested futures, for anchoring
+        _curve = _cached_futures_curve()   # ADM-harvested futures {symbol -> cents}
+
+        def _anchor(_raw, _sym, _anc):
+            """Re-express basis (vs _sym) as a basis to _anc via the futures curve.
+            None when a needed futures price is missing (caller falls back to raw)."""
+            if not _sym or not _anc or _sym == _anc:
+                return _raw
+            _ps, _pa = _curve.get(_sym), _curve.get(_anc)
+            return None if (_ps is None or _pa is None) else _raw + (_ps - _pa)
 
         _fwd_rows = sorted(
             [r for r in body_rows if r.basisCents is not None],
@@ -2153,7 +2160,7 @@ with tab_bids:
                              key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
                 _out, _ok = [], True
                 for _r in _rs:
-                    _adj = _fs.anchor_basis(_r.basisCents, _r.futuresSymbol, _anchor_sym)
+                    _adj = _anchor(_r.basisCents, _r.futuresSymbol, _anchor_sym)
                     if _adj is None:
                         _adj = _r.basisCents
                         if _r.futuresSymbol != _anchor_sym:
