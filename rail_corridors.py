@@ -51,11 +51,17 @@ _PACKAGES = {"JFM": 1, "FMA": 2, "MAM": 3, "AMJ": 4, "MJJ": 5, "JJA": 6,
              "JAS": 7, "ASO": 8, "SON": 9, "OND": 10, "NDJ": 11, "DJF": 12}
 
 
+# Shorthand 2-letter period packages → first delivery month (extend as they appear).
+_ABBREV = {"AS": 8}   # Aug-Sep
+
+
 def period_start_month(period: str) -> Optional[int]:
     """First delivery month (1-12) implied by a period label, else None."""
     p = period.strip().upper()
     if p in _PACKAGES:
         return _PACKAGES[p]
+    if p in _ABBREV:
+        return _ABBREV[p]
     found = [(p.find(tok), m) for tok, m in _MONTHS.items() if tok in p]
     if found:
         found.sort()
