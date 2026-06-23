@@ -12,30 +12,52 @@ futures spread between that delivery's month and the anchor:
 
 So the only external input needed is a futures price (cents/bu) per CME symbol.
 
-──────────────────────────────────────────────────────────────────────────────
-TODO (futures API): implement `get_futures_price(symbol)` to return the latest
-settle/last price in CENTS per bushel for a CME symbol like "ZSN26" / "ZCZ26".
-Until then it returns None and callers fall back to plotting raw basis.
-──────────────────────────────────────────────────────────────────────────────
+Source: `adm_futures.fetch_futures_curve()` harvests these prices for free from
+ADM's own Gradable feed (each instrument carries the underlying futures price +
+symbol). The app loads that curve behind a cache and calls `set_curve()`; any
+symbol not in the curve returns None and that point falls back to raw basis.
 """
 from __future__ import annotations
 
 from typing import Optional
 
-# Optional manual overrides (cents/bu), handy for testing before the API lands:
+# Optional manual overrides (cents/bu), handy for testing:
 #   _PRICE_OVERRIDES = {"ZSN26": 1123.50, "ZSX26": 1143.50, ...}
 _PRICE_OVERRIDES: dict[str, float] = {}
+
+# Futures curve {symbol -> cents}. Populated from ADM's Gradable feed
+# (adm_futures.fetch_futures_curve), set via set_curve() — the app loads it
+# behind a cache and pushes it in so anchor calls do no network I/O.
+_CURVE: dict[str, float] = {}
+
+
+def set_curve(curve: Optional[dict[str, float]]) -> None:
+    """Install the futures curve ({symbol -> cents}) used for anchoring."""
+    global _CURVE
+    _CURVE = dict(curve or {})
+
+
+def ensure_curve() -> dict[str, float]:
+    """Lazily harvest the ADM futures curve if one hasn't been set (standalone use)."""
+    global _CURVE
+    if not _CURVE:
+        try:
+            import adm_futures
+            _CURVE = adm_futures.fetch_futures_curve()
+        except Exception:
+            pass
+    return _CURVE
 
 
 def get_futures_price(symbol: str) -> Optional[float]:
     """Latest futures price (cents/bu) for a CME symbol, or None if unavailable.
 
-    Replace the body with a call to the futures-quote API. Returning None for any
-    symbol makes the forward-curve chart fall back to raw (un-anchored) basis.
+    Source is the ADM-harvested curve (see adm_futures.py). None for a symbol
+    makes the forward-curve chart fall back to raw (un-anchored) basis.
     """
     if symbol in _PRICE_OVERRIDES:
         return _PRICE_OVERRIDES[symbol]
-    return None  # ← wire to the futures quote API
+    return ensure_curve().get(symbol)
 
 
 def spread(near_symbol: str, far_symbol: str) -> Optional[float]:

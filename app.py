@@ -75,6 +75,12 @@ def _cached_get_location_meta(provider: str) -> dict:
 def _cached_get_map_data() -> list[dict]:
     return get_map_data()
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_futures_curve() -> dict:
+    """Futures curve {symbol -> cents} harvested from ADM's feed (for basis anchoring)."""
+    import adm_futures
+    return adm_futures.fetch_futures_curve()
+
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
     entry = _GM.get(raw)
@@ -2127,6 +2133,7 @@ with tab_bids:
         import pandas as _pd
         import altair as _alt
         import futures_spread as _fs
+        _fs.set_curve(_cached_futures_curve())   # ADM-harvested futures, for anchoring
 
         _fwd_rows = sorted(
             [r for r in body_rows if r.basisCents is not None],
