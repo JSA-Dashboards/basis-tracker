@@ -89,6 +89,12 @@ def _cached_futures_curve_for(date_str: str) -> dict:
     stored = get_futures_curve(date_str)
     return stored if stored else _cached_futures_curve()
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _cached_rail_fob() -> dict:
+    """Rail FOB bids/offers scraped from palmettograin.com/raildivision."""
+    import palmetto_rail_scraper
+    return palmetto_rail_scraper.fetch_rail_fob() or {}
+
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
     entry = _GM.get(raw)
@@ -1549,8 +1555,8 @@ def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
     """, height=height)
 
 
-tab_changes, tab_bids, tab_map, tab_summary, tab_trends = st.tabs(
-    ["🔔 Changes", "📋 Bids", "🗺️ Map", "📊 Summary", "📈 Trends"])
+tab_changes, tab_bids, tab_railfob, tab_map, tab_summary, tab_trends = st.tabs(
+    ["🔔 Changes", "📋 Bids", "🚂 Rail FOB", "🗺️ Map", "📊 Summary", "📈 Trends"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -1562,6 +1568,56 @@ with tab_changes:
     st.markdown(_email_html, unsafe_allow_html=True)
     with st.expander("HTML source (for email automation / HTML editors)"):
         st.code(_email_html, language="html")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: RAIL FOB  (palmettograin.com rail FOB bids + offers)
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_railfob:
+    _rf = _cached_rail_fob()
+    if not _rf or not _rf.get("rows"):
+        st.info("Rail FOB data is unavailable right now. "
+                "Source: [palmettograin.com/raildivision](https://www.palmettograin.com/raildivision)")
+    else:
+        st.caption(
+            f"Rail FOB bids & offers · source: palmettograin.com · "
+            f"updated {_rf.get('updated') or '—'}"
+        )
+        _RF_TH = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;"
+                  "color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;"
+                  "padding:6px 8px;border-bottom:2px solid #e2e8f0")
+        _RF_TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
+                   "border-bottom:1px solid #f1f5f9;color:#32373c;white-space:nowrap")
+        _RF_TDC = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
+                   "border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap")
+        _rf_html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
+        _rf_html += f'<tr><td style="{_RF_TH}">Market</td>'
+        for _p in _rf["periods"]:
+            _rf_html += f'<td style="{_RF_TH};text-align:center">{_p}</td>'
+        _rf_html += '</tr>'
+        for _r in _rf["rows"]:
+            _railcol = "#0693e3" if _r["rail"] == "CSX" else "#7c3aed"
+            _rf_html += ('<tr><td style="' + _RF_TDL + '">'
+                         f'<b>{_r["location"]}</b> '
+                         f'<span style="font-size:9px;color:#fff;background:{_railcol};'
+                         f'padding:1px 5px;border-radius:3px">{_r["rail"]}</span></td>')
+            for _c in _r["cells"]:
+                if not _c["futures"]:
+                    _rf_html += f'<td style="{_RF_TDC};color:#cbd5e1">—</td>'
+                    continue
+                _fut = f'<span style="color:#94a3b8;font-size:10px">{_c["futures"]}</span>'
+                _bid = f'<b style="color:#32373c">{_c["bid"]:+d}</b>'
+                if _c["offer"] is not None:
+                    _off = (f'<span style="color:#cbd5e1">/</span>'
+                            f'<span style="color:#0693e3;font-weight:600">{_c["offer"]:+d}</span>')
+                else:
+                    _off = ''
+                _rf_html += f'<td style="{_RF_TDC}">{_fut}<br>{_bid}{_off}</td>'
+            _rf_html += '</tr>'
+        _rf_html += '</table></div>'
+        st.markdown(_rf_html, unsafe_allow_html=True)
+        st.caption("Each cell: futures month (top) · bid in dark, offer in blue. "
+                   "Bid-only markets show no offer. CSX/NS = rail carrier.")
+        copy_button(_rf_html, "📋 Copy table")
 
 with tab_bids:
     # ── Provider + Location selector ─────────────────────────────────────────────
