@@ -1647,7 +1647,8 @@ with tab_railfob:
                 "border-bottom:1px solid #f1f5f9;color:#32373c;white-space:nowrap")
         _MTC = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
                 "border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap")
-        _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706", "BNSF": "#16a34a"}
+        _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706",
+                       "BNSF": "#16a34a", "CN": "#b91c1c"}
         _mh = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
         _mh += f'<tr><td style="{_MTH}">Corridor</td>'
         for _p in _periods_m:
