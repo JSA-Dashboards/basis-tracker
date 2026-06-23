@@ -2125,11 +2125,12 @@ with tab_bids:
             unsafe_allow_html=True,
         )
 
-        # ── Forward basis curve (current snapshot) ─────────────────────────────
+        # ── Forward basis curve (current snapshot, optional older overlay) ─────
         # Each delivery is quoted vs its own futures month; anchor them all to the
-        # front month via futures spreads (futures_spread.py) so the curve is an
-        # apples-to-apples cash-basis line. Falls back to raw basis until the
-        # futures-price API is wired up.
+        # current front month via futures spreads (futures_spread.py) so the curve
+        # is an apples-to-apples cash-basis line. An older snapshot can be overlaid
+        # for comparison — anchored with the SAME current curve, so the gap between
+        # the two lines is the true basis change per delivery.
         import pandas as _pd
         import altair as _alt
         import futures_spread as _fs
@@ -2141,24 +2142,57 @@ with tab_bids:
         )
         if len(_fwd_rows) >= 2:
             _anchor_sym = _fwd_rows[0].futuresSymbol
-            _fwd_pts, _anchored_ok = [], True
-            for _r in _fwd_rows:
-                _adj = _fs.anchor_basis(_r.basisCents, _r.futuresSymbol, _anchor_sym)
-                if _adj is None:            # no spread available → show raw basis
-                    _adj = _r.basisCents
-                    if _r.futuresSymbol != _anchor_sym:
-                        _anchored_ok = False
-                _fwd_pts.append({
-                    "Delivery": _r.deliveryMonth,
-                    "Basis":    _adj,
-                    "Raw":      _r.basisCents,
-                    "Futures":  _r.futuresSymbol,
-                })
-            _fwd_order = [p["Delivery"] for p in _fwd_pts]  # chronological
-            _df_fwd = _pd.DataFrame(_fwd_pts)
+
+            def _snap_label(_s):
+                return datetime.fromisoformat(
+                    _s.timestamp.replace("Z", "+00:00")).strftime("%b %d, %Y")
+
+            def _curve_pts(_rows, _series):
+                """Anchored forward points for a snapshot's rows (None spread → raw)."""
+                _rs = sorted([r for r in _rows if r.basisCents is not None],
+                             key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
+                _out, _ok = [], True
+                for _r in _rs:
+                    _adj = _fs.anchor_basis(_r.basisCents, _r.futuresSymbol, _anchor_sym)
+                    if _adj is None:
+                        _adj = _r.basisCents
+                        if _r.futuresSymbol != _anchor_sym:
+                            _ok = False
+                    _out.append({"Delivery": _r.deliveryMonth, "Basis": _adj,
+                                 "Raw": _r.basisCents, "Futures": _r.futuresSymbol,
+                                 "Series": _series})
+                return _out, _ok
+
+            # Optional overlay: pick an older snapshot to compare against
+            _prior_snaps = snapshots[:snapshots.index(viewing)]
+            _cmp_snap = None
+            if _prior_snaps:
+                _cmp_opts = ["None"] + [_snap_label(s) for s in reversed(_prior_snaps)]
+                _cmp_col, _ = st.columns([4, 6])
+                with _cmp_col:
+                    _cmp_pick = st.selectbox("Overlay an earlier date", _cmp_opts,
+                                             key=f"fwd_cmp_{loc_key}_{grain}")
+                if _cmp_pick != "None":
+                    _cmp_snap = next(s for s in _prior_snaps if _snap_label(s) == _cmp_pick)
+
+            _cur_label = _snap_label(viewing)
+            _all_pts, _anchored_ok = _curve_pts(body_rows, _cur_label)
+            _all_pts = list(_all_pts)
+            if _cmp_snap is not None:
+                _cmp_rows = [r for r in _cmp_snap.rows
+                             if not r.isSpot and _grain_disp(r.grain) == grain]
+                _cmp_pts, _ = _curve_pts(_cmp_rows, _snap_label(_cmp_snap))
+                _all_pts += _cmp_pts
+
+            # X order = union of delivery labels, chronological
+            _seen, _fwd_order = set(), []
+            for _p in sorted(_all_pts, key=lambda x: _dp.deliv_key(x["Delivery"], x["Futures"])):
+                if _p["Delivery"] not in _seen:
+                    _seen.add(_p["Delivery"]); _fwd_order.append(_p["Delivery"])
+            _df_fwd = _pd.DataFrame(_all_pts)
 
             _fwd_mode = (f"anchored to {_anchor_sym} (spread-adjusted)" if _anchored_ok
-                         else "raw basis · spot-month anchoring pending futures-price API")
+                         else "raw basis · some contracts lack a futures spread")
             st.markdown(
                 '<div style="margin-top:16px;margin-bottom:4px;font-size:10px;color:#64748b;'
                 'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
@@ -2168,15 +2202,22 @@ with tab_bids:
             )
             _fwd_zero = _alt.Chart(_pd.DataFrame({"y": [0]})).mark_rule(
                 color="#94a3b8", strokeDash=[4, 4], strokeWidth=1).encode(y="y:Q")
+            _dom = [_cur_label] + ([_snap_label(_cmp_snap)] if _cmp_snap is not None else [])
+            _rng = [loc_color] + (["#94a3b8"] if _cmp_snap is not None else [])
             _fwd_line = (
                 _alt.Chart(_df_fwd)
-                .mark_line(point=True, color=loc_color, strokeWidth=2)
+                .mark_line(point=True, strokeWidth=2)
                 .encode(
                     x=_alt.X("Delivery:N", sort=_fwd_order, title=None,
                              axis=_alt.Axis(labelAngle=-30, labelFontSize=10)),
                     y=_alt.Y("Basis:Q", title="Basis (¢)", scale=_alt.Scale(zero=False),
                              axis=_alt.Axis(labelFontSize=10)),
+                    color=_alt.Color("Series:N",
+                                     scale=_alt.Scale(domain=_dom, range=_rng),
+                                     legend=(_alt.Legend(title=None, orient="top-right")
+                                             if _cmp_snap is not None else None)),
                     tooltip=[
+                        _alt.Tooltip("Series:N",   title="Date"),
                         _alt.Tooltip("Delivery:N", title="Delivery"),
                         _alt.Tooltip("Basis:Q",    title="Basis (¢)"),
                         _alt.Tooltip("Raw:Q",      title="Raw basis (¢)"),
