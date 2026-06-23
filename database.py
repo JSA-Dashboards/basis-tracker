@@ -117,6 +117,8 @@ _SQLITE_DDL = [
         futures      TEXT,
         bid          INTEGER,
         offer        INTEGER,
+        bid_raw      TEXT,
+        offer_raw    TEXT,
         captured_at  TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (date, source, market, period)
     )""",
@@ -192,6 +194,8 @@ _PG_DDL = [
         futures      TEXT,
         bid          INTEGER,
         offer        INTEGER,
+        bid_raw      TEXT,
+        offer_raw    TEXT,
         captured_at  TEXT,
         PRIMARY KEY (date, source, market, period)
     )""",
@@ -204,6 +208,8 @@ _MIGRATE_DDL = [
     "ALTER TABLE location_meta ADD COLUMN IF NOT EXISTS delivery_zone TEXT",
     "CREATE INDEX IF NOT EXISTS idx_snap_prov_loc_ts ON snapshots(provider, location, timestamp DESC)",
     "CREATE INDEX IF NOT EXISTS idx_snap_rows_sid ON snapshot_rows(snapshot_id)",
+    "ALTER TABLE rail_fob ADD COLUMN IF NOT EXISTS bid_raw   TEXT",
+    "ALTER TABLE rail_fob ADD COLUMN IF NOT EXISTS offer_raw TEXT",
 ]
 
 
@@ -894,17 +900,20 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
     ph   = "%s" if _use_pg() else "?"
     now  = datetime.now(timezone.utc).isoformat()
     sql  = (f"INSERT INTO rail_fob (date, source, market, rail, commodity, period, "
-            f"period_order, futures, bid, offer, captured_at) "
-            f"VALUES ({','.join([ph]*11)}) "
+            f"period_order, futures, bid, offer, bid_raw, offer_raw, captured_at) "
+            f"VALUES ({','.join([ph]*13)}) "
             f"ON CONFLICT (date, source, market, period) DO UPDATE SET "
             f"rail=EXCLUDED.rail, commodity=EXCLUDED.commodity, "
             f"period_order=EXCLUDED.period_order, futures=EXCLUDED.futures, "
-            f"bid=EXCLUDED.bid, offer=EXCLUDED.offer, captured_at=EXCLUDED.captured_at")
+            f"bid=EXCLUDED.bid, offer=EXCLUDED.offer, "
+            f"bid_raw=EXCLUDED.bid_raw, offer_raw=EXCLUDED.offer_raw, "
+            f"captured_at=EXCLUDED.captured_at")
     try:
         for r in rows:
             c.execute(sql, (date, source, r["market"], r.get("rail"), r.get("commodity"),
                             r["period"], r.get("period_order"), r.get("futures"),
-                            r.get("bid"), r.get("offer"), now))
+                            r.get("bid"), r.get("offer"),
+                            r.get("bid_raw"), r.get("offer_raw"), now))
         conn.commit()
     finally:
         conn.close()
@@ -917,7 +926,8 @@ def get_rail_fob(source: str, date: str) -> list:
     c    = conn.cursor()
     ph   = "%s" if _use_pg() else "?"
     try:
-        c.execute(f"""SELECT market, rail, commodity, period, period_order, futures, bid, offer
+        c.execute(f"""SELECT market, rail, commodity, period, period_order, futures,
+                             bid, offer, bid_raw, offer_raw
                       FROM rail_fob WHERE source={ph} AND date={ph}
                       ORDER BY market, period_order, period""", (source, date))
         return [dict(r) for r in c.fetchall()]

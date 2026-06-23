@@ -119,6 +119,31 @@ def period_order(period: str, anchor_month: Optional[int] = None) -> int:
     return m
 
 
+# Multi-month packages that span more than one futures contract are quoted vs "R"
+# (respective option month), e.g. AMJJ (Apr-Jul), Jan-Jul.
+_SPAN_PACKAGES = {"AMJJ", "AMJ J", "JFMAMJJ"}
+
+
+def _span_contracts(period: str) -> set:
+    """Distinct corn contracts implied by every month named in a period label."""
+    p = period.strip().upper()
+    return {_CORN_BY_MONTH[m] for tok, m in _MONTHS.items() if tok in p}
+
+
+def corn_futures(period: str, rail: Optional[str] = None, as_of=None) -> Optional[str]:
+    """Futures contract for a rail corridor cell, applying the special rules:
+      • spanning packages (AMJJ, Jan-Jul, …) → 'R' (respective option month)
+      • CSX / NS December always prices vs CH (March)
+      • otherwise the standard date-aware (FND-rolled) corn contract.
+    """
+    p = period.strip().upper()
+    if p in _SPAN_PACKAGES or len(_span_contracts(period)) > 1:
+        return "R"
+    if rail in ("CSX", "NS") and period_start_month(period) == 12:
+        return "CH"
+    return corn_futures_for_period(period, as_of)
+
+
 _CELL_RE = re.compile(r"^\s*([A-Z][FGHJKMNQUVXZ])?\s*([+-]?\d+)\s*(?:/\s*([+-]?\d+))?\s*$")
 
 

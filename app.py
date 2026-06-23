@@ -1661,16 +1661,21 @@ with tab_railfob:
                     f'<span style="font-size:9px;color:#fff;background:{_rcol};'
                     f'padding:1px 5px;border-radius:3px">{_rail}</span></td>')
             for _p in _periods_m:
-                _cell = _lookup.get((_m, _p))
-                if not _cell or _cell.get("bid") is None:
+                _cell = _lookup.get((_m, _p)) or {}
+                _bs = _cell.get("bid_raw")   or (f'{_cell["bid"]:+d}'   if _cell.get("bid")   is not None else None)
+                _os = _cell.get("offer_raw") or (f'{_cell["offer"]:+d}' if _cell.get("offer") is not None else None)
+                if _bs is None and _os is None:
                     _mh += f'<td style="{_MTC};color:#cbd5e1">—</td>'
                     continue
-                _fut = f'<span style="color:#94a3b8;font-size:10px">{_cell.get("futures") or ""}</span>'
-                _bid = f'<b style="color:#32373c">{_cell["bid"]:+d}</b>'
-                _off = (f'<span style="color:#cbd5e1">/</span>'
-                        f'<span style="color:#0693e3;font-weight:600">{_cell["offer"]:+d}</span>'
-                        if _cell.get("offer") is not None else '')
-                _mh += f'<td style="{_MTC}">{_fut}<br>{_bid}{_off}</td>'
+                _fut  = f'<span style="color:#94a3b8;font-size:10px">{_cell.get("futures") or ""}</span>'
+                _bidh = ('' if _bs is None else
+                         (f'<span style="color:#94a3b8">{_bs}</span>' if _bs == "?"
+                          else f'<b style="color:#32373c">{_bs}</b>'))
+                _offh = ('' if _os is None else
+                         '<span style="color:#cbd5e1">/</span>' +
+                         (f'<span style="color:#94a3b8">{_os}</span>' if _os == "?"
+                          else f'<span style="color:#0693e3;font-weight:600">{_os}</span>'))
+                _mh += f'<td style="{_MTC}">{_fut}<br>{_bidh}{_offh}</td>'
             _mh += '</tr>'
         _mh += '</table></div>'
         st.markdown(_mh, unsafe_allow_html=True)
