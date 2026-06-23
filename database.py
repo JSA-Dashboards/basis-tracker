@@ -948,6 +948,21 @@ def get_rail_fob_dates(source: str) -> list:
         conn.close()
 
 
+def get_rail_fob_all(source: str) -> list:
+    """All rail FOB cells for a source across every date (for trend/change columns)."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""SELECT date, market, rail, commodity, period, period_order, futures,
+                             bid, offer, bid_raw, offer_raw
+                      FROM rail_fob WHERE source={ph}
+                      ORDER BY market, period_order, period, date""", (source,))
+        return [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
 def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> dict:
     """
     Fetch all snapshots (with rows) for multiple (provider, location) pairs

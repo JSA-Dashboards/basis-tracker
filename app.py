@@ -1620,7 +1620,7 @@ with tab_railfob:
         copy_button(_rf_html, "📋 Copy table")
 
     # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
-    from database import get_rail_fob, get_rail_fob_dates
+    from database import get_rail_fob, get_rail_fob_dates, get_rail_fob_all
     from rail_corridors import CORRIDOR_ORDER
     st.markdown('<div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:10px;'
                 "font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;"
@@ -1633,52 +1633,92 @@ with tab_railfob:
         _mc, _ = st.columns([3, 7])
         with _mc:
             _msel = st.selectbox("Posting date", _mdates, key="rail_manual_date")
-        _mrows = get_rail_fob("manual", _msel)
-        _markets = sorted({_r["market"] for _r in _mrows},
+        from datetime import timedelta as _td
+        _allrows = get_rail_fob_all("manual")
+        _by_md, _mkt_dates = {}, {}
+        for _r in _allrows:
+            _by_md.setdefault((_r["market"], _r["date"]), {})[_r["period"]] = _r
+            _mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
+        _markets = sorted({_r["market"] for _r in get_rail_fob("manual", _msel)},
                           key=lambda m: (CORRIDOR_ORDER.get(m, 999), m))
-        _bymkt = {}
-        for _r in _mrows:
-            _bymkt.setdefault(_r["market"], []).append(_r)
-        _MTH = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
-                "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
-                "border-bottom:2px solid #e2e8f0;text-align:center;white-space:nowrap")
-        _MTC = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:5px 8px;"
-                "border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap")
         _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706",
                        "BNSF": "#16a34a", "CN": "#b91c1c"}
+        _THL = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
+                "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
+                "border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap")
+        _THR = _THL.replace("text-align:left", "text-align:right")
+        _TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 8px;"
+                "border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
+        _TDR = _TDL.replace("text-align:left", "text-align:right")
 
-        def _railcell(_cell):
-            _bs = _cell.get("bid_raw")   or (f'{_cell["bid"]:+d}'   if _cell.get("bid")   is not None else None)
-            _os = _cell.get("offer_raw") or (f'{_cell["offer"]:+d}' if _cell.get("offer") is not None else None)
-            if _bs is None and _os is None:
-                return f'<td style="{_MTC};color:#cbd5e1">—</td>'
-            _fut  = f'<span style="color:#94a3b8;font-size:10px">{_cell.get("futures") or ""}</span>'
-            _bidh = ('' if _bs is None else
-                     (f'<span style="color:#94a3b8">{_bs}</span>' if _bs == "?"
-                      else f'<b style="color:#32373c">{_bs}</b>'))
-            _offh = ('' if _os is None else
-                     '<span style="color:#cbd5e1">/</span>' +
-                     (f'<span style="color:#94a3b8">{_os}</span>' if _os == "?"
-                      else f'<span style="color:#0693e3;font-weight:600">{_os}</span>'))
-            return f'<td style="{_MTC}">{_fut}<br>{_bidh}{_offh}</td>'
+        def _disp(num, raw):
+            return raw if raw else (f"{num:+d}" if num is not None else None)
+
+        def _bidoff_html(_cell, blue):
+            s = _disp(_cell.get("offer" if blue else "bid"),
+                      _cell.get("offer_raw" if blue else "bid_raw"))
+            if s is None:
+                return f'<td style="{_TDR};color:#cbd5e1">—</td>'
+            if s == "?":
+                return f'<td style="{_TDR};color:#94a3b8">?</td>'
+            col = "color:#0693e3;font-weight:600" if blue else "color:#32373c;font-weight:700"
+            return f'<td style="{_TDR};{col}">{s}</td>'
+
+        def _chg_html(cur_bid, prior_map, period):
+            if cur_bid is None or not prior_map or prior_map.get(period) is None:
+                return f'<td style="{_TDR};color:#cbd5e1">—</td>'
+            pb = prior_map[period].get("bid")
+            if pb is None:
+                return f'<td style="{_TDR};color:#cbd5e1">—</td>'
+            d = cur_bid - pb
+            if d == 0:
+                return f'<td style="{_TDR};color:#94a3b8">0</td>'
+            return f'<td style="{_TDR};color:{"#16a34a" if d > 0 else "#dc2626"};font-weight:700">{d:+d}</td>'
+
+        def _prior_maps(market, cur):
+            earlier = sorted(d for d in _mkt_dates.get(market, ()) if d < cur)
+            if not earlier:
+                return (None, None, None)
+            cd = datetime.fromisoformat(cur).date()
+            def closest(days, maxd):
+                tgt  = cd - _td(days=days)
+                best = min(earlier, key=lambda d: abs((datetime.fromisoformat(d).date() - tgt).days))
+                return best if abs((datetime.fromisoformat(best).date() - tgt).days) <= maxd else None
+            return (_by_md.get((market, earlier[-1])),
+                    _by_md.get((market, closest(7, 4))),
+                    _by_md.get((market, closest(30, 10))))
 
         _mh = ''
         for _m in _markets:
-            _cells = sorted(_bymkt[_m],
+            _cells = sorted(_by_md.get((_m, _msel), {}).values(),
                             key=lambda r: (r["period_order"] if r.get("period_order") is not None else 99))
-            _rail = (_cells[0].get("rail") or "") if _cells else ""
+            if not _cells:
+                continue
+            _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
-            _mh += (f'<div style="margin-top:14px;margin-bottom:3px;'
+            _pd, _pw, _pmo = _prior_maps(_m, _msel)
+            _mh += (f'<div style="margin-top:16px;margin-bottom:3px;'
                     f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
                     f'{_m} <span style="font-size:9px;color:#fff;background:{_rcol};'
                     f'padding:1px 5px;border-radius:3px">{_rail}</span></div>')
             _mh += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
-            _mh += '<tr>' + ''.join(f'<td style="{_MTH}">{c["period"]}</td>' for c in _cells) + '</tr>'
-            _mh += '<tr>' + ''.join(_railcell(c) for c in _cells) + '</tr>'
+            _mh += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
+                    f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
+                    f'<td style="{_THR}">Δ Day</td><td style="{_THR}">Δ Wk</td>'
+                    f'<td style="{_THR}">Δ Mo</td></tr>')
+            for c in _cells:
+                _b = c.get("bid")
+                _mh += (f'<tr><td style="{_TDL};color:#32373c">{c["period"]}</td>'
+                        f'<td style="{_TDL};color:#94a3b8;font-size:10px">{c.get("futures") or ""}</td>'
+                        + _bidoff_html(c, False) + _bidoff_html(c, True)
+                        + _chg_html(_b, _pd, c["period"])
+                        + _chg_html(_b, _pw, c["period"])
+                        + _chg_html(_b, _pmo, c["period"])
+                        + '</tr>')
             _mh += '</table></div>'
         st.markdown(_mh, unsafe_allow_html=True)
-        st.caption(f"Archived posting · {_msel} · each corridor: futures month above each cell, "
-                   f"bid dark / offer blue · ? = pending side.")
+        st.caption(f"Archived posting · {_msel} · Δ = bid change vs prior posting / ~1 week / ~1 month "
+                   f"(— until history builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
 
 with tab_bids:
