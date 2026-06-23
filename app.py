@@ -1582,41 +1582,36 @@ with tab_railfob:
             f"Rail FOB bids & offers · source: palmettograin.com · "
             f"updated {_rf.get('updated') or '—'}"
         )
-        _RF_TH = ("font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:700;"
-                  "color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;"
-                  "padding:6px 8px;border-bottom:2px solid #e2e8f0")
-        _RF_TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
-                   "border-bottom:1px solid #f1f5f9;color:#32373c;white-space:nowrap")
-        _RF_TDC = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:6px 8px;"
-                   "border-bottom:1px solid #f1f5f9;text-align:center;white-space:nowrap")
-        _rf_html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%">'
-        _rf_html += f'<tr><td style="{_RF_TH}">Market</td>'
-        for _p in _rf["periods"]:
-            _rf_html += f'<td style="{_RF_TH};text-align:center">{_p}</td>'
-        _rf_html += '</tr>'
+        _RF_THL = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
+                   "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
+                   "border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap")
+        _RF_THR = _RF_THL.replace("text-align:left", "text-align:right")
+        _RF_TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 8px;"
+                   "border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
+        _RF_TDR = _RF_TDL.replace("text-align:left", "text-align:right")
+        _rf_railcol = {"CSX": "#0693e3", "NS": "#7c3aed"}
+        _rf_html = ''
         for _r in _rf["rows"]:
-            _railcol = "#0693e3" if _r["rail"] == "CSX" else "#7c3aed"
-            _rf_html += ('<tr><td style="' + _RF_TDL + '">'
-                         f'<b>{_r["location"]}</b> '
-                         f'<span style="font-size:9px;color:#fff;background:{_railcol};'
-                         f'padding:1px 5px;border-radius:3px">{_r["rail"]}</span></td>')
+            _rc = _rf_railcol.get(_r["rail"], "#64748b")
+            _rf_html += (f'<div style="margin-top:14px;margin-bottom:3px;'
+                         f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
+                         f'{_r["location"]} <span style="font-size:9px;color:#fff;background:{_rc};'
+                         f'padding:1px 5px;border-radius:3px">{_r["rail"]}</span></div>')
+            _rf_html += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
+            _rf_html += (f'<tr><td style="{_RF_THL}">Period</td><td style="{_RF_THL}">Fut</td>'
+                         f'<td style="{_RF_THR}">Bid</td><td style="{_RF_THR}">Offer</td></tr>')
             for _c in _r["cells"]:
                 if not _c["futures"]:
-                    _rf_html += f'<td style="{_RF_TDC};color:#cbd5e1">—</td>'
                     continue
-                _fut = f'<span style="color:#94a3b8;font-size:10px">{_c["futures"]}</span>'
-                _bid = f'<b style="color:#32373c">{_c["bid"]:+d}</b>'
-                if _c["offer"] is not None:
-                    _off = (f'<span style="color:#cbd5e1">/</span>'
-                            f'<span style="color:#0693e3;font-weight:600">{_c["offer"]:+d}</span>')
-                else:
-                    _off = ''
-                _rf_html += f'<td style="{_RF_TDC}">{_fut}<br>{_bid}{_off}</td>'
-            _rf_html += '</tr>'
-        _rf_html += '</table></div>'
+                _bidc = f'<td style="{_RF_TDR};color:#32373c;font-weight:700">{_c["bid"]:+d}</td>'
+                _offc = (f'<td style="{_RF_TDR};color:#0693e3;font-weight:600">{_c["offer"]:+d}</td>'
+                         if _c["offer"] is not None else f'<td style="{_RF_TDR};color:#cbd5e1">—</td>')
+                _rf_html += (f'<tr><td style="{_RF_TDL};color:#32373c">{_c["period"]}</td>'
+                             f'<td style="{_RF_TDL};color:#94a3b8;font-size:10px">{_c["futures"]}</td>'
+                             f'{_bidc}{_offc}</tr>')
+            _rf_html += '</table></div>'
         st.markdown(_rf_html, unsafe_allow_html=True)
-        st.caption("Each cell: futures month (top) · bid in dark, offer in blue. "
-                   "Bid-only markets show no offer. CSX/NS = rail carrier.")
+        st.caption("Bid in dark, offer in blue · bid-only markets show — for offer · CSX/NS = rail carrier.")
         copy_button(_rf_html, "📋 Copy table")
 
     # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
