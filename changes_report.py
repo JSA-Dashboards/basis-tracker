@@ -118,8 +118,9 @@ def _load(facility_type: str):
         ds = [d for s in snaps if (d := _trend_ts(s.timestamp)) <= today_noon]
         if ds:
             loc_latest.append(max(ds).date())
-    now = (datetime(*_C(loc_latest).most_common(1)[0][0].timetuple()[:3], 12)
-           if loc_latest else today_noon)
+    # Anchor on the LATEST date reached (≤ today), not the most common, so a provider
+    # that's a day ahead of the others still surfaces its fresh change.
+    now = (datetime(*max(loc_latest).timetuple()[:3], 12) if loc_latest else today_noon)
     return pairs, data, now
 
 

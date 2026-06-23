@@ -1128,8 +1128,10 @@ def _trend_load(facility_type: str):
         ds = [d for s in snaps if (d := _trend_ts(s.timestamp)) <= today_noon]
         if ds:
             loc_latest.append(max(ds).date())
-    now = (datetime(*_C(loc_latest).most_common(1)[0][0].timetuple()[:3], 12)
-           if loc_latest else today_noon)
+    # Anchor on the LATEST date any location reached (≤ today), not the most common,
+    # so a provider that's a day ahead (e.g. ADM scraped before the others) still
+    # surfaces its fresh change instead of being pinned to the lagging majority date.
+    now = (datetime(*max(loc_latest).timetuple()[:3], 12) if loc_latest else today_noon)
     return pairs, meta, data, now
 
 
