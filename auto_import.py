@@ -1056,6 +1056,26 @@ def run_prune() -> None:
         log.error("Pruning failed: %s", exc)
 
 
+def run_futures_capture() -> int:
+    """Harvest the current futures curve from ADM's feed and store it under today's
+    date, so historical forward-basis curves can later anchor on each day's actual
+    futures (instead of always today's). Best-effort — never blocks the scrape."""
+    try:
+        import adm_futures
+        from database import save_futures_curve
+        curve = adm_futures.fetch_futures_curve()
+        if not curve:
+            log.warning("Futures capture: empty curve — skipped")
+            return 0
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        n = save_futures_curve(curve, today)
+        log.info("Futures capture: stored %d contracts for %s", n, today)
+        return n
+    except Exception as exc:
+        log.warning("Futures capture failed (scrape unaffected): %s", exc)
+        return 0
+
+
 def run(
     run_poet_scrape: bool = True,
     run_chs_scrape: bool = True,
@@ -1138,6 +1158,9 @@ def run(
         total += run_ndsp()
     if run_sdsp_scrape:
         total += run_sdsp()
+
+    # Capture today's futures curve (for per-day basis anchoring as history builds)
+    run_futures_capture()
 
     # Auto-prune every Monday (weekday 0), or if explicitly requested
     if run_pruning and datetime.now().weekday() == 0:

@@ -77,9 +77,17 @@ def _cached_get_map_data() -> list[dict]:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _cached_futures_curve() -> dict:
-    """Futures curve {symbol -> cents} harvested from ADM's feed (for basis anchoring)."""
+    """Today's live futures curve {symbol -> cents} harvested from ADM's feed."""
     import adm_futures
     return adm_futures.fetch_futures_curve()
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_futures_curve_for(date_str: str) -> dict:
+    """Futures curve for a snapshot date: the curve captured that day if we have it
+    stored, else today's live ADM curve (fallback for pre-capture history)."""
+    from database import get_futures_curve
+    stored = get_futures_curve(date_str)
+    return stored if stored else _cached_futures_curve()
 
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
@@ -2133,10 +2141,9 @@ with tab_bids:
         # the two lines is the true basis change per delivery.
         import pandas as _pd
         import altair as _alt
-        _curve = _cached_futures_curve()   # ADM-harvested futures {symbol -> cents}
 
-        def _anchor(_raw, _sym, _anc):
-            """Re-express basis (vs _sym) as a basis to _anc via the futures curve.
+        def _anchor_in(_curve, _raw, _sym, _anc):
+            """Re-express basis (vs _sym) as a basis to _anc via a given futures curve.
             None when a needed futures price is missing (caller falls back to raw)."""
             if not _sym or not _anc or _sym == _anc:
                 return _raw
@@ -2154,13 +2161,16 @@ with tab_bids:
                 return datetime.fromisoformat(
                     _s.timestamp.replace("Z", "+00:00")).strftime("%b %d, %Y")
 
-            def _curve_pts(_rows, _series):
-                """Anchored forward points for a snapshot's rows (None spread → raw)."""
+            def _curve_pts(_rows, _series, _snap):
+                """Anchored forward points for a snapshot's rows, using THAT day's
+                futures curve (stored if captured, else today's). None spread → raw.
+                Anchored to the current front month so series stay comparable."""
+                _curve = _cached_futures_curve_for(_snap.timestamp[:10])
                 _rs = sorted([r for r in _rows if r.basisCents is not None],
                              key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
                 _out, _ok = [], True
                 for _r in _rs:
-                    _adj = _anchor(_r.basisCents, _r.futuresSymbol, _anchor_sym)
+                    _adj = _anchor_in(_curve, _r.basisCents, _r.futuresSymbol, _anchor_sym)
                     if _adj is None:
                         _adj = _r.basisCents
                         if _r.futuresSymbol != _anchor_sym:
@@ -2183,12 +2193,12 @@ with tab_bids:
                     _cmp_snap = next(s for s in _prior_snaps if _snap_label(s) == _cmp_pick)
 
             _cur_label = _snap_label(viewing)
-            _all_pts, _anchored_ok = _curve_pts(body_rows, _cur_label)
+            _all_pts, _anchored_ok = _curve_pts(body_rows, _cur_label, viewing)
             _all_pts = list(_all_pts)
             if _cmp_snap is not None:
                 _cmp_rows = [r for r in _cmp_snap.rows
                              if not r.isSpot and _grain_disp(r.grain) == grain]
-                _cmp_pts, _ = _curve_pts(_cmp_rows, _snap_label(_cmp_snap))
+                _cmp_pts, _ = _curve_pts(_cmp_rows, _snap_label(_cmp_snap), _cmp_snap)
                 _all_pts += _cmp_pts
 
             # X order = union of delivery labels, chronological

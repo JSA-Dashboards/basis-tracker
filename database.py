@@ -99,6 +99,13 @@ _SQLITE_DDL = [
         protein          TEXT,
         is_active        INTEGER NOT NULL DEFAULT 1
     )""",
+    """CREATE TABLE IF NOT EXISTS futures_prices (
+        date        TEXT NOT NULL,
+        symbol      TEXT NOT NULL,
+        price_cents REAL NOT NULL,
+        captured_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (date, symbol)
+    )""",
 ]
 
 _PG_DDL = [
@@ -152,6 +159,13 @@ _PG_DDL = [
         wheat_class      TEXT,
         protein          TEXT,
         is_active        SMALLINT NOT NULL DEFAULT 1
+    )""",
+    """CREATE TABLE IF NOT EXISTS futures_prices (
+        date        TEXT NOT NULL,
+        symbol      TEXT NOT NULL,
+        price_cents DOUBLE PRECISION NOT NULL,
+        captured_at TEXT,
+        PRIMARY KEY (date, symbol)
     )""",
 ]
 
@@ -801,6 +815,41 @@ def grain_counts_by_facility(days: int = 21) -> list[tuple]:
             GROUP BY lm.facility_type, r.grain
         """, (cutoff,))
         return [(r["ft"], r["grain"], r["n"]) for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
+def save_futures_curve(curve: dict, date: str) -> int:
+    """Upsert a day's futures curve ({symbol -> cents}) under `date` ('YYYY-MM-DD').
+    Returns the number of symbols written."""
+    if not curve:
+        return 0
+    from datetime import datetime, timezone
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    now  = datetime.now(timezone.utc).isoformat()
+    sql  = (f"INSERT INTO futures_prices (date, symbol, price_cents, captured_at) "
+            f"VALUES ({ph},{ph},{ph},{ph}) "
+            f"ON CONFLICT (date, symbol) DO UPDATE "
+            f"SET price_cents = EXCLUDED.price_cents, captured_at = EXCLUDED.captured_at")
+    try:
+        for sym, px in curve.items():
+            c.execute(sql, (date, sym, float(px), now))
+        conn.commit()
+    finally:
+        conn.close()
+    return len(curve)
+
+
+def get_futures_curve(date: str) -> dict:
+    """Return the stored futures curve {symbol -> cents} for `date`, or {} if none."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"SELECT symbol, price_cents FROM futures_prices WHERE date={ph}", (date,))
+        return {r["symbol"]: r["price_cents"] for r in c.fetchall()}
     finally:
         conn.close()
 
