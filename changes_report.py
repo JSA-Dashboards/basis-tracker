@@ -138,23 +138,29 @@ def _curve_map(snap, grain):
     return m
 
 
-def _curve_metrics(cur_snap, prior, grain):
-    """Avg basis change + firmer/weaker month counts across matched delivery months."""
-    if cur_snap is None or prior is None:
-        return None
-    cm, pm = _curve_map(cur_snap, grain), _curve_map(prior, grain)
-    deltas = [cm[k] - pm[k] for k in cm if k in pm]
-    if not deltas:
-        return None
-    return {"avg":    sum(deltas) / len(deltas),
-            "n_up":   sum(1 for d in deltas if d > 0),
-            "n_down": sum(1 for d in deltas if d < 0)}
+def _two_nearest(cur_snap, prior, grain):
+    """(m1, m2): the nearest and next-nearest forward delivery months, each as
+    {label, basis, change} where change is the daily Δ vs the matched month in the
+    prior posting (None if that month isn't in the prior)."""
+    cm = _curve_map(cur_snap, grain)
+    if not cm:
+        return None, None
+    pm = _curve_map(prior, grain) if prior is not None else {}
+    months = sorted(cm)
+
+    def cell(k):
+        if k is None:
+            return None
+        return {"label": _dp.label(k), "basis": cm[k],
+                "change": (cm[k] - pm[k]) if k in pm else None}
+
+    return cell(months[0]), (cell(months[1]) if len(months) > 1 else None)
 
 
 def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
-    """Locations whose spot OR forward curve moved vs the prior posting. Each row:
-    provider, location, basis (spot), change (spot Δ), spot_changed, curve_avg,
-    n_up, n_down. Sorted firmest spot → weakest."""
+    """Locations whose nearest OR next-nearest delivery month moved vs the prior
+    posting. Each row: provider, location, m1{label,basis,change}, m2{...}|None.
+    Sorted firmest nearest-month change → weakest."""
     pairs, data, now = _load(facility_type)
     out = []
     for key in pairs:
@@ -162,27 +168,23 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> lis
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
             continue
-        cur = _trend_extract(cur_snap, grain, mode)
-        if cur is None:
-            continue
         ref_t = _trend_ts(cur_snap.timestamp)
         prior = None
         for s in snaps:
             t = _trend_ts(s.timestamp)
             if t < ref_t and (prior is None or t > _trend_ts(prior.timestamp)):
                 prior = s
-        prev     = _trend_extract(prior, grain, mode)
-        spot_chg = (cur - prev) if prev is not None else 0
-        cm       = _curve_metrics(cur_snap, prior, grain)
-        n_up     = cm["n_up"]   if cm else 0
-        n_down   = cm["n_down"] if cm else 0
-        if spot_chg == 0 and (n_up + n_down) == 0:
+        m1, m2 = _two_nearest(cur_snap, prior, grain)
+        if m1 is None:
             continue
-        out.append({"provider": key[0], "location": key[1], "basis": cur,
-                    "change": spot_chg, "spot_changed": spot_chg != 0,
-                    "curve_avg": (cm["avg"] if cm else None),
-                    "n_up": n_up, "n_down": n_down})
-    out.sort(key=lambda r: (-r["change"], r["provider"], r["location"]))
+        c1 = m1.get("change") or 0
+        c2 = (m2.get("change") if m2 else None) or 0
+        if c1 == 0 and c2 == 0:
+            continue
+        out.append({"provider": key[0], "location": key[1], "m1": m1, "m2": m2})
+    out.sort(key=lambda r: (-(r["m1"].get("change") or 0),
+                            -((r["m2"] or {}).get("change") or 0),
+                            r["provider"], r["location"]))
     return out
 
 
@@ -221,21 +223,17 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
     return out
 
 
-def _tally_html(n_up: int, n_down: int) -> str:
-    """Compact firmer/weaker month tally, e.g. '6▲ 1▼'."""
-    parts = []
-    if n_up:
-        parts.append(f'<span style="color:{_GAIN}">{n_up}&#9650;</span>')
-    if n_down:
-        parts.append(f'<span style="color:{_LOSS}">{n_down}&#9660;</span>')
-    return '&nbsp;'.join(parts) if parts else '<span style="color:#94a3b8">—</span>'
-
-
-def _curve_cell_html(avg) -> str:
-    """Average curve change, colored, muted weight."""
-    if avg is None or round(avg, 1) == 0:
-        return '<span style="color:#94a3b8">—</span>'
-    return f'<span style="color:{_GAIN if avg > 0 else _LOSS}">{avg:+.1f}</span>'
+def _mcell(cell) -> str:
+    """A nearest/next delivery-month cell: month label (small) + basis + daily Δ."""
+    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    if not cell or cell.get("basis") is None:
+        return f'<td style="{td};color:#cbd5e1">—</td>'
+    basis, chg = cell["basis"], cell.get("change")
+    delta = (f'<span style="color:{_GAIN if chg > 0 else _LOSS};font-weight:700">{chg:+d}</span>'
+             if (chg is not None and chg != 0) else '<span style="color:#cbd5e1">·</span>')
+    return (f'<td style="{td}">'
+            f'<span style="color:#94a3b8;font-size:9px">{cell["label"]}</span><br>'
+            f'<b style="color:{JPSI_DARK}">{basis:+d}</b> {delta}</td>')
 
 
 def build_changes_email_html(mode: str = "spot") -> str:
@@ -268,52 +266,22 @@ def build_changes_email_html(mode: str = "spot") -> str:
                          f'<td align="right" style="padding:3px 6px">{chtxt}</td></tr>')
             body += '</table>'
         else:
-            rows       = build_change_rows(ft, gr, mode)
-            spot_rows  = [r for r in rows if r["spot_changed"]]
-            curve_only = sorted([r for r in rows if not r["spot_changed"]],
-                                key=lambda r: -(r["curve_avg"] or 0))
-            if not spot_rows and not curve_only:
+            rows = build_change_rows(ft, gr, mode)
+            if not rows:
                 body += '<div style="font-size:12px;color:#94a3b8;padding:2px 6px">No changes today.</div>'
                 continue
-            if spot_rows:
-                body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
-                         f'<tr><td style="{_hdr}">Location</td>'
-                         f'<td align="right" style="{_hdr}">Basis</td>'
-                         f'<td align="right" style="{_hdr}">Δ Spot</td>'
-                         f'<td align="right" style="{_hdr}">Δ Curve</td>'
-                         f'<td align="right" style="{_hdr}">Months</td></tr>')
-                for i, r in enumerate(spot_rows):
-                    bg  = "#f4f9fd" if i % 2 else "#ffffff"
-                    loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
-                    c   = r["change"]
-                    body += (f'<tr style="background:{bg}">'
-                             f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
-                             f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}</td>'
-                             f'<td align="right" style="padding:3px 6px;color:{JPSI_DARK};font-weight:600">{r["basis"]:+d}</td>'
-                             f'<td align="right" style="padding:3px 6px;color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+d}</td>'
-                             f'<td align="right" style="padding:3px 6px">{_curve_cell_html(r["curve_avg"])}</td>'
-                             f'<td align="right" style="padding:3px 6px;font-size:11px">{_tally_html(r["n_up"], r["n_down"])}</td>'
-                             f'</tr>')
-                body += '</table>'
-            if curve_only:
-                body += ('<div style="margin:7px 0 1px;font-size:10px;color:#94a3b8;'
-                         'text-transform:uppercase;letter-spacing:.05em">Curve shifts · spot unchanged</div>')
-                body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
-                         f'<tr><td style="{_hdr}">Location</td>'
-                         f'<td align="right" style="{_hdr}">Basis</td>'
-                         f'<td align="right" style="{_hdr}">Δ Curve</td>'
-                         f'<td align="right" style="{_hdr}">Months</td></tr>')
-                for i, r in enumerate(curve_only):
-                    bg  = "#f4f9fd" if i % 2 else "#ffffff"
-                    loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
-                    body += (f'<tr style="background:{bg}">'
-                             f'<td style="padding:3px 6px;color:#64748b">'
-                             f'<b style="color:#64748b">{r["provider"]}</b> {loc}</td>'
-                             f'<td align="right" style="padding:3px 6px;color:#64748b">{r["basis"]:+d}</td>'
-                             f'<td align="right" style="padding:3px 6px">{_curve_cell_html(r["curve_avg"])}</td>'
-                             f'<td align="right" style="padding:3px 6px;font-size:11px">{_tally_html(r["n_up"], r["n_down"])}</td>'
-                             f'</tr>')
-                body += '</table>'
+            body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
+                     f'<tr><td style="{_hdr}">Location</td>'
+                     f'<td align="right" style="{_hdr}">Nearest</td>'
+                     f'<td align="right" style="{_hdr}">Next</td></tr>')
+            for i, r in enumerate(rows):
+                bg  = "#f4f9fd" if i % 2 else "#ffffff"
+                loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
+                body += (f'<tr style="background:{bg}">'
+                         f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
+                         f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}</td>'
+                         + _mcell(r["m1"]) + _mcell(r["m2"]) + '</tr>')
+            body += '</table>'
 
     return (
         f'<div style="max-width:680px;margin:0;{_ff};border:1px solid #e2e8f0;'
@@ -324,7 +292,7 @@ def build_changes_email_html(mode: str = "spot") -> str:
         f'<td align="right" style="padding:14px 18px;color:#ffffff">'
         f'<div style="font-size:16px;font-weight:700">Daily Basis Changes</div>'
         f'<div style="font-size:12px;color:#cbd5e1">{today.day} {today.strftime("%b %Y")} '
-        f'· spot + curve vs prior posting</div></td></tr></table>'
+        f'· nearest & next delivery month vs prior posting</div></td></tr></table>'
         f'<div style="padding:8px 18px 14px;background:#ffffff">{body}</div>'
         f'<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:10px 18px;'
         f'font-size:11px;color:#64748b">John Stewart &amp; Associates · '
