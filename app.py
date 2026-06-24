@@ -89,6 +89,16 @@ def _cached_futures_curve_for(date_str: str) -> dict:
     stored = get_futures_curve(date_str)
     return stored if stored else _cached_futures_curve()
 
+@st.cache_data(show_spinner=False)
+def _jsa_watermark_uri() -> str:
+    """The JSA 50-year logo as a base64 data URI (for the Changes-table watermark)."""
+    import base64, pathlib
+    p = pathlib.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+    try:
+        return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
+    except Exception:
+        return ""
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def _cached_rail_fob() -> dict:
     """Rail FOB bids/offers scraped from palmettograin.com/raildivision."""
@@ -1608,7 +1618,7 @@ def build_changes_email_html(mode: str = "spot") -> str:
                 continue
             _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
                    "padding:2px 6px;text-align:right")
-            body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
+            body += ('<table width="100%" class="jsachg" style="border-collapse:collapse;font-size:12px">'
                      f'<tr><td style="{_hdr}" rowspan="2">Segment</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
@@ -1628,7 +1638,7 @@ def build_changes_email_html(mode: str = "spot") -> str:
                 continue
             _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
                    "padding:2px 6px;text-align:right")
-            body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
+            body += ('<table width="100%" class="jsachg" style="border-collapse:collapse;font-size:12px">'
                      f'<tr><td style="{_hdr}" rowspan="2">Location</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
@@ -1723,6 +1733,17 @@ with tab_changes:
     st.caption("Branded daily report — click Copy, then paste into your email (formatting is preserved).")
     _email_html = build_changes_email_html()
     copy_button(_email_html, "📋 Copy report for email")
+    _wm = _jsa_watermark_uri()
+    if _wm:
+        st.markdown(
+            "<style>"
+            ".jsachg{position:relative}"
+            f".jsachg::before{{content:'';position:absolute;inset:0;"
+            f"background:url('{_wm}') center center no-repeat;background-size:46% auto;"
+            "opacity:.07;z-index:0;pointer-events:none}"
+            ".jsachg tr{background-color:transparent !important}"
+            ".jsachg td,.jsachg th{position:relative;z-index:1}"
+            "</style>", unsafe_allow_html=True)
     st.markdown(_email_html, unsafe_allow_html=True)
     with st.expander("HTML source (for email automation / HTML editors)"):
         st.code(_email_html, language="html")
