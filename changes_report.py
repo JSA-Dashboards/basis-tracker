@@ -196,17 +196,16 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
             "rows": rows}
 
 
-def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
-    """Per river-segment avg basis and avg day-over-day change (firmer = positive)."""
+def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dict:
+    """Per river-segment avg basis & avg daily change at the category's two nearest
+    delivery months. Returns {m1_label, m2_label, rows:[{segment,b1,c1,b2,c2,n}]}."""
+    from collections import Counter
     pairs, data, now = _load(facility_type)
-    by_seg: dict = {}
+    locs = []
     for key in pairs:
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
-            continue
-        cur = _trend_extract(cur_snap, grain, mode)
-        if cur is None:
             continue
         ref_t = _trend_ts(cur_snap.timestamp)
         prior = None
@@ -214,21 +213,42 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
             t = _trend_ts(s.timestamp)
             if t < ref_t and (prior is None or t > _trend_ts(prior.timestamp)):
                 prior = s
-        prev = _trend_extract(prior, grain, mode)
-        chg  = (cur - prev) if prev is not None else None
-        by_seg.setdefault(river_segment(key[1]), []).append((cur, chg))
-    out = []
-    for seg in SEGMENT_ORDER:
-        vals = by_seg.get(seg)
-        if not vals:
+        cm = _curve_map(cur_snap, grain)
+        if not cm:
             continue
-        curs = [c for c, _ in vals]
-        chgs = [ch for _, ch in vals if ch is not None]
-        out.append({"segment":    seg,
-                    "avg_basis":  sum(curs) / len(curs),
-                    "avg_change": (sum(chgs) / len(chgs)) if chgs else None,
-                    "n":          len(curs)})
-    return out
+        pm = _curve_map(prior, grain) if prior is not None else {}
+        locs.append((river_segment(key[1]), cm, pm))
+    if not locs:
+        return {"m1_label": None, "m2_label": None, "rows": []}
+
+    m1 = Counter(min(cm) for _, cm, _ in locs).most_common(1)[0][0]
+    nxt = Counter()
+    for _, cm, _ in locs:
+        after = [k for k in sorted(cm) if k > m1]
+        if after:
+            nxt[after[0]] += 1
+    m2 = nxt.most_common(1)[0][0] if nxt else None
+
+    by_seg: dict = {}
+    for seg, cm, pm in locs:
+        by_seg.setdefault(seg, []).append((cm, pm))
+
+    def avg(vals):
+        return (sum(vals) / len(vals)) if vals else None
+
+    rows = []
+    for seg in SEGMENT_ORDER:
+        items = by_seg.get(seg)
+        if not items:
+            continue
+        b1 = avg([cm[m1] for cm, _ in items if m1 in cm])
+        c1 = avg([cm[m1] - pm[m1] for cm, pm in items if m1 in cm and m1 in pm])
+        b2 = avg([cm[m2] for cm, _ in items if m2 and m2 in cm]) if m2 else None
+        c2 = avg([cm[m2] - pm[m2] for cm, pm in items if m2 and m2 in cm and m2 in pm]) if m2 else None
+        rows.append({"segment": seg, "b1": b1, "c1": c1, "b2": b2, "c2": c2, "n": len(items)})
+    return {"m1_label": (_FULL_MON[m1[1]] if m1 else None),
+            "m2_label": (_FULL_MON[m2[1]] if m2 else None),
+            "rows": rows}
 
 
 def _bcell(b) -> str:
@@ -247,6 +267,22 @@ def _ccell(c) -> str:
     return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+d}</td>'
 
 
+def _bcellf(b) -> str:
+    """Segment avg-basis cell (1 decimal)."""
+    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    if b is None:
+        return f'<td style="{td};color:#cbd5e1">—</td>'
+    return f'<td style="{td};color:{JPSI_DARK};font-weight:600">{b:+.1f}</td>'
+
+
+def _ccellf(c) -> str:
+    """Segment avg-change cell (1 decimal, colored)."""
+    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    if c is None or round(c, 1) == 0:
+        return f'<td style="{td};color:#cbd5e1">—</td>'
+    return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+.1f}</td>'
+
+
 def build_changes_email_html(mode: str = "spot") -> str:
     """A branded, email-ready HTML report of daily basis changes (JPSI styling)."""
     today = datetime.now()
@@ -259,22 +295,24 @@ def build_changes_email_html(mode: str = "spot") -> str:
         body += (f'<div style="margin:16px 0 5px;font-size:13px;font-weight:700;color:{JPSI_BLUE};'
                  f'border-bottom:2px solid {JPSI_BLUE};padding-bottom:3px">{ttl}</div>')
         if gmode == "segment":
-            rows = build_segment_change_rows(ft, gr, mode)
+            result = build_segment_change_rows(ft, gr, mode)
+            rows   = result["rows"]
+            if not rows:
+                body += '<div style="font-size:12px;color:#94a3b8;padding:2px 6px">No data.</div>'
+                continue
+            _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
+                   "padding:2px 6px;text-align:right")
             body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
-                     f'<tr><td style="{_hdr}">Segment</td>'
-                     f'<td align="right" style="{_hdr}">Avg Basis</td>'
-                     f'<td align="right" style="{_hdr}">Avg Δ Day</td></tr>')
+                     f'<tr><td style="{_hdr}" rowspan="2">Segment</td>'
+                     f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
+                     f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
+                     f'<tr><td style="{_h2}">Avg Basis</td><td style="{_h2}">Δ</td>'
+                     f'<td style="{_h2}">Avg Basis</td><td style="{_h2}">Δ</td></tr>')
             for i, r in enumerate(rows):
                 bg = "#f4f9fd" if i % 2 else "#ffffff"
-                ab, ch = r["avg_basis"], r["avg_change"]
-                if ch is None or round(ch, 1) == 0:
-                    chtxt = '<span style="color:#94a3b8">—</span>'
-                else:
-                    chtxt = f'<span style="color:{_GAIN if ch > 0 else _LOSS};font-weight:700">{ch:+.1f}</span>'
                 body += (f'<tr style="background:{bg}">'
                          f'<td style="padding:3px 6px;color:{JPSI_DARK}">{r["segment"]}</td>'
-                         f'<td align="right" style="padding:3px 6px;color:{JPSI_DARK};font-weight:600">{ab:+.1f}</td>'
-                         f'<td align="right" style="padding:3px 6px">{chtxt}</td></tr>')
+                         + _bcellf(r["b1"]) + _ccellf(r["c1"]) + _bcellf(r["b2"]) + _ccellf(r["c2"]) + '</tr>')
             body += '</table>'
         else:
             result = build_change_rows(ft, gr, mode)
