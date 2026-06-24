@@ -1344,6 +1344,17 @@ def _short_fut(sym) -> str:
     return (comm + sym[2]) if (comm and len(sym) >= 3) else sym
 
 
+def _roll_adjust(nominal, from_sym, to_sym, curve):
+    """Spread-adjust a rolled month's change: re-base yesterday's quote onto the new
+    contract by adding price(new) - price(old). None if a futures price is missing."""
+    if nominal is None:
+        return None
+    pf, pt = curve.get(from_sym), curve.get(to_sym)
+    if pf is None or pt is None:
+        return None
+    return round(nominal + (pt - pf))
+
+
 _FULL_MON = ["", "January", "February", "March", "April", "May", "June",
              "July", "August", "September", "October", "November", "December"]
 
@@ -1386,6 +1397,7 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
         if after:
             nxt[after[0]] += 1
     m2 = nxt.most_common(1)[0][0] if nxt else None
+    curve = _cached_futures_curve()
 
     rows = []
     for prov, loc, cm, pm, csym, psym in locs:
@@ -1395,6 +1407,10 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
         c2 = (cm[m2] - pm[m2]) if (m2 is not None and m2 in cm and m2 in pm) else None
         roll1 = (m1 in csym and m1 in psym and csym[m1] != psym[m1])
         roll2 = (m2 is not None and m2 in csym and m2 in psym and csym[m2] != psym[m2])
+        if roll1:        # add back the contract spread to recover the true basis move
+            c1 = _roll_adjust(c1, psym.get(m1), csym.get(m1), curve)
+        if roll2:
+            c2 = _roll_adjust(c2, psym.get(m2), csym.get(m2), curve)
         if (c1 or 0) == 0 and (c2 or 0) == 0 and not roll1 and not roll2:
             continue
         rows.append({"provider": prov, "location": loc, "b1": b1, "c1": c1, "b2": b2, "c2": c2,
@@ -1487,11 +1503,16 @@ def _ccell(c) -> str:
 
 
 def _ccell_roll(c, rolled) -> str:
-    """Change cell that shows an amber ↻ when the month's futures contract rolled."""
-    if rolled:
-        td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    """Rolled month: show the spread-adjusted change with a ↻ marker; if it couldn't
+    be adjusted (missing futures price), show ↻ alone."""
+    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    if not rolled:
+        return _ccell(c)
+    if c is None:
         return f'<td style="{td};color:#d97706;font-weight:700">&#8635;</td>'
-    return _ccell(c)
+    col = _GAIN if c > 0 else (_LOSS if c < 0 else "#94a3b8")
+    return (f'<td style="{td}"><span style="color:{col};font-weight:700">{c:+d}</span>'
+            f'<span style="color:#d97706"> &#8635;</span></td>')
 
 
 def _bcellf(b) -> str:
@@ -1573,8 +1594,8 @@ def build_changes_email_html(mode: str = "spot") -> str:
 
     if "&#8635;" in body:
         body += ('<div style="margin-top:10px;font-size:10px;color:#d97706">'
-                 '&#8635; = rolled to a new futures contract — basis is now quoted vs the new '
-                 'month, so the day-over-day change is suppressed.</div>')
+                 '&#8635; = rolled to a new futures contract — the change is spread-adjusted '
+                 '(the contract spread is added back so it reflects the true basis move).</div>')
 
     return (
         f'<div style="max-width:680px;margin:0;{_ff};border:1px solid #e2e8f0;'
