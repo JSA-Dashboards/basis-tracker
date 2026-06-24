@@ -1318,6 +1318,32 @@ def _curve_map(snap, grain):
     return m
 
 
+def _curve_syms(snap, grain):
+    """{canonical (year, month) -> nearest-slot futures symbol} (for roll detection)."""
+    m, best = {}, {}
+    for r in snap.rows:
+        if (r.isSpot or _grain_disp(r.grain) != grain
+                or r.basisCents is None or not r.futuresSymbol):
+            continue
+        k  = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+        sk = _dp.slot_key(r.deliveryMonth)
+        if k not in best or sk < best[k]:
+            best[k], m[k] = sk, r.futuresSymbol
+    return m
+
+
+_FUT_SHORT = {"ZS": "S", "ZC": "C", "ZW": "W", "ZM": "SM",
+              "ZL": "BO", "ZO": "O", "KE": "KW", "MW": "MW"}
+
+
+def _short_fut(sym) -> str:
+    """'ZSN26' → 'SN', 'ZCN26' → 'CN'."""
+    if not sym:
+        return ""
+    comm = _FUT_SHORT.get(sym[:2])
+    return (comm + sym[2]) if (comm and len(sym) >= 3) else sym
+
+
 _FULL_MON = ["", "January", "February", "March", "April", "May", "June",
              "July", "August", "September", "October", "November", "December"]
 
@@ -1346,29 +1372,36 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
         cm = _curve_map(cur_snap, grain)
         if not cm:
             continue
-        pm = _curve_map(prior, grain) if prior is not None else {}
-        locs.append((key[0], key[1], cm, pm))
+        pm   = _curve_map(prior, grain)  if prior is not None else {}
+        csym = _curve_syms(cur_snap, grain)
+        psym = _curve_syms(prior, grain) if prior is not None else {}
+        locs.append((key[0], key[1], cm, pm, csym, psym))
     if not locs:
         return {"m1_label": None, "m2_label": None, "rows": []}
 
-    m1 = Counter(min(cm) for _, _, cm, _ in locs).most_common(1)[0][0]
+    m1 = Counter(min(cm) for _, _, cm, _, _, _ in locs).most_common(1)[0][0]
     nxt = Counter()
-    for _, _, cm, _ in locs:
+    for _, _, cm, _, _, _ in locs:
         after = [k for k in sorted(cm) if k > m1]
         if after:
             nxt[after[0]] += 1
     m2 = nxt.most_common(1)[0][0] if nxt else None
 
     rows = []
-    for prov, loc, cm, pm in locs:
+    for prov, loc, cm, pm, csym, psym in locs:
         b1 = cm.get(m1)
         c1 = (cm[m1] - pm[m1]) if (m1 in cm and m1 in pm) else None
         b2 = cm.get(m2) if m2 else None
         c2 = (cm[m2] - pm[m2]) if (m2 is not None and m2 in cm and m2 in pm) else None
-        if (c1 or 0) == 0 and (c2 or 0) == 0:
+        roll1 = (m1 in csym and m1 in psym and csym[m1] != psym[m1])
+        roll2 = (m2 is not None and m2 in csym and m2 in psym and csym[m2] != psym[m2])
+        if (c1 or 0) == 0 and (c2 or 0) == 0 and not roll1 and not roll2:
             continue
-        rows.append({"provider": prov, "location": loc,
-                     "b1": b1, "c1": c1, "b2": b2, "c2": c2})
+        rows.append({"provider": prov, "location": loc, "b1": b1, "c1": c1, "b2": b2, "c2": c2,
+                     "roll1": roll1, "roll1_from": (psym.get(m1) if roll1 else None),
+                     "roll1_to": (csym.get(m1) if roll1 else None),
+                     "roll2": roll2, "roll2_from": (psym.get(m2) if roll2 else None),
+                     "roll2_to": (csym.get(m2) if roll2 else None)})
     rows.sort(key=lambda r: (-(r["c1"] or 0), -(r["c2"] or 0), r["provider"], r["location"]))
     return {"m1_label": (_FULL_MON[m1[1]] if m1 else None),
             "m2_label": (_FULL_MON[m2[1]] if m2 else None),
@@ -1453,6 +1486,14 @@ def _ccell(c) -> str:
     return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+d}</td>'
 
 
+def _ccell_roll(c, rolled) -> str:
+    """Change cell that shows an amber ↻ when the month's futures contract rolled."""
+    if rolled:
+        td = "padding:3px 6px;text-align:right;white-space:nowrap"
+        return f'<td style="{td};color:#d97706;font-weight:700">&#8635;</td>'
+    return _ccell(c)
+
+
 def _bcellf(b) -> str:
     """Segment avg-basis cell (1 decimal)."""
     td = "padding:3px 6px;text-align:right;white-space:nowrap"
@@ -1517,11 +1558,23 @@ def build_changes_email_html(mode: str = "spot") -> str:
             for i, r in enumerate(rows):
                 bg  = "#f4f9fd" if i % 2 else "#ffffff"
                 loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
+                badge = ""
+                if r["roll1"] or r["roll2"]:
+                    rf = _short_fut(r["roll1_from"] or r["roll2_from"])
+                    rt = _short_fut(r["roll1_to"] or r["roll2_to"])
+                    badge = (f' <span style="font-size:9px;color:#fff;background:#d97706;'
+                             f'padding:1px 5px;border-radius:3px">&#8635; {rf}&rarr;{rt}</span>')
                 body += (f'<tr style="background:{bg}">'
                          f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
-                         f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}</td>'
-                         + _bcell(r["b1"]) + _ccell(r["c1"]) + _bcell(r["b2"]) + _ccell(r["c2"]) + '</tr>')
+                         f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}{badge}</td>'
+                         + _bcell(r["b1"]) + _ccell_roll(r["c1"], r["roll1"])
+                         + _bcell(r["b2"]) + _ccell_roll(r["c2"], r["roll2"]) + '</tr>')
             body += '</table>'
+
+    if "&#8635;" in body:
+        body += ('<div style="margin-top:10px;font-size:10px;color:#d97706">'
+                 '&#8635; = rolled to a new futures contract — basis is now quoted vs the new '
+                 'month, so the day-over-day change is suppressed.</div>')
 
     return (
         f'<div style="max-width:680px;margin:0;{_ff};border:1px solid #e2e8f0;'
