@@ -1723,6 +1723,19 @@ def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
     """, height=height)
 
 
+def _paste_clean(html: str) -> str:
+    """Make an on-screen table paste cleanly into Outlook / Word / Excel: drop the
+    scroll wrapper and min-width (so it isn't forced 900px wide), unstick the header,
+    and turn the bottom-only rules into full cell gridlines so it reads as a real
+    table. Only used for the clipboard copy — the on-screen render is unchanged."""
+    return (html
+            .replace("overflow-x:auto;max-height:72vh;overflow-y:auto;", "")
+            .replace(";min-width:900px", "")
+            .replace("position:sticky;top:0;", "")
+            .replace("border-bottom:2px solid #e2e8f0", "border:1px solid #b8c0cc")
+            .replace("border-bottom:1px solid #f1f5f9", "border:1px solid #e6e9ee"))
+
+
 tab_changes, tab_bids, tab_railfob, tab_map, tab_summary, tab_trends = st.tabs(
     ["🔔 Changes", "📋 Bids", "🚂 Rail FOB", "🗺️ Map", "📊 Summary", "📈 Trends"])
 
@@ -3668,7 +3681,7 @@ with tab_summary:
             else:
                 _cards, _grid_cols = _hA + _hB + _hC, "1.15fr 1.15fr .7fr"
                 _stat_parts = [_hA, _hB, _hC]
-            copy_button(_cards_copy_layout(_stat_parts), "📋 Copy stats")
+            copy_button(_paste_clean(_cards_copy_layout(_stat_parts)), "📋 Copy stats")
             st.markdown(
                 f'<div style="display:grid;grid-template-columns:{_grid_cols};'
                 f'gap:10px;margin:2px 0 14px 0">{_cards}</div>',
@@ -3903,7 +3916,7 @@ with tab_summary:
                 h += '</tr>'
 
             h += '</tbody></table></div>'
-            copy_button(h, "📋 Copy table")
+            copy_button(_paste_clean(h), "📋 Copy table")
             st.markdown(h, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
