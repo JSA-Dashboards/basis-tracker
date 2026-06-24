@@ -124,32 +124,55 @@ def _load(facility_type: str):
     return pairs, data, now
 
 
+_CME_MON = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
+            "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12}
+
+
+def _fut_ord(sym) -> int:
+    """Sortable ordinal for a futures contract ('ZSN26' → 2026*12+7) so a roll's
+    newer contract sorts after the older one."""
+    if not sym or len(sym) < 4:
+        return 0
+    mon = _CME_MON.get(sym[2], 0)
+    try:
+        yr = int(sym[3:])
+    except ValueError:
+        yr = 0
+    return yr * 12 + mon
+
+
 def _curve_map(snap, grain):
-    """{canonical (year, month) -> basis_cents} for a grain's forward rows (nearest slot)."""
+    """{canonical (year, month) -> basis_cents} for a grain's forward rows (nearest
+    slot; on a slot tie the later/rolled-to contract wins)."""
     m, best = {}, {}
     for r in snap.rows:
         if (r.isSpot or _grain_disp(r.grain) != grain
                 or r.basisCents is None or not r.futuresSymbol):
             continue
-        k  = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
-        sk = _dp.slot_key(r.deliveryMonth)
-        if k not in best or sk < best[k]:
-            best[k], m[k] = sk, r.basisCents
+        k   = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+        sk  = _dp.slot_key(r.deliveryMonth)
+        fo  = _fut_ord(r.futuresSymbol)
+        cur = best.get(k)
+        if cur is None or sk < cur[0] or (sk == cur[0] and fo > cur[1]):
+            best[k], m[k] = (sk, fo), r.basisCents
     return m
 
 
 def _curve_syms(snap, grain):
-    """{canonical (year, month) -> nearest-slot futures symbol} for a grain's rows.
-    Parallel to _curve_map, used to detect a contract roll (e.g. ZSN26 → ZSQ26)."""
+    """{canonical (year, month) -> nearest-slot futures symbol}; on a slot tie the
+    later/rolled-to contract wins, so a roll (ZSN26 → ZSQ26) is detected even while a
+    location still lists the delivery month against both the old and new contract."""
     m, best = {}, {}
     for r in snap.rows:
         if (r.isSpot or _grain_disp(r.grain) != grain
                 or r.basisCents is None or not r.futuresSymbol):
             continue
-        k  = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
-        sk = _dp.slot_key(r.deliveryMonth)
-        if k not in best or sk < best[k]:
-            best[k], m[k] = sk, r.futuresSymbol
+        k   = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+        sk  = _dp.slot_key(r.deliveryMonth)
+        fo  = _fut_ord(r.futuresSymbol)
+        cur = best.get(k)
+        if cur is None or sk < cur[0] or (sk == cur[0] and fo > cur[1]):
+            best[k], m[k] = (sk, fo), r.futuresSymbol
     return m
 
 
