@@ -888,6 +888,29 @@ def get_futures_curve(date: str) -> dict:
         conn.close()
 
 
+def get_roll_spread(from_sym: str, to_sym: str):
+    """Futures spread in cents = price(from) - price(to) at the most recent date where
+    BOTH contracts had a stored price. While both still trade this equals today's
+    spread; once `from` passes first notice (no longer quoted) it stays frozen at the
+    last close where both were quoted. Returns None if they never co-occur."""
+    if not from_sym or not to_sym:
+        return None
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""SELECT a.price_cents - b.price_cents AS spread
+                      FROM futures_prices a
+                      JOIN futures_prices b ON a.date = b.date
+                      WHERE a.symbol={ph} AND b.symbol={ph}
+                      ORDER BY a.date DESC
+                      LIMIT 1""", (from_sym, to_sym))
+        row = c.fetchone()
+        return row["spread"] if row else None
+    finally:
+        conn.close()
+
+
 def save_rail_fob(date: str, source: str, rows: list) -> int:
     """Upsert a dated rail FOB posting. `rows` items:
     {market, rail, commodity, period, period_order, futures, bid, offer}.

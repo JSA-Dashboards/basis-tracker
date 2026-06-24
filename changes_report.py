@@ -195,14 +195,23 @@ def _futures_curve() -> dict:
 
 
 def _roll_adjust(nominal, from_sym, to_sym, curve):
-    """Spread-adjust a rolled month's change: re-base yesterday's quote onto the new
-    contract by adding price(new) - price(old). None if a futures price is missing."""
+    """True basis move across a contract roll = nominal change minus the from→to
+    futures spread. Uses the live curve while both legs trade, else the spread frozen
+    at the last joint close (past first notice). None if no spread is available."""
     if nominal is None:
         return None
     pf, pt = curve.get(from_sym), curve.get(to_sym)
-    if pf is None or pt is None:
-        return None
-    return round(nominal + (pt - pf))
+    if pf is not None and pt is not None:
+        spread = pf - pt
+    else:
+        try:
+            from database import get_roll_spread
+            spread = get_roll_spread(from_sym, to_sym)
+        except Exception:
+            spread = None
+        if spread is None:
+            return None
+    return round(nominal - spread)
 
 
 _FULL_MON = ["", "January", "February", "March", "April", "May", "June",
@@ -265,6 +274,7 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
         if (c1 or 0) == 0 and (c2 or 0) == 0 and not roll1 and not roll2:
             continue
         rows.append({"provider": prov, "location": loc, "b1": b1, "c1": c1, "b2": b2, "c2": c2,
+                     "m1_sym": csym.get(m1), "m2_sym": csym.get(m2),
                      "roll1": roll1, "roll1_from": (psym.get(m1) if roll1 else None),
                      "roll1_to": (csym.get(m1) if roll1 else None),
                      "roll2": roll2, "roll2_from": (psym.get(m2) if roll2 else None),
@@ -423,15 +433,19 @@ def build_changes_email_html(mode: str = "spot") -> str:
             for i, r in enumerate(rows):
                 bg  = "#f4f9fd" if i % 2 else "#ffffff"
                 loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
-                badge = ""
                 if r["roll1"] or r["roll2"]:
-                    rf = _short_fut(r["roll1_from"] or r["roll2_from"])
-                    rt = _short_fut(r["roll1_to"] or r["roll2_to"])
-                    badge = (f' <span style="font-size:9px;color:#fff;background:#d97706;'
-                             f'padding:1px 5px;border-radius:3px">&#8635; {rf}&rarr;{rt}</span>')
+                    rf  = _short_fut(r["roll1_from"] or r["roll2_from"])
+                    rt  = _short_fut(r["roll1_to"] or r["roll2_to"])
+                    tag = (f' <span style="font-size:9px;color:#fff;background:#d97706;'
+                           f'padding:1px 5px;border-radius:3px">&#8635; {rf}&rarr;{rt}</span>')
+                elif r.get("m1_sym"):    # persistent note of the contract the spot is vs
+                    tag = (f' <span style="font-size:9px;color:#94a3b8">'
+                           f'vs {_short_fut(r["m1_sym"])}</span>')
+                else:
+                    tag = ""
                 body += (f'<tr style="background:{bg}">'
                          f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
-                         f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}{badge}</td>'
+                         f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}{tag}</td>'
                          + _bcell(r["b1"]) + _ccell_roll(r["c1"], r["roll1"])
                          + _bcell(r["b2"]) + _ccell_roll(r["c2"], r["roll2"]) + '</tr>')
             body += '</table>'
