@@ -138,31 +138,21 @@ def _curve_map(snap, grain):
     return m
 
 
-def _two_nearest(cur_snap, prior, grain):
-    """(m1, m2): the nearest and next-nearest forward delivery months, each as
-    {label, basis, change} where change is the daily Δ vs the matched month in the
-    prior posting (None if that month isn't in the prior)."""
-    cm = _curve_map(cur_snap, grain)
-    if not cm:
-        return None, None
-    pm = _curve_map(prior, grain) if prior is not None else {}
-    months = sorted(cm)
-
-    def cell(k):
-        if k is None:
-            return None
-        return {"label": _dp.label(k), "basis": cm[k],
-                "change": (cm[k] - pm[k]) if k in pm else None}
-
-    return cell(months[0]), (cell(months[1]) if len(months) > 1 else None)
+_FULL_MON = ["", "January", "February", "March", "April", "May", "June",
+             "July", "August", "September", "October", "November", "December"]
 
 
-def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
-    """Locations whose nearest OR next-nearest delivery month moved vs the prior
-    posting. Each row: provider, location, m1{label,basis,change}, m2{...}|None.
-    Sorted firmest nearest-month change → weakest."""
+def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dict:
+    """Day-over-day basis change at the category's two nearest delivery months.
+
+    Returns {m1_label, m2_label, rows}. m1 = the category's nearest delivery month
+    (e.g. 'June'), m2 = the next ('July'); both roll forward over time. Each row:
+    provider, location, b1/c1 (basis & daily change at m1), b2/c2 (at m2). A
+    location is included if it moved at m1 OR m2.
+    """
+    from collections import Counter
     pairs, data, now = _load(facility_type)
-    out = []
+    locs = []
     for key in pairs:
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
@@ -174,18 +164,36 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> lis
             t = _trend_ts(s.timestamp)
             if t < ref_t and (prior is None or t > _trend_ts(prior.timestamp)):
                 prior = s
-        m1, m2 = _two_nearest(cur_snap, prior, grain)
-        if m1 is None:
+        cm = _curve_map(cur_snap, grain)
+        if not cm:
             continue
-        c1 = m1.get("change") or 0
-        c2 = (m2.get("change") if m2 else None) or 0
-        if c1 == 0 and c2 == 0:
+        pm = _curve_map(prior, grain) if prior is not None else {}
+        locs.append((key[0], key[1], cm, pm))
+    if not locs:
+        return {"m1_label": None, "m2_label": None, "rows": []}
+
+    m1 = Counter(min(cm) for _, _, cm, _ in locs).most_common(1)[0][0]
+    nxt = Counter()
+    for _, _, cm, _ in locs:
+        after = [k for k in sorted(cm) if k > m1]
+        if after:
+            nxt[after[0]] += 1
+    m2 = nxt.most_common(1)[0][0] if nxt else None
+
+    rows = []
+    for prov, loc, cm, pm in locs:
+        b1 = cm.get(m1)
+        c1 = (cm[m1] - pm[m1]) if (m1 in cm and m1 in pm) else None
+        b2 = cm.get(m2) if m2 else None
+        c2 = (cm[m2] - pm[m2]) if (m2 is not None and m2 in cm and m2 in pm) else None
+        if (c1 or 0) == 0 and (c2 or 0) == 0:
             continue
-        out.append({"provider": key[0], "location": key[1], "m1": m1, "m2": m2})
-    out.sort(key=lambda r: (-(r["m1"].get("change") or 0),
-                            -((r["m2"] or {}).get("change") or 0),
-                            r["provider"], r["location"]))
-    return out
+        rows.append({"provider": prov, "location": loc,
+                     "b1": b1, "c1": c1, "b2": b2, "c2": c2})
+    rows.sort(key=lambda r: (-(r["c1"] or 0), -(r["c2"] or 0), r["provider"], r["location"]))
+    return {"m1_label": (_FULL_MON[m1[1]] if m1 else None),
+            "m2_label": (_FULL_MON[m2[1]] if m2 else None),
+            "rows": rows}
 
 
 def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
@@ -223,17 +231,20 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
     return out
 
 
-def _mcell(cell) -> str:
-    """A nearest/next delivery-month cell: month label (small) + basis + daily Δ."""
+def _bcell(b) -> str:
+    """Basis cell."""
     td = "padding:3px 6px;text-align:right;white-space:nowrap"
-    if not cell or cell.get("basis") is None:
+    if b is None:
         return f'<td style="{td};color:#cbd5e1">—</td>'
-    basis, chg = cell["basis"], cell.get("change")
-    delta = (f'<span style="color:{_GAIN if chg > 0 else _LOSS};font-weight:700">{chg:+d}</span>'
-             if (chg is not None and chg != 0) else '<span style="color:#cbd5e1">·</span>')
-    return (f'<td style="{td}">'
-            f'<span style="color:#94a3b8;font-size:9px">{cell["label"]}</span><br>'
-            f'<b style="color:{JPSI_DARK}">{basis:+d}</b> {delta}</td>')
+    return f'<td style="{td};color:{JPSI_DARK};font-weight:700">{b:+d}</td>'
+
+
+def _ccell(c) -> str:
+    """Daily-change cell (colored; — when unchanged or no prior)."""
+    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    if c is None or c == 0:
+        return f'<td style="{td};color:#cbd5e1">—</td>'
+    return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+d}</td>'
 
 
 def build_changes_email_html(mode: str = "spot") -> str:
@@ -266,21 +277,26 @@ def build_changes_email_html(mode: str = "spot") -> str:
                          f'<td align="right" style="padding:3px 6px">{chtxt}</td></tr>')
             body += '</table>'
         else:
-            rows = build_change_rows(ft, gr, mode)
+            result = build_change_rows(ft, gr, mode)
+            rows = result["rows"]
             if not rows:
                 body += '<div style="font-size:12px;color:#94a3b8;padding:2px 6px">No changes today.</div>'
                 continue
+            _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
+                   "padding:2px 6px;text-align:right")
             body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
-                     f'<tr><td style="{_hdr}">Location</td>'
-                     f'<td align="right" style="{_hdr}">Nearest</td>'
-                     f'<td align="right" style="{_hdr}">Next</td></tr>')
+                     f'<tr><td style="{_hdr}" rowspan="2">Location</td>'
+                     f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
+                     f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
+                     f'<tr><td style="{_h2}">Basis</td><td style="{_h2}">Δ</td>'
+                     f'<td style="{_h2}">Basis</td><td style="{_h2}">Δ</td></tr>')
             for i, r in enumerate(rows):
                 bg  = "#f4f9fd" if i % 2 else "#ffffff"
                 loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
                 body += (f'<tr style="background:{bg}">'
                          f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
                          f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}</td>'
-                         + _mcell(r["m1"]) + _mcell(r["m2"]) + '</tr>')
+                         + _bcell(r["b1"]) + _ccell(r["c1"]) + _bcell(r["b2"]) + _ccell(r["c2"]) + '</tr>')
             body += '</table>'
 
     return (
