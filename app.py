@@ -1985,7 +1985,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Star of West", "Mennel"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -2488,6 +2488,53 @@ with tab_bids:
             grains = _build_grains(_ldc_snaps[-1].rows)
         else:
             grains = ["Corn"]
+
+    elif provider in ("Star of West", "Mennel"):
+        _ag_cli   = "--sotw-only" if provider == "Star of West" else "--mennel-only"
+        _ag_btn   = "Scrape SOW now" if provider == "Star of West" else "Scrape Mennel now"
+        _ag_color = "#F6B710" if provider == "Star of West" else "#a3243b"
+        _ag_locs  = sorted(
+            {r["location"] for r in _cached_list_locations() if r["provider"] == provider}
+        )
+        if not _ag_locs:
+            st.markdown(
+                '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
+                f'No {provider} data yet.<br><br>'
+                f'Click <b>{_ag_btn}</b> in the sidebar or run:<br>'
+                f'<code style="color:#0693e3">python auto_import.py {_ag_cli}</code>'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+            st.stop()
+
+        _ag_meta   = _cached_get_location_meta(provider)
+        _ag_states = sorted({
+            v["state"] for v in _ag_meta.values()
+            if v.get("state") and v["state"] not in ("", "?", "N/A")
+        })
+        _ag_state_col, _ag_loc_col = st.columns([2, 6])
+        with _ag_state_col:
+            _sel_ag_state = st.selectbox(
+                "State", options=["All States"] + _ag_states,
+                key="ag_state_filter", label_visibility="collapsed",
+            )
+        with _ag_loc_col:
+            if _sel_ag_state == "All States":
+                _ag_filtered = _ag_locs
+            else:
+                _ag_filtered = sorted([
+                    n for n in _ag_locs if _ag_meta.get(n, {}).get("state") == _sel_ag_state
+                ])
+            if not _ag_filtered:
+                _ag_filtered = _ag_locs
+            _sel_ag_loc = st.selectbox(
+                f"{provider} Location", options=_ag_filtered,
+                key="ag_loc_select", label_visibility="collapsed",
+            )
+        loc_key   = _sel_ag_loc
+        loc_color = _ag_color
+        _ag_snaps = _cached_get_snapshots(provider, loc_key)
+        grains = _build_grains(_ag_snaps[-1].rows) if _ag_snaps else ["Corn"]
 
 
 

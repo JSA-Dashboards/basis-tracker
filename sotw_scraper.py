@@ -37,6 +37,24 @@ _HEADERS = {
 }
 _BIDS_RE = re.compile(r"var bids\s*=\s*(\[.*?\]);", re.DOTALL)
 
+_US_STATES = frozenset(
+    "AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT "
+    "NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC".split())
+
+# Star of the West wheat-only locations are its mills (rest are mixed-grain elevators).
+_MILLS = {"Churchville", "Ligonier", "Quincy", "Willard"}
+
+
+def _clean_name(name: str) -> str:
+    """Tidy an AgriCharts location name: drop an embedded street address and a
+    trailing state suffix ('Bucyrus - OH'→'Bucyrus', 'Ligonier, IN'→'Ligonier')."""
+    n = " ".join(str(name or "").split())
+    n = re.sub(r"\s+\d{2,}\b.*$", "", n)               # embedded street address
+    m = re.match(r"^(.*?)[\s,\-]+([A-Z]{2})$", n)      # trailing state code
+    if m and m.group(2) in _US_STATES and len(m.group(1).strip()) > 1:
+        n = m.group(1)
+    return n.strip()
+
 
 def _to_cents(val) -> Optional[int]:
     if val is None or val == "":
@@ -92,12 +110,13 @@ def fetch_sotw_bids() -> list[dict]:
             })
         if not bids:
             continue
+        name = _clean_name(loc.get("name") or "")
         out.append({
             "location_id":   str(loc.get("id") or ""),
-            "location_name": (loc.get("name") or "").strip(),
+            "location_name": name,
             "city":          (loc.get("city") or "").strip(),
             "state":         (loc.get("state") or "").strip(),
-            "facility_type": "Country Elevator",
+            "facility_type": "Wheat Milling" if name in _MILLS else "Country Elevator",
             "timestamp":     today,
             "cashbids":      bids,
         })
