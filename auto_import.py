@@ -67,6 +67,8 @@ from adm_scraper import fetch_adm_bids
 from parsers.adm_parser import parse_instruments as parse_adm_instruments
 from cgb_scraper import fetch_cgb_bids
 from parsers.cgb_parser import parse_cgb_location
+from sotw_scraper import fetch_sotw_bids
+from parsers.sotw_parser import parse_sotw_location
 from cargill_scraper import fetch_cargill_bids
 from parsers.cargill_parser import parse_cargill_location
 from gpre_scraper import fetch_gpre_bids
@@ -332,6 +334,50 @@ def run_cgb() -> int:
         "  |  %d skipped  |  %d error(s)",
         locations_done, total_rows, skipped, errors,
     )
+    return total_rows
+
+
+def run_sotw() -> int:
+    """Scrape Star of the West (AgriCharts) — all active locations in one call."""
+    log.info("=" * 60)
+    log.info("Star of the West scrape starting…")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_sotw_bids()
+    except Exception as exc:
+        log.error("Star of the West scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("Star of the West scrape returned no data.")
+        return 0
+
+    locations_done = total_rows = skipped = errors = 0
+    for loc in raw_locations:
+        try:
+            snap_req = parse_sotw_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+            upsert_snapshot(snap_req.model_dump())
+            upsert_location_meta(
+                "Star of West",
+                snap_req.location,
+                state         = loc.get("state") or None,
+                facility_type = loc.get("facility_type") or None,
+            )
+            locations_done += 1
+            total_rows     += len(snap_req.rows)
+            log.info("  ✓  %-30s  %s  %d row(s)",
+                     snap_req.location, loc.get("state", "--"), len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    log.info("-" * 60)
+    log.info("Star of the West done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
+             locations_done, total_rows, skipped, errors)
     return total_rows
 
 
@@ -1081,6 +1127,7 @@ def run(
     run_chs_scrape: bool = True,
     run_adm_scrape: bool = True,
     run_cgb_scrape: bool = True,
+    run_sotw_scrape: bool = True,
     run_cargill_scrape: bool = True,
     run_gpre_scrape: bool = True,
     run_andersons_scrape: bool = True,
@@ -1118,6 +1165,8 @@ def run(
         total += run_chs()
     if run_cgb_scrape:
         total += run_cgb()
+    if run_sotw_scrape:
+        total += run_sotw()
     if run_cargill_scrape:
         total += run_cargill()
     if run_gpre_scrape:
@@ -1212,6 +1261,16 @@ if __name__ == "__main__":
     cgb_group.add_argument(
         "--cgb-only", dest="cgb_only", action="store_true",
         help="Run CGB Grain scrape only — skip everything else",
+    )
+
+    sotw_group = parser.add_mutually_exclusive_group()
+    sotw_group.add_argument(
+        "--no-sotw", dest="no_sotw", action="store_true",
+        help="Skip Star of the West scrape",
+    )
+    sotw_group.add_argument(
+        "--sotw-only", dest="sotw_only", action="store_true",
+        help="Run Star of the West scrape only — skip everything else",
     )
 
     cargill_group = parser.add_mutually_exclusive_group()
@@ -1394,6 +1453,9 @@ if __name__ == "__main__":
     elif args.cgb_only:
         init_db()
         run_cgb()
+    elif args.sotw_only:
+        init_db()
+        run_sotw()
     elif args.cargill_only:
         init_db()
         run_cargill()
@@ -1460,6 +1522,7 @@ if __name__ == "__main__":
             run_chs_scrape=not args.no_chs,
             run_adm_scrape=not args.no_adm,
             run_cgb_scrape=not args.no_cgb,
+            run_sotw_scrape=not args.no_sotw,
             run_cargill_scrape=not args.no_cargill,
             run_gpre_scrape=not args.no_gpre,
             run_andersons_scrape=not args.no_andersons,

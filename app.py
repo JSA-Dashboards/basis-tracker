@@ -158,6 +158,7 @@ _PROVIDER_COLOR: dict[str, str] = {
     "LDC":       "#0693e3",
     "Tyson":     "#6b7280",
     "GPC":       "#10b981",
+    "Star of West": "#F6B710",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -574,6 +575,36 @@ with st.sidebar:
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
         'CLI: <code style="color:#0693e3">python auto_import.py --cgb-only</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape SOW now", key="sotw_scrape_btn"):
+        from sotw_scraper import fetch_sotw_bids as _fetch_sotw
+        from parsers.sotw_parser import parse_sotw_location as _parse_sotw
+        from database import upsert_location_meta as _ulm_sotw
+        with st.spinner("Fetching Star of the West bids…"):
+            try:
+                _locs = _fetch_sotw()
+                sotw_rows = sotw_locs = 0
+                for _loc in _locs:
+                    _snap = _parse_sotw(_loc)
+                    if _snap:
+                        upsert_snapshot(_snap.model_dump())
+                        _ulm_sotw(
+                            "Star of West", _snap.location,
+                            state         = _loc.get("state") or None,
+                            facility_type = _loc.get("facility_type") or None,
+                        )
+                        sotw_rows += len(_snap.rows)
+                        sotw_locs += 1
+                st.success(f"✓ {sotw_locs} location(s) — {sotw_rows} bid row(s) upserted.")
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Star of the West scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#0693e3">python auto_import.py --sotw-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
