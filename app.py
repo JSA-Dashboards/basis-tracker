@@ -1826,7 +1826,10 @@ with tab_railfob:
         for _r in _allrows:
             _by_md.setdefault((_r["market"], _r["date"]), {})[_r["period"]] = _r
             _mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
-        _markets = sorted({_r["market"] for _r in get_rail_fob("manual", _msel)},
+        # Every corridor with a posting at or before the selected date; each renders
+        # its most recent posting <= the date, so un-updated lines carry forward
+        # (stamped with their actual, older posting date).
+        _markets = sorted({m for m, ds in _mkt_dates.items() if any(d <= _msel for d in ds)},
                           key=lambda m: (CORRIDOR_ORDER.get(m, 999), m))
         _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706",
                        "BNSF": "#16a34a", "CN": "#b91c1c"}
@@ -1877,17 +1880,23 @@ with tab_railfob:
 
         _mh = ''
         for _m in _markets:
-            _cells = sorted(_by_md.get((_m, _msel), {}).values(),
+            _eff = max(d for d in _mkt_dates[_m] if d <= _msel)   # latest posting <= selected
+            _cells = sorted(_by_md.get((_m, _eff), {}).values(),
                             key=lambda r: (r["period_order"] if r.get("period_order") is not None else 99))
             if not _cells:
                 continue
             _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
-            _pd, _pw, _pmo = _prior_maps(_m, _msel)
+            _pd, _pw, _pmo = _prior_maps(_m, _eff)
+            _asof = ""
+            if _eff != _msel:    # carried forward — stamp with its actual posting date
+                _yy, _mo2, _dd = _eff.split("-")
+                _asof = (f' <span style="font-size:9px;color:#fff;background:#d97706;'
+                         f'padding:1px 5px;border-radius:3px">as of {int(_mo2)}/{int(_dd)}</span>')
             _mh += (f'<div style="margin-top:16px;margin-bottom:3px;'
                     f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
                     f'{_m} <span style="font-size:9px;color:#fff;background:{_rcol};'
-                    f'padding:1px 5px;border-radius:3px">{_rail}</span></div>')
+                    f'padding:1px 5px;border-radius:3px">{_rail}</span>{_asof}</div>')
             _mh += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
             _mh += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
                     f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
@@ -1904,8 +1913,9 @@ with tab_railfob:
                         + '</tr>')
             _mh += '</table></div>'
         st.markdown(_mh, unsafe_allow_html=True)
-        st.caption(f"Archived posting · {_msel} · Δ = bid change vs prior posting / ~1 week / ~1 month "
-                   f"(— until history builds) · ? = pending side.")
+        st.caption(f"Full board as of {_msel} · corridors not posted that day carry forward "
+                   f"their latest values (amber “as of M/D” stamp) · Δ = bid change vs prior "
+                   f"posting / ~1 week / ~1 month (— until history builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
 
 with tab_bids:
