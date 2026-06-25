@@ -3721,8 +3721,20 @@ with tab_summary:
                     extra += ";font-weight:800"
                 return f'<td style="{_TD_R}{extra}">{sign}{basis}{badge}</td>'
 
-            def _ccell(chg, bold=False) -> str:
+            def _sum_change(r, win):
+                """Spread-adjusted change of current vs an earlier window. When the two
+                postings price against different futures months the contract spread is
+                added back (live while both trade, else frozen at the last joint close),
+                so the move reflects basis only. Mirrors the daily Changes report."""
+                cb, pb = r.get("b_current"), r.get(f"b_{win}")
+                if cb is None or pb is None:
+                    return {"val": None, "rolled": False, "unknown": False}
+                return diff({"sym": r.get(f"s_{win}"), "b": pb}, cb, r.get("s_current"))
+
+            def _ccell(chg, bold=False, rolled=False, unknown=False) -> str:
                 fw = "800" if bold else "700"
+                if unknown:    # rolled but no spread available to adjust across contracts
+                    return f'<td style="{_TD_R};color:#d97706;font-weight:{fw}">⚠</td>'
                 if chg is None:
                     return f'<td style="{_TD_R};color:#cbd5e1">—</td>'
                 if chg == 0:
@@ -3730,7 +3742,8 @@ with tab_summary:
                     return f'<td style="{_TD_R};color:#64748b{dash_fw}">—</td>'
                 sign  = "+" if chg > 0 else ""
                 color = "#16a34a" if chg > 0 else "#dc2626"
-                return f'<td style="{_TD_R};color:{color};font-weight:{fw}">{sign}{chg}</td>'
+                roll  = '<span style="color:#d97706;font-size:9px"> ↻</span>' if rolled else ""
+                return f'<td style="{_TD_R};color:{color};font-weight:{fw}">{sign}{chg}{roll}</td>'
 
             # ── Build HTML ────────────────────────────────────────────────────
             _COL_META = [
@@ -3817,8 +3830,8 @@ with tab_summary:
                     agg[f"b_{lbl}"] = (sum(vals) / len(vals)) if vals else None
                 for ck, win in (("c_daily", "d1_ago"), ("c_weekly", "wk_ago"),
                                 ("c_monthly", "mo_ago"), ("c_yearly", "yr_ago")):
-                    ms = [r["b_current"] - r[f"b_{win}"] for r in subset
-                          if r.get("b_current") is not None and r.get(f"b_{win}") is not None]
+                    ms = [d["val"] for r in subset
+                          if not (d := _sum_change(r, win))["unknown"] and d["val"] is not None]
                     agg[ck] = (sum(ms) / len(ms)) if ms else None
                 return agg
 
@@ -3903,16 +3916,18 @@ with tab_summary:
                     # Inject border into the cell's style
                     h += cell.replace(f'style="{_TD_R}', f'style="{_TD_R}{bdr}', 1)
 
-                # Change columns
-                _daily  = (r["b_current"] - r["b_d1_ago"])  if (r["b_current"] is not None and r["b_d1_ago"]  is not None) else None
-                _weekly = (r["b_current"] - r["b_wk_ago"])  if (r["b_current"] is not None and r["b_wk_ago"]  is not None) else None
-                _montly = (r["b_current"] - r["b_mo_ago"])  if (r["b_current"] is not None and r["b_mo_ago"]  is not None) else None
-                _yearly = (r["b_current"] - r["b_yr_ago"])  if (r["b_current"] is not None and r["b_yr_ago"]  is not None) else None
+                # Change columns — spread-adjusted across futures-month rolls (daily,
+                # weekly, monthly, yearly all use the same live-or-frozen spread math).
+                _dd = _sum_change(r, "d1_ago")
+                _dw = _sum_change(r, "wk_ago")
+                _dm = _sum_change(r, "mo_ago")
+                _dy = _sum_change(r, "yr_ago")
 
-                h += _ccell(_daily, bold=True).replace(f'style="{_TD_R}',  f'style="{_TD_R};border-left:1px solid #f1f5f9"', 1)
-                h += _ccell(_weekly)
-                h += _ccell(_montly)
-                h += _ccell(_yearly)
+                h += _ccell(_dd["val"], bold=True, rolled=_dd["rolled"], unknown=_dd["unknown"]
+                            ).replace(f'style="{_TD_R}',  f'style="{_TD_R};border-left:1px solid #f1f5f9"', 1)
+                h += _ccell(_dw["val"], rolled=_dw["rolled"], unknown=_dw["unknown"])
+                h += _ccell(_dm["val"], rolled=_dm["rolled"], unknown=_dm["unknown"])
+                h += _ccell(_dy["val"], rolled=_dy["rolled"], unknown=_dy["unknown"])
                 h += '</tr>'
 
             h += '</tbody></table></div>'
