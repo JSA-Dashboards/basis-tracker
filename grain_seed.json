@@ -15,12 +15,13 @@
 
   {"raw_grain": "Wheat",                                      "canonical_grain": "Wheat",             "wheat_class": null,    "protein": null,   "is_active": 1},
 
-  {"raw_grain": "SRW Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
-  {"raw_grain": "Wheat (Soft Red Winter)",                    "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
-  {"raw_grain": "Wheat (Northern Canadian Soft Red Winter)",  "canonical_grain": "Wheat",             "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "SRW Wheat",                                  "canonical_grain": "Red Wheat",         "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat SRW",                                  "canonical_grain": "Red Wheat",         "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Soft Red Winter)",                    "canonical_grain": "Red Wheat",         "wheat_class": "SRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat (Northern Canadian Soft Red Winter)",  "canonical_grain": "Red Wheat",         "wheat_class": "SRW",   "protein": null,   "is_active": 1},
   {"raw_grain": "Red Wheat",                                  "canonical_grain": "Red Wheat",         "wheat_class": "SRW",   "protein": null,   "is_active": 1},
 
-  {"raw_grain": "Wheat Sww",                                  "canonical_grain": "Wheat",             "wheat_class": "SWW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat Sww",                                  "canonical_grain": "White Wheat",       "wheat_class": "SWW",   "protein": null,   "is_active": 1},
   {"raw_grain": "White Wheat",                                "canonical_grain": "White Wheat",       "wheat_class": "SWW",   "protein": null,   "is_active": 1},
 
   {"raw_grain": "HRW Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
@@ -31,6 +32,9 @@
   {"raw_grain": "Wheat, Hrw 11.5%",                          "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": "11.5%", "is_active": 1},
   {"raw_grain": "Winter Wheat 12%",                           "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": "12%",  "is_active": 1},
   {"raw_grain": "Canadian Eastern Hrww",                      "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 0},
+  {"raw_grain": "Wheat HRW",                                  "canonical_grain": "Wheat",             "wheat_class": "HRW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat HWW",                                  "canonical_grain": "Wheat",             "wheat_class": "HWW",   "protein": null,   "is_active": 1},
+  {"raw_grain": "Wheat, Wcw",                                 "canonical_grain": "Wheat",             "wheat_class": null,    "protein": null,   "is_active": 1},
 
   {"raw_grain": "DNS Wheat",                                  "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
   {"raw_grain": "Dns -Spring Wheat",                          "canonical_grain": "Wheat",             "wheat_class": "HRS",   "protein": null,   "is_active": 1},
