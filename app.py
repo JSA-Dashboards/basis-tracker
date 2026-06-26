@@ -483,6 +483,8 @@ st.markdown("""
 
 # 50-year JSA logo watermark for the Summary & Trends tables (class "jsawm").
 st.markdown(_jsa_watermark_css("jsawm"), unsafe_allow_html=True)
+# Trends cards span the full width, so use a smaller (zoomed-out) watermark there.
+st.markdown(_jsa_watermark_css("jsawmt", size="22% auto"), unsafe_allow_html=True)
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -4161,7 +4163,7 @@ with tab_trends:
             _grps = [g for g in ("East", "West") if any((r.get("region") or "") == g for r in _rows)]
             _gf = "region"
         copy_button(render_trend_cards(_rows, _gf, _grps, layout="table"), "📋 Copy tables")
-        st.markdown(f'<div class="jsawm">{render_trend_cards(_rows, _gf, _grps)}</div>',
+        st.markdown(f'<div class="jsawmt">{render_trend_cards(_rows, _gf, _grps)}</div>',
                     unsafe_allow_html=True)
 
 
