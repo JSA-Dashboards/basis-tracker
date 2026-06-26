@@ -33,7 +33,7 @@ except Exception:
 
 st.set_page_config(
     page_title="Basis Tracker · JPSI",
-    page_icon="📊",
+    page_icon="https://www.jpsi.com/wp-content/uploads/2019/04/cropped-Favicon-1-192x192.png",
     layout="wide",
 )
 
@@ -435,13 +435,14 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
 # ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
-  /* JPSI brand sans-serif everywhere (overrides inline mono); tabular figures keep
-     basis numbers aligned in the data tables. */
+  /* JPSI site typography: Source Sans Pro body + EB Garamond serif headings */
+  @import url('https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@300;400;600;700&family=EB+Garamond:wght@400;500;600&display=swap');
   html, body, [class*="css"], .stApp, button, input, select, textarea,
   table, td, th, .stMarkdown, [data-testid="stMetricValue"] {
-    font-family: 'Open Sans', system-ui, -apple-system, sans-serif !important; }
+    font-family: 'Source Sans Pro', system-ui, -apple-system, sans-serif !important; }
   table td, table th { font-variant-numeric: tabular-nums; }
+  /* Branded serif accent (matches jpsi.com headings) */
+  .jpsi-serif { font-family: 'EB Garamond', Georgia, 'Times New Roman', serif !important; }
   /* Hide Streamlit's fixed header so it doesn't overlap content */
   header[data-testid="stHeader"] { display: none !important; }
   #MainMenu { visibility: hidden !important; }
@@ -449,13 +450,20 @@ st.markdown("""
   .block-container { padding-top: 0.75rem !important; padding-bottom: 1rem !important; }
   div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
   a { color: #0693e3; }
-  /* Tabs — JPSI blue active indicator */
+  /* Tabs — JPSI blue active indicator on the dark-slate brand */
   .stTabs [data-baseweb="tab-list"] { gap: 0; background: #ffffff; border-bottom: 1px solid #e2e8f0; }
   .stTabs [data-baseweb="tab"] { color: #5b6470; font-size: 13px; padding: 8px 18px;
     font-weight: 600; border-radius: 0; }
   .stTabs [aria-selected="true"] { color: #0693e3 !important; font-weight: 700 !important;
     border-bottom: 3px solid #0693e3 !important; }
   .stTabs [data-baseweb="tab-panel"] { padding-top: 8px !important; }
+  /* Buttons — JPSI blue */
+  .stButton > button { background: #0693e3; color: #fff; border: none; border-radius: 6px;
+    font-weight: 600; }
+  .stButton > button:hover { background: #057ec2; color: #fff; }
+  /* Sidebar — subtle brand tint */
+  section[data-testid="stSidebar"] { background: #f6f8fa; border-right: 1px solid #e6eaee; }
+  section[data-testid="stSidebar"] h3 { color: #32373c; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1130,18 +1138,25 @@ _hdr_logo = _Path(__file__).parent / "assets" / "50 Year logo JSA.png"
 _hdr_logo_img = ""
 if _hdr_logo.exists():
     _hdr_logo_uri = "data:image/png;base64," + _b64.b64encode(_hdr_logo.read_bytes()).decode()
-    _hdr_logo_img = (f'<img src="{_hdr_logo_uri}" alt="John Stewart &amp; Associates" '
-                     f'style="height:50px;display:block">')
+    _hdr_logo_img = (f'<img src="{_hdr_logo_uri}" alt="John Stewart &amp; Associates 50 Years" '
+                     f'style="height:46px;display:block">')
+_JPSI_WHITE_LOGO = "https://www.jpsi.com/wp-content/themes/gate39media/img/logo-white.png"
 
 st.markdown(f"""
-<div style="display:flex;align-items:center;gap:18px;padding:8px 2px 12px;
-     border-bottom:3px solid #0693e3;margin-bottom:12px">
-  {_hdr_logo_img}
-  <div style="line-height:1.15">
-    <div style="font-size:10px;color:#0693e3;letter-spacing:.16em;text-transform:uppercase;
+<div style="background:#32373c;border-radius:12px;padding:15px 24px;margin-bottom:14px;
+     display:flex;align-items:center;gap:20px;box-shadow:0 1px 4px rgba(0,0,0,.18)">
+  <div style="background:#ffffff;border-radius:8px;padding:7px 11px;display:flex;align-items:center">
+    {_hdr_logo_img}
+  </div>
+  <div style="line-height:1.12">
+    <div style="font-size:10px;color:#8ec9ee;letter-spacing:.18em;text-transform:uppercase;
       font-weight:700">Commodity &amp; Ag Risk Management Specialists</div>
-    <div style="font-size:24px;font-weight:800;color:#32373c;letter-spacing:-.02em">
+    <div class="jpsi-serif" style="font-size:31px;font-weight:600;color:#ffffff;letter-spacing:.01em">
       Cash Grain Basis Tracker</div>
+  </div>
+  <div style="margin-left:auto;display:flex;align-items:center">
+    <img src="{_JPSI_WHITE_LOGO}" alt="John Stewart &amp; Associates"
+         style="height:34px;opacity:.92;display:block">
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -4098,3 +4113,26 @@ with tab_trends:
             _gf = "region"
         copy_button(render_trend_cards(_rows, _gf, _grps, layout="table"), "📋 Copy tables")
         st.markdown(render_trend_cards(_rows, _gf, _grps), unsafe_allow_html=True)
+
+
+# ── Branded footer (JPSI) ─────────────────────────────────────────────────────
+st.markdown(f"""
+<div style="margin-top:26px;border-top:2px solid #0693e3;padding:14px 6px 4px;
+     font-family:'Source Sans Pro',system-ui,sans-serif;display:flex;align-items:center;
+     gap:14px;flex-wrap:wrap;color:#5b6470;font-size:11px">
+  <span class="jpsi-serif" style="font-size:16px;color:#32373c;font-weight:600">
+    John Stewart &amp; Associates</span>
+  <span style="color:#cbd5e1">|</span>
+  <span style="letter-spacing:.04em">Commodity &amp; Ag Risk Management Specialists</span>
+  <span style="margin-left:auto">
+    <a href="https://www.jpsi.com" target="_blank"
+       style="color:#0693e3;text-decoration:none;font-weight:600">jpsi.com</a>
+    &nbsp;·&nbsp;877-671-1670
+  </span>
+</div>
+<div style="font-size:10px;color:#94a3b8;padding:2px 6px 12px;
+     font-family:'Source Sans Pro',system-ui,sans-serif">
+  Cash bids aggregated from public sources for informational purposes only — not an
+  offer to buy or sell. © {datetime.now():%Y} John Stewart &amp; Associates.
+</div>
+""", unsafe_allow_html=True)
