@@ -3385,33 +3385,31 @@ with tab_summary:
     # ── Filters row ───────────────────────────────────────────────────────────
     _sl = _cached_get_bids_filter_data()  # [{provider, location, state, facility_type, region}]
     _sfac_types = sorted({l["facility_type"] for l in _sl if l["facility_type"]})
-    _sgrains = ["Soybeans", "Corn", "Wheat", "Soft Red Winter", "Hard Red Winter",
-                "Hard Red Spring", "Soft White", "Soybean Meal", "Soybean Oil"]
-
-    # Default the Grain to whichever commodity has the most bids for the selected
-    # Location Type(s). Snaps on first load and whenever Location Type changes;
-    # a manual Grain choice still sticks until the type is changed again.
-    def _majority_grain(selected_ftypes) -> "str | None":
+    # Grains that actually have data for the selected Location Type(s), most-common
+    # first. Dynamic so e.g. Wheat Milling offers its real classes (Soft Red Winter,
+    # Hard Red Winter, …) instead of a generic "Wheat" with no rows.
+    def _grains_for(selected_ftypes) -> list:
         from collections import Counter as _C
         cnt = _C()
         for ft, graw, n in _cached_grain_counts_by_facility():
             if selected_ftypes and ft not in selected_ftypes:
                 continue
-            disp = _grain_disp(graw)
-            opt  = next((o for o in _sgrains
-                         if disp == o or (disp or "").startswith(o + " ")), None)
-            if opt:
-                cnt[opt] += n
-        return cnt.most_common(1)[0][0] if cnt else None
+            d = _grain_disp(graw)
+            if d:
+                cnt[d] += n
+        return [g for g, _ in cnt.most_common()]
 
     if "sum_ftype" not in st.session_state:
         st.session_state["sum_ftype"] = (["Soy Processing"]
                                          if "Soy Processing" in _sfac_types else [])
-    _cur_ft = tuple(st.session_state.get("sum_ftype", []))
-    if _cur_ft != st.session_state.get("_sum_prev_ftype"):
-        _maj = _majority_grain(_cur_ft)
-        if _maj:
-            st.session_state["sum_grain"] = _maj
+    _cur_ft  = tuple(st.session_state.get("sum_ftype", []))
+    _sgrains = _grains_for(_cur_ft) or ["Corn"]
+    # Snap the Grain to the most common option on first load / when the Location Type
+    # changes, or whenever the current pick has no data for the new type. A manual
+    # Grain choice still sticks while the type is unchanged.
+    if (_cur_ft != st.session_state.get("_sum_prev_ftype")
+            or st.session_state.get("sum_grain") not in _sgrains):
+        st.session_state["sum_grain"] = _sgrains[0]
         st.session_state["_sum_prev_ftype"] = _cur_ft
 
     _sf1, _sf2, _sf3 = st.columns([2, 2, 2])
