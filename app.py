@@ -173,6 +173,7 @@ _PROVIDER_COLOR: dict[str, str] = {
     "GPC":       "#10b981",
     "Star of West": "#F6B710",
     "Mennel":    "#a3243b",
+    "Agtegra":   "#5a8a2c",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -660,6 +661,36 @@ with st.sidebar:
     st.markdown(
         '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
         'CLI: <code style="color:#0693e3">python auto_import.py --mennel-only</code>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    if st.button("Scrape Agtegra now", key="agtegra_scrape_btn"):
+        from agtegra_scraper import fetch_agtegra_bids as _fetch_agt
+        from parsers.agtegra_parser import parse_agtegra_location as _parse_agt
+        from database import upsert_location_meta as _ulm_agt
+        with st.spinner("Fetching Agtegra bids…"):
+            try:
+                _locs = _fetch_agt()
+                agt_rows = agt_locs = 0
+                for _loc in _locs:
+                    _snap = _parse_agt(_loc)
+                    if _snap:
+                        upsert_snapshot(_snap.model_dump())
+                        _ulm_agt(
+                            "Agtegra", _snap.location,
+                            state         = _loc.get("state") or None,
+                            facility_type = _loc.get("facility_type") or None,
+                        )
+                        agt_rows += len(_snap.rows)
+                        agt_locs += 1
+                st.success(f"✓ {agt_locs} location(s) — {agt_rows} bid row(s) upserted.")
+                st.rerun()
+            except Exception as _exc:
+                st.error(f"Agtegra scrape failed: {_exc}")
+    st.markdown(
+        '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
+        'CLI: <code style="color:#0693e3">python auto_import.py --agtegra-only</code>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -2016,7 +2047,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Star of West", "Mennel"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Star of West", "Mennel", "Agtegra"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -2520,10 +2551,12 @@ with tab_bids:
         else:
             grains = ["Corn"]
 
-    elif provider in ("Star of West", "Mennel"):
-        _ag_cli   = "--sotw-only" if provider == "Star of West" else "--mennel-only"
-        _ag_btn   = "Scrape SOW now" if provider == "Star of West" else "Scrape Mennel now"
-        _ag_color = "#F6B710" if provider == "Star of West" else "#a3243b"
+    elif provider in ("Star of West", "Mennel", "Agtegra"):
+        _ag_cli   = {"Star of West": "--sotw-only", "Mennel": "--mennel-only",
+                     "Agtegra": "--agtegra-only"}[provider]
+        _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
+                     "Agtegra": "Scrape Agtegra now"}[provider]
+        _ag_color = _PROVIDER_COLOR.get(provider, "#64748b")
         _ag_locs  = sorted(
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}
         )

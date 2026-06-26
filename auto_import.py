@@ -71,6 +71,8 @@ from sotw_scraper import fetch_sotw_bids
 from parsers.sotw_parser import parse_sotw_location
 from mennel_scraper import fetch_mennel_bids
 from parsers.mennel_parser import parse_mennel_location
+from agtegra_scraper import fetch_agtegra_bids
+from parsers.agtegra_parser import parse_agtegra_location
 from cargill_scraper import fetch_cargill_bids
 from parsers.cargill_parser import parse_cargill_location
 from gpre_scraper import fetch_gpre_bids
@@ -423,6 +425,50 @@ def run_mennel() -> int:
 
     log.info("-" * 60)
     log.info("Mennel done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
+             locations_done, total_rows, skipped, errors)
+    return total_rows
+
+
+def run_agtegra() -> int:
+    """Scrape Agtegra (AgriCharts) — all active SD/ND/MN locations in one call."""
+    log.info("=" * 60)
+    log.info("Agtegra scrape starting…")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_agtegra_bids()
+    except Exception as exc:
+        log.error("Agtegra scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("Agtegra scrape returned no data.")
+        return 0
+
+    locations_done = total_rows = skipped = errors = 0
+    for loc in raw_locations:
+        try:
+            snap_req = parse_agtegra_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+            upsert_snapshot(snap_req.model_dump())
+            upsert_location_meta(
+                "Agtegra",
+                snap_req.location,
+                state         = loc.get("state") or None,
+                facility_type = loc.get("facility_type") or None,
+            )
+            locations_done += 1
+            total_rows     += len(snap_req.rows)
+            log.info("  ✓  %-30s  %s  %d row(s)",
+                     snap_req.location, loc.get("state", "--"), len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    log.info("-" * 60)
+    log.info("Agtegra done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
              locations_done, total_rows, skipped, errors)
     return total_rows
 
@@ -1175,6 +1221,7 @@ def run(
     run_cgb_scrape: bool = True,
     run_sotw_scrape: bool = True,
     run_mennel_scrape: bool = True,
+    run_agtegra_scrape: bool = True,
     run_cargill_scrape: bool = True,
     run_gpre_scrape: bool = True,
     run_andersons_scrape: bool = True,
@@ -1216,6 +1263,8 @@ def run(
         total += run_sotw()
     if run_mennel_scrape:
         total += run_mennel()
+    if run_agtegra_scrape:
+        total += run_agtegra()
     if run_cargill_scrape:
         total += run_cargill()
     if run_gpre_scrape:
@@ -1330,6 +1379,16 @@ if __name__ == "__main__":
     mennel_group.add_argument(
         "--mennel-only", dest="mennel_only", action="store_true",
         help="Run Mennel scrape only — skip everything else",
+    )
+
+    agtegra_group = parser.add_mutually_exclusive_group()
+    agtegra_group.add_argument(
+        "--no-agtegra", dest="no_agtegra", action="store_true",
+        help="Skip Agtegra scrape",
+    )
+    agtegra_group.add_argument(
+        "--agtegra-only", dest="agtegra_only", action="store_true",
+        help="Run Agtegra scrape only — skip everything else",
     )
 
     cargill_group = parser.add_mutually_exclusive_group()
@@ -1518,6 +1577,9 @@ if __name__ == "__main__":
     elif args.mennel_only:
         init_db()
         run_mennel()
+    elif args.agtegra_only:
+        init_db()
+        run_agtegra()
     elif args.cargill_only:
         init_db()
         run_cargill()
@@ -1586,6 +1648,7 @@ if __name__ == "__main__":
             run_cgb_scrape=not args.no_cgb,
             run_sotw_scrape=not args.no_sotw,
             run_mennel_scrape=not args.no_mennel,
+            run_agtegra_scrape=not args.no_agtegra,
             run_cargill_scrape=not args.no_cargill,
             run_gpre_scrape=not args.no_gpre,
             run_andersons_scrape=not args.no_andersons,
