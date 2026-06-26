@@ -122,6 +122,16 @@ _SQLITE_DDL = [
         captured_at  TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (date, source, market, period)
     )""",
+    """CREATE TABLE IF NOT EXISTS spot_forward_manual (
+        date              TEXT NOT NULL,
+        corn_cif_cents    INTEGER,
+        bean_cif_cents    INTEGER,
+        ilr_freight_cents INTEGER,
+        chi_eth_cents     INTEGER,
+        ny_eth_cents      INTEGER,
+        captured_at       TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (date)
+    )""",
 ]
 
 _PG_DDL = [
@@ -198,6 +208,16 @@ _PG_DDL = [
         offer_raw    TEXT,
         captured_at  TEXT,
         PRIMARY KEY (date, source, market, period)
+    )""",
+    """CREATE TABLE IF NOT EXISTS spot_forward_manual (
+        date              TEXT NOT NULL,
+        corn_cif_cents    INTEGER,
+        bean_cif_cents    INTEGER,
+        ilr_freight_cents INTEGER,
+        chi_eth_cents     INTEGER,
+        ny_eth_cents      INTEGER,
+        captured_at       TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (date)
     )""",
 ]
 
@@ -1049,6 +1069,80 @@ def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> d
 
 
 # ── Data retention / pruning ───────────────────────────────────────────────────
+
+def save_spot_forward_manual(date: str, corn_cif: int | None = None, bean_cif: int | None = None,
+                             ilr_freight: int | None = None, chi_eth: int | None = None,
+                             ny_eth: int | None = None) -> bool:
+    """Upsert manual spot/forward entries for a date. All params in cents."""
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        if _use_pg():
+            c.execute("""
+                INSERT INTO spot_forward_manual
+                (date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (date) DO UPDATE SET
+                    corn_cif_cents = COALESCE(EXCLUDED.corn_cif_cents, spot_forward_manual.corn_cif_cents),
+                    bean_cif_cents = COALESCE(EXCLUDED.bean_cif_cents, spot_forward_manual.bean_cif_cents),
+                    ilr_freight_cents = COALESCE(EXCLUDED.ilr_freight_cents, spot_forward_manual.ilr_freight_cents),
+                    chi_eth_cents = COALESCE(EXCLUDED.chi_eth_cents, spot_forward_manual.chi_eth_cents),
+                    ny_eth_cents = COALESCE(EXCLUDED.ny_eth_cents, spot_forward_manual.ny_eth_cents)
+            """, (date, corn_cif, bean_cif, ilr_freight, chi_eth, ny_eth))
+        else:
+            c.execute("""
+                INSERT INTO spot_forward_manual
+                (date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date) DO UPDATE SET
+                    corn_cif_cents = COALESCE(excluded.corn_cif_cents, spot_forward_manual.corn_cif_cents),
+                    bean_cif_cents = COALESCE(excluded.bean_cif_cents, spot_forward_manual.bean_cif_cents),
+                    ilr_freight_cents = COALESCE(excluded.ilr_freight_cents, spot_forward_manual.ilr_freight_cents),
+                    chi_eth_cents = COALESCE(excluded.chi_eth_cents, spot_forward_manual.chi_eth_cents),
+                    ny_eth_cents = COALESCE(excluded.ny_eth_cents, spot_forward_manual.ny_eth_cents)
+            """, (date, corn_cif, bean_cif, ilr_freight, chi_eth, ny_eth))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def get_spot_forward_manual(date: str) -> dict:
+    """Get manual spot/forward entries for a date. Returns {date, corn_cif_cents, ...}."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""
+            SELECT date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents
+            FROM spot_forward_manual WHERE date={ph}
+        """, (date,))
+        row = c.fetchone()
+        if row:
+            return dict(row)
+        return {"date": date, "corn_cif_cents": None, "bean_cif_cents": None,
+                "ilr_freight_cents": None, "chi_eth_cents": None, "ny_eth_cents": None}
+    finally:
+        conn.close()
+
+
+def get_spot_forward_manual_history(days: int = 30) -> list[dict]:
+    """Get manual spot/forward entries for the last N days, ordered by date desc."""
+    from datetime import datetime, timedelta
+    cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        c.execute(f"""
+            SELECT date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents
+            FROM spot_forward_manual WHERE date >= {ph}
+            ORDER BY date DESC
+        """, (cutoff,))
+        return [dict(r) for r in c.fetchall()]
+    finally:
+        conn.close()
+
 
 def prune_old_snapshots(dry_run: bool = False) -> dict:
     """
