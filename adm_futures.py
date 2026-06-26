@@ -34,9 +34,12 @@ _HEADERS = {
                    "AppleWebKit/537.36 (KHTML, like Gecko) "
                    "Chrome/124.0.0.0 Safari/537.36"),
 }
-# ADM location display-name keywords to harvest (processing plants list the most
-# contract months); take a couple of each so the union covers both commodities.
+# Corn/soy processing plants each quote the full forward curve, so a couple of each
+# suffices.
 _HARVEST = ("corn processing", "soy processing")
+# Wheat-milling locations quote ZW* but each only lists a few months (some none), so
+# harvest ALL of them and union — Mendota/St. Louis carry the deferred 2027 contracts.
+_HARVEST_ALL = ("wheat milling",)
 
 
 def _parse(text: str) -> dict:
@@ -46,9 +49,9 @@ def _parse(text: str) -> dict:
 
 
 def fetch_futures_curve(per_type: int = 2) -> dict[str, float]:
-    """Return {fbn_symbol -> futures_price_cents} for corn & soybeans.
+    """Return {fbn_symbol -> futures_price_cents} for corn, soybeans & wheat.
 
-    Harvests `per_type` corn-processing and `per_type` soy-processing ADM
+    Harvests `per_type` corn-processing, soy-processing and wheat-milling ADM
     locations and unions their futures quotes. Empty dict on fatal error.
     """
     curve: dict[str, float] = {}
@@ -63,6 +66,9 @@ def fetch_futures_curve(per_type: int = 2) -> dict[str, float]:
         for kw in _HARVEST:
             targets += [m for m in markets
                         if kw in (m.get("display_name") or "").lower()][:per_type]
+        for kw in _HARVEST_ALL:        # sparse per-location → take all and union
+            targets += [m for m in markets
+                        if kw in (m.get("display_name") or "").lower()]
 
         for mk in targets:
             try:
