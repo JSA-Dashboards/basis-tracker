@@ -1889,195 +1889,127 @@ with tab_changes:
         st.code(_email_html, language="html")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TAB: SPOT & FORWARD  (fixed location tracking with manual inputs)
+# TAB: SPOT & FORWARD  (18 fixed locations: spot/forward basis with daily changes)
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_spotfwd:
-    today_str = date.today().isoformat()
+    st.caption("18-location tracker: Spot & following month basis with daily changes.")
 
-    st.caption("Track spot and following month basis for key locations with daily change analysis.")
-
+    # Manual input section
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        corn_cif = st.number_input("Corn CIF (¢)", value=0, step=1, key="corn_cif_input")
+        corn_cif_input = st.number_input("Corn CIF (¢)", value=0, step=1, key="corn_cif")
     with col2:
-        bean_cif = st.number_input("Bean CIF (¢)", value=0, step=1, key="bean_cif_input")
+        bean_cif_input = st.number_input("Bean CIF (¢)", value=0, step=1, key="bean_cif")
     with col3:
-        ilr_freight = st.number_input("ILR Barge Freight (¢)", value=0, step=1, key="ilr_freight_input")
+        ilr_freight_input = st.number_input("ILR Freight (¢)", value=0, step=1, key="ilr_freight")
     with col4:
-        chi_eth = st.number_input("Chi Platts Eth (¢)", value=0, step=1, key="chi_eth_input")
+        chi_eth_input = st.number_input("Chi Eth (¢)", value=0, step=1, key="chi_eth")
     with col5:
-        ny_eth = st.number_input("NY Platts Eth (¢)", value=0, step=1, key="ny_eth_input")
-
-    if st.button("Save Manual Entries", key="save_spotfwd_btn"):
-        save_spot_forward_manual(
-            today_str,
-            corn_cif=corn_cif if corn_cif != 0 else None,
-            bean_cif=bean_cif if bean_cif != 0 else None,
-            ilr_freight=ilr_freight if ilr_freight != 0 else None,
-            chi_eth=chi_eth if chi_eth != 0 else None,
-            ny_eth=ny_eth if ny_eth != 0 else None,
-        )
-        st.success("✓ Saved")
+        ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
 
     st.markdown("---")
 
-    # Get River Terminal locations (Corn & Soybeans)
-    all_locs = _cached_get_bids_filter_data()
-    river_terms = [l for l in all_locs if l.get("facility_type") == "River Terminal"]
+    # Helper to get location basis & changes
+    def _get_loc_basis(prov: str, loc: str, grain: str) -> tuple:
+        """Return (spot, next, spot_chg, next_chg)."""
+        snaps = _cached_get_snapshots(prov, loc)
+        if not snaps or len(snaps) < 1:
+            return None, None, None, None
+        cur = snaps[-1]
+        prior = snaps[-2] if len(snaps) > 1 else None
+        spot_row = _front_month_row(cur.rows, grain)
+        if not spot_row:
+            return None, None, None, None
+        cands = [r for r in cur.rows if not r.isSpot and _grain_disp(r.grain) == grain
+                and r.basisCents is not None and r.futuresSymbol]
+        cands.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
+        next_row = cands[1] if len(cands) > 1 else None
+        spot_chg, next_chg = None, None
+        if prior:
+            ps = _front_month_row(prior.rows, grain)
+            if ps:
+                spot_chg = spot_row.basisCents - ps.basisCents
+            if next_row:
+                pc = [r for r in prior.rows if not r.isSpot and _grain_disp(r.grain) == grain
+                     and r.basisCents is not None and r.futuresSymbol]
+                pc.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
+                if len(pc) > 1:
+                    next_chg = next_row.basisCents - pc[1].basisCents
+        return spot_row.basisCents, next_row.basisCents if next_row else None, spot_chg, next_chg
 
-    if not river_terms:
-        st.info("No River Terminal locations found. Make sure locations are tagged with facility_type='River Terminal'.")
+    # Build 18 items
+    items_18 = []
+    items_18.append(("Corn CIF", corn_cif_input, None, None, None))
+    items_18.append(("Bean CIF", bean_cif_input, None, None, None))
+    items_18.append(("ILR Barge Freight", ilr_freight_input, None, None, None))
+    items_18.append(("Chi Platts Eth", chi_eth_input, None, None, None))
+    items_18.append(("NY Platts Eth", ny_eth_input, None, None, None))
+
+    # Rail FOB items (6)
+    from database import get_rail_fob_dates, get_rail_fob
+    rail_markets = ["CSX Columbus", "NS Ft Wayne", "Hereford", "PNW", "Group 3", "BN Shuttle"]
+    rail_dates = get_rail_fob_dates("manual")
+    if rail_dates:
+        today_rail = get_rail_fob("manual", rail_dates[0])
+        prior_rail = get_rail_fob("manual", rail_dates[1]) if len(rail_dates) > 1 else []
+        for market in rail_markets:
+            tr = next((r for r in today_rail if r["market"] == market and r["period_order"] == 1), None)
+            pr = next((r for r in prior_rail if r["market"] == market and r["period_order"] == 1), None)
+            spot = tr["bid"] if tr and tr["bid"] else None
+            spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
+            nxt = next((r["bid"] for r in today_rail if r["market"] == market and r["period_order"] == 2), None) if tr else None
+            items_18.append((market, spot, nxt, spot_chg, None))
     else:
-        st.subheader(f"River Terminal Locations ({len(river_terms)})")
+        for market in rail_markets:
+            items_18.append((market, None, None, None, None))
 
-        # Get snapshots for all river terminals
-        pairs = [(l["provider"], l["location"]) for l in river_terms]
+    # ADM locations (2)
+    for loc_name in ["Decatur", "Des Moines"]:
+        s, n, sc, nc = _get_loc_basis("ADM", f"ADM {loc_name}", "Corn")
+        items_18.append((f"ADM {loc_name}", s, n, sc, nc))
 
-        @st.cache_data(ttl=300)
-        def _cached_spotfwd_snaps():
-            return get_snapshots_bulk(pairs, since_days=30)
+    # Compute Zone 3 & STL averages (4)
+    try:
+        all_locs = _cached_get_bids_filter_data()
+        proc_locs = [l for l in all_locs if l.get("facility_type") == "Corn Processing"]
+        soy_locs = [l for l in all_locs if l.get("facility_type") == "Soy Processing"]
 
-        snaps_data = _cached_spotfwd_snaps()
+        def avg_by_zone(locs, grain, zone_name):
+            zone_locs = [l for l in locs if zone_name.lower() in (l.get("delivery_zone") or "").lower()]
+            spots, nexts = [], []
+            for l in zone_locs:
+                s, n, _, _ = _get_loc_basis(l["provider"], l["location"], grain)
+                if s: spots.append(s)
+                if n: nexts.append(n)
+            return (round(sum(spots)/len(spots)) if spots else None,
+                   round(sum(nexts)/len(nexts)) if nexts else None, None, None)
 
-        # Build rows: for each location, show spot and next month basis with changes
-        now_target = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
+        items_18.append(("Zone 3 Avg Corn",) + avg_by_zone(proc_locs, "Corn", "Zone 3"))
+        items_18.append(("STL Avg Corn",) + avg_by_zone(proc_locs, "Corn", "STL"))
+        items_18.append(("Zone 3 Avg Beans",) + avg_by_zone(soy_locs, "Soybeans", "Zone 3"))
+        items_18.append(("STL Avg Beans",) + avg_by_zone(soy_locs, "Soybeans", "STL"))
+    except Exception as e:
+        for _ in range(4):
+            items_18.append((None, None, None, None, None))
 
-        all_rows = []
-        for loc_meta in river_terms:
-            key = (loc_meta["provider"], loc_meta["location"])
-            snaps = snaps_data.get(key, [])
-            if not snaps:
-                continue
+    # Render table
+    th = "background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap"
+    td = "padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px"
+    html = '<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:\'IBM Plex Mono\',monospace;border:1px solid #e2e8f0;border-radius:6px">'
+    html += f'<thead><tr><th style="{th}">Item</th><th style="{th}">Spot</th><th style="{th}">Δ</th><th style="{th}">Next</th><th style="{th}">Δ</th></tr></thead><tbody>'
 
-            # Find closest snapshot to now_target (within 2 days)
-            cur_snap = None
-            for s in snaps:
-                s_dt = _trend_ts(s.timestamp)
-                if s_dt <= now_target:
-                    if cur_snap is None or s_dt > _trend_ts(cur_snap.timestamp):
-                        cur_snap = s
+    for i, (name, spot, nxt, sc, nc) in enumerate(items_18):
+        bg = "#f8fafc" if i % 2 else "transparent"
+        if not name:
+            continue
+        spot_str = f'{spot:+d}¢' if spot else "—"
+        nxt_str = f'{nxt:+d}¢' if nxt else "—"
+        sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
+        nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
+        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{"#16a34a" if spot and spot >= 0 else "#dc2626"}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
 
-            if not cur_snap:
-                continue
-
-            # Find prior snapshot
-            ref_t = _trend_ts(cur_snap.timestamp)
-            prior = None
-            for s in snaps:
-                t = _trend_ts(s.timestamp)
-                if t < ref_t and (prior is None or t > _trend_ts(prior.timestamp)):
-                    prior = s
-
-            # Get grains in this location
-            seen_grains = set()
-            for r in cur_snap.rows:
-                if r.isSpot:
-                    continue
-                grain_disp = _grain_disp(r.grain)
-                if not grain_disp or grain_disp in seen_grains:
-                    continue
-                seen_grains.add(grain_disp)
-
-                # Get front-month (spot) and next month basis
-                spot_row = _front_month_row(cur_snap.rows, grain_disp)
-                if not spot_row or spot_row.basisCents is None:
-                    continue
-
-                # Get next month row
-                all_candidates = [x for x in cur_snap.rows
-                                if not x.isSpot and _grain_disp(x.grain) == grain_disp
-                                and x.basisCents is not None and x.futuresSymbol]
-                if len(all_candidates) < 2:
-                    continue
-                all_candidates.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
-                next_row = all_candidates[1] if len(all_candidates) > 1 else None
-
-                if not next_row or next_row.basisCents is None:
-                    continue
-
-                # Calculate changes
-                spot_change = None
-                next_change = None
-                if prior:
-                    prior_spot = _front_month_row(prior.rows, grain_disp)
-                    if prior_spot and prior_spot.basisCents is not None:
-                        spot_change = spot_row.basisCents - prior_spot.basisCents
-
-                    prior_cands = [x for x in prior.rows
-                                 if not x.isSpot and _grain_disp(x.grain) == grain_disp
-                                 and x.basisCents is not None and x.futuresSymbol]
-                    if len(prior_cands) > 1:
-                        prior_cands.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
-                        prior_next = prior_cands[1]
-                        if prior_next.basisCents is not None:
-                            next_change = next_row.basisCents - prior_next.basisCents
-
-                all_rows.append({
-                    "provider": loc_meta["provider"],
-                    "location": loc_meta["location"],
-                    "grain": grain_disp,
-                    "spot_basis": spot_row.basisCents,
-                    "spot_change": spot_change,
-                    "next_basis": next_row.basisCents,
-                    "next_change": next_change,
-                    "spot_sym": spot_row.futuresSymbol,
-                    "next_sym": next_row.futuresSymbol,
-                })
-
-        # Render table
-        if all_rows:
-            th = ("background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;"
-                  "letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;"
-                  "font-weight:700;white-space:nowrap;line-height:1.3;font-family:inherit")
-            td_base = "padding:9px 12px;font-family:'IBM Plex Mono',monospace"
-
-            html = (
-                '<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono'
-                ':wght@400;600;700;800&display=swap" rel="stylesheet">'
-                '<table style="width:100%;border-collapse:collapse;font-size:12px;'
-                'font-family:\'IBM Plex Mono\',monospace;border:1px solid #e2e8f0;border-radius:6px">'
-                "<thead><tr>" +
-                f'<th style="{th}">Location</th>' +
-                f'<th style="{th}">Grain</th>' +
-                f'<th style="{th}">Spot Basis</th>' +
-                f'<th style="{th}">Δ</th>' +
-                f'<th style="{th}">Next Basis</th>' +
-                f'<th style="{th}">Δ</th>' +
-                "</tr></thead><tbody>"
-            )
-
-            for i, r in enumerate(all_rows):
-                bg = "#f8fafc" if i % 2 == 1 else "transparent"
-                spot_color = "#16a34a" if r["spot_basis"] >= 0 else "#dc2626"
-                next_color = "#16a34a" if r["next_basis"] >= 0 else "#dc2626"
-
-                spot_delta = (f'<span style="color:#16a34a;font-weight:700">+{r["spot_change"]}¢</span>'
-                             if r["spot_change"] and r["spot_change"] > 0 else
-                             f'<span style="color:#dc2626;font-weight:700">{r["spot_change"]}¢</span>'
-                             if r["spot_change"] else
-                             '<span style="color:#94a3b8">—</span>')
-
-                next_delta = (f'<span style="color:#16a34a;font-weight:700">+{r["next_change"]}¢</span>'
-                             if r["next_change"] and r["next_change"] > 0 else
-                             f'<span style="color:#dc2626;font-weight:700">{r["next_change"]}¢</span>'
-                             if r["next_change"] else
-                             '<span style="color:#94a3b8">—</span>')
-
-                html += (
-                    f'<tr style="background:{bg}">'
-                    f'<td style="{td_base};color:#1e293b;font-weight:700">{r["provider"]} {r["location"]}</td>'
-                    f'<td style="{td_base};color:#64748b">{r["grain"]}</td>'
-                    f'<td style="{td_base}"><span style="color:{spot_color};font-weight:800;font-size:14px">{r["spot_basis"]:+d}¢</span></td>'
-                    f'<td style="{td_base}">{spot_delta}</td>'
-                    f'<td style="{td_base}"><span style="color:{next_color};font-weight:800;font-size:14px">{r["next_basis"]:+d}¢</span></td>'
-                    f'<td style="{td_base}">{next_delta}</td>'
-                    f'</tr>'
-                )
-
-            html += "</tbody></table>"
-            st.markdown(html, unsafe_allow_html=True)
-        else:
-            st.info("No data available for river terminals yet.")
+    html += '</tbody></table>'
+    st.markdown(html, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RAIL FOB  (palmettograin.com rail FOB bids + offers)
