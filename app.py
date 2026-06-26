@@ -1937,60 +1937,76 @@ with tab_spotfwd:
                     next_chg = next_row.basisCents - pc[1].basisCents
         return spot_row.basisCents, next_row.basisCents if next_row else None, spot_chg, next_chg
 
-    # Build 18 items
-    items_18 = []
-    items_18.append(("Corn CIF", corn_cif_input, None, None, None))
-    items_18.append(("Bean CIF", bean_cif_input, None, None, None))
-    items_18.append(("ILR Barge Freight", ilr_freight_input, None, None, None))
-    items_18.append(("Chi Platts Eth", chi_eth_input, None, None, None))
-    items_18.append(("NY Platts Eth", ny_eth_input, None, None, None))
-
-    # Rail FOB items (6)
+    # Build 18 items in specified order
     from database import get_rail_fob_dates, get_rail_fob
-    rail_markets = ["CSX Columbus", "NS Ft Wayne", "Hereford", "PNW", "Group 3", "BN Shuttle"]
+
+    items_18 = []
+    all_locs = _cached_get_bids_filter_data()
+    proc_locs = [l for l in all_locs if l.get("facility_type") == "Corn Processing"]
+    soy_locs = [l for l in all_locs if l.get("facility_type") == "Soy Processing"]
+
+    def avg_by_zone(locs, grain, zone_name):
+        zone_locs = [l for l in locs if zone_name.lower() in (l.get("delivery_zone") or "").lower()]
+        spots, nexts = [], []
+        for l in zone_locs:
+            s, n, _, _ = _get_loc_basis(l["provider"], l["location"], grain)
+            if s: spots.append(s)
+            if n: nexts.append(n)
+        return (round(sum(spots)/len(spots)) if spots else None,
+               round(sum(nexts)/len(nexts)) if nexts else None, None, None)
+
+    # Exact order from user specification:
+    # Corn group
+    items_18.append(("Corn CIF", corn_cif_input, None, None, None))
+    items_18.append(("Zone 3 Avg Bid - Corn",) + avg_by_zone(proc_locs, "Corn", "Zone 3"))
+    items_18.append(("STL Avg Basis Bid - Corn",) + avg_by_zone(proc_locs, "Corn", "STL"))
+
+    # Rail FOB Corn items
+    rail_markets = {"CSX Columbus": "Corn", "NS Ft Wayne": "Corn", "Hereford": "Corn",
+                   "PNW": "Corn", "Group 3": "Corn"}
     rail_dates = get_rail_fob_dates("manual")
     if rail_dates:
         today_rail = get_rail_fob("manual", rail_dates[0])
         prior_rail = get_rail_fob("manual", rail_dates[1]) if len(rail_dates) > 1 else []
-        for market in rail_markets:
-            tr = next((r for r in today_rail if r["market"] == market and r["period_order"] == 1), None)
-            pr = next((r for r in prior_rail if r["market"] == market and r["period_order"] == 1), None)
-            spot = tr["bid"] if tr and tr["bid"] else None
-            spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
-            nxt = next((r["bid"] for r in today_rail if r["market"] == market and r["period_order"] == 2), None) if tr else None
-            items_18.append((market, spot, nxt, spot_chg, None))
     else:
-        for market in rail_markets:
-            items_18.append((market, None, None, None, None))
+        today_rail, prior_rail = [], []
 
-    # ADM locations (2)
-    for loc_name in ["Decatur", "Des Moines"]:
-        s, n, sc, nc = _get_loc_basis("ADM", f"ADM {loc_name}", "Corn")
-        items_18.append((f"ADM {loc_name}", s, n, sc, nc))
+    for market in ["CSX Columbus", "NS Ft Wayne", "Hereford", "PNW", "Group 3"]:
+        tr = next((r for r in today_rail if r["market"] == market and r["period_order"] == 1), None)
+        pr = next((r for r in prior_rail if r["market"] == market and r["period_order"] == 1), None)
+        spot = tr["bid"] if tr and tr["bid"] else None
+        spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
+        nxt = next((r["bid"] for r in today_rail if r["market"] == market and r["period_order"] == 2), None) if tr else None
+        items_18.append((f"{market} Corn Bid", spot, nxt, spot_chg, None))
 
-    # Compute Zone 3 & STL averages (4)
-    try:
-        all_locs = _cached_get_bids_filter_data()
-        proc_locs = [l for l in all_locs if l.get("facility_type") == "Corn Processing"]
-        soy_locs = [l for l in all_locs if l.get("facility_type") == "Soy Processing"]
+    # ADM Decatur corn
+    s, n, sc, nc = _get_loc_basis("ADM", "ADM Decatur", "Corn")
+    items_18.append(("ADM Decatur Corn Bid", s, n, sc, nc))
 
-        def avg_by_zone(locs, grain, zone_name):
-            zone_locs = [l for l in locs if zone_name.lower() in (l.get("delivery_zone") or "").lower()]
-            spots, nexts = [], []
-            for l in zone_locs:
-                s, n, _, _ = _get_loc_basis(l["provider"], l["location"], grain)
-                if s: spots.append(s)
-                if n: nexts.append(n)
-            return (round(sum(spots)/len(spots)) if spots else None,
-                   round(sum(nexts)/len(nexts)) if nexts else None, None, None)
+    # Bean group
+    items_18.append(("Bean CIF", bean_cif_input, None, None, None))
+    items_18.append(("Zone 3 Avg Bean Bid",) + avg_by_zone(soy_locs, "Soybeans", "Zone 3"))
+    items_18.append(("STL Avg Bean Bid",) + avg_by_zone(soy_locs, "Soybeans", "STL"))
 
-        items_18.append(("Zone 3 Avg Corn",) + avg_by_zone(proc_locs, "Corn", "Zone 3"))
-        items_18.append(("STL Avg Corn",) + avg_by_zone(proc_locs, "Corn", "STL"))
-        items_18.append(("Zone 3 Avg Beans",) + avg_by_zone(soy_locs, "Soybeans", "Zone 3"))
-        items_18.append(("STL Avg Beans",) + avg_by_zone(soy_locs, "Soybeans", "STL"))
-    except Exception as e:
-        for _ in range(4):
-            items_18.append((None, None, None, None, None))
+    # ADM beans
+    s, n, sc, nc = _get_loc_basis("ADM", "ADM Decatur", "Soybeans")
+    items_18.append(("ADM Decatur Bean Bid", s, n, sc, nc))
+    s, n, sc, nc = _get_loc_basis("ADM", "ADM Des Moines", "Soybeans")
+    items_18.append(("ADM Des Moines Bean Bid", s, n, sc, nc))
+
+    # Freight & Ethanol
+    items_18.append(("ILR Barge Freight", ilr_freight_input, None, None, None))
+
+    # BN Shuttle from Rail FOB
+    tr = next((r for r in today_rail if r["market"] == "BN Shuttle" and r["period_order"] == 1), None)
+    pr = next((r for r in prior_rail if r["market"] == "BN Shuttle" and r["period_order"] == 1), None)
+    spot = tr["bid"] if tr and tr["bid"] else None
+    spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
+    nxt = next((r["bid"] for r in today_rail if r["market"] == "BN Shuttle" and r["period_order"] == 2), None) if tr else None
+    items_18.append(("BN Shuttle Freight", spot, nxt, spot_chg, None))
+
+    items_18.append(("Chi Platts Eth", chi_eth_input, None, None, None))
+    items_18.append(("NY Platts Eth", ny_eth_input, None, None, None))
 
     # Render table
     th = "background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap"
