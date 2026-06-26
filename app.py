@@ -91,13 +91,26 @@ def _cached_futures_curve_for(date_str: str) -> dict:
 
 @st.cache_data(show_spinner=False)
 def _jsa_watermark_uri() -> str:
-    """The JSA 50-year logo as a base64 data URI (for the Changes-table watermark)."""
+    """The JSA 50-year logo as a base64 data URI (for the table watermarks)."""
     import base64, pathlib
     p = pathlib.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
     try:
         return "data:image/png;base64," + base64.b64encode(p.read_bytes()).decode()
     except Exception:
         return ""
+
+
+def _jsa_watermark_css(cls: str, size: str = "42% auto", opacity: str = ".07") -> str:
+    """A faint 50-year-logo watermark stamped as an overlay on any table tagged with
+    `cls`. Unlike the Changes-tab version (behind transparent rows), this overlays the
+    table, so it works even where rows/cells have meaningful background colors."""
+    uri = _jsa_watermark_uri()
+    if not uri:
+        return ""
+    return (f"<style>.{cls}{{position:relative}}"
+            f".{cls}::after{{content:'';position:absolute;inset:0;pointer-events:none;"
+            f"z-index:4;background:url('{uri}') center center no-repeat;"
+            f"background-size:{size};opacity:{opacity}}}</style>")
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _cached_rail_fob() -> dict:
@@ -466,6 +479,9 @@ st.markdown("""
   section[data-testid="stSidebar"] h3 { color: #32373c; }
 </style>
 """, unsafe_allow_html=True)
+
+# 50-year JSA logo watermark for the Summary & Trends tables (class "jsawm").
+st.markdown(_jsa_watermark_css("jsawm"), unsafe_allow_html=True)
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -3892,7 +3908,7 @@ with tab_summary:
             h = (
                 '<div style="overflow-x:auto;max-height:72vh;overflow-y:auto;'
                 'border:1px solid #e2e8f0;border-radius:6px">'
-                '<table style="border-collapse:collapse;width:100%;min-width:900px">'
+                '<table class="jsawm" style="border-collapse:collapse;width:100%;min-width:900px">'
                 '<thead>'
                 # Row 1 — group labels
                 '<tr style="background:#f8fafc">'
@@ -4112,7 +4128,8 @@ with tab_trends:
             _grps = [g for g in ("East", "West") if any((r.get("region") or "") == g for r in _rows)]
             _gf = "region"
         copy_button(render_trend_cards(_rows, _gf, _grps, layout="table"), "📋 Copy tables")
-        st.markdown(render_trend_cards(_rows, _gf, _grps), unsafe_allow_html=True)
+        st.markdown(f'<div class="jsawm">{render_trend_cards(_rows, _gf, _grps)}</div>',
+                    unsafe_allow_html=True)
 
 
 # ── Branded footer (JPSI) ─────────────────────────────────────────────────────
