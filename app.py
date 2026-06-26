@@ -3385,7 +3385,8 @@ with tab_summary:
     # ── Filters row ───────────────────────────────────────────────────────────
     _sl = _cached_get_bids_filter_data()  # [{provider, location, state, facility_type, region}]
     _sfac_types = sorted({l["facility_type"] for l in _sl if l["facility_type"]})
-    _sgrains = ["Soybeans", "Corn", "Wheat", "Soybean Meal", "Soybean Oil"]
+    _sgrains = ["Soybeans", "Corn", "Wheat", "Soft Red Winter", "Hard Red Winter",
+                "Hard Red Spring", "Soft White", "Soybean Meal", "Soybean Oil"]
 
     # Default the Grain to whichever commodity has the most bids for the selected
     # Location Type(s). Snaps on first load and whenever Location Type changes;
