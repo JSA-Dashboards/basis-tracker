@@ -1957,73 +1957,76 @@ with tab_spotfwd:
     from database import get_rail_fob_dates, get_rail_fob
 
     items_18 = []
-    all_locs = _cached_get_bids_filter_data()
-    proc_locs = [l for l in all_locs if l.get("facility_type") == "Corn Processing"]
-    soy_locs = [l for l in all_locs if l.get("facility_type") == "Soy Processing"]
 
-    def avg_by_zone(locs, grain, zone_name):
-        zone_locs = [l for l in locs if zone_name.lower() in (l.get("delivery_zone") or "").lower()]
-        spots, nexts = [], []
-        for l in zone_locs:
-            s, n, _, _ = _get_loc_basis(l["provider"], l["location"], grain)
-            if s: spots.append(s)
-            if n: nexts.append(n)
-        return (round(sum(spots)/len(spots)) if spots else None,
-               round(sum(nexts)/len(nexts)) if nexts else None, None, None)
+    # STL / Zone-3 reference rows use ADM's posted bids (per JSA: ADM St. Louis
+    # for STL, ADM Hennepin for Zone 3) rather than a synthetic zone average.
+    ADM_STL, ADM_HENN = "St. Louis, MO (Elevator)", "Hennepin, IL"
+
+    # ── Rail rows: data referenced from the Rail FOB section ───────────────────
+    # Manual corridors (BN/UP/CN) are archived & date-stamped; palmetto CSX/NS is
+    # a live scrape with no history (so no change column).  period_order is
+    # 0-based, so spot = first posted period, next = the following one.
+    rail_dates = get_rail_fob_dates("manual")
+    _rd_le = sorted([d for d in rail_dates if d <= sf_asof.isoformat()], reverse=True)
+    today_rail = get_rail_fob("manual", _rd_le[0]) if _rd_le else []
+    prior_rail = get_rail_fob("manual", _rd_le[1]) if len(_rd_le) > 1 else []
+
+    def _rail_spot_next(rows, market):
+        mr = sorted([r for r in rows if r["market"] == market and r["bid"] is not None],
+                    key=lambda x: x["period_order"])
+        return (mr[0]["bid"] if mr else None, mr[1]["bid"] if len(mr) > 1 else None)
+
+    def _manual_rail_item(label, market):
+        spot, nxt = _rail_spot_next(today_rail, market)
+        psp, _    = _rail_spot_next(prior_rail, market)
+        chg = (spot - psp) if (spot is not None and psp is not None) else None
+        return (label, spot, nxt, chg, None)
+
+    _pal_rows = (_cached_rail_fob() or {}).get("rows", [])
+
+    def _palmetto_item(label, loc_match):
+        for r in _pal_rows:
+            if loc_match.lower() in (r.get("location") or "").lower():
+                cells = [c for c in r["cells"] if c.get("bid") is not None]
+                return (label, cells[0]["bid"] if cells else None,
+                        cells[1]["bid"] if len(cells) > 1 else None, None, None)
+        return (label, None, None, None, None)
 
     # Exact order from user specification:
     # Corn group
-    items_18.append(("Corn CIF", corn_cif_input, None, None, None))
-    items_18.append(("Zone 3 Avg Bid - Corn",) + avg_by_zone(proc_locs, "Corn", "Zone 3"))
-    items_18.append(("STL Avg Basis Bid - Corn",) + avg_by_zone(proc_locs, "Corn", "STL"))
+    items_18.append(("Corn CIF", corn_cif_input or None, None, None, None))
+    items_18.append(("Zone 3 (ADM Hennepin) - Corn",) + _get_loc_basis("ADM", ADM_HENN, "Corn"))
+    items_18.append(("STL (ADM St. Louis) - Corn",) + _get_loc_basis("ADM", ADM_STL, "Corn"))
 
-    # Rail FOB Corn items
-    rail_markets = {"CSX Columbus": "Corn", "NS Ft Wayne": "Corn", "Hereford": "Corn",
-                   "PNW": "Corn", "Group 3": "Corn"}
-    rail_dates = get_rail_fob_dates("manual")
-    _rd_le = sorted([d for d in rail_dates if d <= sf_asof.isoformat()], reverse=True)
-    if _rd_le:
-        today_rail = get_rail_fob("manual", _rd_le[0])
-        prior_rail = get_rail_fob("manual", _rd_le[1]) if len(_rd_le) > 1 else []
-    else:
-        today_rail, prior_rail = [], []
-
-    for market in ["CSX Columbus", "NS Ft Wayne", "Hereford", "PNW", "Group 3"]:
-        tr = next((r for r in today_rail if r["market"] == market and r["period_order"] == 1), None)
-        pr = next((r for r in prior_rail if r["market"] == market and r["period_order"] == 1), None)
-        spot = tr["bid"] if tr and tr["bid"] else None
-        spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
-        nxt = next((r["bid"] for r in today_rail if r["market"] == market and r["period_order"] == 2), None) if tr else None
-        items_18.append((f"{market} Corn Bid", spot, nxt, spot_chg, None))
+    # Rail FOB Corn items (referenced from the Rail FOB section)
+    items_18.append(_palmetto_item("CSX Columbus Corn Bid", "COL, OH Corn"))
+    items_18.append(_palmetto_item("NS Ft Wayne Corn Bid", "NS FT. WAYNE"))
+    items_18.append(_manual_rail_item("BN Hereford Corn Bid", "BN Hereford"))
+    items_18.append(_manual_rail_item("BN PNW Corn Bid", "BN PNW"))
+    items_18.append(_manual_rail_item("UP Group 3 Corn Bid", "UP Group 3"))
 
     # ADM Decatur corn
-    s, n, sc, nc = _get_loc_basis("ADM", "ADM Decatur", "Corn")
-    items_18.append(("ADM Decatur Corn Bid", s, n, sc, nc))
+    items_18.append(("ADM Decatur Corn Bid",)
+                    + _get_loc_basis("ADM", "Decatur, IL (Corn Processing)", "Corn"))
 
     # Bean group
-    items_18.append(("Bean CIF", bean_cif_input, None, None, None))
-    items_18.append(("Zone 3 Avg Bean Bid",) + avg_by_zone(soy_locs, "Soybeans", "Zone 3"))
-    items_18.append(("STL Avg Bean Bid",) + avg_by_zone(soy_locs, "Soybeans", "STL"))
+    items_18.append(("Bean CIF", bean_cif_input or None, None, None, None))
+    items_18.append(("Zone 3 (ADM Hennepin) - Beans",) + _get_loc_basis("ADM", ADM_HENN, "Soybeans"))
+    items_18.append(("STL (ADM St. Louis) - Beans",) + _get_loc_basis("ADM", ADM_STL, "Soybeans"))
 
     # ADM beans
-    s, n, sc, nc = _get_loc_basis("ADM", "ADM Decatur", "Soybeans")
-    items_18.append(("ADM Decatur Bean Bid", s, n, sc, nc))
-    s, n, sc, nc = _get_loc_basis("ADM", "ADM Des Moines", "Soybeans")
-    items_18.append(("ADM Des Moines Bean Bid", s, n, sc, nc))
+    items_18.append(("ADM Decatur Bean Bid",)
+                    + _get_loc_basis("ADM", "Decatur, IL (Soy Processing)", "Soybeans"))
+    items_18.append(("ADM Des Moines Bean Bid",)
+                    + _get_loc_basis("ADM", "Des Moines, IA", "Soybeans"))
 
-    # Freight & Ethanol
-    items_18.append(("ILR Barge Freight", ilr_freight_input, None, None, None))
+    # Freight & Ethanol — manual entries; BN/UP Freight section is TBD (user
+    # building it later), so the rail-freight row is a placeholder for now.
+    items_18.append(("ILR Barge Freight", ilr_freight_input or None, None, None, None))
+    items_18.append(("BN Shuttle Freight", None, None, None, None))
 
-    # BN Shuttle from Rail FOB
-    tr = next((r for r in today_rail if r["market"] == "BN Shuttle" and r["period_order"] == 1), None)
-    pr = next((r for r in prior_rail if r["market"] == "BN Shuttle" and r["period_order"] == 1), None)
-    spot = tr["bid"] if tr and tr["bid"] else None
-    spot_chg = (tr["bid"] - pr["bid"]) if (tr and pr and tr["bid"] and pr["bid"]) else None
-    nxt = next((r["bid"] for r in today_rail if r["market"] == "BN Shuttle" and r["period_order"] == 2), None) if tr else None
-    items_18.append(("BN Shuttle Freight", spot, nxt, spot_chg, None))
-
-    items_18.append(("Chi Platts Eth", chi_eth_input, None, None, None))
-    items_18.append(("NY Platts Eth", ny_eth_input, None, None, None))
+    items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None))
+    items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None))
 
     # Render table
     th = "background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap"
@@ -2035,11 +2038,11 @@ with tab_spotfwd:
         bg = "#f8fafc" if i % 2 else "transparent"
         if not name:
             continue
-        spot_str = f'{spot:+d}¢' if spot else "—"
-        nxt_str = f'{nxt:+d}¢' if nxt else "—"
+        spot_str = f'{spot:+d}¢' if spot is not None else "—"
+        nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
-        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{"#16a34a" if spot and spot >= 0 else "#dc2626"}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
+        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{"#16a34a" if spot is not None and spot >= 0 else "#dc2626"}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
 
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
