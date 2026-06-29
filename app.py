@@ -1894,6 +1894,18 @@ with tab_changes:
 with tab_spotfwd:
     st.caption("18-location tracker: Spot & following month basis with daily changes.")
 
+    # As-of selector — defaults to the most recent Friday so the table reflects
+    # Friday's close (Δ = change into that Friday vs the prior business day).
+    from datetime import timedelta as _tdelta
+    _today_sf = datetime.utcnow().date()
+    _def_fri  = _today_sf - _tdelta(days=(_today_sf.weekday() - 4) % 7)
+    _asof_col, _ = st.columns([3, 7])
+    with _asof_col:
+        sf_asof = st.date_input("As of (defaults to most recent Friday)",
+                                value=_def_fri, key="spotfwd_asof")
+    st.caption(f"Showing basis as of **{sf_asof:%a %b %d, %Y}** · "
+               f"Δ = change vs prior business day.")
+
     # Manual input section
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
@@ -1911,12 +1923,16 @@ with tab_spotfwd:
 
     # Helper to get location basis & changes
     def _get_loc_basis(prov: str, loc: str, grain: str) -> tuple:
-        """Return (spot, next, spot_chg, next_chg)."""
+        """Return (spot, next, spot_chg, next_chg) as of sf_asof (most recent
+        snapshot on/before that date; prior = the snapshot before it)."""
         snaps = _cached_get_snapshots(prov, loc)
-        if not snaps or len(snaps) < 1:
+        if not snaps:
             return None, None, None, None
-        cur = snaps[-1]
-        prior = snaps[-2] if len(snaps) > 1 else None
+        valid = [s for s in snaps if _trend_ts(s.timestamp).date() <= sf_asof]
+        if not valid:
+            return None, None, None, None
+        cur = valid[-1]
+        prior = valid[-2] if len(valid) > 1 else None
         spot_row = _front_month_row(cur.rows, grain)
         if not spot_row:
             return None, None, None, None
@@ -1965,9 +1981,10 @@ with tab_spotfwd:
     rail_markets = {"CSX Columbus": "Corn", "NS Ft Wayne": "Corn", "Hereford": "Corn",
                    "PNW": "Corn", "Group 3": "Corn"}
     rail_dates = get_rail_fob_dates("manual")
-    if rail_dates:
-        today_rail = get_rail_fob("manual", rail_dates[0])
-        prior_rail = get_rail_fob("manual", rail_dates[1]) if len(rail_dates) > 1 else []
+    _rd_le = sorted([d for d in rail_dates if d <= sf_asof.isoformat()], reverse=True)
+    if _rd_le:
+        today_rail = get_rail_fob("manual", _rd_le[0])
+        prior_rail = get_rail_fob("manual", _rd_le[1]) if len(_rd_le) > 1 else []
     else:
         today_rail, prior_rail = [], []
 
