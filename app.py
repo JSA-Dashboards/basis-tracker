@@ -3562,6 +3562,12 @@ with tab_summary:
     with _sf3:
         _sgrain  = st.selectbox("Grain", _sgrains, key="sum_grain")
 
+    # Soybean Meal basis is stored as $/ton × 100 ($3/ton = 300) — display it as
+    # $/ton; corn/soy/wheat stay as cents/bushel.
+    _is_meal = (_sgrain == "Soybean Meal")
+    _mdiv    = 100.0 if _is_meal else 1.0
+    _unit    = "$/t" if _is_meal else "¢"
+
     # ── Apply filters ─────────────────────────────────────────────────────────
     _sfilt = [
         l for l in _sl
@@ -3793,6 +3799,7 @@ with tab_summary:
                         continue
                     v = fn(rs)
                     if v is not None:
+                        v = v / _mdiv          # meal: cents → $/ton
                         lon, lat = _CENTROID[stt]
                         recs.append({"id": _FIPS[stt], "state": stt, "value": round(v, 1),
                                      "n": len(rs), "lon": lon, "lat": lat,
@@ -3812,7 +3819,7 @@ with tab_summary:
                         color=_alt.Color("value:Q",
                                          scale=_alt.Scale(scheme="redyellowgreen",
                                                           domain=[-_m, _m]),
-                                         legend=_alt.Legend(title=f"{metric} (¢)", orient="bottom")),
+                                         legend=_alt.Legend(title=f"{metric} ({_unit})", orient="bottom")),
                         tooltip=[_alt.Tooltip("state:N", title="State"),
                                  _alt.Tooltip("value:Q", title=metric),
                                  _alt.Tooltip("n:Q", title="Locations")],
@@ -3852,11 +3859,11 @@ with tab_summary:
             def _avg(xs):
                 return (sum(xs) / len(xs)) if xs else None
 
-            def _fc(v):  # signed cents, 1 decimal
+            def _fc(v):  # signed, 1 decimal — meal in $/ton, else cents
                 if v is None:
                     return "—"
                 s = "+" if v >= 0 else "−"
-                return f"{s}{abs(v):.1f}"
+                return f"{s}{abs(v) / _mdiv:.1f}"
 
             def _fp(v):  # percent, 0 decimals
                 return "—" if v is None else f"{round(v)}%"
@@ -3928,7 +3935,7 @@ with tab_summary:
                 return f'<td style="{_SC_TD};color:{col};font-weight:700">{txt}</td>'
 
             # Card A: Avg basis change
-            _hA = (f'<div style="{_SC_CARD}"><div style="{_SC_TITLE}">Avg Basis Change (¢)</div>'
+            _hA = (f'<div style="{_SC_CARD}"><div style="{_SC_TITLE}">Avg Basis Change ({_unit})</div>'
                    f'<table style="border-collapse:collapse;width:100%"><thead><tr>'
                    f'<th style="{_SC_THL}"></th>')
             for _, lab in _WINS:
@@ -3946,7 +3953,7 @@ with tab_summary:
             _hD = ""
             if _river_view:
                 _hD = (f'<div style="{_SC_CARD}"><div style="{_SC_TITLE}">'
-                       f'Avg Basis &amp; Change by {_grp_title} (¢)</div>'
+                       f'Avg Basis &amp; Change by {_grp_title} ({_unit})</div>'
                        f'<table style="border-collapse:collapse;width:100%"><thead><tr>'
                        f'<th style="{_SC_THL}"></th>'
                        f'<th style="{_SC_TH}">Avg Basis</th>')
@@ -3957,7 +3964,7 @@ with tab_summary:
                     _hD += f'<tr><td style="{_SC_TDL};font-weight:700;color:#1e293b">{gv}</td>'
                     # Avg basis level (neutral, bold — distinct from the change cols)
                     ab = _grp_avg_basis(gv)
-                    abtxt = "—" if ab is None else f"{'+' if ab >= 0 else '−'}{abs(ab):.1f}"
+                    abtxt = "—" if ab is None else f"{'+' if ab >= 0 else '−'}{abs(ab) / _mdiv:.1f}"
                     _hD += f'<td style="{_SC_TD};color:#0f172a;font-weight:800">{abtxt}</td>'
                     for w, _ in _WINS:
                         v = _grp_avg(gv, w)
@@ -4026,6 +4033,12 @@ with tab_summary:
             _TD_R  = ("font-family:'IBM Plex Mono',monospace;font-size:11px;"
                       "padding:3px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap")
 
+            def _fmt_b(v) -> str:   # meal in $/ton, else integer cents (see _mdiv above)
+                x = v / _mdiv
+                if _is_meal:
+                    return f"{x:.0f}" if abs(x - round(x)) < 0.05 else f"{x:.1f}"
+                return f"{int(x)}"
+
             def _bcell(basis, sym, col_ref, move=None, bold=False) -> str:
                 # Badge a cell only when it prices against a different option month
                 # than its OWN column's majority reference (e.g. Platinum vs Nov).
@@ -4043,7 +4056,7 @@ with tab_summary:
                     extra += ";background:#dcfce7" if move > 0 else ";background:#fee2e2"
                 if bold:
                     extra += ";font-weight:800"
-                return f'<td style="{_TD_R}{extra}">{sign}{basis}{badge}</td>'
+                return f'<td style="{_TD_R}{extra}">{sign}{_fmt_b(basis)}{badge}</td>'
 
             def _sum_change(r, win):
                 """Spread-adjusted change of current vs an earlier window. When the two
@@ -4067,7 +4080,7 @@ with tab_summary:
                 sign  = "+" if chg > 0 else ""
                 color = "#16a34a" if chg > 0 else "#dc2626"
                 roll  = '<span style="color:#d97706;font-size:9px"> ↻</span>' if rolled else ""
-                return f'<td style="{_TD_R};color:{color};font-weight:{fw}">{sign}{chg}{roll}</td>'
+                return f'<td style="{_TD_R};color:{color};font-weight:{fw}">{sign}{_fmt_b(chg)}{roll}</td>'
 
             # ── Build HTML ────────────────────────────────────────────────────
             _COL_META = [
@@ -4174,7 +4187,7 @@ with tab_summary:
                     bdr = ";border-left:1px solid #e2e8f0" if lbl in ("yr_ago", "current") else ""
                     bw  = ";font-weight:800" if lbl == "current" else ""
                     v   = agg.get(f"b_{lbl}")
-                    txt = "—" if v is None else f"{v:.1f}"
+                    txt = "—" if v is None else f"{v / _mdiv:.1f}"
                     tr += f'<td style="{_TD_R}{bdr}{bw};color:#0f172a">{txt}</td>'
                 # Avg changes (colored like the change columns)
                 for j, ck in enumerate(("c_daily", "c_weekly", "c_monthly", "c_yearly")):
@@ -4186,7 +4199,7 @@ with tab_summary:
                     else:
                         col = "#16a34a" if v > 0 else "#dc2626"
                         sgn = "+" if v > 0 else "−"
-                        tr += f'<td style="{_TD_R}{bdr}{bw};color:{col}">{sgn}{abs(v):.1f}</td>'
+                        tr += f'<td style="{_TD_R}{bdr}{bw};color:{col}">{sgn}{abs(v) / _mdiv:.1f}</td>'
                 tr += '</tr>'
                 return tr
 
