@@ -3,6 +3,7 @@ Basis Tracker · JPSI
 Streamlit app — run with: streamlit run app.py
 """
 import os
+import re
 from datetime import date, datetime, timezone, timedelta
 from dotenv import load_dotenv
 import streamlit as st
@@ -1933,25 +1934,37 @@ with tab_spotfwd:
             return None, None, None, None
         cur = valid[-1]
         prior = valid[-2] if len(valid) > 1 else None
-        spot_row = _front_month_row(cur.rows, grain)
+        # Spot = nearest delivery month; Next = the first delivery whose calendar
+        # month is LATER than spot's (skip same-month sub-periods like "June 23-27"
+        # vs "June 28-July 2", so Next is genuinely the following month).
+        def _spot_next(rows):
+            spot = _front_month_row(rows, grain)
+            if not spot:
+                return None, None
+            sm = _dp.canonical(spot.deliveryMonth, spot.futuresSymbol)
+            cands = [r for r in rows if not r.isSpot and _grain_disp(r.grain) == grain
+                     and r.basisCents is not None and r.futuresSymbol]
+            cands.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
+            nxt = None
+            for r in cands:
+                rm = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+                if sm is None or (rm is not None and rm > sm):
+                    nxt = r
+                    break
+            return spot, nxt
+
+        spot_row, next_row = _spot_next(cur.rows)
         if not spot_row:
             return None, None, None, None
-        cands = [r for r in cur.rows if not r.isSpot and _grain_disp(r.grain) == grain
-                and r.basisCents is not None and r.futuresSymbol]
-        cands.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
-        next_row = cands[1] if len(cands) > 1 else None
         spot_chg, next_chg = None, None
         if prior:
-            ps = _front_month_row(prior.rows, grain)
+            ps, pn = _spot_next(prior.rows)
             if ps:
                 spot_chg = spot_row.basisCents - ps.basisCents
-            if next_row:
-                pc = [r for r in prior.rows if not r.isSpot and _grain_disp(r.grain) == grain
-                     and r.basisCents is not None and r.futuresSymbol]
-                pc.sort(key=lambda x: _dp.deliv_key(x.deliveryMonth, x.futuresSymbol))
-                if len(pc) > 1:
-                    next_chg = next_row.basisCents - pc[1].basisCents
-        return spot_row.basisCents, next_row.basisCents if next_row else None, spot_chg, next_chg
+            if next_row and pn:
+                next_chg = next_row.basisCents - pn.basisCents
+        return (spot_row.basisCents, next_row.basisCents if next_row else None,
+                spot_chg, next_chg)
 
     # Build 18 items in specified order
     from database import get_rail_fob_dates, get_rail_fob
@@ -1964,17 +1977,43 @@ with tab_spotfwd:
 
     # ── Rail rows: data referenced from the Rail FOB section ───────────────────
     # Manual corridors (BN/UP/CN) are archived & date-stamped; palmetto CSX/NS is
-    # a live scrape with no history (so no change column).  period_order is
-    # 0-based, so spot = first posted period, next = the following one.
+    # a live scrape with no history (so no change column).  Spot = nearest posted
+    # period; Next = the first later calendar month (skip same-month splits like
+    # PNW's "FH July"/"July 5-20"), matching the cash rows' Now/Next convention.
     rail_dates = get_rail_fob_dates("manual")
     _rd_le = sorted([d for d in rail_dates if d <= sf_asof.isoformat()], reverse=True)
     today_rail = get_rail_fob("manual", _rd_le[0]) if _rd_le else []
     prior_rail = get_rail_fob("manual", _rd_le[1]) if len(_rd_le) > 1 else []
 
+    # Rail periods are free text ("FH July", "AUGUST", "JAS") with only a short
+    # futures code, so _dp.canonical can't resolve them — pull the month name out
+    # of the period string directly (packages like "JAS"/"AS" yield None).
+    _MONTHS = {"jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+               "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12}
+
+    def _period_month(period):
+        for w in re.findall(r"[a-z]+", (period or "").lower()):
+            if w[:3] in _MONTHS:
+                return _MONTHS[w[:3]]
+        return None
+
+    def _spot_next_by_month(pairs):
+        """pairs: ordered (month|None, value); spot = first, next = the first whose
+        month is later than spot's (rows are already in chronological order)."""
+        if not pairs:
+            return None, None
+        sm, spot = pairs[0]
+        nxt = None
+        for rm, val in pairs[1:]:
+            if sm is None or (rm is not None and rm > sm):
+                nxt = val
+                break
+        return spot, nxt
+
     def _rail_spot_next(rows, market):
         mr = sorted([r for r in rows if r["market"] == market and r["bid"] is not None],
                     key=lambda x: x["period_order"])
-        return (mr[0]["bid"] if mr else None, mr[1]["bid"] if len(mr) > 1 else None)
+        return _spot_next_by_month([(_period_month(r.get("period")), r["bid"]) for r in mr])
 
     def _manual_rail_item(label, market):
         spot, nxt = _rail_spot_next(today_rail, market)
@@ -1988,8 +2027,9 @@ with tab_spotfwd:
         for r in _pal_rows:
             if loc_match.lower() in (r.get("location") or "").lower():
                 cells = [c for c in r["cells"] if c.get("bid") is not None]
-                return (label, cells[0]["bid"] if cells else None,
-                        cells[1]["bid"] if len(cells) > 1 else None, None, None)
+                spot, nxt = _spot_next_by_month(
+                    [(_period_month(c.get("period")), c["bid"]) for c in cells])
+                return (label, spot, nxt, None, None)
         return (label, None, None, None, None)
 
     # Exact order from user specification:
