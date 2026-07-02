@@ -120,6 +120,16 @@ def _cached_rail_fob() -> dict:
     import palmetto_rail_scraper
     return palmetto_rail_scraper.fetch_rail_fob() or {}
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_river_dates() -> list:
+    import river_fob_data
+    return river_fob_data.list_dates()
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_river_snapshot(as_of: str):
+    import river_fob_data
+    return river_fob_data.load_snapshot(as_of)
+
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
     entry = _GM.get(raw)
@@ -1864,8 +1874,10 @@ def _paste_clean(html: str) -> str:
             .replace("border-bottom:1px solid #f1f5f9", "border:1px solid #e6e9ee"))
 
 
-tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_map, tab_summary, tab_trends = st.tabs(
-    ["🔔 Changes", "📈 Spot & Forward", "📋 Bids", "🚂 Rail FOB", "🗺️ Map", "📊 Summary", "📈 Trends"])
+(tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
+ tab_summary, tab_trends) = st.tabs(
+    ["🔔 Changes", "📈 Spot & Forward", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
+     "🗺️ Map", "📊 Summary", "📈 Trends"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -1907,18 +1919,44 @@ with tab_spotfwd:
     st.caption(f"Showing basis as of **{sf_asof:%a %b %d, %Y}** · "
                f"Δ = change vs prior business day.")
 
+    # Corn/Bean CIF prefill from the latest River FOB snapshot (shared Supabase);
+    # river CIF is $/bu → ×100 = ¢. Freight/ethanol stay manual. Override-able.
+    _riv_dates = _cached_river_dates()
+    _riv_cif   = _cached_river_snapshot(_riv_dates[0])[0] if _riv_dates else None
+    _RIV_MONTHS = ["June", "July", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"]
+    _RIV_ML = {6: "June", 7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov",
+               12: "Dec", 1: "Jan"}
+
+    def _riv_cif_cents(com):
+        mv = (_riv_cif or {}).get(com, {})
+        if not mv:
+            return 0
+        cur = _RIV_ML.get(datetime.now().month)
+        if cur and mv.get(cur) is not None:
+            return int(round(mv[cur] * 100))
+        for m in _RIV_MONTHS:                      # fallback: first month present
+            if mv.get(m) is not None:
+                return int(round(mv[m] * 100))
+        return 0
+
     # Manual input section
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        corn_cif_input = st.number_input("Corn CIF (¢)", value=0, step=1, key="corn_cif")
+        corn_cif_input = st.number_input("Corn CIF (¢)", value=_riv_cif_cents("Corn"),
+                                         step=1, key="corn_cif")
     with col2:
-        bean_cif_input = st.number_input("Bean CIF (¢)", value=0, step=1, key="bean_cif")
+        bean_cif_input = st.number_input("Bean CIF (¢)", value=_riv_cif_cents("Soybeans"),
+                                         step=1, key="bean_cif")
     with col3:
         ilr_freight_input = st.number_input("ILR Freight (¢)", value=0, step=1, key="ilr_freight")
     with col4:
         chi_eth_input = st.number_input("Chi Eth (¢)", value=0, step=1, key="chi_eth")
     with col5:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
+    if _riv_dates:
+        st.caption(f"Corn/Bean CIF prefilled from the River FOB sheet "
+                   f"({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} column) "
+                   f"— edit to override.")
 
     st.markdown("---")
 
@@ -2243,6 +2281,118 @@ with tab_railfob:
                    f"their latest values (amber “as of M/D” stamp) · Δ = bid change vs prior "
                    f"posting / ~1 week / ~1 month (— until history builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: RIVER FOB  (read-only view of the JSA FOB Sheet, shared Supabase archive)
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_riverfob:
+    import fob_model as _M
+
+    _rdates = _cached_river_dates()
+    if not _rdates:
+        st.info("No River FOB data archived yet — enter it in the River FOB portal.")
+    else:
+        st.caption("River FOB values — CIF, barge freight & FOB basis by river "
+                   "location. Mirrors the JSA FOB Sheet (entered in the River FOB "
+                   "portal); read-only here.")
+        _rc1, _rc2, _ = st.columns([2, 5, 5])
+        with _rc1:
+            _rsel = st.selectbox("As of date", _rdates, key="riverfob_date")
+        with _rc2:
+            _rcom = st.radio("Commodity", _M.COMMODITIES, horizontal=True,
+                             key="riverfob_com")
+
+        _cif, _frt, _cal = _cached_river_snapshot(_rsel)
+        _pdate = next((d for d in _rdates if d < _rsel), None)
+        _pcif, _pfrt, _pcal = (_cached_river_snapshot(_pdate) if _pdate
+                               else (None, None, None))
+
+        _calc      = (_cal or {}).get(_rcom) or []
+        _months    = [m for m, _c in _calc] or _M.MONTHS
+        _contracts = [c for _m, c in _calc] or _M.CONTRACTS[_rcom]
+        _cifrow    = (_cif or {}).get(_rcom, {})
+        _pcifrow   = (_pcif or {}).get(_rcom, {})
+        _frtreg    = _frt or {}
+        _pfrtreg   = _pfrt or {}
+
+        _grid  = _M.compute_fob_grid(_rcom, _cifrow, _frtreg, _months)
+        _pgrid = (_M.compute_fob_grid(_rcom, _pcifrow, _pfrtreg, _months)
+                  if _pcifrow else {})
+
+        def _rdc(cur, prior):
+            if cur is None or prior is None:
+                return ""
+            return "up" if cur > prior else ("down" if cur < prior else "")
+
+        def _cell(txt, cls):
+            return f'<td class="{cls}">{txt}</td>' if cls else f"<td>{txt}</td>"
+
+        _ncol  = len(_months) + 1
+        _rrows = []
+        _rrows.append('<tr class="mrow"><td class="lbl"></td>'
+                      + "".join(f"<td>{m}</td>" for m in _months) + "</tr>")
+        _rrows.append('<tr class="crow"><td class="lbl"></td>'
+                      + "".join(f"<td>{c or ''}</td>" for c in _contracts) + "</tr>")
+        # CIF NOLA row
+        _cc = []
+        for _m in _months:
+            _v = _cifrow.get(_m)
+            _cc.append("<td></td>" if _v is None
+                       else _cell(f"{_v:.2f}", _rdc(_v, _pcifrow.get(_m))))
+        _rrows.append('<tr class="strong"><td class="lbl">CIF NOLA</td>'
+                      + "".join(_cc) + "</tr>")
+        # river reaches: reach header, freight (%), FOB (2dp, neg in parens)
+        for _it in _M.BLOCK_LAYOUT:
+            if _it[0] == "reach":
+                _rrows.append(f'<tr class="reach"><td colspan="{_ncol}">{_it[1]}</td></tr>')
+            elif _it[0] == "freight":
+                _, _rg, _lbl = _it
+                _fr, _pfr = _frtreg.get(_rg, {}), _pfrtreg.get(_rg, {})
+                _cells = []
+                for _m in _months:
+                    _v = _fr.get(_m)
+                    _cells.append("<td></td>" if _v is None
+                                  else _cell(f"{_v * 100:.0f}%", _rdc(_v, _pfr.get(_m))))
+                _rrows.append(f'<tr class="frt"><td class="lbl">{_lbl}</td>'
+                              + "".join(_cells) + "</tr>")
+            else:
+                _loc = _it[1]
+                _pg  = _pgrid.get(_loc, {})
+                _cells = []
+                for _m in _months:
+                    _v = _grid[_loc].get(_m)
+                    if _v is None:
+                        _cells.append("<td></td>")
+                    else:
+                        _txt = f"({abs(_v):.2f})" if _v < 0 else f"{_v:.2f}"
+                        _cells.append(_cell(_txt, _rdc(_v, _pg.get(_m))))
+                _rrows.append(f'<tr><td class="lbl">FOB Barge {_loc}</td>'
+                              + "".join(_cells) + "</tr>")
+
+        _rcss = (
+            "<style>"
+            ".rfob{border-collapse:collapse;width:100%;font-family:'IBM Plex Mono',monospace;font-size:11px}"
+            ".rfob td{padding:3px 8px;text-align:right;border-bottom:1px solid #f1f5f9;white-space:nowrap}"
+            ".rfob td.lbl{text-align:left;color:#32373c;font-weight:600}"
+            ".rfob tr.mrow td{background:#32373c;color:#fff;font-weight:700;font-size:10px}"
+            ".rfob tr.crow td{color:#94a3b8;font-size:9px;border-bottom:2px solid #e2e8f0}"
+            ".rfob tr.strong td{font-weight:700;background:#f8fafc}"
+            ".rfob tr.reach td{background:#e8eef3;color:#0693e3;font-weight:700;text-align:left;"
+            "text-transform:uppercase;letter-spacing:.06em;font-size:9px;padding:4px 8px}"
+            ".rfob tr.frt td{font-style:italic;color:#64748b}"
+            ".rfob td.up{color:#16a34a;font-weight:700}"
+            ".rfob td.down{color:#dc2626;font-weight:700}"
+            "</style>"
+        )
+        _rhtml = (f'{_rcss}<div style="overflow-x:auto"><table class="rfob">'
+                  f'{"".join(_rrows)}</table></div>')
+        st.markdown(_rhtml, unsafe_allow_html=True)
+        _srcnote = (f"FOB = CIF − (factor × freight%) ÷ 2000 × bushel "
+                    f"({_M.BUSHEL_WEIGHT[_rcom]} lb). ")
+        if _pdate:
+            _srcnote += f"Green ▲ / red ▼ vs prior archived date ({_pdate})."
+        st.caption(_srcnote)
+        copy_button(_rhtml, "📋 Copy sheet")
 
 with tab_bids:
     # ── Provider + Location selector ─────────────────────────────────────────────
