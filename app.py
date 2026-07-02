@@ -1922,22 +1922,29 @@ with tab_spotfwd:
     # Corn/Bean CIF prefill from the latest River FOB snapshot (shared Supabase);
     # river CIF is $/bu → ×100 = ¢. Freight/ethanol stay manual. Override-able.
     _riv_dates = _cached_river_dates()
-    _riv_cif   = _cached_river_snapshot(_riv_dates[0])[0] if _riv_dates else None
+    _riv_snap  = _cached_river_snapshot(_riv_dates[0]) if _riv_dates else (None, None, None)
+    _riv_cif, _riv_frt = _riv_snap[0], _riv_snap[1]
     _RIV_MONTHS = ["June", "July", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"]
     _RIV_ML = {6: "June", 7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov",
                12: "Dec", 1: "Jan"}
 
-    def _riv_cif_cents(com):
-        mv = (_riv_cif or {}).get(com, {})
+    def _riv_month_val(mv, scale):
+        """Value for the current calendar month (fallback: first present), scaled."""
         if not mv:
             return 0
         cur = _RIV_ML.get(datetime.now().month)
         if cur and mv.get(cur) is not None:
-            return int(round(mv[cur] * 100))
-        for m in _RIV_MONTHS:                      # fallback: first month present
+            return int(round(mv[cur] * scale))
+        for m in _RIV_MONTHS:
             if mv.get(m) is not None:
-                return int(round(mv[m] * 100))
+                return int(round(mv[m] * scale))
         return 0
+
+    def _riv_cif_cents(com):
+        return _riv_month_val((_riv_cif or {}).get(com, {}), 100)   # $/bu → ¢
+
+    def _riv_il_pct():
+        return _riv_month_val((_riv_frt or {}).get("IL", {}), 100)  # stored → %
 
     # Manual input section
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -1948,15 +1955,16 @@ with tab_spotfwd:
         bean_cif_input = st.number_input("Bean CIF (¢)", value=_riv_cif_cents("Soybeans"),
                                          step=1, key="bean_cif")
     with col3:
-        ilr_freight_input = st.number_input("ILR Freight (¢)", value=0, step=1, key="ilr_freight")
+        ilr_freight_input = st.number_input("IL Freight (%)", value=_riv_il_pct(),
+                                            step=5, key="ilr_freight")
     with col4:
         chi_eth_input = st.number_input("Chi Eth (¢)", value=0, step=1, key="chi_eth")
     with col5:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
     if _riv_dates:
-        st.caption(f"Corn/Bean CIF prefilled from the River FOB sheet "
-                   f"({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} column) "
-                   f"— edit to override.")
+        st.caption(f"Corn/Bean CIF & IL barge freight prefilled from the River FOB "
+                   f"sheet ({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} "
+                   f"column) — edit to override.")
 
     st.markdown("---")
 
@@ -2098,9 +2106,9 @@ with tab_spotfwd:
     items_18.append(("ADM Des Moines Bean Bid",)
                     + _get_loc_basis("ADM", "Des Moines, IA", "Soybeans"))
 
-    # Freight & Ethanol — manual entries; BN/UP Freight section is TBD (user
-    # building it later), so the rail-freight row is a placeholder for now.
-    items_18.append(("ILR Barge Freight", ilr_freight_input or None, None, None, None))
+    # Freight & Ethanol — IL barge freight is a % of tariff (from the River FOB
+    # sheet); BN/UP Freight section is TBD (user building it later).
+    items_18.append(("IL Barge Freight", ilr_freight_input or None, None, None, None))
     items_18.append(("BN Shuttle Freight", None, None, None, None))
 
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None))
@@ -2116,11 +2124,17 @@ with tab_spotfwd:
         bg = "#f8fafc" if i % 2 else "transparent"
         if not name:
             continue
-        spot_str = f'{spot:+d}¢' if spot is not None else "—"
+        _is_pct = (name == "IL Barge Freight")   # % of tariff, not a ¢ basis
+        if _is_pct:
+            spot_str  = f"{spot:.0f}%" if spot is not None else "—"
+            spot_col  = "#1e293b"
+        else:
+            spot_str  = f'{spot:+d}¢' if spot is not None else "—"
+            spot_col  = "#16a34a" if spot is not None and spot >= 0 else "#dc2626"
         nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
-        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{"#16a34a" if spot is not None and spot >= 0 else "#dc2626"}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
+        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{spot_col}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
 
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
