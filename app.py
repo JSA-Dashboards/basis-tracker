@@ -1946,38 +1946,51 @@ with tab_spotfwd:
     def _riv_il_pct():
         return _riv_month_val((_riv_frt or {}).get("IL", {}), 100)  # stored → %
 
-    # Manual input section
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        corn_cif_input = st.number_input("Corn CIF (¢)", value=_riv_cif_cents("Corn"),
-                                         step=1, key="corn_cif")
-    with col2:
-        bean_cif_input = st.number_input("Bean CIF (¢)", value=_riv_cif_cents("Soybeans"),
-                                         step=1, key="bean_cif")
-    with col3:
-        ilr_freight_input = st.number_input("IL Freight (%)", value=_riv_il_pct(),
-                                            step=5, key="ilr_freight")
-    with col4:
+    _riv_cal = _riv_snap[2]
+
+    def _riv_contract(com):
+        """The FOB sheet's futures contract for the current-month column of `com`."""
+        cols = (_riv_cal or {}).get(com, [])
+        cur = _RIV_ML.get(datetime.now().month)
+        for m, ct in cols:
+            if m == cur:
+                return ct
+        return cols[0][1] if cols else None
+
+    def _fut_short(sym):
+        """'ZCU26' → 'CU'; rail short codes (CU, CZ, R, CH) pass through."""
+        if not sym:
+            return None
+        s = str(sym).strip().upper()
+        return s[1:3] if (s.startswith("Z") and len(s) >= 3) else s
+
+    # CIF and IL freight come straight from the latest River FOB snapshot — no manual
+    # entry. River CIF $/bu → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
+    corn_cif_val    = _riv_cif_cents("Corn") or None
+    bean_cif_val    = _riv_cif_cents("Soybeans") or None
+    ilr_freight_val = _riv_il_pct() or None
+
+    _e1, _e2, _ = st.columns([2, 2, 6])
+    with _e1:
         chi_eth_input = st.number_input("Chi Eth (¢)", value=0, step=1, key="chi_eth")
-    with col5:
+    with _e2:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
     if _riv_dates:
-        st.caption(f"Corn/Bean CIF & IL barge freight prefilled from the River FOB "
-                   f"sheet ({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} "
-                   f"column) — edit to override.")
+        st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
+                   f"({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} column).")
 
     st.markdown("---")
 
     # Helper to get location basis & changes
     def _get_loc_basis(prov: str, loc: str, grain: str) -> tuple:
-        """Return (spot, next, spot_chg, next_chg) as of sf_asof (most recent
-        snapshot on/before that date; prior = the snapshot before it)."""
+        """Return (spot, next, spot_chg, next_chg, spot_fut) as of sf_asof (most
+        recent snapshot on/before that date; prior = the snapshot before it)."""
         snaps = _cached_get_snapshots(prov, loc)
         if not snaps:
-            return None, None, None, None
+            return None, None, None, None, None
         valid = [s for s in snaps if _trend_ts(s.timestamp).date() <= sf_asof]
         if not valid:
-            return None, None, None, None
+            return None, None, None, None, None
         cur = valid[-1]
         prior = valid[-2] if len(valid) > 1 else None
         # Spot = nearest delivery month; Next = the first delivery whose calendar
@@ -2001,7 +2014,7 @@ with tab_spotfwd:
 
         spot_row, next_row = _spot_next(cur.rows)
         if not spot_row:
-            return None, None, None, None
+            return None, None, None, None, None
         spot_chg, next_chg = None, None
         if prior:
             ps, pn = _spot_next(prior.rows)
@@ -2010,7 +2023,7 @@ with tab_spotfwd:
             if next_row and pn:
                 next_chg = next_row.basisCents - pn.basisCents
         return (spot_row.basisCents, next_row.basisCents if next_row else None,
-                spot_chg, next_chg)
+                spot_chg, next_chg, spot_row.futuresSymbol)
 
     # Build 18 items in specified order
     from database import get_rail_fob_dates, get_rail_fob
@@ -2043,29 +2056,30 @@ with tab_spotfwd:
                 return _MONTHS[w[:3]]
         return None
 
-    def _spot_next_by_month(pairs):
-        """pairs: ordered (month|None, value); spot = first, next = the first whose
-        month is later than spot's (rows are already in chronological order)."""
-        if not pairs:
-            return None, None
-        sm, spot = pairs[0]
+    def _spot_next_by_month(triples):
+        """triples: ordered (month|None, value, fut); spot = first, next = the first
+        later calendar month. Returns (spot_val, next_val, spot_fut)."""
+        if not triples:
+            return None, None, None
+        sm, spot, sfut = triples[0]
         nxt = None
-        for rm, val in pairs[1:]:
+        for rm, val, _f in triples[1:]:
             if sm is None or (rm is not None and rm > sm):
                 nxt = val
                 break
-        return spot, nxt
+        return spot, nxt, sfut
 
     def _rail_spot_next(rows, market):
         mr = sorted([r for r in rows if r["market"] == market and r["bid"] is not None],
                     key=lambda x: x["period_order"])
-        return _spot_next_by_month([(_period_month(r.get("period")), r["bid"]) for r in mr])
+        return _spot_next_by_month(
+            [(_period_month(r.get("period")), r["bid"], r.get("futures")) for r in mr])
 
     def _manual_rail_item(label, market):
-        spot, nxt = _rail_spot_next(today_rail, market)
-        psp, _    = _rail_spot_next(prior_rail, market)
+        spot, nxt, sfut = _rail_spot_next(today_rail, market)
+        psp, _, _       = _rail_spot_next(prior_rail, market)
         chg = (spot - psp) if (spot is not None and psp is not None) else None
-        return (label, spot, nxt, chg, None)
+        return (label, spot, nxt, chg, None, sfut)
 
     _pal_rows = (_cached_rail_fob() or {}).get("rows", [])
 
@@ -2073,14 +2087,15 @@ with tab_spotfwd:
         for r in _pal_rows:
             if loc_match.lower() in (r.get("location") or "").lower():
                 cells = [c for c in r["cells"] if c.get("bid") is not None]
-                spot, nxt = _spot_next_by_month(
-                    [(_period_month(c.get("period")), c["bid"]) for c in cells])
-                return (label, spot, nxt, None, None)
-        return (label, None, None, None, None)
+                spot, nxt, sfut = _spot_next_by_month(
+                    [(_period_month(c.get("period")), c["bid"], c.get("futures")) for c in cells])
+                return (label, spot, nxt, None, None, sfut)
+        return (label, None, None, None, None, None)
 
     # Exact order from user specification:
     # Corn group
-    items_18.append(("Corn CIF", corn_cif_input or None, None, None, None))
+    items_18.append(("Corn CIF", corn_cif_val, None, None, None,
+                     _riv_contract("Corn") if corn_cif_val is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Corn",) + _get_loc_basis("ADM", ADM_HENN, "Corn"))
     items_18.append(("STL (ADM St. Louis) - Corn",) + _get_loc_basis("ADM", ADM_STL, "Corn"))
 
@@ -2096,7 +2111,8 @@ with tab_spotfwd:
                     + _get_loc_basis("ADM", "Decatur, IL (Corn Processing)", "Corn"))
 
     # Bean group
-    items_18.append(("Bean CIF", bean_cif_input or None, None, None, None))
+    items_18.append(("Bean CIF", bean_cif_val, None, None, None,
+                     _riv_contract("Soybeans") if bean_cif_val is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Beans",) + _get_loc_basis("ADM", ADM_HENN, "Soybeans"))
     items_18.append(("STL (ADM St. Louis) - Beans",) + _get_loc_basis("ADM", ADM_STL, "Soybeans"))
 
@@ -2108,19 +2124,26 @@ with tab_spotfwd:
 
     # Freight & Ethanol — IL barge freight is a % of tariff (from the River FOB
     # sheet); BN/UP Freight section is TBD (user building it later).
-    items_18.append(("IL Barge Freight", ilr_freight_input or None, None, None, None))
-    items_18.append(("BN Shuttle Freight", None, None, None, None))
+    items_18.append(("IL Barge Freight", ilr_freight_val, None, None, None, None))
+    items_18.append(("BN Shuttle Freight", None, None, None, None, None))
 
-    items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None))
-    items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None))
+    items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
+    items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None, None))
 
-    # Render table
-    th = "background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap"
-    td = "padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:11px"
-    html = '<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:\'IBM Plex Mono\',monospace;border:1px solid #e2e8f0;border-radius:6px">'
-    html += f'<thead><tr><th style="{th}">Item</th><th style="{th}">Spot</th><th style="{th}">Δ</th><th style="{th}">Next</th><th style="{th}">Δ</th></tr></thead><tbody>'
+    # Render table — compact; "Fut" column shows the contract each row is basis.
+    th = ("background:#f1f5f9;color:#64748b;font-size:8px;text-transform:uppercase;"
+          "letter-spacing:.06em;padding:2px 7px;text-align:left;"
+          "border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap")
+    thr = th.replace("text-align:left", "text-align:right")
+    td = "padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10px;white-space:nowrap"
+    tdr = td + ";text-align:right"
+    html = ("<table style=\"width:100%;border-collapse:collapse;"
+            "font-family:'IBM Plex Mono',monospace;border:1px solid #e2e8f0;border-radius:6px\">")
+    html += (f'<thead><tr><th style="{th}">Item</th><th style="{th}">Fut</th>'
+             f'<th style="{thr}">Spot</th><th style="{thr}">Δ</th>'
+             f'<th style="{thr}">Next</th><th style="{thr}">Δ</th></tr></thead><tbody>')
 
-    for i, (name, spot, nxt, sc, nc) in enumerate(items_18):
+    for i, (name, spot, nxt, sc, nc, fut) in enumerate(items_18):
         bg = "#f8fafc" if i % 2 else "transparent"
         if not name:
             continue
@@ -2132,9 +2155,16 @@ with tab_spotfwd:
             spot_str  = f'{spot:+d}¢' if spot is not None else "—"
             spot_col  = "#16a34a" if spot is not None and spot >= 0 else "#dc2626"
         nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
+        fut_str = _fut_short(fut) or "—"
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
-        html += f'<tr style="background:{bg}"><td style="{td};font-weight:600;color:#1e293b">{name}</td><td style="{td};font-weight:700;color:{spot_col}">{spot_str}</td><td style="{td}">{sc_str}</td><td style="{td};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td><td style="{td}">{nc_str}</td></tr>'
+        html += (f'<tr style="background:{bg}">'
+                 f'<td style="{td};font-weight:600;color:#1e293b">{name}</td>'
+                 f'<td style="{td};color:#94a3b8;font-size:9px">{fut_str}</td>'
+                 f'<td style="{tdr};font-weight:700;color:{spot_col}">{spot_str}</td>'
+                 f'<td style="{tdr}">{sc_str}</td>'
+                 f'<td style="{tdr};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td>'
+                 f'<td style="{tdr}">{nc_str}</td></tr>')
 
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
