@@ -1876,7 +1876,7 @@ def _paste_clean(html: str) -> str:
 
 (tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
  tab_summary, tab_trends) = st.tabs(
-    ["🔔 Changes", "📈 Spot & Forward", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
+    ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
      "🗺️ Map", "📊 Summary", "📈 Trends"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1905,17 +1905,18 @@ with tab_changes:
 # TAB: SPOT & FORWARD  (18 fixed locations: spot/forward basis with daily changes)
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_spotfwd:
-    st.caption("18-location tracker: Spot & following month basis with daily changes.")
+    st.caption("Nightly Recap — 18-location spot &amp; next-month basis with daily changes.")
 
-    # As-of selector — defaults to the most recent Friday so the table reflects
-    # Friday's close (Δ = change into that Friday vs the prior business day).
+    # As-of selector — defaults to the current business day (today if a weekday,
+    # else the prior Friday) so the recap shows that day's daily changes.
     from datetime import timedelta as _tdelta
     _today_sf = datetime.utcnow().date()
-    _def_fri  = _today_sf - _tdelta(days=(_today_sf.weekday() - 4) % 7)
+    _def_day  = (_today_sf if _today_sf.weekday() < 5
+                 else _today_sf - _tdelta(days=_today_sf.weekday() - 4))
     _asof_col, _ = st.columns([3, 7])
     with _asof_col:
-        sf_asof = st.date_input("As of (defaults to most recent Friday)",
-                                value=_def_fri, key="spotfwd_asof")
+        sf_asof = st.date_input("As of (defaults to today)",
+                                value=_def_day, key="spotfwd_asof")
     st.caption(f"Showing basis as of **{sf_asof:%a %b %d, %Y}** · "
                f"Δ = change vs prior business day.")
 
