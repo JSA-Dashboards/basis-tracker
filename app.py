@@ -186,6 +186,7 @@ _PROVIDER_COLOR: dict[str, str] = {
     "Star of West": "#F6B710",
     "Mennel":    "#a3243b",
     "Agtegra":   "#5a8a2c",
+    "Bartlett":  "#b45309",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -2444,7 +2445,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Star of West", "Mennel", "Agtegra"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -2948,11 +2949,11 @@ with tab_bids:
         else:
             grains = ["Corn"]
 
-    elif provider in ("Star of West", "Mennel", "Agtegra"):
+    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett"):
         _ag_cli   = {"Star of West": "--sotw-only", "Mennel": "--mennel-only",
-                     "Agtegra": "--agtegra-only"}[provider]
+                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only"}[provider]
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
-                     "Agtegra": "Scrape Agtegra now"}[provider]
+                     "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now"}[provider]
         _ag_color = _PROVIDER_COLOR.get(provider, "#64748b")
         _ag_locs  = sorted(
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}
