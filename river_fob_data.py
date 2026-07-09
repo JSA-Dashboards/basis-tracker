@@ -55,3 +55,48 @@ def load_snapshot(as_of: str):
 def latest_date() -> str | None:
     ds = list_dates()
     return ds[0] if ds else None
+
+
+def _f(v):
+    try:
+        if v is None:
+            return None
+        import math
+        v = float(v)
+        return None if math.isnan(v) else v
+    except (TypeError, ValueError):
+        return None
+
+
+def save_snapshot(as_of, cif_by_commodity, freight_by_region, calendar=None):
+    """Upsert one day's River FOB inputs into the shared archive (replaces the
+    date's rows). Used by the on-demand 'Update from the FOB sheet' control.
+    Returns (n_cif, n_freight)."""
+    from datetime import datetime, timezone
+    ph = _ph()
+    conn = get_conn()
+    c = conn.cursor()
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        for t in ("cif_history", "freight_history", "calendar_history"):
+            c.execute(f"DELETE FROM {t} WHERE as_of={ph}", (as_of,))
+        cif_rows = [(as_of, com, m, _f(v))
+                    for com, mv in cif_by_commodity.items()
+                    for m, v in mv.items() if _f(v) is not None]
+        frt_rows = [(as_of, r, m, _f(v))
+                    for r, mv in freight_by_region.items()
+                    for m, v in mv.items() if _f(v) is not None]
+        cal_rows = [(as_of, com, i, m, ct)
+                    for com, cols in (calendar or {}).items()
+                    for i, (m, ct) in enumerate(cols)]
+        if cif_rows:
+            c.executemany(f"INSERT INTO cif_history VALUES ({ph},{ph},{ph},{ph})", cif_rows)
+        if frt_rows:
+            c.executemany(f"INSERT INTO freight_history VALUES ({ph},{ph},{ph},{ph})", frt_rows)
+        if cal_rows:
+            c.executemany(
+                f"INSERT INTO calendar_history VALUES ({ph},{ph},{ph},{ph},{ph})", cal_rows)
+        conn.commit()
+        return len(cif_rows), len(frt_rows)
+    finally:
+        conn.close()

@@ -2336,6 +2336,46 @@ with tab_railfob:
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_riverfob:
     import fob_model as _M
+    import river_fob_import as _rfi
+    import river_fob_data as _rfd
+
+    with st.expander("🔄 Update from the FOB sheet — pull in before the 4:30 PM auto-import"):
+        st.caption("Reads the most recent daily tabs from the JSA FOB workbook and "
+                   "updates the archive now. Use this if you edited the sheet before "
+                   "the scheduled 4:30 PM import.")
+
+        def _run_river_import(_src, _name):
+            try:
+                _snaps = _rfi.import_workbook(_src, name=_name, recent=8)
+            except Exception as _exc:
+                st.error(f"Couldn't read the workbook: {_exc}")
+                return
+            if not _snaps:
+                st.warning("No dated tabs found in that workbook.")
+                return
+            for _as_of, _cif, _frt, _cal in _snaps:
+                _rfd.save_snapshot(_as_of, _cif, _frt, _cal)
+            _cached_river_dates.clear()
+            _cached_river_snapshot.clear()
+            st.success(f"Pulled in {len(_snaps)} day(s): "
+                       f"{_snaps[0][0]} → {_snaps[-1][0]}.")
+            st.rerun()
+
+        _local_wb = _rfi.find_active_workbook()
+        if _local_wb:
+            import os as _os
+            st.caption(f"Local sheet detected: **{_os.path.basename(_local_wb)}**")
+            if st.button("🔄 Pull from local FOB sheet now", key="riv_pull_local"):
+                with st.spinner("Reading the FOB sheet…"):
+                    _run_river_import(_local_wb, _os.path.basename(_local_wb))
+            st.markdown("<div style='color:#94a3b8;font-size:11px;margin:2px 0'>— or —</div>",
+                        unsafe_allow_html=True)
+        _riv_up = st.file_uploader("Upload the JSA FOB workbook (.xlsx)", type=["xlsx"],
+                                   key="riv_upload")
+        if _riv_up is not None and st.button("🔄 Pull in the uploaded workbook",
+                                             key="riv_pull_upload"):
+            with st.spinner("Reading the uploaded workbook…"):
+                _run_river_import(_riv_up, _riv_up.name)
 
     _rdates = _cached_river_dates()
     if not _rdates:
