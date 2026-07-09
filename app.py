@@ -2132,14 +2132,16 @@ with tab_spotfwd:
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
     items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None, None))
 
-    # Render table — compact; "Fut" column shows the contract each row is basis.
-    th = ("background:#f1f5f9;color:#64748b;font-size:8px;text-transform:uppercase;"
-          "letter-spacing:.06em;padding:2px 7px;text-align:left;"
+    # Render table — as tight as possible; "Fut" = the contract each row is basis.
+    th = ("background:#f1f5f9;color:#64748b;font-size:7px;text-transform:uppercase;"
+          "letter-spacing:.02em;padding:2px 5px;text-align:left;"
           "border-bottom:1px solid #e2e8f0;font-weight:700;white-space:nowrap")
     thr = th.replace("text-align:left", "text-align:right")
-    td = "padding:1px 7px;font-family:'IBM Plex Mono',monospace;font-size:10px;white-space:nowrap"
+    td = ("padding:0 5px;font-family:'IBM Plex Mono',monospace;font-size:9px;"
+          "line-height:1.55;white-space:nowrap")
     tdr = td + ";text-align:right"
-    html = ("<table style=\"width:100%;border-collapse:collapse;"
+    # width:auto (not 100%) so the table shrinks to its content instead of stretching.
+    html = ("<table style=\"width:auto;border-collapse:collapse;"
             "font-family:'IBM Plex Mono',monospace;border:1px solid #e2e8f0;border-radius:6px\">")
     html += (f'<thead><tr><th style="{th}">Item</th><th style="{th}">Fut</th>'
              f'<th style="{thr}">Spot</th><th style="{thr}">Δ</th>'
@@ -2162,7 +2164,7 @@ with tab_spotfwd:
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
         html += (f'<tr style="background:{bg}">'
                  f'<td style="{td};font-weight:600;color:#1e293b">{name}</td>'
-                 f'<td style="{td};color:#94a3b8;font-size:9px">{fut_str}</td>'
+                 f'<td style="{td};color:#94a3b8;font-size:8px">{fut_str}</td>'
                  f'<td style="{tdr};font-weight:700;color:{spot_col}">{spot_str}</td>'
                  f'<td style="{tdr}">{sc_str}</td>'
                  f'<td style="{tdr};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td>'
