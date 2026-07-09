@@ -4598,11 +4598,18 @@ with tab_export:
         mon = MONTH_CODES.get(sym[-3])
         return f"{mon} 20{sym[-2:]}" if mon else sym
 
-    _xlocs  = _cached_get_bids_filter_data()
+    _xlocs = _cached_get_bids_filter_data()
+    _companies = sorted({l["provider"] for l in _xlocs})
+    _co_col, _loc_col = st.columns([3, 7])
+    with _co_col:
+        _sel_cos = st.multiselect("Company", _companies, key="exp_cos",
+                                  help="Filter the location list by company; leave empty to show all.")
+    _pool = [l for l in _xlocs if (not _sel_cos or l["provider"] in _sel_cos)]
     _xlabel = {f'{l["provider"]} · {l["location"]}': (l["provider"], l["location"])
-               for l in _xlocs}
-    _sel_lbls = st.multiselect("Location(s)", sorted(_xlabel), key="exp_locs",
-                               help="Pick one or more; each becomes a Fut-Ref + Basis column pair.")
+               for l in _pool}
+    with _loc_col:
+        _sel_lbls = st.multiselect("Location(s)", sorted(_xlabel), key="exp_locs",
+                                   help="Pick one or more; each becomes a Fut-Ref + Basis column pair.")
 
     if not _sel_lbls:
         st.info("Select one or more locations to begin.")
