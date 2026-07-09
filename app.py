@@ -1984,12 +1984,11 @@ with tab_spotfwd:
                12: "Dec", 1: "Jan"}
 
     def _riv_month_val(mv, scale):
-        """Value for the current calendar month (fallback: first present), scaled."""
+        """Value for the front active month (fallback: first present), scaled."""
         if not mv:
             return 0
-        cur = _RIV_ML.get(datetime.now().month)
-        if cur and mv.get(cur) is not None:
-            return int(round(mv[cur] * scale))
+        if _front_riv and mv.get(_front_riv) is not None:
+            return int(round(mv[_front_riv] * scale))
         for m in _RIV_MONTHS:
             if mv.get(m) is not None:
                 return int(round(mv[m] * scale))
@@ -2004,11 +2003,10 @@ with tab_spotfwd:
     _riv_cal = _riv_snap[2]
 
     def _riv_contract(com):
-        """The FOB sheet's futures contract for the current-month column of `com`."""
+        """The FOB sheet's futures contract for the front-month column of `com`."""
         cols = (_riv_cal or {}).get(com, [])
-        cur = _RIV_ML.get(datetime.now().month)
         for m, ct in cols:
-            if m == cur:
+            if m == _front_riv:
                 return ct
         return cols[0][1] if cols else None
 
@@ -2018,6 +2016,33 @@ with tab_spotfwd:
             return None
         s = str(sym).strip().upper()
         return s[1:3] if (s.startswith("Z") and len(s) >= 3) else s
+
+    _MONTH_NUM = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "June": 6,
+                  "July": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+
+    def _front_riv_month():
+        """River sheet's front *active* month: the current calendar month rolled
+        past any month whose corn contract is already past First Notice Day
+        (e.g. after ~June 30 the July/CN column is settled → roll to Aug/CU)."""
+        try:
+            from rail_corridors import corn_fnd
+        except Exception:
+            return _RIV_ML.get(datetime.now().month)
+        today = datetime.now().date()
+        for name, ct in (_riv_cal or {}).get("Corn", []):
+            c  = _fut_short(ct)
+            mn = _MONTH_NUM.get(name)
+            if not c or mn is None:
+                continue
+            yr = today.year if mn >= today.month else today.year + 1
+            try:
+                if corn_fnd(c, yr) >= today:
+                    return name
+            except Exception:
+                return name
+        return _RIV_ML.get(datetime.now().month)
+
+    _front_riv = _front_riv_month()
 
     # CIF and IL freight come straight from the latest River FOB snapshot — no manual
     # entry. River CIF $/bu → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
@@ -2032,7 +2057,7 @@ with tab_spotfwd:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
     if _riv_dates:
         st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
-                   f"({_riv_dates[0]}, {_RIV_ML.get(datetime.now().month, '—')} column).")
+                   f"({_riv_dates[0]}, {_front_riv or '—'} column).")
 
     st.markdown("---")
 
