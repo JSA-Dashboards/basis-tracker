@@ -1983,30 +1983,40 @@ with tab_spotfwd:
     _RIV_ML = {6: "June", 7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov",
                12: "Dec", 1: "Jan"}
 
-    def _riv_month_val(mv, scale):
-        """Value for the front active month (fallback: first present), scaled."""
+    _spot_riv = _RIV_ML.get(datetime.now().month)   # current calendar month, e.g. "July"
+
+    def _riv_one(mv, scale, month):
+        """Scaled value for a single month column, or None if absent."""
+        if not mv or not month or mv.get(month) is None:
+            return None
+        return int(round(mv[month] * scale))
+
+    def _riv_spot_next(mv, scale):
+        """(spot, next) columns: spot = current calendar month (fallback first
+        present); next = the following present month in the June→Jan order."""
         if not mv:
-            return 0
-        if _front_riv and mv.get(_front_riv) is not None:
-            return int(round(mv[_front_riv] * scale))
-        for m in _RIV_MONTHS:
-            if mv.get(m) is not None:
-                return int(round(mv[m] * scale))
-        return 0
+            return None, None
+        spot_m = (_spot_riv if mv.get(_spot_riv) is not None
+                  else next((m for m in _RIV_MONTHS if mv.get(m) is not None), None))
+        if spot_m is None:
+            return None, None
+        i = _RIV_MONTHS.index(spot_m)
+        next_m = next((m for m in _RIV_MONTHS[i + 1:] if mv.get(m) is not None), None)
+        return _riv_one(mv, scale, spot_m), _riv_one(mv, scale, next_m)
 
     def _riv_cif_cents(com):
-        return _riv_month_val((_riv_cif or {}).get(com, {}), 100)   # $/bu → ¢
+        return _riv_spot_next((_riv_cif or {}).get(com, {}), 100)   # $/bu → ¢
 
     def _riv_il_pct():
-        return _riv_month_val((_riv_frt or {}).get("IL", {}), 100)  # stored → %
+        return _riv_spot_next((_riv_frt or {}).get("IL", {}), 100)  # stored → %
 
     _riv_cal = _riv_snap[2]
 
     def _riv_contract(com):
-        """The FOB sheet's futures contract for the front-month column of `com`."""
+        """FOB sheet futures contract for the spot (current-month) column."""
         cols = (_riv_cal or {}).get(com, [])
         for m, ct in cols:
-            if m == _front_riv:
+            if m == _spot_riv:
                 return ct
         return cols[0][1] if cols else None
 
@@ -2017,38 +2027,12 @@ with tab_spotfwd:
         s = str(sym).strip().upper()
         return s[1:3] if (s.startswith("Z") and len(s) >= 3) else s
 
-    _MONTH_NUM = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "June": 6,
-                  "July": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
-
-    def _front_riv_month():
-        """River sheet's front *active* month: the current calendar month rolled
-        past any month whose corn contract is already past First Notice Day
-        (e.g. after ~June 30 the July/CN column is settled → roll to Aug/CU)."""
-        try:
-            from rail_corridors import corn_fnd
-        except Exception:
-            return _RIV_ML.get(datetime.now().month)
-        today = datetime.now().date()
-        for name, ct in (_riv_cal or {}).get("Corn", []):
-            c  = _fut_short(ct)
-            mn = _MONTH_NUM.get(name)
-            if not c or mn is None:
-                continue
-            yr = today.year if mn >= today.month else today.year + 1
-            try:
-                if corn_fnd(c, yr) >= today:
-                    return name
-            except Exception:
-                return name
-        return _RIV_ML.get(datetime.now().month)
-
-    _front_riv = _front_riv_month()
-
     # CIF and IL freight come straight from the latest River FOB snapshot — no manual
-    # entry. River CIF $/bu → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
-    corn_cif_val    = _riv_cif_cents("Corn") or None
-    bean_cif_val    = _riv_cif_cents("Soybeans") or None
-    ilr_freight_val = _riv_il_pct() or None
+    # entry. Spot = current calendar month, Next = following month. River CIF $/bu
+    # → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
+    corn_cif_spot, corn_cif_next = _riv_cif_cents("Corn")
+    bean_cif_spot, bean_cif_next = _riv_cif_cents("Soybeans")
+    ilr_spot,      ilr_next      = _riv_il_pct()
 
     _e1, _e2, _ = st.columns([2, 2, 6])
     with _e1:
@@ -2057,7 +2041,7 @@ with tab_spotfwd:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
     if _riv_dates:
         st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
-                   f"({_riv_dates[0]}, {_front_riv or '—'} column).")
+                   f"({_riv_dates[0]}; {_spot_riv or '—'} spot / next-month columns).")
 
     st.markdown("---")
 
@@ -2191,8 +2175,8 @@ with tab_spotfwd:
 
     # Exact order from user specification:
     # Corn group
-    items_18.append(("Corn CIF", corn_cif_val, None, None, None,
-                     _riv_contract("Corn") if corn_cif_val is not None else None))
+    items_18.append(("Corn CIF", corn_cif_spot, corn_cif_next, None, None,
+                     _riv_contract("Corn") if corn_cif_spot is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Corn",) + _get_loc_basis("ADM", ADM_HENN, "Corn"))
     items_18.append(("STL (ADM St. Louis) - Corn",) + _get_loc_basis("ADM", ADM_STL, "Corn"))
 
@@ -2208,8 +2192,8 @@ with tab_spotfwd:
                     + _get_loc_basis("ADM", "Decatur, IL (Corn Processing)", "Corn"))
 
     # Bean group
-    items_18.append(("Bean CIF", bean_cif_val, None, None, None,
-                     _riv_contract("Soybeans") if bean_cif_val is not None else None))
+    items_18.append(("Bean CIF", bean_cif_spot, bean_cif_next, None, None,
+                     _riv_contract("Soybeans") if bean_cif_spot is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Beans",) + _get_loc_basis("ADM", ADM_HENN, "Soybeans"))
     items_18.append(("STL (ADM St. Louis) - Beans",) + _get_loc_basis("ADM", ADM_STL, "Soybeans"))
 
@@ -2221,7 +2205,7 @@ with tab_spotfwd:
 
     # Freight & Ethanol — IL barge freight is a % of tariff (from the River FOB
     # sheet); BN/UP Freight section is TBD (user building it later).
-    items_18.append(("IL Barge Freight", ilr_freight_val, None, None, None, None))
+    items_18.append(("IL Barge Freight", ilr_spot, ilr_next, None, None, None))
     items_18.append(_freight_item("BN Shuttle Freight", "BN 110 Shuttle"))
 
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
@@ -2258,7 +2242,14 @@ with tab_spotfwd:
         else:
             spot_str  = f'{spot:+d}¢' if spot is not None else "—"
             spot_col  = "#16a34a" if spot is not None and spot >= 0 else "#dc2626"
-        nxt_str = _dol(nxt) if _is_dollar else (f'{nxt:+d}¢' if nxt is not None else "—")
+        if _is_dollar:
+            nxt_str = _dol(nxt)
+        elif _is_pct:
+            nxt_str = f"{nxt:.0f}%" if nxt is not None else "—"
+        else:
+            nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
+        nxt_col = ("#1e293b" if (_is_pct or _is_dollar)
+                   else ("#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"))
         fut_str = _fut_short(fut) or "—"
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
@@ -2267,7 +2258,7 @@ with tab_spotfwd:
                  f'<td style="{td};color:#94a3b8;font-size:8px">{fut_str}</td>'
                  f'<td style="{tdr};font-weight:700;color:{spot_col}">{spot_str}</td>'
                  f'<td style="{tdr}">{sc_str}</td>'
-                 f'<td style="{tdr};font-weight:700;color:{"#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"}">{nxt_str}</td>'
+                 f'<td style="{tdr};font-weight:700;color:{nxt_col}">{nxt_str}</td>'
                  f'<td style="{tdr}">{nc_str}</td></tr>')
 
     html += '</tbody></table>'
