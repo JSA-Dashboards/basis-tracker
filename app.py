@@ -2172,6 +2172,7 @@ with tab_spotfwd:
 
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
+    copy_button(html, "📋 Copy table")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RAIL FOB  (palmettograin.com rail FOB bids + offers)
