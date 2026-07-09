@@ -78,6 +78,13 @@ def _require_password():
 
 _require_password()
 
+if _view_only():
+    # No sidebar at all in the read-only build (and hide its expand control).
+    st.markdown(
+        "<style>[data-testid='stSidebar'],[data-testid='stSidebarCollapsedControl'],"
+        "[data-testid='collapsedControl']{display:none !important}</style>",
+        unsafe_allow_html=True)
+
 # ── On-startup init (once per Streamlit process, not per rerun) ───────────────
 @st.cache_resource
 def _init_db_once():
@@ -540,9 +547,7 @@ st.markdown(_jsa_watermark_css("jsawmt", size="22% auto"), unsafe_allow_html=Tru
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    if _view_only():
-        st.caption('Read-only mode — scraping is disabled in this view.')
-    else:
+    if not _view_only():
         st.markdown("### 🌽 ADM / POET / CHS")
         if st.button("Scrape ADM now", key="adm_scrape_btn"):
             from adm_scraper import fetch_adm_bids
@@ -1919,10 +1924,14 @@ def _paste_clean(html: str) -> str:
             .replace("border-bottom:1px solid #f1f5f9", "border:1px solid #e6e9ee"))
 
 
+_tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
+               "🗺️ Map", "📊 Summary", "📈 Trends"]
+if not _view_only():
+    _tab_labels.append("📥 Export")          # no download tab in the read-only build
+_tabs = st.tabs(_tab_labels)
 (tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
- tab_summary, tab_trends, tab_export) = st.tabs(
-    ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
-     "🗺️ Map", "📊 Summary", "📈 Trends", "📥 Export"])
+ tab_summary, tab_trends) = _tabs[:8]
+tab_export = _tabs[8] if not _view_only() else None
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -4673,127 +4682,128 @@ with tab_trends:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: EXPORT  (download basis history to Excel — dates × locations)
 # ═══════════════════════════════════════════════════════════════════════════════
-with tab_export:
-    import pandas as pd
-    from io import BytesIO
+if not _view_only():
+    with tab_export:
+        import pandas as pd
+        from io import BytesIO
 
-    st.caption("Download basis history to Excel — **dates in rows, locations in "
-               "columns**. Each location gets two columns: its **futures reference "
-               "month** and the **nominal basis** for the chosen delivery period.")
+        st.caption("Download basis history to Excel — **dates in rows, locations in "
+                   "columns**. Each location gets two columns: its **futures reference "
+                   "month** and the **nominal basis** for the chosen delivery period.")
 
-    _MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        _MON3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    def _ym_label(ym):
-        return f"{_MON3[ym[1] - 1]} {ym[0]}"
+        def _ym_label(ym):
+            return f"{_MON3[ym[1] - 1]} {ym[0]}"
 
-    def _fut_ref(sym):
-        """'ZCU26' → 'Sep 2026' (the reference contract month)."""
-        if not sym or len(sym) < 4 or not sym[-2:].isdigit():
-            return sym
-        mon = MONTH_CODES.get(sym[-3])
-        return f"{mon} 20{sym[-2:]}" if mon else sym
+        def _fut_ref(sym):
+            """'ZCU26' → 'Sep 2026' (the reference contract month)."""
+            if not sym or len(sym) < 4 or not sym[-2:].isdigit():
+                return sym
+            mon = MONTH_CODES.get(sym[-3])
+            return f"{mon} 20{sym[-2:]}" if mon else sym
 
-    _xlocs = _cached_get_bids_filter_data()
-    _companies = sorted({l["provider"] for l in _xlocs})
-    _co_col, _loc_col = st.columns([3, 7])
-    with _co_col:
-        _sel_cos = st.multiselect("Company", _companies, key="exp_cos",
-                                  help="Filter the location list by company; leave empty to show all.")
-    _pool = [l for l in _xlocs if (not _sel_cos or l["provider"] in _sel_cos)]
-    _xlabel = {f'{l["provider"]} · {l["location"]}': (l["provider"], l["location"])
-               for l in _pool}
-    with _loc_col:
-        _sel_lbls = st.multiselect("Location(s)", sorted(_xlabel), key="exp_locs",
-                                   help="Pick one or more; each becomes a Fut-Ref + Basis column pair.")
+        _xlocs = _cached_get_bids_filter_data()
+        _companies = sorted({l["provider"] for l in _xlocs})
+        _co_col, _loc_col = st.columns([3, 7])
+        with _co_col:
+            _sel_cos = st.multiselect("Company", _companies, key="exp_cos",
+                                      help="Filter the location list by company; leave empty to show all.")
+        _pool = [l for l in _xlocs if (not _sel_cos or l["provider"] in _sel_cos)]
+        _xlabel = {f'{l["provider"]} · {l["location"]}': (l["provider"], l["location"])
+                   for l in _pool}
+        with _loc_col:
+            _sel_lbls = st.multiselect("Location(s)", sorted(_xlabel), key="exp_locs",
+                                       help="Pick one or more; each becomes a Fut-Ref + Basis column pair.")
 
-    if not _sel_lbls:
-        st.info("Select one or more locations to begin.")
-    else:
-        _sel_pairs = [_xlabel[s] for s in _sel_lbls]
-        _exp_snaps = {p: _cached_get_snapshots(*p) for p in _sel_pairs}
-        _grains = sorted({g for snaps in _exp_snaps.values() if snaps
-                          for r in snaps[-1].rows if (g := _grain_disp(r.grain))})
-
-        if not _grains:
-            st.warning("No snapshot data for the selected location(s).")
+        if not _sel_lbls:
+            st.info("Select one or more locations to begin.")
         else:
-            _c1, _c2, _c3 = st.columns([3, 3, 5])
-            with _c1:
-                _xgrain = st.selectbox("Grain", _grains, key="exp_grain")
+            _sel_pairs = [_xlabel[s] for s in _sel_lbls]
+            _exp_snaps = {p: _cached_get_snapshots(*p) for p in _sel_pairs}
+            _grains = sorted({g for snaps in _exp_snaps.values() if snaps
+                              for r in snaps[-1].rows if (g := _grain_disp(r.grain))})
 
-            # Delivery months available for this grain across the selected locations.
-            _month_set = set()
-            for snaps in _exp_snaps.values():
-                if not snaps:
-                    continue
-                for r in snaps[-1].rows:
-                    if _grain_disp(r.grain) != _xgrain or r.isSpot or not r.futuresSymbol:
-                        continue
-                    ym = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
-                    if ym:
-                        _month_set.add(ym)
-            _month_opts = sorted(_month_set)
-            with _c2:
-                _deliv_choice = st.selectbox(
-                    "Delivery month",
-                    ["Spot (rolling front)"] + [_ym_label(m) for m in _month_opts],
-                    key="exp_deliv",
-                    help="'Spot' follows the rolling front-month bid as contracts roll.")
-            _deliv_ym = (None if _deliv_choice.startswith("Spot")
-                         else _month_opts[[_ym_label(m) for m in _month_opts].index(_deliv_choice)])
-
-            _today_x = datetime.utcnow().date()
-            with _c3:
-                _rng = st.date_input("Date range",
-                                     value=(_today_x - timedelta(days=90), _today_x),
-                                     key="exp_range")
-            _start, _end = (_rng if isinstance(_rng, tuple) and len(_rng) == 2
-                            else (_today_x - timedelta(days=90), _today_x))
-
-            def _pick_row(rows, grain, deliv_ym):
-                if deliv_ym is None:                       # Spot = rolling front month
-                    return _front_month_row(rows, grain)
-                for r in rows:
-                    if (not r.isSpot and _grain_disp(r.grain) == grain
-                            and r.basisCents is not None and r.futuresSymbol
-                            and _dp.canonical(r.deliveryMonth, r.futuresSymbol) == deliv_ym):
-                        return r
-                return None
-
-            _data = {}
-            for lbl, pair in zip(_sel_lbls, _sel_pairs):
-                for s in _exp_snaps[pair]:
-                    d = _trend_ts(s.timestamp).date()
-                    if not (_start <= d <= _end):
-                        continue
-                    row = _pick_row(s.rows, _xgrain, _deliv_ym)
-                    if not row or row.basisCents is None:
-                        continue
-                    _data.setdefault((lbl, "Fut Ref"), {})[d] = _fut_ref(row.futuresSymbol)
-                    _data.setdefault((lbl, "Basis"), {})[d] = row.basisCents
-
-            if not _data:
-                st.warning("No data for that grain / delivery / date range.")
+            if not _grains:
+                st.warning("No snapshot data for the selected location(s).")
             else:
-                _df = pd.DataFrame(_data).sort_index()
-                _df.index.name = "Date"
-                _cols = [(lbl, sub) for lbl in _sel_lbls for sub in ("Fut Ref", "Basis")
-                         if (lbl, sub) in _df.columns]
-                _df = _df[_cols]
-                st.caption(f"{len(_df)} dates × {len(_sel_lbls)} location(s) · grain "
-                           f"**{_xgrain}** · delivery **{_deliv_choice}** · basis in ¢/bu.")
-                st.dataframe(_df, use_container_width=True, height=340)
-                if _view_only():
-                    st.caption("🔒 Downloads are disabled in this read-only view.")
+                _c1, _c2, _c3 = st.columns([3, 3, 5])
+                with _c1:
+                    _xgrain = st.selectbox("Grain", _grains, key="exp_grain")
+
+                # Delivery months available for this grain across the selected locations.
+                _month_set = set()
+                for snaps in _exp_snaps.values():
+                    if not snaps:
+                        continue
+                    for r in snaps[-1].rows:
+                        if _grain_disp(r.grain) != _xgrain or r.isSpot or not r.futuresSymbol:
+                            continue
+                        ym = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+                        if ym:
+                            _month_set.add(ym)
+                _month_opts = sorted(_month_set)
+                with _c2:
+                    _deliv_choice = st.selectbox(
+                        "Delivery month",
+                        ["Spot (rolling front)"] + [_ym_label(m) for m in _month_opts],
+                        key="exp_deliv",
+                        help="'Spot' follows the rolling front-month bid as contracts roll.")
+                _deliv_ym = (None if _deliv_choice.startswith("Spot")
+                             else _month_opts[[_ym_label(m) for m in _month_opts].index(_deliv_choice)])
+
+                _today_x = datetime.utcnow().date()
+                with _c3:
+                    _rng = st.date_input("Date range",
+                                         value=(_today_x - timedelta(days=90), _today_x),
+                                         key="exp_range")
+                _start, _end = (_rng if isinstance(_rng, tuple) and len(_rng) == 2
+                                else (_today_x - timedelta(days=90), _today_x))
+
+                def _pick_row(rows, grain, deliv_ym):
+                    if deliv_ym is None:                       # Spot = rolling front month
+                        return _front_month_row(rows, grain)
+                    for r in rows:
+                        if (not r.isSpot and _grain_disp(r.grain) == grain
+                                and r.basisCents is not None and r.futuresSymbol
+                                and _dp.canonical(r.deliveryMonth, r.futuresSymbol) == deliv_ym):
+                            return r
+                    return None
+
+                _data = {}
+                for lbl, pair in zip(_sel_lbls, _sel_pairs):
+                    for s in _exp_snaps[pair]:
+                        d = _trend_ts(s.timestamp).date()
+                        if not (_start <= d <= _end):
+                            continue
+                        row = _pick_row(s.rows, _xgrain, _deliv_ym)
+                        if not row or row.basisCents is None:
+                            continue
+                        _data.setdefault((lbl, "Fut Ref"), {})[d] = _fut_ref(row.futuresSymbol)
+                        _data.setdefault((lbl, "Basis"), {})[d] = row.basisCents
+
+                if not _data:
+                    st.warning("No data for that grain / delivery / date range.")
                 else:
-                    _buf = BytesIO()
-                    with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
-                        _df.to_excel(_w, sheet_name="Basis")
-                    _fname = (f"basis_{_xgrain.replace(' ', '')}_"
-                              f"{_start:%Y%m%d}-{_end:%Y%m%d}.xlsx")
-                    st.download_button("⬇️  Download Excel", _buf.getvalue(), file_name=_fname,
-                                       mime=("application/vnd.openxmlformats-officedocument"
-                                             ".spreadsheetml.sheet"))
+                    _df = pd.DataFrame(_data).sort_index()
+                    _df.index.name = "Date"
+                    _cols = [(lbl, sub) for lbl in _sel_lbls for sub in ("Fut Ref", "Basis")
+                             if (lbl, sub) in _df.columns]
+                    _df = _df[_cols]
+                    st.caption(f"{len(_df)} dates × {len(_sel_lbls)} location(s) · grain "
+                               f"**{_xgrain}** · delivery **{_deliv_choice}** · basis in ¢/bu.")
+                    st.dataframe(_df, use_container_width=True, height=340)
+                    if _view_only():
+                        st.caption("🔒 Downloads are disabled in this read-only view.")
+                    else:
+                        _buf = BytesIO()
+                        with pd.ExcelWriter(_buf, engine="openpyxl") as _w:
+                            _df.to_excel(_w, sheet_name="Basis")
+                        _fname = (f"basis_{_xgrain.replace(' ', '')}_"
+                                  f"{_start:%Y%m%d}-{_end:%Y%m%d}.xlsx")
+                        st.download_button("⬇️  Download Excel", _buf.getvalue(), file_name=_fname,
+                                           mime=("application/vnd.openxmlformats-officedocument"
+                                                 ".spreadsheetml.sheet"))
 
 
 # ── Branded footer (JPSI) ─────────────────────────────────────────────────────
