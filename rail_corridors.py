@@ -16,19 +16,27 @@ import datetime as _dt
 import re
 from typing import Optional
 
-# Corridor registry (display order) → rail carrier. All corn.
+# Corridor registry (display/sort order) → rail carrier. Names match the stored
+# market names. "* Shuttle" rows are freight ($/car), placed per JSA: the BN
+# shuttle just below BN PNW, the UP shuttle just below UP Group 3.
 CORRIDORS = [
-    ("CSX Columbus",          "CSX"),
-    ("CSX Evansville",        "CSX"),
-    ("NS Ft Wayne",           "NS"),
-    ("UP Allen Station (IL)", "UP"),
-    ("UP Group 3 (NE)",       "UP"),
-    ("UP Interior IA (IA)",   "UP"),
-    ("BN Hereford",           "BNSF"),   # aka "BNCN Sellers"
-    ("BN PNW",                "BNSF"),
-    ("BN COBO",               "BNSF"),
-    ("CN 105s",               "CN"),     # Canadian National
-    ("CN 25's",               "CN"),
+    ("CSX Columbus",     "CSX"),
+    ("CSX Evansville",   "CSX"),
+    ("CSX Freight",      "CSX"),
+    ("NS Ft Wayne",      "NS"),
+    ("UP Interior IA",   "UP"),
+    ("UP Group 3",       "UP"),
+    ("UP 110 Shuttle",   "UP"),      # freight, below UP Group 3
+    ("UP Illinois (Dom)", "UP"),
+    ("UP Illinois (Mex)", "UP"),
+    ("BN Hereford",      "BNSF"),    # aka "BNCN Sellers"
+    ("BN PNW",           "BNSF"),
+    ("BN 110 Shuttle",   "BNSF"),    # freight, below BN PNW
+    ("BN PNW BE",        "BNSF"),
+    ("BN PNW CP",        "BNSF"),
+    ("BN COBO",          "BNSF"),
+    ("CN 105s",          "CN"),      # Canadian National
+    ("CN 25's",          "CN"),
 ]
 RAIL_BY_CORRIDOR = {n: r for n, r in CORRIDORS}
 CORRIDOR_ORDER   = {n: i for i, (n, _) in enumerate(CORRIDORS)}

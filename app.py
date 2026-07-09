@@ -2136,6 +2136,23 @@ with tab_spotfwd:
         chg = (spot - psp) if (spot is not None and psp is not None) else None
         return (label, spot, nxt, chg, None, sfut)
 
+    def _freight_item(label, market):
+        # Freight ($/car): front MONTH bid, skipping "Return Trip" and other
+        # non-month rows; next = first later month. No contract, no Δ.
+        mr = sorted([r for r in today_rail
+                     if r["market"] == market and r["bid"] is not None
+                     and _period_month(r.get("period")) is not None],
+                    key=lambda x: x["period_order"])
+        if not mr:
+            return (label, None, None, None, None, None)
+        sm, spot, nxt = _period_month(mr[0]["period"]), mr[0]["bid"], None
+        for r in mr[1:]:
+            rm = _period_month(r["period"])
+            if rm is not None and rm > sm:
+                nxt = r["bid"]
+                break
+        return (label, spot, nxt, None, None, None)
+
     _pal_rows = (_cached_rail_fob() or {}).get("rows", [])
 
     def _palmetto_item(label, loc_match):
@@ -2180,7 +2197,7 @@ with tab_spotfwd:
     # Freight & Ethanol — IL barge freight is a % of tariff (from the River FOB
     # sheet); BN/UP Freight section is TBD (user building it later).
     items_18.append(("IL Barge Freight", ilr_freight_val, None, None, None, None))
-    items_18.append(("BN Shuttle Freight", None, None, None, None, None))
+    items_18.append(_freight_item("BN Shuttle Freight", "BN 110 Shuttle"))
 
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
     items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None, None))
@@ -2204,14 +2221,19 @@ with tab_spotfwd:
         bg = "#f8fafc" if i % 2 else "transparent"
         if not name:
             continue
-        _is_pct = (name == "IL Barge Freight")   # % of tariff, not a ¢ basis
+        _is_pct = (name == "IL Barge Freight")        # % of tariff, not a ¢ basis
+        _is_dollar = (name == "BN Shuttle Freight")   # freight $/car
+        _dol = lambda v: ("—" if v is None else (f"-${abs(v):,}" if v < 0 else f"${v:,}"))
         if _is_pct:
             spot_str  = f"{spot:.0f}%" if spot is not None else "—"
+            spot_col  = "#1e293b"
+        elif _is_dollar:
+            spot_str  = _dol(spot)
             spot_col  = "#1e293b"
         else:
             spot_str  = f'{spot:+d}¢' if spot is not None else "—"
             spot_col  = "#16a34a" if spot is not None and spot >= 0 else "#dc2626"
-        nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
+        nxt_str = _dol(nxt) if _is_dollar else (f'{nxt:+d}¢' if nxt is not None else "—")
         fut_str = _fut_short(fut) or "—"
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
