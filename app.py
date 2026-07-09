@@ -2336,10 +2336,17 @@ with tab_railfob:
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_riverfob:
     import fob_model as _M
-    import river_fob_import as _rfi
     import river_fob_data as _rfd
+    try:
+        import river_fob_import as _rfi          # needs openpyxl
+    except Exception:
+        _rfi = None
 
     with st.expander("🔄 Update from the FOB sheet — pull in before the 4:30 PM auto-import"):
+      if _rfi is None:
+        st.caption("Update-from-workbook is unavailable in this deployment "
+                   "(the openpyxl package isn't installed).")
+      else:
         st.caption("Reads the most recent daily tabs from the JSA FOB workbook and "
                    "updates the archive now. Use this if you edited the sheet before "
                    "the scheduled 4:30 PM import.")
