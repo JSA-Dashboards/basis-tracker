@@ -1974,11 +1974,18 @@ with tab_spotfwd:
     st.caption(f"Showing basis as of **{sf_asof:%a %b %d, %Y}** · "
                f"Δ = change vs prior business day.")
 
-    # Corn/Bean CIF prefill from the latest River FOB snapshot (shared Supabase);
-    # river CIF is $/bu → ×100 = ¢. Freight/ethanol stay manual. Override-able.
+    # Corn/Bean CIF & IL freight from the River FOB snapshots (shared Supabase),
+    # aligned to the as-of date: current = snapshot on/before sf_asof, prior = the
+    # one before it (for day-over-day Δ). River CIF $/bu → ×100 = ¢.
     _riv_dates = _cached_river_dates()
-    _riv_snap  = _cached_river_snapshot(_riv_dates[0]) if _riv_dates else (None, None, None)
-    _riv_cif, _riv_frt = _riv_snap[0], _riv_snap[1]
+    _sf_asof_str = sf_asof.isoformat()
+    _riv_le = [d for d in _riv_dates if d <= _sf_asof_str]
+    _riv_cur  = _riv_le[0] if _riv_le else (_riv_dates[0] if _riv_dates else None)
+    _riv_prev = next((d for d in _riv_dates if _riv_cur and d < _riv_cur), None)
+    _riv_snap  = _cached_river_snapshot(_riv_cur)  if _riv_cur  else (None, None, None)
+    _riv_psnap = _cached_river_snapshot(_riv_prev) if _riv_prev else (None, None, None)
+    _riv_cif,  _riv_frt  = _riv_snap[0],  _riv_snap[1]
+    _riv_pcif, _riv_pfrt = _riv_psnap[0], _riv_psnap[1]
     _RIV_MONTHS = ["June", "July", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"]
     _RIV_ML = {6: "June", 7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov",
                12: "Dec", 1: "Jan"}
@@ -2004,11 +2011,19 @@ with tab_spotfwd:
         next_m = next((m for m in _RIV_MONTHS[i + 1:] if mv.get(m) is not None), None)
         return _riv_one(mv, scale, spot_m), _riv_one(mv, scale, next_m)
 
-    def _riv_cif_cents(com):
-        return _riv_spot_next((_riv_cif or {}).get(com, {}), 100)   # $/bu → ¢
+    def _riv_row(cur_mv, prev_mv, scale):
+        """(spot, next, spot_Δ, next_Δ) vs the prior River snapshot."""
+        s, n   = _riv_spot_next(cur_mv, scale)
+        ps, pn = _riv_spot_next(prev_mv, scale)
+        sc = (s - ps) if (s is not None and ps is not None) else None
+        nc = (n - pn) if (n is not None and pn is not None) else None
+        return s, n, sc, nc
 
-    def _riv_il_pct():
-        return _riv_spot_next((_riv_frt or {}).get("IL", {}), 100)  # stored → %
+    def _riv_cif_cents(com):                                        # $/bu → ¢
+        return _riv_row((_riv_cif or {}).get(com, {}), (_riv_pcif or {}).get(com, {}), 100)
+
+    def _riv_il_pct():                                              # stored → %
+        return _riv_row((_riv_frt or {}).get("IL", {}), (_riv_pfrt or {}).get("IL", {}), 100)
 
     _riv_cal = _riv_snap[2]
 
@@ -2030,9 +2045,9 @@ with tab_spotfwd:
     # CIF and IL freight come straight from the latest River FOB snapshot — no manual
     # entry. Spot = current calendar month, Next = following month. River CIF $/bu
     # → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
-    corn_cif_spot, corn_cif_next = _riv_cif_cents("Corn")
-    bean_cif_spot, bean_cif_next = _riv_cif_cents("Soybeans")
-    ilr_spot,      ilr_next      = _riv_il_pct()
+    corn_cif_spot, corn_cif_next, corn_cif_sc, corn_cif_nc = _riv_cif_cents("Corn")
+    bean_cif_spot, bean_cif_next, bean_cif_sc, bean_cif_nc = _riv_cif_cents("Soybeans")
+    ilr_spot,      ilr_next,      ilr_sc,      ilr_nc      = _riv_il_pct()
 
     _e1, _e2, _ = st.columns([2, 2, 6])
     with _e1:
@@ -2040,8 +2055,9 @@ with tab_spotfwd:
     with _e2:
         ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
     if _riv_dates:
+        _riv_cap_d = f"{_riv_cur} vs {_riv_prev}" if _riv_prev else f"{_riv_cur}"
         st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
-                   f"({_riv_dates[0]}; {_spot_riv or '—'} spot / next-month columns).")
+                   f"({_riv_cap_d}; {_spot_riv or '—'} spot / next-month columns).")
 
     st.markdown("---")
 
@@ -2175,7 +2191,7 @@ with tab_spotfwd:
 
     # Exact order from user specification:
     # Corn group
-    items_18.append(("Corn CIF", corn_cif_spot, corn_cif_next, None, None,
+    items_18.append(("Corn CIF", corn_cif_spot, corn_cif_next, corn_cif_sc, corn_cif_nc,
                      _riv_contract("Corn") if corn_cif_spot is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Corn",) + _get_loc_basis("ADM", ADM_HENN, "Corn"))
     items_18.append(("STL (ADM St. Louis) - Corn",) + _get_loc_basis("ADM", ADM_STL, "Corn"))
@@ -2192,7 +2208,7 @@ with tab_spotfwd:
                     + _get_loc_basis("ADM", "Decatur, IL (Corn Processing)", "Corn"))
 
     # Bean group
-    items_18.append(("Bean CIF", bean_cif_spot, bean_cif_next, None, None,
+    items_18.append(("Bean CIF", bean_cif_spot, bean_cif_next, bean_cif_sc, bean_cif_nc,
                      _riv_contract("Soybeans") if bean_cif_spot is not None else None))
     items_18.append(("Zone 3 (ADM Hennepin) - Beans",) + _get_loc_basis("ADM", ADM_HENN, "Soybeans"))
     items_18.append(("STL (ADM St. Louis) - Beans",) + _get_loc_basis("ADM", ADM_STL, "Soybeans"))
@@ -2205,7 +2221,7 @@ with tab_spotfwd:
 
     # Freight & Ethanol — IL barge freight is a % of tariff (from the River FOB
     # sheet); BN/UP Freight section is TBD (user building it later).
-    items_18.append(("IL Barge Freight", ilr_spot, ilr_next, None, None, None))
+    items_18.append(("IL Barge Freight", ilr_spot, ilr_next, ilr_sc, ilr_nc, None))
     items_18.append(_freight_item("BN Shuttle Freight", "BN 110 Shuttle"))
 
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
@@ -2251,8 +2267,9 @@ with tab_spotfwd:
         nxt_col = ("#1e293b" if (_is_pct or _is_dollar)
                    else ("#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"))
         fut_str = _fut_short(fut) or "—"
-        sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}¢</span>' if sc else '<span style="color:#cbd5e1">—</span>'
-        nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}¢</span>' if nc else '<span style="color:#cbd5e1">—</span>'
+        _du = "%" if _is_pct else "¢"
+        sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}{_du}</span>' if sc else '<span style="color:#cbd5e1">—</span>'
+        nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}{_du}</span>' if nc else '<span style="color:#cbd5e1">—</span>'
         html += (f'<tr style="background:{bg}">'
                  f'<td style="{td};font-weight:600;color:#1e293b">{name}</td>'
                  f'<td style="{td};color:#94a3b8;font-size:8px">{fut_str}</td>'
