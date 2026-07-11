@@ -47,6 +47,7 @@ import argparse
 import sys
 import os
 import logging
+import threading
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -1214,6 +1215,34 @@ def run_futures_capture() -> int:
         return 0
 
 
+def _run_guarded(fn, name, budget=240):
+    """Run one scraper with a hard wall-clock budget so a single hung provider
+    can't starve the rest of the run — most importantly the daily Changes email,
+    which is the last step. A provider site that trickles bytes can defeat the
+    per-request read timeouts and block for hours (this is what killed the
+    2026-07-10 email at Scoular). Here the scraper runs in a daemon thread; if it
+    blows the budget we log it, abandon the thread, and move on. Because every
+    scraper opens its own short-lived DB connection and a hang parks in the
+    network read (before any DB write), abandoning the thread is safe.
+    Returns the scraper's row count, or 0 on timeout / crash."""
+    box = {"n": 0}
+
+    def _target():
+        try:
+            box["n"] = fn() or 0
+        except Exception as exc:                       # noqa: BLE001 — never abort the run
+            log.error("%s scrape crashed: %s", name, exc)
+
+    t = threading.Thread(target=_target, name=f"scrape-{name}", daemon=True)
+    t.start()
+    t.join(budget)
+    if t.is_alive():
+        log.error("%s scrape exceeded %ds budget — abandoning it and continuing "
+                  "so the run still finishes and the email sends.", name, budget)
+        return 0
+    return box["n"]
+
+
 def run(
     run_poet_scrape: bool = True,
     run_chs_scrape: bool = True,
@@ -1251,60 +1280,62 @@ def run(
     """
     init_db()
     total = 0
+    # Each scraper runs under a wall-clock budget (POET needs longer for its
+    # Playwright browser) so one hung provider can't block the daily email.
     if run_adm_scrape:
-        total += run_adm()
+        total += _run_guarded(run_adm, "ADM")
     if run_poet_scrape:
-        total += run_poet()
+        total += _run_guarded(run_poet, "POET", budget=420)
     if run_chs_scrape:
-        total += run_chs()
+        total += _run_guarded(run_chs, "CHS")
     if run_cgb_scrape:
-        total += run_cgb()
+        total += _run_guarded(run_cgb, "CGB")
     if run_sotw_scrape:
-        total += run_sotw()
+        total += _run_guarded(run_sotw, "Star of the West")
     if run_mennel_scrape:
-        total += run_mennel()
+        total += _run_guarded(run_mennel, "Mennel")
     if run_agtegra_scrape:
-        total += run_agtegra()
+        total += _run_guarded(run_agtegra, "Agtegra")
     if run_cargill_scrape:
-        total += run_cargill()
+        total += _run_guarded(run_cargill, "Cargill")
     if run_gpre_scrape:
-        total += run_gpre()
+        total += _run_guarded(run_gpre, "GPRE")
     if run_andersons_scrape:
-        total += run_andersons()
+        total += _run_guarded(run_andersons, "Andersons")
     if run_bunge_scrape:
-        total += run_bunge()
+        total += _run_guarded(run_bunge, "Bunge")
     if run_scoular_scrape:
-        total += run_scoular()
+        total += _run_guarded(run_scoular, "Scoular")
     if run_agp_scrape:
-        total += run_agp()
+        total += _run_guarded(run_agp, "AGP")
     if run_ldc_scrape:
-        total += run_ldc()
+        total += _run_guarded(run_ldc, "LDC")
     if run_tyson_scrape:
-        total += run_tyson()
+        total += _run_guarded(run_tyson, "Tyson")
     if run_gpc_scrape:
-        total += run_gpc()
+        total += _run_guarded(run_gpc, "GPC")
     if run_zfs_scrape:
-        total += run_zfs()
+        total += _run_guarded(run_zfs, "ZFS")
     if run_mnsp_scrape:
-        total += run_mnsp()
+        total += _run_guarded(run_mnsp, "MN Soy")
     if run_platinum_scrape:
-        total += run_platinum()
+        total += _run_guarded(run_platinum, "Platinum")
     if run_shellrock_scrape:
-        total += run_shellrock()
+        total += _run_guarded(run_shellrock, "Shell Rock")
     if run_whiteriver_scrape:
-        total += run_whiteriver()
+        total += _run_guarded(run_whiteriver, "White River")
     if run_hppsd_scrape:
-        total += run_hppsd()
+        total += _run_guarded(run_hppsd, "HPPSD")
     if run_bartlett_scrape:
-        total += run_bartlett()
+        total += _run_guarded(run_bartlett, "Bartlett")
     if run_primient_scrape:
-        total += run_primient()
+        total += _run_guarded(run_primient, "Primient")
     if run_norfolkcrush_scrape:
-        total += run_norfolkcrush()
+        total += _run_guarded(run_norfolkcrush, "Norfolk Crush")
     if run_ndsp_scrape:
-        total += run_ndsp()
+        total += _run_guarded(run_ndsp, "NDSP")
     if run_sdsp_scrape:
-        total += run_sdsp()
+        total += _run_guarded(run_sdsp, "SDSP")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
