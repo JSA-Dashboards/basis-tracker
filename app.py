@@ -2106,7 +2106,7 @@ with tab_spotfwd:
                 spot_chg, next_chg, spot_row.futuresSymbol)
 
     # Build 18 items in specified order
-    from database import get_rail_fob_dates, get_rail_fob
+    from database import get_rail_fob_all
 
     items_18 = []
 
@@ -2119,10 +2119,20 @@ with tab_spotfwd:
     # a live scrape with no history (so no change column).  Spot = nearest posted
     # period; Next = the first later calendar month (skip same-month splits like
     # PNW's "FH July"/"July 5-20"), matching the cash rows' Now/Next convention.
-    rail_dates = get_rail_fob_dates("manual")
-    _rd_le = sorted([d for d in rail_dates if d <= sf_asof.isoformat()], reverse=True)
-    today_rail = get_rail_fob("manual", _rd_le[0]) if _rd_le else []
-    prior_rail = get_rail_fob("manual", _rd_le[1]) if len(_rd_le) > 1 else []
+    # Per-corridor carry-forward: each market uses its OWN latest posting <= as-of
+    # (and the posting before that for the Δ), so a corridor not re-posted on the
+    # most recent date still shows its last-known values instead of "—".
+    _asof_iso = sf_asof.isoformat()
+    _rail_by_md, _rail_mkt_dates = {}, {}
+    for _r in get_rail_fob_all("manual"):
+        _rail_by_md.setdefault((_r["market"], _r["date"]), []).append(_r)
+        _rail_mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
+
+    def _rail_rows(market, prior=False):
+        _elig = sorted(d for d in _rail_mkt_dates.get(market, ()) if d <= _asof_iso)
+        if not _elig or (prior and len(_elig) < 2):
+            return []
+        return _rail_by_md.get((market, _elig[-2 if prior else -1]), [])
 
     # Rail periods are free text ("FH July", "AUGUST", "JAS") with only a short
     # futures code, so _dp.canonical can't resolve them — pull the month name out
@@ -2156,16 +2166,16 @@ with tab_spotfwd:
             [(_period_month(r.get("period")), r["bid"], r.get("futures")) for r in mr])
 
     def _manual_rail_item(label, market):
-        spot, nxt, sfut = _rail_spot_next(today_rail, market)
-        psp, _, _       = _rail_spot_next(prior_rail, market)
+        spot, nxt, sfut = _rail_spot_next(_rail_rows(market), market)
+        psp, _, _       = _rail_spot_next(_rail_rows(market, prior=True), market)
         chg = (spot - psp) if (spot is not None and psp is not None) else None
         return (label, spot, nxt, chg, None, sfut)
 
     def _freight_item(label, market):
         # Freight ($/car): front MONTH bid, skipping "Return Trip" and other
         # non-month rows; next = first later month. No contract, no Δ.
-        mr = sorted([r for r in today_rail
-                     if r["market"] == market and r["bid"] is not None
+        mr = sorted([r for r in _rail_rows(market)
+                     if r["bid"] is not None
                      and _period_month(r.get("period")) is not None],
                     key=lambda x: x["period_order"])
         if not mr:
