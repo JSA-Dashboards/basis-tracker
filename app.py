@@ -2452,36 +2452,51 @@ with tab_railfob:
                 return ''.join(_market_html(m) for m in spec)   # stacked in one column
             return _market_html(spec)
 
-        # Board layout: each inner list is a left→right row of up to 3 corridors;
-        # a nested list stacks multiple corridors in one column (Allen Dom+Mex).
-        _LAYOUT = [
-            ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
-            ["CSX Freight"],
-            ["CN 105s", "CN 25's"],
-            ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
-            ["UP 110 Shuttle"],
-            ["BN Hereford", "BN PNW", "BN COBO"],
-            ["BN 110 Shuttle"],
-            ["BN PNW BE"],
-            ["BN PNW CP"],   # → "CP PNW", very bottom
+        # Board layout grouped into labeled sections; each row is up to 3 corridors
+        # left→right, a nested list stacks corridors in one column (Allen Dom+Mex).
+        _SECTIONS = [
+            ("Eastern Rail", [
+                ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
+                ["CSX Freight"],
+            ]),
+            ("Gulf Export Rail", [
+                ["CN 105s", "CN 25's"],
+            ]),
+            ("UP Western Rail", [
+                ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
+                ["UP 110 Shuttle"],
+            ]),
+            ("BN Western Rail", [
+                ["BN Hereford", "BN PNW", "BN COBO"],
+                ["BN 110 Shuttle"],
+                ["BN PNW BE"],
+                ["BN PNW CP"],   # → "CP PNW", very bottom
+            ]),
         ]
-        # Safety net: append any corridor with data that isn't placed above.
+        # Safety net: any corridor with data not placed above → an "Other" section.
         _placed = set()
-        for _row in _LAYOUT:
-            for _spec in _row:
-                _placed.update(_spec if isinstance(_spec, (list, tuple)) else [_spec])
-        for _m in _markets:
-            if _m not in _placed:
-                _LAYOUT.append([_m])
+        for _t, _rows in _SECTIONS:
+            for _row in _rows:
+                for _spec in _row:
+                    _placed.update(_spec if isinstance(_spec, (list, tuple)) else [_spec])
+        _leftover = [[m] for m in _markets if m not in _placed]
+        if _leftover:
+            _SECTIONS.append(("Other", _leftover))
 
+        _RF_SECHDR = ("margin-top:22px;margin-bottom:2px;font-family:'IBM Plex Mono',monospace;"
+                      "font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;"
+                      "color:#0693e3;border-bottom:1px solid #e2e8f0;padding-bottom:3px")
         _mh = ''   # stacked HTML for the copy button
-        for _row in _LAYOUT:
-            _cols = st.columns(3)
-            for _ci in range(3):
-                _html = _cell_html(_row[_ci] if _ci < len(_row) else None)
-                if _html:
-                    _cols[_ci].markdown(_html, unsafe_allow_html=True)
-                    _mh += _html
+        for _title, _rows in _SECTIONS:
+            st.markdown(f'<div style="{_RF_SECHDR}">{_title}</div>', unsafe_allow_html=True)
+            _mh += f'<div style="{_RF_SECHDR}">{_title}</div>'
+            for _row in _rows:
+                _cols = st.columns(3)
+                for _ci in range(3):
+                    _html = _cell_html(_row[_ci] if _ci < len(_row) else None)
+                    if _html:
+                        _cols[_ci].markdown(_html, unsafe_allow_html=True)
+                        _mh += _html
         st.caption(f"Full board as of {_msel} · corridors not posted that day carry forward "
                    f"their latest values (amber “as of M/D” stamp) · Δ = bid change vs prior "
                    f"posting / ~1 week / ~1 month (— until history builds) · ? = pending side.")
