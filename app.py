@@ -2286,81 +2286,45 @@ with tab_spotfwd:
 # TAB: RAIL FOB  (palmettograin.com rail FOB bids + offers)
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_railfob:
-    _rf = _cached_rail_fob()
-    if not _rf or not _rf.get("rows"):
-        st.info("Rail FOB data is unavailable right now. "
-                "Source: [palmettograin.com/raildivision](https://www.palmettograin.com/raildivision)")
-    else:
-        st.caption(
-            f"Rail FOB bids & offers · source: palmettograin.com · "
-            f"updated {_rf.get('updated') or '—'}"
-        )
-        _RF_THL = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
-                   "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
-                   "border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap")
-        _RF_THR = _RF_THL.replace("text-align:left", "text-align:right")
-        _RF_TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 8px;"
-                   "border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
-        _RF_TDR = _RF_TDL.replace("text-align:left", "text-align:right")
-        _rf_railcol = {"CSX": "#0693e3", "NS": "#7c3aed"}
-        _rf_html = ''
-        for _r in _rf["rows"]:
-            _rc = _rf_railcol.get(_r["rail"], "#64748b")
-            _rf_html += (f'<div style="margin-top:14px;margin-bottom:3px;'
-                         f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
-                         f'{_r["location"]} <span style="font-size:9px;color:#fff;background:{_rc};'
-                         f'padding:1px 5px;border-radius:3px">{_r["rail"]}</span></div>')
-            _rf_html += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
-            _rf_html += (f'<tr><td style="{_RF_THL}">Period</td><td style="{_RF_THL}">Fut</td>'
-                         f'<td style="{_RF_THR}">Bid</td><td style="{_RF_THR}">Offer</td></tr>')
-            for _c in _r["cells"]:
-                if not _c["futures"]:
-                    continue
-                _bidc = f'<td style="{_RF_TDR};color:#32373c;font-weight:700">{_c["bid"]:+d}</td>'
-                _offc = (f'<td style="{_RF_TDR};color:#0693e3;font-weight:600">{_c["offer"]:+d}</td>'
-                         if _c["offer"] is not None else f'<td style="{_RF_TDR};color:#cbd5e1">—</td>')
-                _rf_html += (f'<tr><td style="{_RF_TDL};color:#32373c">{_c["period"]}</td>'
-                             f'<td style="{_RF_TDL};color:#94a3b8;font-size:10px">{_c["futures"]}</td>'
-                             f'{_bidc}{_offc}</tr>')
-            _rf_html += '</table></div>'
-        st.markdown(_rf_html, unsafe_allow_html=True)
-        st.caption("Bid in dark, offer in blue · bid-only markets show — for offer · CSX/NS = rail carrier.")
-        copy_button(_rf_html, "📋 Copy table")
+    from database import (get_rail_fob, get_rail_fob_dates, get_rail_fob_all,
+                          save_rail_fob)
+    from datetime import timedelta as _td
 
-    # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
-    from database import get_rail_fob, get_rail_fob_dates, get_rail_fob_all
-    from rail_corridors import CORRIDOR_ORDER
-    st.markdown('<div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:10px;'
-                "font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;"
-                'color:#32373c">Rail Corridors · archived (corn)</div>',
-                unsafe_allow_html=True)
-    _mdates = get_rail_fob_dates("manual")
-    if not _mdates:
-        st.caption("No archived rail-corridor postings yet — these are added ~2×/week.")
-    else:
+    _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706",
+                   "BNSF": "#16a34a", "CN": "#b91c1c"}
+    _THL = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
+            "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
+            "border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap")
+    _THR = _THL.replace("text-align:left", "text-align:right")
+    _TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 8px;"
+            "border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
+    _TDR = _TDL.replace("text-align:left", "text-align:right")
+    _RF_SECHDR = ("margin-top:22px;margin-bottom:2px;font-family:'IBM Plex Mono',monospace;"
+                  "font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;"
+                  "color:#0693e3;border-bottom:1px solid #e2e8f0;padding-bottom:3px")
+    _RF_BOARDHDR = ("margin-top:20px;border-top:2px solid #e2e8f0;padding-top:10px;"
+                    "font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#32373c")
+    _RAIL_DISPLAY = {
+        "BN PNW CP":         "CP PNW",
+        "UP Illinois (Dom)": "Allen Station (Dom)",
+        "UP Illinois (Mex)": "Allen Station (Mex)",
+    }
+
+    def _rail_board(source, sections, key):
+        """Grid board for a stored rail-FOB source (palmetto / manual): labeled
+        section headings + per-corridor tables with Day/Wk/Mo bid changes and
+        carry-forward of corridors not posted on the selected date."""
+        _dates = get_rail_fob_dates(source)
+        if not _dates:
+            st.caption("No postings stored yet — this board fills in as data is saved.")
+            return
         _mc, _ = st.columns([3, 7])
         with _mc:
-            _msel = st.selectbox("Posting date", _mdates, key="rail_manual_date")
-        from datetime import timedelta as _td
-        _allrows = get_rail_fob_all("manual")
+            _msel = st.selectbox("Posting date", _dates, key=f"rail_date_{key}")
         _by_md, _mkt_dates = {}, {}
-        for _r in _allrows:
+        for _r in get_rail_fob_all(source):
             _by_md.setdefault((_r["market"], _r["date"]), {})[_r["period"]] = _r
             _mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
-        # Every corridor with a posting at or before the selected date; each renders
-        # its most recent posting <= the date, so un-updated lines carry forward
-        # (stamped with their actual, older posting date).
-        _markets = sorted({m for m, ds in _mkt_dates.items() if any(d <= _msel for d in ds)},
-                          key=lambda m: (CORRIDOR_ORDER.get(m, 999), m))
-        _railcolors = {"CSX": "#0693e3", "NS": "#7c3aed", "UP": "#d97706",
-                       "BNSF": "#16a34a", "CN": "#b91c1c"}
-        _THL = ("font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:#94a3b8;"
-                "text-transform:uppercase;letter-spacing:.04em;padding:5px 8px;"
-                "border-bottom:2px solid #e2e8f0;text-align:left;white-space:nowrap")
-        _THR = _THL.replace("text-align:left", "text-align:right")
-        _TDL = ("font-family:'IBM Plex Mono',monospace;font-size:12px;padding:4px 8px;"
-                "border-bottom:1px solid #f1f5f9;text-align:left;white-space:nowrap")
-        _TDR = _TDL.replace("text-align:left", "text-align:right")
 
         def _disp(num, raw):
             return raw if raw else (f"{num:+d}" if num is not None else None)
@@ -2399,15 +2363,7 @@ with tab_railfob:
                     _by_md.get((market, closest(7, 4))),
                     _by_md.get((market, closest(30, 10))))
 
-        # Display-name overrides (Kolten's preferred board labels).
-        _DISPLAY = {
-            "BN PNW CP":         "CP PNW",
-            "UP Illinois (Dom)": "Allen Station (Dom)",
-            "UP Illinois (Mex)": "Allen Station (Mex)",
-        }
-
         def _market_html(_m):
-            """One corridor's table (latest posting ≤ selected date), or '' if none."""
             _elig = [d for d in _mkt_dates.get(_m, ()) if d <= _msel]
             if not _elig:
                 return ''
@@ -2426,7 +2382,7 @@ with tab_railfob:
                          f'padding:1px 5px;border-radius:3px">as of {int(_mo2)}/{int(_dd)}</span>')
             h = (f'<div style="margin-top:16px;margin-bottom:3px;'
                  f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
-                 f'{_DISPLAY.get(_m, _m)} <span style="font-size:9px;color:#fff;background:{_rcol};'
+                 f'{_RAIL_DISPLAY.get(_m, _m)} <span style="font-size:9px;color:#fff;background:{_rcol};'
                  f'padding:1px 5px;border-radius:3px">{_rail}</span>{_asof}</div>')
             h += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
             h += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
@@ -2452,55 +2408,84 @@ with tab_railfob:
                 return ''.join(_market_html(m) for m in spec)   # stacked in one column
             return _market_html(spec)
 
-        # Board layout grouped into labeled sections; each row is up to 3 corridors
-        # left→right, a nested list stacks corridors in one column (Allen Dom+Mex).
-        _SECTIONS = [
-            ("Eastern Rail", [
-                ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
-                ["CSX Freight"],
-            ]),
-            ("Gulf Export Rail", [
-                ["CN 105s", "CN 25's"],
-            ]),
-            ("UP Western Rail", [
-                ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
-                ["UP 110 Shuttle"],
-            ]),
-            ("BN Western Rail", [
-                ["BN Hereford", "BN PNW", "BN COBO"],
-                ["BN 110 Shuttle"],
-                ["BN PNW BE"],
-                ["BN PNW CP"],   # → "CP PNW", very bottom
-            ]),
-        ]
-        # Safety net: any corridor with data not placed above → an "Other" section.
         _placed = set()
-        for _t, _rows in _SECTIONS:
+        for _t, _rows in sections:
             for _row in _rows:
                 for _spec in _row:
                     _placed.update(_spec if isinstance(_spec, (list, tuple)) else [_spec])
-        _leftover = [[m] for m in _markets if m not in _placed]
-        if _leftover:
-            _SECTIONS.append(("Other", _leftover))
+        _elig_markets = {m for m, ds in _mkt_dates.items() if any(d <= _msel for d in ds)}
+        _leftover = [[m] for m in sorted(_elig_markets) if m not in _placed]
+        _secs = list(sections) + ([("Other", _leftover)] if _leftover else [])
+        _ncols = max((len(r) for _t, _rows in _secs for r in _rows), default=1)
 
-        _RF_SECHDR = ("margin-top:22px;margin-bottom:2px;font-family:'IBM Plex Mono',monospace;"
-                      "font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;"
-                      "color:#0693e3;border-bottom:1px solid #e2e8f0;padding-bottom:3px")
         _mh = ''   # stacked HTML for the copy button
-        for _title, _rows in _SECTIONS:
-            st.markdown(f'<div style="{_RF_SECHDR}">{_title}</div>', unsafe_allow_html=True)
-            _mh += f'<div style="{_RF_SECHDR}">{_title}</div>'
+        for _title, _rows in _secs:
+            if _title:
+                st.markdown(f'<div style="{_RF_SECHDR}">{_title}</div>', unsafe_allow_html=True)
+                _mh += f'<div style="{_RF_SECHDR}">{_title}</div>'
             for _row in _rows:
-                _cols = st.columns(3)
-                for _ci in range(3):
+                _cols = st.columns(_ncols)
+                for _ci in range(_ncols):
                     _html = _cell_html(_row[_ci] if _ci < len(_row) else None)
                     if _html:
                         _cols[_ci].markdown(_html, unsafe_allow_html=True)
                         _mh += _html
-        st.caption(f"Full board as of {_msel} · corridors not posted that day carry forward "
-                   f"their latest values (amber “as of M/D” stamp) · Δ = bid change vs prior "
-                   f"posting / ~1 week / ~1 month (— until history builds) · ? = pending side.")
+        st.caption(f"As of {_msel} · corridors not posted that day carry forward (amber “as of M/D”) · "
+                   f"Δ = bid change vs prior posting / ~1 week / ~1 month (— until history builds) · "
+                   f"? = pending side.")
         copy_button(_mh, "📋 Copy table")
+
+    # ── Palmetto (live CSX/NS scrape) — persisted daily so its change columns build ──
+    _rf = _cached_rail_fob()
+    if _rf and _rf.get("rows") and not _view_only():
+        _ptoday = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if _ptoday not in get_rail_fob_dates("palmetto"):
+            _prows = []
+            for _r in _rf["rows"]:
+                for _i, _c in enumerate(_r["cells"]):
+                    if _c.get("bid") is None:
+                        continue
+                    _prows.append({"market": _r["location"], "rail": _r["rail"],
+                                   "commodity": _r["commodity"], "period": _c["period"],
+                                   "period_order": _i, "futures": _c.get("futures"),
+                                   "bid": _c["bid"], "offer": _c.get("offer"),
+                                   "bid_raw": None, "offer_raw": None})
+            if _prows:
+                save_rail_fob(_ptoday, "palmetto", _prows)
+
+    st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX / NS</div>',
+                unsafe_allow_html=True)
+    if _rf and _rf.get("updated"):
+        st.caption(f"source: palmettograin.com · live updated {_rf.get('updated')}")
+    _PALMETTO_SECTIONS = [
+        ("", [["COL, OH Corn 90's", "EVILLE, Corn- 90's",
+               "NS FT. WAYNE, IN Corn- 105's", "COL, OH Beans 90's"]]),
+    ]
+    _rail_board("palmetto", _PALMETTO_SECTIONS, "pal")
+
+    # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
+    st.markdown(f'<div style="{_RF_BOARDHDR}">Rail Corridors · archived (corn)</div>',
+                unsafe_allow_html=True)
+    _MANUAL_SECTIONS = [
+        ("Eastern Rail", [
+            ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
+            ["CSX Freight"],
+        ]),
+        ("Gulf Export Rail", [
+            ["CN 105s", "CN 25's"],
+        ]),
+        ("UP Western Rail", [
+            ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
+            ["UP 110 Shuttle"],
+        ]),
+        ("BN Western Rail", [
+            ["BN Hereford", "BN PNW", "BN COBO"],
+            ["BN 110 Shuttle"],
+            ["BN PNW BE"],
+            ["BN PNW CP"],   # → "CP PNW", very bottom
+        ]),
+    ]
+    _rail_board("manual", _MANUAL_SECTIONS, "man")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RIVER FOB  (read-only view of the JSA FOB Sheet, shared Supabase archive)
