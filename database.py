@@ -560,6 +560,108 @@ def upsert_snapshot(snap: dict) -> int:
         conn.close()
 
 
+def upsert_snapshots(snaps: list[dict]) -> int:
+    """Bulk upsert: insert many snapshots + their rows in ONE connection using
+    batched multi-row INSERTs. Same INSERT … ON CONFLICT DO NOTHING semantics as
+    upsert_snapshot. Replaces the per-snapshot connect/insert/commit storm — e.g.
+    CHS produces ~500 snapshots / ~2000 rows; the old path opened a fresh cloud
+    connection per snapshot (minutes) and even a single-connection row-at-a-time
+    loop was ~100s of round-trips. Here it's 3 round-trips: insert snapshots,
+    fetch their ids, insert rows. Note several snaps can share one
+    (timestamp, provider, location) — e.g. one per grain — and correctly collapse
+    to a single snapshot whose rows are the union. Returns rows written/seen."""
+    if not snaps:
+        return 0
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        # Distinct snapshot keys (a location's per-grain snaps share one key).
+        seen: dict[tuple, tuple] = {}
+        for s in snaps:
+            key = (s["timestamp"], s["provider"], s["location"])
+            if key not in seen:
+                seen[key] = (s["timestamp"], s["provider"], s["location"],
+                             s.get("source", "manual"), s.get("emailSubject"),
+                             s.get("emailDate"))
+
+        if _use_pg():
+            from psycopg2.extras import execute_values
+            execute_values(
+                c,
+                """INSERT INTO snapshots
+                   (timestamp, provider, location, source, email_subject, email_date)
+                   VALUES %s ON CONFLICT (timestamp, provider, location) DO NOTHING""",
+                list(seen.values()),
+            )
+            id_map: dict[tuple, int] = {}
+            keys = list(seen.keys())
+            for i in range(0, len(keys), 1000):
+                chunk = keys[i:i + 1000]
+                c.execute(
+                    "SELECT id, timestamp, provider, location FROM snapshots "
+                    "WHERE (timestamp, provider, location) IN %s",
+                    (tuple(chunk),),
+                )
+                for r in c.fetchall():
+                    id_map[(r["timestamp"], r["provider"], r["location"])] = r["id"]
+
+            row_tuples = []
+            for s in snaps:
+                sid = id_map.get((s["timestamp"], s["provider"], s["location"]))
+                if sid is None:
+                    continue
+                for r in s.get("rows", []):
+                    row_tuples.append((
+                        sid, r["id"], r["grain"], r["deliveryMonth"],
+                        r["futuresSymbol"], r.get("basisCents"),
+                        1 if r.get("isSpot") else 0, r.get("spotGrain")))
+            if row_tuples:
+                execute_values(
+                    c,
+                    """INSERT INTO snapshot_rows
+                       (snapshot_id, row_id, grain, delivery_month, futures_symbol,
+                        basis_cents, is_spot, spot_grain)
+                       VALUES %s ON CONFLICT (snapshot_id, row_id) DO NOTHING""",
+                    row_tuples,
+                )
+            conn.commit()
+            return len(row_tuples)
+
+        # ── SQLite fallback (local dev) — executemany, still one connection ──
+        c.executemany(
+            """INSERT OR IGNORE INTO snapshots
+               (timestamp, provider, location, source, email_subject, email_date)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            list(seen.values()),
+        )
+        id_map = {}
+        for key in seen:
+            c.execute("SELECT id FROM snapshots WHERE timestamp=? AND provider=? AND location=?", key)
+            id_map[key] = c.fetchone()["id"]
+        row_tuples = []
+        for s in snaps:
+            sid = id_map.get((s["timestamp"], s["provider"], s["location"]))
+            if sid is None:
+                continue
+            for r in s.get("rows", []):
+                row_tuples.append((
+                    sid, r["id"], r["grain"], r["deliveryMonth"],
+                    r["futuresSymbol"], r.get("basisCents"),
+                    1 if r.get("isSpot") else 0, r.get("spotGrain")))
+        if row_tuples:
+            c.executemany(
+                """INSERT OR IGNORE INTO snapshot_rows
+                   (snapshot_id, row_id, grain, delivery_month, futures_symbol,
+                    basis_cents, is_spot, spot_grain)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                row_tuples,
+            )
+        conn.commit()
+        return len(row_tuples)
+    finally:
+        conn.close()
+
+
 # ── Reads ──────────────────────────────────────────────────────────────────────
 
 def get_snapshots(provider: str, location: str) -> list[Snapshot]:

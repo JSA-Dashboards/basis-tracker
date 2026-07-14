@@ -57,7 +57,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from database import (
-    init_db, upsert_snapshot,
+    init_db, upsert_snapshot, upsert_snapshots,
     upsert_location_meta, prune_old_snapshots,
 )
 from poet_scraper import fetch_poet_bids
@@ -184,28 +184,17 @@ def run_chs() -> int:
         log.warning("CHS parser produced no snapshots.")
         return 0
 
-    total_rows = 0
-    errors     = 0
-    for snap in snapshots:
-        try:
-            upsert_snapshot(snap.model_dump())
-            total_rows += len(snap.rows)
-            log.info(
-                "  ✓  %-28s  %-10s  %d row(s)",
-                snap.location, snap.rows[0].grain if snap.rows else "", len(snap.rows),
-            )
-        except Exception as exc:
-            errors += 1
-            log.error("  ✗  %s / %s: %s",
-                      snap.location,
-                      snap.rows[0].grain if snap.rows else "?",
-                      exc)
+    # Bulk upsert over ONE connection — CHS yields ~500 snapshots, and a fresh
+    # cloud connection per snapshot (~0.33s each) used to run it past its budget.
+    try:
+        total_rows = upsert_snapshots([s.model_dump() for s in snapshots])
+    except Exception as exc:
+        log.error("CHS bulk upsert failed: %s", exc)
+        return 0
 
     log.info("-" * 60)
-    log.info(
-        "CHS done: %d snapshot(s)  |  %d row(s) total  |  %d error(s)",
-        len(snapshots) - errors, total_rows, errors,
-    )
+    log.info("CHS done: %d snapshot(s)  |  %d row(s) total (bulk upsert)",
+             len(snapshots), total_rows)
     return total_rows
 
 
