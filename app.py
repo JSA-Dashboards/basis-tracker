@@ -2399,13 +2399,23 @@ with tab_railfob:
                     _by_md.get((market, closest(7, 4))),
                     _by_md.get((market, closest(30, 10))))
 
-        _mh = ''
-        for _m in _markets:
-            _eff = max(d for d in _mkt_dates[_m] if d <= _msel)   # latest posting <= selected
+        # Display-name overrides (Kolten's preferred board labels).
+        _DISPLAY = {
+            "BN PNW CP":         "CP PNW",
+            "UP Illinois (Dom)": "Allen Station (Dom)",
+            "UP Illinois (Mex)": "Allen Station (Mex)",
+        }
+
+        def _market_html(_m):
+            """One corridor's table (latest posting ≤ selected date), or '' if none."""
+            _elig = [d for d in _mkt_dates.get(_m, ()) if d <= _msel]
+            if not _elig:
+                return ''
+            _eff = max(_elig)
             _cells = sorted(_by_md.get((_m, _eff), {}).values(),
                             key=lambda r: (r["period_order"] if r.get("period_order") is not None else 99))
             if not _cells:
-                continue
+                return ''
             _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
             _pd, _pw, _pmo = _prior_maps(_m, _eff)
@@ -2414,26 +2424,64 @@ with tab_railfob:
                 _yy, _mo2, _dd = _eff.split("-")
                 _asof = (f' <span style="font-size:9px;color:#fff;background:#d97706;'
                          f'padding:1px 5px;border-radius:3px">as of {int(_mo2)}/{int(_dd)}</span>')
-            _mh += (f'<div style="margin-top:16px;margin-bottom:3px;'
-                    f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
-                    f'{_m} <span style="font-size:9px;color:#fff;background:{_rcol};'
-                    f'padding:1px 5px;border-radius:3px">{_rail}</span>{_asof}</div>')
-            _mh += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
-            _mh += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
-                    f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
-                    f'<td style="{_THR}">Δ Day</td><td style="{_THR}">Δ Wk</td>'
-                    f'<td style="{_THR}">Δ Mo</td></tr>')
+            h = (f'<div style="margin-top:16px;margin-bottom:3px;'
+                 f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
+                 f'{_DISPLAY.get(_m, _m)} <span style="font-size:9px;color:#fff;background:{_rcol};'
+                 f'padding:1px 5px;border-radius:3px">{_rail}</span>{_asof}</div>')
+            h += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
+            h += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
+                  f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
+                  f'<td style="{_THR}">Δ Day</td><td style="{_THR}">Δ Wk</td>'
+                  f'<td style="{_THR}">Δ Mo</td></tr>')
             for c in _cells:
                 _b = c.get("bid")
-                _mh += (f'<tr><td style="{_TDL};color:#32373c">{c["period"]}</td>'
-                        f'<td style="{_TDL};color:#94a3b8;font-size:10px">{c.get("futures") or ""}</td>'
-                        + _bidoff_html(c, False) + _bidoff_html(c, True)
-                        + _chg_html(_b, _pd, c["period"])
-                        + _chg_html(_b, _pw, c["period"])
-                        + _chg_html(_b, _pmo, c["period"])
-                        + '</tr>')
-            _mh += '</table></div>'
-        st.markdown(_mh, unsafe_allow_html=True)
+                h += (f'<tr><td style="{_TDL};color:#32373c">{c["period"]}</td>'
+                      f'<td style="{_TDL};color:#94a3b8;font-size:10px">{c.get("futures") or ""}</td>'
+                      + _bidoff_html(c, False) + _bidoff_html(c, True)
+                      + _chg_html(_b, _pd, c["period"])
+                      + _chg_html(_b, _pw, c["period"])
+                      + _chg_html(_b, _pmo, c["period"])
+                      + '</tr>')
+            h += '</table></div>'
+            return h
+
+        def _cell_html(spec):
+            if not spec:
+                return ''
+            if isinstance(spec, (list, tuple)):
+                return ''.join(_market_html(m) for m in spec)   # stacked in one column
+            return _market_html(spec)
+
+        # Board layout: each inner list is a left→right row of up to 3 corridors;
+        # a nested list stacks multiple corridors in one column (Allen Dom+Mex).
+        _LAYOUT = [
+            ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
+            ["CSX Freight"],
+            ["CN 105s", "CN 25's"],
+            ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
+            ["UP 110 Shuttle"],
+            ["BN Hereford", "BN PNW", "BN COBO"],
+            ["BN 110 Shuttle"],
+            ["BN PNW BE"],
+            ["BN PNW CP"],   # → "CP PNW", very bottom
+        ]
+        # Safety net: append any corridor with data that isn't placed above.
+        _placed = set()
+        for _row in _LAYOUT:
+            for _spec in _row:
+                _placed.update(_spec if isinstance(_spec, (list, tuple)) else [_spec])
+        for _m in _markets:
+            if _m not in _placed:
+                _LAYOUT.append([_m])
+
+        _mh = ''   # stacked HTML for the copy button
+        for _row in _LAYOUT:
+            _cols = st.columns(3)
+            for _ci in range(3):
+                _html = _cell_html(_row[_ci] if _ci < len(_row) else None)
+                if _html:
+                    _cols[_ci].markdown(_html, unsafe_allow_html=True)
+                    _mh += _html
         st.caption(f"Full board as of {_msel} · corridors not posted that day carry forward "
                    f"their latest values (amber “as of M/D” stamp) · Δ = bid change vs prior "
                    f"posting / ~1 week / ~1 month (— until history builds) · ? = pending side.")
