@@ -2551,7 +2551,6 @@ with tab_railfob:
         ("Eastern Rail", [
             ["CSX Columbus", "CSX Evansville", "NS Ft Wayne"],
             ["CSX Freight"],
-            ["CSX Columbus (Beans)"],
         ]),
         ("Gulf Export Rail", [
             ["CN 105s", "CN 25's"],
