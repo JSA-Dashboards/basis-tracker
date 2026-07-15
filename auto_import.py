@@ -500,6 +500,7 @@ def run_cargill() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -511,14 +512,8 @@ def run_cargill() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            # Store state in location_meta for UI filters
-            upsert_location_meta(
-                "Cargill",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -529,10 +524,21 @@ def run_cargill() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    # Bulk-write over one connection each — avoid the per-location connection storm
+    # that got Cargill abandoned at its 240s budget (2026-07-15). Same fix as ADM.
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("Cargill bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("Cargill", _metas)
+    except Exception as exc:
+        log.error("Cargill location-meta bulk failed: %s", exc)
+
     log.info("-" * 60)
     log.info(
         "Cargill done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk upsert)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -737,6 +743,7 @@ def run_scoular() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -748,13 +755,8 @@ def run_scoular() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Scoular",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -765,10 +767,21 @@ def run_scoular() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    # Bulk-write over one connection each — avoid the per-location connection storm
+    # that got Scoular abandoned at its 240s budget (2026-07-15). Same fix as ADM.
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("Scoular bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("Scoular", _metas)
+    except Exception as exc:
+        log.error("Scoular location-meta bulk failed: %s", exc)
+
     log.info("-" * 60)
     log.info(
         "Scoular done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk upsert)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
