@@ -2442,8 +2442,8 @@ with tab_railfob:
                 return best if abs((datetime.fromisoformat(best).date() - tgt).days) <= maxd else None
             return (_by_md.get((market, earlier[-1])),
                     _by_md.get((market, closest(7, 4))),
-                    _by_md.get((market, closest(30, 10))),
-                    _by_md.get((market, closest(365, 45))))
+                    _by_md.get((market, closest(30, 4))),
+                    _by_md.get((market, closest(365, 4))))
 
         def _market_html(_m):
             _elig = [d for d in _mkt_dates.get(_m, ()) if d <= _msel]
