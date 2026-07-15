@@ -2106,7 +2106,8 @@ with tab_spotfwd:
                 spot_chg, next_chg, spot_row.futuresSymbol)
 
     # Build 18 items in specified order
-    from database import get_rail_fob_all
+    from database import (get_rail_fob_all, get_nightly_overrides,
+                          set_nightly_overrides)
 
     items_18 = []
 
@@ -2237,6 +2238,24 @@ with tab_spotfwd:
     items_18.append(("Chi Platts Eth", chi_eth_input or None, None, None, None, None))
     items_18.append(("NY Platts Eth", ny_eth_input or None, None, None, None, None))
 
+    # Apply manual per-row overrides (edited via the "✏️ Edit table" control below).
+    # Each override field is None unless the user changed it, so computed values
+    # still flow through for untouched fields.
+    _computed_items = list(items_18)
+    _nightly_ovr = get_nightly_overrides(_asof_iso)
+
+    def _apply_ovr(it):
+        o = _nightly_ovr.get(it[0])
+        if not o:
+            return it
+        return (it[0],
+                o["spot"]     if o["spot"]     is not None else it[1],
+                o["nxt"]      if o["nxt"]      is not None else it[2],
+                o["spot_chg"] if o["spot_chg"] is not None else it[3],
+                o["nxt_chg"]  if o["nxt_chg"]  is not None else it[4],
+                o["fut"]      if o["fut"]                    else it[5])
+    items_18 = [_apply_ovr(it) for it in items_18]
+
     # Render table — as tight as possible; "Fut" = the contract each row is basis.
     th = ("background:#f1f5f9;color:#64748b;font-size:7px;text-transform:uppercase;"
           "letter-spacing:.02em;padding:2px 5px;text-align:left;"
@@ -2291,6 +2310,58 @@ with tab_spotfwd:
     html += '</tbody></table>'
     st.markdown(html, unsafe_allow_html=True)
     copy_button(html, "📋 Copy table")
+
+    # ── Edit any row (manual overrides, saved per as-of date) ──────────────────
+    if not _view_only():
+        with st.expander("✏️ Edit table — override any row for this date"):
+            import pandas as _pd
+            st.caption("Raw values: ¢ for basis rows, % for IL Barge Freight, $ for "
+                       "BN Shuttle Freight. Blank a cell to revert it to the computed "
+                       "value. Overrides are saved for the selected as-of date only.")
+            _edf = _pd.DataFrame(
+                [{"Item": it[0], "Spot": it[1], "Next": it[2],
+                  "Δ Spot": it[3], "Δ Next": it[4], "Fut": it[5] or ""}
+                 for it in items_18 if it[0]])
+            for _col in ("Spot", "Next", "Δ Spot", "Δ Next"):
+                _edf[_col] = _edf[_col].astype("Int64")
+            _edited = st.data_editor(_edf, hide_index=True, use_container_width=True,
+                                     disabled=["Item"], key="nightly_editor")
+            _b1, _b2, _ = st.columns([2, 2, 6])
+
+            def _ival(v):
+                try:
+                    return None if (v is None or v == "" or _pd.isna(v)) else int(round(float(v)))
+                except (ValueError, TypeError):
+                    return None
+
+            if _b1.button("💾 Save overrides", key="nightly_save"):
+                _base = {it[0]: it for it in _computed_items}
+                _rows = []
+                for _, _r in _edited.iterrows():
+                    _nm = _r["Item"]
+                    _b  = _base.get(_nm)
+                    if _b is None:
+                        continue
+                    _es, _en = _ival(_r["Spot"]), _ival(_r["Next"])
+                    _esc, _enc = _ival(_r["Δ Spot"]), _ival(_r["Δ Next"])
+                    _ef = (str(_r["Fut"]).strip() or None)
+                    # store only fields that differ from the computed baseline
+                    _rows.append({
+                        "item_name": _nm,
+                        "spot":     _es  if _es  != _b[1] else None,
+                        "nxt":      _en  if _en  != _b[2] else None,
+                        "spot_chg": _esc if _esc != _b[3] else None,
+                        "nxt_chg":  _enc if _enc != _b[4] else None,
+                        "fut":      _ef  if _ef  != (_b[5] or None) else None,
+                    })
+                set_nightly_overrides(_asof_iso, _rows)
+                st.success("Saved — overrides apply to this as-of date.")
+                st.rerun()
+            if _b2.button("↺ Clear all", key="nightly_clear"):
+                set_nightly_overrides(_asof_iso, [])
+                st.rerun()
+            if _nightly_ovr:
+                st.caption(f"{len(_nightly_ovr)} row(s) currently overridden for {_asof_iso}.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RAIL FOB  (palmettograin.com rail FOB bids + offers)

@@ -1246,6 +1246,74 @@ def get_spot_forward_manual_history(days: int = 30) -> list[dict]:
         conn.close()
 
 
+# ── Nightly Recap per-row overrides (manual edits to any table row) ──────────────
+_NIGHTLY_OVERRIDE_DDL = """
+    CREATE TABLE IF NOT EXISTS nightly_override (
+        date      TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        spot      INTEGER,
+        nxt       INTEGER,
+        spot_chg  INTEGER,
+        nxt_chg   INTEGER,
+        fut       TEXT,
+        PRIMARY KEY (date, item_name)
+    )
+"""
+
+
+def _ensure_nightly_override(conn, c) -> None:
+    c.execute(_NIGHTLY_OVERRIDE_DDL)
+    conn.commit()
+
+
+def set_nightly_overrides(date: str, rows: list[dict]) -> bool:
+    """Replace ALL Nightly Recap overrides for `date`. Each row:
+    {item_name, spot, nxt, spot_chg, nxt_chg, fut}; any field None = 'no
+    override for that field, use the computed value'. Rows with every field
+    None are skipped (nothing to override)."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        _ensure_nightly_override(conn, c)
+        c.execute(f"DELETE FROM nightly_override WHERE date={ph}", (date,))
+        for r in rows:
+            vals = (r.get("spot"), r.get("nxt"), r.get("spot_chg"),
+                    r.get("nxt_chg"), r.get("fut"))
+            if all(v is None for v in vals):
+                continue
+            c.execute(
+                f"INSERT INTO nightly_override "
+                f"(date, item_name, spot, nxt, spot_chg, nxt_chg, fut) "
+                f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})",
+                (date, r["item_name"], *vals))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def get_nightly_overrides(date: str) -> dict:
+    """Return {item_name: {spot, nxt, spot_chg, nxt_chg, fut}} for `date`
+    (each field None means no override for that field)."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        _ensure_nightly_override(conn, c)
+        c.execute(
+            f"SELECT item_name, spot, nxt, spot_chg, nxt_chg, fut "
+            f"FROM nightly_override WHERE date={ph}", (date,))
+        out = {}
+        for row in c.fetchall():
+            d = dict(row)
+            out[d["item_name"]] = {k: d[k] for k in
+                                   ("spot", "nxt", "spot_chg", "nxt_chg", "fut")}
+        return out
+    finally:
+        conn.close()
+
+
 def prune_old_snapshots(dry_run: bool = False) -> dict:
     """
     Apply tiered data retention to snapshots (PostgreSQL only).
