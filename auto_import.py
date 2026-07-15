@@ -58,7 +58,7 @@ load_dotenv()
 
 from database import (
     init_db, upsert_snapshot, upsert_snapshots,
-    upsert_location_meta, prune_old_snapshots,
+    upsert_location_meta, upsert_location_metas, prune_old_snapshots,
 )
 from poet_scraper import fetch_poet_bids
 from parsers.poet_parser import parse_instruments as parse_poet_instruments
@@ -225,6 +225,7 @@ def run_adm() -> int:
     # ADM locations to drop (e.g. Canadian sites priced in CAD → bogus basis).
     _ADM_SKIP = {"Windsor, ON"}
 
+    _snaps, _metas = [], []
     for item in raw_results:
         market_id        = item["market_id"]
         display_name     = item["display_name"]
@@ -247,11 +248,11 @@ def run_adm() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
+            _snaps.append(snap_req)
             # Persist state parsed from the ADM name (e.g. "Decatur, IL …" → IL)
             _adm_state = adm_state_from_name(snap_req.location)
             if _adm_state:
-                upsert_location_meta("ADM", snap_req.location, state=_adm_state)
+                _metas.append({"location": snap_req.location, "state": _adm_state})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-45s  %d row(s)", display_name, len(snap_req.rows))
@@ -260,10 +261,22 @@ def run_adm() -> int:
             errors += 1
             log.error("  ✗  %s: %s", display_name, exc)
 
+    # Bulk-write over one connection each — ADM's ~130 snapshots + ~130 metas as
+    # a fresh cloud connection apiece was ~200s of overhead and got the scrape
+    # abandoned at its 240s budget (2026-07-14). Same fix as CHS.
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("ADM bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("ADM", _metas)
+    except Exception as exc:
+        log.error("ADM location-meta bulk failed: %s", exc)
+
     log.info("-" * 60)
     log.info(
         "ADM done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk upsert)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows

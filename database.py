@@ -765,6 +765,48 @@ def upsert_location_meta(provider: str, location: str,
         conn.close()
 
 
+def upsert_location_metas(provider: str, items: list[dict]) -> int:
+    """Bulk idempotent upsert of location metadata over ONE connection (same
+    COALESCE-only-non-None semantics as upsert_location_meta). Avoids the
+    per-location connection storm when a scraper sets meta for many locations.
+    items: [{location, state?, facility_type?, region?, lat?, lon?}]."""
+    if not items:
+        return 0
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        rows = [(provider, it["location"], it.get("state"), it.get("facility_type"),
+                 it.get("region"), it.get("lat"), it.get("lon")) for it in items]
+        if _use_pg():
+            c.executemany(
+                """INSERT INTO location_meta
+                   (provider, location, state, facility_type, region, lat, lon)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s)
+                   ON CONFLICT (provider, location) DO UPDATE SET
+                       state         = COALESCE(EXCLUDED.state,         location_meta.state),
+                       facility_type = COALESCE(EXCLUDED.facility_type, location_meta.facility_type),
+                       region        = COALESCE(EXCLUDED.region,        location_meta.region),
+                       lat           = COALESCE(EXCLUDED.lat,           location_meta.lat),
+                       lon           = COALESCE(EXCLUDED.lon,           location_meta.lon)""",
+                rows)
+        else:
+            c.executemany(
+                """INSERT INTO location_meta
+                   (provider, location, state, facility_type, region, lat, lon)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(provider, location) DO UPDATE SET
+                       state         = COALESCE(excluded.state,         location_meta.state),
+                       facility_type = COALESCE(excluded.facility_type, location_meta.facility_type),
+                       region        = COALESCE(excluded.region,        location_meta.region),
+                       lat           = COALESCE(excluded.lat,           location_meta.lat),
+                       lon           = COALESCE(excluded.lon,           location_meta.lon)""",
+                rows)
+        conn.commit()
+        return len(rows)
+    finally:
+        conn.close()
+
+
 def get_location_meta(provider: str) -> dict[str, dict]:
     """Return {location_name: {state, facility_type, region, lat, lon}} for a provider."""
     conn = get_conn()
