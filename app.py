@@ -2434,7 +2434,7 @@ with tab_railfob:
         def _prior_maps(market, cur):
             earlier = sorted(d for d in _mkt_dates.get(market, ()) if d < cur)
             if not earlier:
-                return (None, None, None)
+                return (None, None, None, None)
             cd = datetime.fromisoformat(cur).date()
             def closest(days, maxd):
                 tgt  = cd - _td(days=days)
@@ -2442,7 +2442,8 @@ with tab_railfob:
                 return best if abs((datetime.fromisoformat(best).date() - tgt).days) <= maxd else None
             return (_by_md.get((market, earlier[-1])),
                     _by_md.get((market, closest(7, 4))),
-                    _by_md.get((market, closest(30, 10))))
+                    _by_md.get((market, closest(30, 10))),
+                    _by_md.get((market, closest(365, 45))))
 
         def _market_html(_m):
             _elig = [d for d in _mkt_dates.get(_m, ()) if d <= _msel]
@@ -2455,7 +2456,7 @@ with tab_railfob:
                 return ''
             _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
-            _pd, _pw, _pmo = _prior_maps(_m, _eff)
+            _pd, _pw, _pmo, _pyr = _prior_maps(_m, _eff)
             _asof = ""
             if _eff != _msel:    # carried forward — stamp with its actual posting date
                 _yy, _mo2, _dd = _eff.split("-")
@@ -2469,7 +2470,7 @@ with tab_railfob:
             h += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
                   f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
                   f'<td style="{_THR}">Δ Day</td><td style="{_THR}">Δ Wk</td>'
-                  f'<td style="{_THR}">Δ Mo</td></tr>')
+                  f'<td style="{_THR}">Δ Mo</td><td style="{_THR}">Δ Yr</td></tr>')
             for c in _cells:
                 _b = c.get("bid")
                 h += (f'<tr><td style="{_TDL};color:#32373c">{c["period"]}</td>'
@@ -2478,6 +2479,7 @@ with tab_railfob:
                       + _chg_html(_b, _pd, c["period"])
                       + _chg_html(_b, _pw, c["period"])
                       + _chg_html(_b, _pmo, c["period"])
+                      + _chg_html(_b, _pyr, c["period"])
                       + '</tr>')
             h += '</table></div>'
             return h
@@ -2512,8 +2514,8 @@ with tab_railfob:
                         _cols[_ci].markdown(_html, unsafe_allow_html=True)
                         _mh += _html
         st.caption(f"As of {_msel} · corridors not posted that day carry forward (amber “as of M/D”) · "
-                   f"Δ = bid change vs prior posting / ~1 week / ~1 month (— until history builds) · "
-                   f"? = pending side.")
+                   f"Δ = bid change vs prior posting / ~1 week / ~1 month / ~1 year (— until history "
+                   f"builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
 
     # ── Palmetto (live CSX/NS scrape) — persisted daily so its change columns build ──
