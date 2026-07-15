@@ -2277,7 +2277,7 @@ with tab_spotfwd:
             continue
         _is_pct = (name == "IL Barge Freight")        # % of tariff, not a ¢ basis
         _is_dollar = (name == "BN Shuttle Freight")   # freight $/car
-        _dol = lambda v: ("—" if v is None else (f"-${abs(v):,}" if v < 0 else f"${v:,}"))
+        _dol = lambda v: ("—" if v is None else f"{v:+,d}")
         if _is_pct:
             spot_str  = f"{spot:.0f}%" if spot is not None else "—"
             spot_col  = "#1e293b"
