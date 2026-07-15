@@ -2285,18 +2285,18 @@ with tab_spotfwd:
             spot_str  = _dol(spot)
             spot_col  = "#1e293b"
         else:
-            spot_str  = f'{spot:+d}¢' if spot is not None else "—"
+            spot_str  = f'{spot:+d}' if spot is not None else "—"
             spot_col  = "#16a34a" if spot is not None and spot >= 0 else "#dc2626"
         if _is_dollar:
             nxt_str = _dol(nxt)
         elif _is_pct:
             nxt_str = f"{nxt:.0f}%" if nxt is not None else "—"
         else:
-            nxt_str = f'{nxt:+d}¢' if nxt is not None else "—"
+            nxt_str = f'{nxt:+d}' if nxt is not None else "—"
         nxt_col = ("#1e293b" if (_is_pct or _is_dollar)
                    else ("#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"))
         fut_str = _fut_short(fut) or "—"
-        _du = "%" if _is_pct else "¢"
+        _du = "%" if _is_pct else ""
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}{_du}</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}{_du}</span>' if nc else '<span style="color:#cbd5e1">—</span>'
         html += (f'<tr style="background:{bg}">'
