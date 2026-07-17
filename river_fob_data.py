@@ -1,20 +1,37 @@
 """Read layer for the River FOB archive (cif_history / freight_history /
-calendar_history), sharing the basis tracker's DB connection so the River FOB
-tab reads the same Supabase the rest of the dashboard uses.
+calendar_history).
 
-Mirrors river-fob-portal/db.py's read functions; the River FOB portal remains the
-place data is entered/saved.  Read-only here.
+River data lives in its OWN Supabase now (the portal writes there). If
+RIVER_DATABASE_URL is set we read/write that dedicated DB; otherwise we fall
+back to the basis tracker's main connection (the old shared DB) for backward
+compatibility. The River FOB portal remains the place data is entered/saved.
 """
+import os
 from database import get_conn, _use_pg
 
 
+def _river_url() -> str:
+    return os.environ.get("RIVER_DATABASE_URL", "").strip()
+
+
+def _river_conn():
+    """Connection to the dedicated river DB (RIVER_DATABASE_URL) if configured,
+    else the basis tracker's main connection."""
+    url = _river_url()
+    if url:
+        import psycopg2
+        import psycopg2.extras
+        return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+    return get_conn()
+
+
 def _ph() -> str:
-    return "%s" if _use_pg() else "?"
+    return "%s" if (_river_url() or _use_pg()) else "?"
 
 
 def list_dates() -> list:
     """All archived as-of dates, newest first."""
-    conn = get_conn()
+    conn = _river_conn()
     c = conn.cursor()
     try:
         c.execute("""SELECT as_of FROM cif_history
@@ -29,7 +46,7 @@ def load_snapshot(as_of: str):
     """Return (cif_by_commodity, freight_by_region, calendar) for a date, or
     (None, None, None) if absent.  calendar: {commodity: [(month, contract)…]}."""
     ph = _ph()
-    conn = get_conn()
+    conn = _river_conn()
     c = conn.cursor()
     try:
         c.execute(f"SELECT commodity, month, value FROM cif_history WHERE as_of={ph}", (as_of,))
@@ -74,7 +91,7 @@ def save_snapshot(as_of, cif_by_commodity, freight_by_region, calendar=None):
     Returns (n_cif, n_freight)."""
     from datetime import datetime, timezone
     ph = _ph()
-    conn = get_conn()
+    conn = _river_conn()
     c = conn.cursor()
     now = datetime.now(timezone.utc).isoformat()
     try:
