@@ -306,6 +306,7 @@ def run_cgb() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -317,14 +318,9 @@ def run_cgb() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            # Store state & facility_type in location_meta for UI filters
-            upsert_location_meta(
-                "CGB",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = loc.get("facility_type") or None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -335,10 +331,21 @@ def run_cgb() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    # Bulk-write over one connection each — the per-location connection storm got
+    # CGB abandoned at its 240s budget (2026-07-17). Same fix as ADM/CHS.
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("CGB bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("CGB", _metas)
+    except Exception as exc:
+        log.error("CGB location-meta bulk failed: %s", exc)
+
     log.info("-" * 60)
     log.info(
         "CGB done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk upsert)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -361,19 +368,16 @@ def run_sotw() -> int:
         return 0
 
     locations_done = total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
     for loc in raw_locations:
         try:
             snap_req = parse_sotw_location(loc)
             if snap_req is None:
                 skipped += 1
                 continue
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Star of West",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = loc.get("facility_type") or None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-30s  %s  %d row(s)",
@@ -382,8 +386,9 @@ def run_sotw() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("Star of West", "Star of West", _snaps, _metas)
     log.info("-" * 60)
-    log.info("Star of the West done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
+    log.info("Star of the West done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
              locations_done, total_rows, skipped, errors)
     return total_rows
 
@@ -405,19 +410,16 @@ def run_mennel() -> int:
         return 0
 
     locations_done = total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
     for loc in raw_locations:
         try:
             snap_req = parse_mennel_location(loc)
             if snap_req is None:
                 skipped += 1
                 continue
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Mennel",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = loc.get("facility_type") or None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-30s  %s  %d row(s)",
@@ -426,8 +428,9 @@ def run_mennel() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("Mennel", "Mennel", _snaps, _metas)
     log.info("-" * 60)
-    log.info("Mennel done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
+    log.info("Mennel done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
              locations_done, total_rows, skipped, errors)
     return total_rows
 
@@ -449,19 +452,16 @@ def run_agtegra() -> int:
         return 0
 
     locations_done = total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
     for loc in raw_locations:
         try:
             snap_req = parse_agtegra_location(loc)
             if snap_req is None:
                 skipped += 1
                 continue
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Agtegra",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = loc.get("facility_type") or None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-30s  %s  %d row(s)",
@@ -470,8 +470,9 @@ def run_agtegra() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("Agtegra", "Agtegra", _snaps, _metas)
     log.info("-" * 60)
-    log.info("Agtegra done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)",
+    log.info("Agtegra done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
              locations_done, total_rows, skipped, errors)
     return total_rows
 
@@ -568,6 +569,7 @@ def run_gpre() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps = []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -579,7 +581,7 @@ def run_gpre() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
+            _snaps.append(snap_req)
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info("  ✓  %-25s  %d row(s)", snap_req.location, len(snap_req.rows))
@@ -588,10 +590,11 @@ def run_gpre() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("GPRE", "GPRE", _snaps)
     log.info("-" * 60)
     log.info(
         "GPRE done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -621,6 +624,7 @@ def run_andersons() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -632,13 +636,8 @@ def run_andersons() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Andersons",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -649,10 +648,11 @@ def run_andersons() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("Andersons", "Andersons", _snaps, _metas)
     log.info("-" * 60)
     log.info(
         "Andersons done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -682,6 +682,7 @@ def run_bunge() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -693,13 +694,8 @@ def run_bunge() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "Bunge",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -710,10 +706,11 @@ def run_bunge() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("Bunge", "Bunge", _snaps, _metas)
     log.info("-" * 60)
     log.info(
         "Bunge done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -811,6 +808,7 @@ def run_poet() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps = []
     for item in raw_results:
         market_id      = item["market_id"]
         display_name   = item["display_name"]
@@ -832,7 +830,7 @@ def run_poet() -> int:
                 log.debug("SKIP  %s (parser returned None)", display_name)
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
+            _snaps.append(snap_req)
             locations_done += 1
             total_rows     += len(snap_req.rows)
 
@@ -848,10 +846,11 @@ def run_poet() -> int:
             errors += 1
             log.error("  ✗  %s: %s", display_name, exc)
 
+    _flush_scraper("POET", "POET", _snaps)
     log.info("-" * 60)
     log.info(
         "POET done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -882,6 +881,7 @@ def run_agp() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -893,13 +893,8 @@ def run_agp() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "AGP",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -910,10 +905,11 @@ def run_agp() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("AGP", "AGP", _snaps, _metas)
     log.info("-" * 60)
     log.info(
         "AGP done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -943,6 +939,7 @@ def run_ldc() -> int:
     errors         = 0
     skipped        = 0
 
+    _snaps, _metas = [], []
     for loc in raw_locations:
         if not loc.get("cashbids"):
             skipped += 1
@@ -954,13 +951,8 @@ def run_ldc() -> int:
                 skipped += 1
                 continue
 
-            upsert_snapshot(snap_req.model_dump())
-            upsert_location_meta(
-                "LDC",
-                snap_req.location,
-                state         = loc.get("state") or None,
-                facility_type = None,
-            )
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(
@@ -971,10 +963,11 @@ def run_ldc() -> int:
             errors += 1
             log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
 
+    _flush_scraper("LDC", "LDC", _snaps, _metas)
     log.info("-" * 60)
     log.info(
         "LDC done: %d location(s) updated  |  %d row(s) total"
-        "  |  %d skipped  |  %d error(s)",
+        "  |  %d skipped  |  %d error(s)  (bulk)",
         locations_done, total_rows, skipped, errors,
     )
     return total_rows
@@ -1114,8 +1107,22 @@ def run_gpc() -> int:
     return total_rows
 
 
+def _flush_scraper(name: str, provider: str, snaps: list, metas: list | None = None) -> None:
+    """Bulk-write a scraper's collected snapshots (and optional location metas) over
+    one connection each — avoids the per-location connection storm."""
+    try:
+        upsert_snapshots([s.model_dump() for s in snaps])
+    except Exception as exc:
+        log.error("%s bulk snapshot upsert failed: %s", name, exc)
+    if metas:
+        try:
+            upsert_location_metas(provider, metas)
+        except Exception as exc:
+            log.error("%s location-meta bulk failed: %s", name, exc)
+
+
 def _run_simple(name: str, fetch_fn, parse_fn) -> int:
-    """Generic runner for fetch → parse → upsert scrapers."""
+    """Generic runner for fetch → parse → bulk-upsert scrapers (one connection)."""
     log.info("=" * 60)
     log.info("%s scrape starting…", name)
     log.info("=" * 60)
@@ -1126,19 +1133,24 @@ def _run_simple(name: str, fetch_fn, parse_fn) -> int:
         return 0
     total_rows = 0
     errors     = 0
+    _snaps = []
     for loc in locs:
         try:
             snap = parse_fn(loc)
             if not snap:
                 continue
-            upsert_snapshot(snap.model_dump())
+            _snaps.append(snap)
             total_rows += len(snap.rows)
             log.info("  ✓  %-34s  %d row(s)", snap.location, len(snap.rows))
         except Exception as exc:
             errors += 1
             log.error("  ✗  %s", exc)
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("%s bulk upsert failed: %s", name, exc)
     log.info("-" * 60)
-    log.info("%s done: %d row(s)  |  %d error(s)", name, total_rows, errors)
+    log.info("%s done: %d row(s)  |  %d error(s)  (bulk upsert)", name, total_rows, errors)
     return total_rows
 
 
