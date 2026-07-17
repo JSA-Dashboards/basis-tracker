@@ -46,6 +46,7 @@ TREND_CATEGORIES = [
     ("Soy Processing — Soybeans",  "Soy Processing",  "Soybeans", "region"),
     ("River Terminals — Soybeans", "River Terminal",  "Soybeans", "segment"),
     ("Wheat Mills — Soft Red Winter",     "Wheat Milling",  "Soft Red Winter (SRW)", "region"),
+    ("Rail Terminals — Soft Red Winter",  "Rail Terminal",  "Soft Red Winter (SRW)", "region"),
     ("River Terminals — Soft Red Winter", "River Terminal", "Soft Red Winter (SRW)", "segment"),
 ]
 
