@@ -48,6 +48,9 @@ TREND_CATEGORIES = [
     ("Wheat Mills — Soft Red Winter",     "Wheat Milling",  "Soft Red Winter (SRW)", "region"),
     ("Rail Terminals — Soft Red Winter",  "Rail Terminal",  "Soft Red Winter (SRW)", "region"),
     ("River Terminals — Soft Red Winter", "River Terminal", "Soft Red Winter (SRW)", "segment"),
+    ("Ethanol Plants — Sorghum",   "Corn Processing",  "Sorghum", "region"),
+    ("Country Elevators — Sorghum", "Country Elevator", "Sorghum", "region"),
+    ("Rail Terminals — Sorghum",   "Rail Terminal",    "Sorghum", "region"),
 ]
 
 _GM: dict = {}

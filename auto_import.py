@@ -33,6 +33,10 @@ Usage
   python auto_import.py --tyson-only      # Tyson LGS scrape only
   python auto_import.py --no-gpc          # skip GPC / Kent scrape
   python auto_import.py --gpc-only        # GPC / Kent scrape only
+  python auto_import.py --no-ksethanol    # skip Kansas Ethanol scrape
+  python auto_import.py --ksethanol-only  # Kansas Ethanol scrape only
+  python auto_import.py --no-wpe          # skip Western Plains Energy scrape
+  python auto_import.py --wpe-only        # Western Plains Energy scrape only
   python auto_import.py --no-prune        # skip automatic Monday pruning
   python auto_import.py --prune-only      # run data retention pruning only
 
@@ -114,6 +118,10 @@ from ndsp_scraper import fetch_ndsp_bids
 from parsers.ndsp_parser import parse_ndsp_location
 from sdsp_scraper import fetch_sdsp_bids
 from parsers.sdsp_parser import parse_sdsp_location
+from ksethanol_scraper import fetch_ksethanol_bids
+from parsers.ksethanol_parser import parse_ksethanol_location
+from wpe_scraper import fetch_wpe_bids
+from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
 import holidays as _holidays
 
@@ -348,6 +356,101 @@ def run_cgb() -> int:
         "  |  %d skipped  |  %d error(s)  (bulk upsert)",
         locations_done, total_rows, skipped, errors,
     )
+    return total_rows
+
+
+def run_ksethanol() -> int:
+    """
+    Scrape Kansas Ethanol (Lyons, KS) corn + milo bids from its agricharts feed
+    and upsert them. It's an ethanol plant, so its milo bid is tracked as an
+    ethanol-plant sorghum bid (facility_type = Corn Processing). Returns the
+    total number of snapshot rows upserted.
+    """
+    log.info("=" * 60)
+    log.info("Kansas Ethanol scrape starting…")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_ksethanol_bids()
+    except Exception as exc:
+        log.error("Kansas Ethanol scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("Kansas Ethanol scrape returned no data.")
+        return 0
+
+    total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
+    for loc in raw_locations:
+        try:
+            snap_req = parse_ksethanol_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
+            total_rows += len(snap_req.rows)
+            log.info("  ✓  %-20s  %s  %d row(s)",
+                     snap_req.location, loc.get("state", "--"), len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    # Per-provider bulk write (single connection) — same pattern as CGB.
+    _flush_scraper("Kansas Ethanol", "Kansas Ethanol", _snaps, _metas)
+
+    log.info("-" * 60)
+    log.info("Kansas Ethanol done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
+             len(_snaps), total_rows, skipped, errors)
+    return total_rows
+
+
+def run_wpe() -> int:
+    """
+    Scrape Western Plains Energy (Oakley, KS) corn + milo bids from its homepage
+    daily-bid widget (hand-posted; can be stale). Milo is tracked as an
+    ethanol-plant sorghum bid (facility_type = Corn Processing). Returns the
+    total number of snapshot rows upserted.
+    """
+    log.info("=" * 60)
+    log.info("Western Plains Energy scrape starting…")
+    log.info("=" * 60)
+
+    try:
+        raw_locations = fetch_wpe_bids()
+    except Exception as exc:
+        log.error("WPE scrape failed: %s", exc)
+        return 0
+
+    if not raw_locations:
+        log.warning("WPE scrape returned no data.")
+        return 0
+
+    total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
+    for loc in raw_locations:
+        try:
+            snap_req = parse_wpe_location(loc)
+            if snap_req is None:
+                skipped += 1
+                continue
+            _snaps.append(snap_req)
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type") or None})
+            total_rows += len(snap_req.rows)
+            log.info("  ✓  %-20s  %s  %d row(s)",
+                     snap_req.location, loc.get("state", "--"), len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", loc.get("location_name", "?"), exc)
+
+    _flush_scraper("WPE", "Western Plains Energy", _snaps, _metas)
+
+    log.info("-" * 60)
+    log.info("WPE done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
+             len(_snaps), total_rows, skipped, errors)
     return total_rows
 
 
@@ -1341,6 +1444,8 @@ def run(
     run_norfolkcrush_scrape: bool = True,
     run_ndsp_scrape: bool = True,
     run_sdsp_scrape: bool = True,
+    run_ksethanol_scrape: bool = True,
+    run_wpe_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1407,6 +1512,10 @@ def run(
         total += _run_guarded(run_ndsp, "NDSP")
     if run_sdsp_scrape:
         total += _run_guarded(run_sdsp, "SDSP")
+    if run_ksethanol_scrape:
+        total += _run_guarded(run_ksethanol, "Kansas Ethanol")
+    if run_wpe_scrape:
+        total += _run_guarded(run_wpe, "WPE")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -1635,6 +1744,14 @@ if __name__ == "__main__":
     sdsp_group.add_argument("--no-sdsp", dest="no_sdsp", action="store_true", help="Skip SDSP Volga scrape")
     sdsp_group.add_argument("--sdsp-only", dest="sdsp_only", action="store_true", help="Run SDSP Volga scrape only")
 
+    ksethanol_group = parser.add_mutually_exclusive_group()
+    ksethanol_group.add_argument("--no-ksethanol", dest="no_ksethanol", action="store_true", help="Skip Kansas Ethanol scrape")
+    ksethanol_group.add_argument("--ksethanol-only", dest="ksethanol_only", action="store_true", help="Run Kansas Ethanol scrape only")
+
+    wpe_group = parser.add_mutually_exclusive_group()
+    wpe_group.add_argument("--no-wpe", dest="no_wpe", action="store_true", help="Skip Western Plains Energy scrape")
+    wpe_group.add_argument("--wpe-only", dest="wpe_only", action="store_true", help="Run Western Plains Energy scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -1750,6 +1867,12 @@ if __name__ == "__main__":
     elif args.sdsp_only:
         init_db()
         run_sdsp()
+    elif args.ksethanol_only:
+        init_db()
+        run_ksethanol()
+    elif args.wpe_only:
+        init_db()
+        run_wpe()
     else:
         run(
             run_poet_scrape=not args.no_poet,
@@ -1779,6 +1902,8 @@ if __name__ == "__main__":
             run_norfolkcrush_scrape=not args.no_norfolkcrush,
             run_ndsp_scrape=not args.no_ndsp,
             run_sdsp_scrape=not args.no_sdsp,
+            run_ksethanol_scrape=not args.no_ksethanol,
+            run_wpe_scrape=not args.no_wpe,
             run_pruning=not args.no_prune,
         )
 
