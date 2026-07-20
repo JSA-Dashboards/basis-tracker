@@ -2587,6 +2587,18 @@ with tab_riverfob:
     except Exception:
         _rfi = None
 
+    # Surface the silent-fallback case: with no RIVER_DATABASE_URL configured the
+    # reader falls back to the main DB, whose river tables froze when the portal
+    # moved to the dedicated river DB — so the data would be stale without warning.
+    if _rfd.using_fallback():
+        st.warning(
+            "⚠️ **River DB not configured — data may be stale.** "
+            "`RIVER_DATABASE_URL` isn't set, so this tab is reading the fallback "
+            "(main) database, which stopped updating when the River FOB portal "
+            "switched to its dedicated database. Add the `RIVER_DATABASE_URL` "
+            "secret to this deployment to pull live data."
+        )
+
     if not _view_only():
         with st.expander("🔄 Update from the FOB sheet — pull in before the 4:30 PM auto-import"):
           if _rfi is None:

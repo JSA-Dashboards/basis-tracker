@@ -29,6 +29,14 @@ def _ph() -> str:
     return "%s" if (_river_url() or _use_pg()) else "?"
 
 
+def using_fallback() -> bool:
+    """True when RIVER_DATABASE_URL is NOT configured, so reads fall back to the
+    basis tracker's main DB. That fallback froze once the portal switched to the
+    dedicated river DB, so a True here means the River FOB data is likely stale.
+    The app surfaces this as a visible banner rather than serving silent staleness."""
+    return not _river_url()
+
+
 def list_dates() -> list:
     """All archived as-of dates, newest first."""
     conn = _river_conn()
