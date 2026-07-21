@@ -235,30 +235,50 @@ _MIGRATE_DDL = [
 
 def init_db():
     """Create all tables and indexes if they don't exist yet."""
-    conn = get_conn()
-    c    = conn.cursor()
-    ddl  = _PG_DDL if _use_pg() else _SQLITE_DDL
+    # Serialize init across app instances. On Streamlit Cloud a reboot can run
+    # two instances briefly; both call init_db() and race on the idempotent
+    # location_meta upserts, which can deadlock. A session-level Postgres
+    # advisory lock held for the whole init lets only one process seed at a time
+    # (auto-released if the holder's connection dies). No-op on SQLite.
+    _INIT_LOCK_KEY = 727274
+    lock_conn = None
+    if _use_pg():
+        lock_conn = get_conn()
+        lock_conn.cursor().execute("SELECT pg_advisory_lock(%s)", (_INIT_LOCK_KEY,))
+        lock_conn.commit()
     try:
-        for stmt in ddl:
-            c.execute(stmt)
-        # Add lat/lon columns to existing databases that pre-date this schema change.
-        for stmt in _MIGRATE_DDL:
-            try:
-                if _use_pg():
-                    c.execute(stmt)
-                else:
-                    # SQLite doesn't support IF NOT EXISTS on ALTER TABLE
-                    sqlite_stmt = stmt.replace(" IF NOT EXISTS", "")
-                    c.execute(sqlite_stmt)
-            except Exception:
-                pass  # column already exists
-        conn.commit()
+        conn = get_conn()
+        c    = conn.cursor()
+        ddl  = _PG_DDL if _use_pg() else _SQLITE_DDL
+        try:
+            for stmt in ddl:
+                c.execute(stmt)
+            # Add columns to existing databases that pre-date this schema change.
+            for stmt in _MIGRATE_DDL:
+                try:
+                    if _use_pg():
+                        c.execute(stmt)
+                    else:
+                        # SQLite doesn't support IF NOT EXISTS on ALTER TABLE
+                        sqlite_stmt = stmt.replace(" IF NOT EXISTS", "")
+                        c.execute(sqlite_stmt)
+                except Exception:
+                    pass  # column already exists
+            conn.commit()
+        finally:
+            conn.close()
+        # Populate lat/lon, facility tags, and grain map from committed seed files.
+        seed_geocoding()
+        seed_facility_types()
+        seed_grain_map()
     finally:
-        conn.close()
-    # Populate lat/lon, facility tags, and grain map from committed seed files.
-    seed_geocoding()
-    seed_facility_types()
-    seed_grain_map()
+        if lock_conn is not None:
+            try:
+                lock_conn.cursor().execute(
+                    "SELECT pg_advisory_unlock(%s)", (_INIT_LOCK_KEY,))
+                lock_conn.commit()
+            finally:
+                lock_conn.close()
 
 
 def seed_geocoding(seed_path: str | None = None) -> int:
