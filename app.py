@@ -2590,7 +2590,9 @@ with tab_riverfob:
     # Surface the silent-fallback case: with no RIVER_DATABASE_URL configured the
     # reader falls back to the main DB, whose river tables froze when the portal
     # moved to the dedicated river DB — so the data would be stale without warning.
-    if _rfd.using_fallback():
+    # Checked inline via the env var (not river_fob_data.using_fallback) so a
+    # Streamlit hot-reload that keeps the old module cached can't AttributeError.
+    if not os.environ.get("RIVER_DATABASE_URL", "").strip():
         st.warning(
             "⚠️ **River DB not configured — data may be stale.** "
             "`RIVER_DATABASE_URL` isn't set, so this tab is reading the fallback "
