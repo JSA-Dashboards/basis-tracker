@@ -1338,9 +1338,14 @@ def _trend_closest(snaps, target, maxd):
 def _trend_load(facility_type: str):
     """Cached snapshot load + anchor for a location type (shared across grain/period)."""
     from collections import Counter as _C
+    from facility_overrides import override_pairs_for
     sl    = get_bids_filter_data()
-    pairs = [(l["provider"], l["location"]) for l in sl if l.get("facility_type") == facility_type]
     meta  = {(l["provider"], l["location"]): l for l in sl}
+    # Base-type locations PLUS any overridden into this type for some grain (e.g.
+    # ADM Beech Grove, a rail terminal that mills its wheat) so their snapshots are
+    # available here; the per-grain guard in each builder does the actual filtering.
+    pairs = [(l["provider"], l["location"]) for l in sl if l.get("facility_type") == facility_type]
+    pairs = sorted(set(pairs) | (override_pairs_for(facility_type) & set(meta)))
     data  = get_snapshots_bulk(pairs, since_days=400) if pairs else {}
     today_noon = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     loc_latest = []
@@ -1383,10 +1388,13 @@ def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list
                "wk_ago":  (now - timedelta(days=7),   4),
                "mo_ago":  (now - timedelta(days=30),  4),
                "yr_ago":  (now - timedelta(days=365), 4)}
+    from facility_overrides import effective_ftype
     rows = []
     for key in pairs:
         snaps = data.get(key, [])
         m     = meta.get(key, {})
+        if effective_ftype(key[0], key[1], grain, m.get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
         stt   = m.get("state", "")
         rd = {"region":  region_from_state(stt) or m.get("region", "") or "",
               "segment": river_segment(key[1])}
@@ -1626,9 +1634,13 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
     provider, location, b1/c1 (basis & daily change at m1), b2/c2 (at m2). A
     location is included if it moved at m1 OR m2."""
     from collections import Counter
+    from facility_overrides import effective_ftype
     pairs, meta, data, now = _trend_load(facility_type)
     locs = []
     for key in pairs:
+        if effective_ftype(key[0], key[1], grain,
+                           meta.get(key, {}).get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
@@ -1688,9 +1700,13 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
     """Per river-segment avg basis & avg daily change at the category's two nearest
     delivery months. Returns {m1_label, m2_label, rows:[{segment,b1,c1,b2,c2,n}]}."""
     from collections import Counter
+    from facility_overrides import effective_ftype
     pairs, meta, data, now = _trend_load(facility_type)
     locs = []
     for key in pairs:
+        if effective_ftype(key[0], key[1], grain,
+                           meta.get(key, {}).get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
@@ -2396,6 +2412,195 @@ with tab_railfob:
         "UP Illinois (Dom)": "Allen Station (Dom)",
         "UP Illinois (Mex)": "Allen Station (Mex)",
     }
+
+    # ── Seasonal chart ────────────────────────────────────────────────────────
+    # The rail board keeps every period exactly as posted (FH/LH/Split halves and
+    # day-ranges are genuinely different quotes). The SEASONAL chart instead buckets
+    # them into the fixed set Kolten tracks (2026-07-21), so a month's series isn't
+    # split across a dozen near-identical labels.
+    _SEAS_MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    _SEAS_PERIODS = ["Spot"] + _SEAS_MON + ["OND", "JFM", "AM", "JJ", "AMJJ",
+                                            "Jan-Jul", "AS"]
+    _MONWORD = {"JANUARY": "Jan", "FEBRUARY": "Feb", "MARCH": "Mar", "APRIL": "Apr",
+                "MAY": "May", "JUNE": "Jun", "JULY": "Jul", "AUGUST": "Aug",
+                "SEPTEMBER": "Sep", "SEPT": "Sep", "OCTOBER": "Oct",
+                "NOVEMBER": "Nov", "DECEMBER": "Dec"}
+    _MON3 = {m.upper(): m for m in _SEAS_MON}
+    # LP (last placement) == LH, FP == FH. MP (mid-month placement) is its own
+    # window on the board, but for seasonals it folds into its month like the rest.
+    _HALF = {"LP": "LH", "FP": "FH"}
+    # Spans Kolten treats as one of the tracked packages; every other multi-month
+    # package (JAS, ONDJFM, MJJ, FM, MJ, MAM, JJAS …) is dropped from seasonals.
+    _SEAS_ALIAS = {"JFMAMJJ": "Jan-Jul", "DJFMAMJJ": "Jan-Jul", "DJFM": "JFM",
+                   "ND": "Nov/Dec"}
+
+    def _canon_period(p):
+        """Normalize spelling only (month words → 3-letter, LP/FP → LH/FH)."""
+        def _tok(m):
+            u = m.group(0).upper()
+            if u in _MONWORD:
+                return _MONWORD[u]
+            if u in _MON3:
+                return _MON3[u]
+            if u in _HALF:
+                return _HALF[u]
+            if u in ("FH", "LH", "MP"):
+                return u
+            return m.group(0)
+        return re.sub(r"[A-Za-z]+", _tok, " ".join(str(p).split()))
+
+    def _seasonal_bucket(p):
+        """Map a posted period onto one of _SEAS_PERIODS, or None to exclude it.
+
+        Rules (Kolten 2026-07-21): Dom/Mex suffixes drop (the market line already
+        splits those) · a leading FH/LH/MP/Split/Full qualifier is stripped · any
+        remaining label is filed under its FIRST named month, so straddles and
+        day-ranges land on the lead month (LH Oct/FH Nov → Oct, Nov/Dec → Nov).
+        Anything with no month and no tracked package (JAS, ONDJFM, Return Trip …)
+        returns None and is left off the chart.
+        """
+        s = _canon_period(p)
+        s = re.sub(r"\s*\b(?:Dom|Mex)\b", "", s).strip()   # market already splits these
+        s = re.sub(r"\s*'\d\d$", "", s).strip()            # forward crop year
+        s = _SEAS_ALIAS.get(s, s)
+        if s in _SEAS_PERIODS:
+            return s
+        core = re.sub(r"^(?:FH|LH|MP|Split|Full)\s+", "", s)
+        core = _SEAS_ALIAS.get(core, core)
+        if core in _SEAS_PERIODS:
+            return core
+        m = re.search(r"\b(" + "|".join(_SEAS_MON) + r")\b", core)
+        return m.group(1) if m else None
+
+    def _rail_seasonal():
+        """Marketing-year (Sep–Aug) seasonal bid chart for one corridor + period,
+        mirroring the seasonal chart on the Bids tab."""
+        import pandas as _pd
+        import altair as _alt
+
+        _rows = []
+        for _src in ("manual", "palmetto"):
+            for _r in get_rail_fob_all(_src):
+                if _r.get("bid") is None:
+                    continue
+                _b = _seasonal_bucket(_r["period"])
+                if _b:                      # None = not a tracked seasonal period
+                    _rows.append((_r["market"], _b, _r["date"], _r["bid"]))
+        if not _rows:
+            st.caption("No rail history archived yet — the seasonal chart fills in as postings are saved.")
+            return
+        _df = _pd.DataFrame(_rows, columns=["Market", "Period", "Date", "Bid"])
+
+        try:
+            from rail_corridors import CORRIDOR_ORDER as _CO
+        except Exception:
+            _CO = {}
+        _mk_n = _df.groupby("Market")["Date"].nunique()
+        _mk_opts = sorted((m for m in _mk_n.index if _mk_n[m] >= 6),
+                          key=lambda m: (_CO.get(m, 99), m))
+        if not _mk_opts:
+            st.caption("Not enough rail history yet to chart a season.")
+            return
+
+        _c1, _c2, _c3 = st.columns([3, 2, 5])
+        with _c1:
+            _mk = st.selectbox("Corridor", _mk_opts, key="rail_seas_mkt",
+                               format_func=lambda m: _RAIL_DISPLAY.get(m, m))
+        _pv = _df[_df["Market"] == _mk]
+        _p_n = _pv.groupby("Period")["Date"].nunique()
+        # Fixed order — Spot, calendar months, then the tracked packages — rather
+        # than by frequency, so the dropdown reads the same for every corridor.
+        _p_opts = [p for p in _SEAS_PERIODS if _p_n.get(p, 0) >= 3]
+        if not _p_opts:
+            st.caption(f"{_RAIL_DISPLAY.get(_mk, _mk)} has no shipping period with enough "
+                       f"postings to chart yet.")
+            return
+        with _c2:
+            _pd_sel = st.selectbox("Shipping period", _p_opts, key="rail_seas_per",
+                                   format_func=lambda p: f"{p}  ({_p_n[p]})")
+
+        _sel = _pv[_pv["Period"] == _pd_sel][["Date", "Bid"]].copy()
+        _dts = _pd.to_datetime(_sel["Date"])
+        _yr, _mo = _dts.dt.year, _dts.dt.month
+        _sel["MktYearNum"] = _yr.where(_mo >= 9, _yr - 1)
+        _sel["MktYear"] = _sel["MktYearNum"].apply(lambda y: f"{y}/{str(y + 1)[-2:]}")
+        _sep1 = _pd.to_datetime(_sel["MktYearNum"].astype(str) + "-09-01")
+        _sel["MktWeek"] = ((_dts - _sep1).dt.days // 7 + 1).clip(1, 52)
+        _sel = _sel.groupby(["MktYear", "MktYearNum", "MktWeek"], as_index=False)["Bid"].mean()
+        _sel["Bid"] = _sel["Bid"].round(1)
+
+        _mx = int(_sel["MktYearNum"].max())
+        _hist = _sel[_sel["MktYearNum"] < _mx]
+        _curr = _sel[_sel["MktYearNum"] == _mx]
+        _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
+
+        _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
+                    axis=_alt.Axis(labelFontSize=10))
+        _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_alt.Scale(zero=False),
+                    axis=_alt.Axis(labelFontSize=10))
+        _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
+                _alt.Tooltip("MktWeek:Q", title="Week"),
+                _alt.Tooltip("Bid:Q", title="Bid (¢)")]
+        _H = 560
+
+        _logo = _Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+        _wm = None
+        if _logo.exists():
+            _wm_h = int(_H * 0.50)
+            _wm = (_alt.Chart(_pd.DataFrame({
+                       "MktWeek": [26.5],
+                       "url": ["data:image/png;base64,"
+                               + _b64.b64encode(_logo.read_bytes()).decode()]}))
+                   .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.20,
+                               align="center", baseline="middle")
+                   .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(_H // 2), url="url:N"))
+
+        _zero = (_alt.Chart(_pd.DataFrame({"MktWeek": [1, 52], "Bid": [0.0, 0.0]}))
+                 .mark_line(color="#94a3b8", strokeDash=[4, 4], strokeWidth=1)
+                 .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Bid:Q")))
+        _cur_ln = (_alt.Chart(_curr).mark_line(strokeWidth=3, color="#000000")
+                   .encode(x=_x, y=_y, tooltip=_tip))
+        _cur_lb = (_alt.Chart(_curr.nlargest(1, "MktWeek") if not _curr.empty else _curr)
+                   .mark_text(align="left", dx=6, fontSize=10, fontWeight="bold",
+                              color="#000000")
+                   .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Bid:Q"), text="MktYear:N"))
+
+        _layers = ([_wm] if _wm else []) + [_zero, _cur_ln, _cur_lb]
+        if not _hist.empty:
+            _layers.insert(2, _alt.Chart(_hist).mark_line(strokeWidth=2, opacity=0.9)
+                           .encode(x=_x, y=_y,
+                                   color=_alt.Color("MktYear:N",
+                                       sort=sorted(_hist["MktYear"].unique()),
+                                       scale=_alt.Scale(scheme="tableau10"),
+                                       legend=_alt.Legend(title="Mkt Year", orient="bottom",
+                                                          columns=6, labelFontSize=10,
+                                                          titleFontSize=10)),
+                                   tooltip=_tip))
+        _fut = _pd.DataFrame([{"MktWeek": 13, "code": "Z"}, {"MktWeek": 27, "code": "H"},
+                              {"MktWeek": 35, "code": "K"}, {"MktWeek": 44, "code": "N"}])
+        _layers = [_alt.Chart(_fut).mark_rule(color="#cbd5e1", strokeWidth=1.5)
+                   .encode(x="MktWeek:Q"),
+                   _alt.Chart(_fut).mark_text(fontSize=12, color="#94a3b8", fontWeight="bold",
+                                              align="center", baseline="top")
+                   .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(6), text="code:N")] + _layers
+
+        st.markdown(
+            '<div style="margin-top:8px;margin-bottom:4px;font-size:10px;color:#64748b;'
+            'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
+            f'Seasonal Bid — {_RAIL_DISPLAY.get(_mk, _mk)} · {_pd_sel} · Marketing Year (Sep–Aug)'
+            + (f'&nbsp;&nbsp;<span style="color:#1e293b;font-weight:900">{_curr_yr} = black</span>'
+               if _curr_yr else '') + '</div>', unsafe_allow_html=True)
+        st.altair_chart(_alt.layer(*_layers).properties(height=_H), use_container_width=True)
+        st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
+                   f"than once · partial windows fold into their month (FH/LH/Split Oct, "
+                   f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted.")
+
+    st.markdown(f'<div style="{_RF_BOARDHDR}">Seasonal Chart</div>', unsafe_allow_html=True)
+    try:
+        _rail_seasonal()
+    except Exception as _rs_err:
+        st.warning(f"Seasonal chart error: {_rs_err}")
 
     def _rail_board(source, sections, key):
         """Grid board for a stored rail-FOB source (palmetto / manual): labeled
@@ -3738,13 +3943,35 @@ with tab_bids:
                     )
                     _s_layers.insert(2, _s_hist)
 
-                if grain in ("Corn", "Soybeans"):
+                # Futures-month gridlines. Corn and soybeans price against DIFFERENT
+                # contract cycles, so each gets its own set (weeks are on the same
+                # Sep–Aug scale as the corn markers). Soybeans add a trailing X for
+                # the new-crop Nov that late-summer bids reference. Other grains
+                # (wheat classes) get no markers.
+                _is_bean = grain == "Soybeans" or "Bean" in grain
+                _fut = None
+                if grain == "Corn":
                     _fut = _pd.DataFrame([
-                        {"MktWeek": 13, "code": "Z"},
-                        {"MktWeek": 27, "code": "H"},
-                        {"MktWeek": 35, "code": "K"},
-                        {"MktWeek": 44, "code": "N"},
+                        {"MktWeek": 13, "code": "Z"},   # Dec
+                        {"MktWeek": 27, "code": "H"},   # Mar
+                        {"MktWeek": 35, "code": "K"},   # May
+                        {"MktWeek": 44, "code": "N"},   # Jul
                     ])
+                elif _is_bean:
+                    # Positions mirror the AgMarket "Dlvd … Soybean Basis Seasonal"
+                    # template (Kolten, 2026-07-21): letters sit ~4 weeks earlier than
+                    # the corn scale. Trailing X = new-crop Nov that late-summer bids
+                    # reference.
+                    _fut = _pd.DataFrame([
+                        {"MktWeek": 6,  "code": "X"},   # Nov
+                        {"MktWeek": 14, "code": "F"},   # Jan
+                        {"MktWeek": 23, "code": "H"},   # Mar
+                        {"MktWeek": 32, "code": "K"},   # May
+                        {"MktWeek": 40, "code": "N"},   # Jul
+                        {"MktWeek": 44, "code": "Q"},   # Aug
+                        {"MktWeek": 49, "code": "X"},   # new-crop Nov
+                    ])
+                if _fut is not None:
                     _s_vlines = (
                         _alt.Chart(_fut).mark_rule(color="#cbd5e1", strokeWidth=1.5)
                         .encode(x="MktWeek:Q")
