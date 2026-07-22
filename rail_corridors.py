@@ -60,7 +60,12 @@ _PACKAGES = {"JFM": 1, "FMA": 2, "MAM": 3, "AMJ": 4, "MJJ": 5, "JJA": 6,
 
 
 # Shorthand 2-letter period packages → first delivery month (extend as they appear).
-_ABBREV = {"AS": 8}   # Aug-Sep
+# Each spans a single corn contract, so the standard month lookup gives the right
+# reference: AS→CU, AM→CK, JJ→CN. Without these the period resolves to None and
+# the cell would be archived with no futures at all.
+_ABBREV = {"AS": 8,   # Aug-Sep  → CU
+           "AM": 4,   # Apr-May  → CK
+           "JJ": 6}   # Jun-Jul  → CN
 
 
 def period_start_month(period: str) -> Optional[int]:
@@ -144,6 +149,27 @@ def _span_contracts(period: str) -> set:
     return {_CORN_BY_MONTH[m] for tok, m in _MONTHS.items() if tok in p}
 
 
+def _package_contracts(period: str, as_of=None) -> set:
+    """Distinct contracts spanned by a packed 3-month package (MJJ = May/Jun/Jul).
+
+    `_span_contracts` only sees full month names, so packed initials slipped
+    through and resolved to just their FIRST month's contract — e.g. MJJ came
+    back CK even though Jun/Jul price against CN. Most of these packages straddle
+    two contracts and belong on 'R'; only JFM (all CH) and OND (all CZ) sit
+    inside a single one.
+
+    Must stay date-aware: the roll can COLLAPSE a package onto one contract.
+    JAS spans CN/CU in mid-June, but once CN is past its FND all three months
+    price against CU and the correct reference is CU, not 'R'.
+    """
+    start = _PACKAGES.get(period.strip().upper())
+    if start is None:
+        return set()
+    by_num = {m: tok for tok, m in _MONTHS.items()}
+    return {corn_futures_for_period(by_num[((start - 1 + i) % 12) + 1], as_of)
+            for i in range(3)}
+
+
 def corn_futures(period: str, rail: Optional[str] = None, as_of=None) -> Optional[str]:
     """Futures contract for a rail corridor cell, applying the special rules:
       • spanning packages (AMJJ, Jan-Jul, …) → 'R' (respective option month)
@@ -151,7 +177,8 @@ def corn_futures(period: str, rail: Optional[str] = None, as_of=None) -> Optiona
       • otherwise the standard date-aware (FND-rolled) corn contract.
     """
     p = period.strip().upper()
-    if p in _SPAN_PACKAGES or len(_span_contracts(period)) > 1:
+    if (p in _SPAN_PACKAGES or len(_span_contracts(period)) > 1
+            or len(_package_contracts(period, as_of)) > 1):
         return "R"
     if rail in ("CSX", "NS") and period_start_month(period) == 12:
         return "CH"
