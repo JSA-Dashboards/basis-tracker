@@ -115,8 +115,14 @@ def _load(facility_type: str):
     if not _GM:
         _GM = get_grain_map()
     from collections import Counter as _C
+    from facility_overrides import override_pairs_for
     sl    = get_bids_filter_data()
+    _meta = {(l["provider"], l["location"]): l for l in sl}
+    # Base-type locations PLUS any overridden into this type for some grain (e.g.
+    # ADM Beech Grove, a rail terminal that mills its wheat); the per-grain guard
+    # in each builder filters within.
     pairs = [(l["provider"], l["location"]) for l in sl if l.get("facility_type") == facility_type]
+    pairs = sorted(set(pairs) | (override_pairs_for(facility_type) & set(_meta)))
     data  = get_snapshots_bulk(pairs, since_days=400) if pairs else {}
     today_noon = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     loc_latest = []
@@ -127,7 +133,7 @@ def _load(facility_type: str):
     # Anchor on the LATEST date reached (≤ today), not the most common, so a provider
     # that's a day ahead of the others still surfaces its fresh change.
     now = (datetime(*max(loc_latest).timetuple()[:3], 12) if loc_latest else today_noon)
-    return pairs, data, now
+    return pairs, _meta, data, now
 
 
 _CME_MON = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
@@ -233,9 +239,13 @@ def build_change_rows(facility_type: str, grain: str, mode: str = "spot") -> dic
     location is included if it moved at m1 OR m2.
     """
     from collections import Counter
-    pairs, data, now = _load(facility_type)
+    from facility_overrides import effective_ftype
+    pairs, meta, data, now = _load(facility_type)
     locs = []
     for key in pairs:
+        if effective_ftype(key[0], key[1], grain,
+                           meta.get(key, {}).get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
@@ -295,9 +305,13 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
     """Per river-segment avg basis & avg daily change at the category's two nearest
     delivery months. Returns {m1_label, m2_label, rows:[{segment,b1,c1,b2,c2,n}]}."""
     from collections import Counter
-    pairs, data, now = _load(facility_type)
+    from facility_overrides import effective_ftype
+    pairs, meta, data, now = _load(facility_type)
     locs = []
     for key in pairs:
+        if effective_ftype(key[0], key[1], grain,
+                           meta.get(key, {}).get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
         snaps    = data.get(key, [])
         cur_snap = _trend_closest(snaps, now, 1.6)
         if cur_snap is None:
