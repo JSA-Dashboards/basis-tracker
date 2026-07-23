@@ -1350,6 +1350,51 @@ def run_futures_capture() -> int:
 _HEALTH: list[dict] = []
 
 
+_LOCK_FH = None
+
+
+def _acquire_single_instance_lock(wait_secs=0):
+    """Take an exclusive lock so two FULL runs can't overlap. True if acquired.
+
+    `wait_secs` > 0 polls for the lock instead of giving up immediately — used by
+    the run that sends the daily email, so it still goes out if it loses the race
+    to the --no-email refresh (a full run is ~10 min, well inside the 2h limit).
+
+    Windows Task Scheduler fires every MISSED task the moment the PC wakes, so on
+    2026-07-22 BasisTrackerDailyImport (due 15:05) and NightlyRecapBidRefresh
+    (due 16:35) both launched at 20:24:29 and ran in parallel: they deadlocked on
+    location_meta and the contention starved Scoular past its 240s budget, which
+    abandoned it and sent a false scraper alert (the data itself was fine).
+    Per-task MultipleInstances=IgnoreNew does NOT cover this — it only stops a
+    task duplicating ITSELF, not two different tasks racing.
+
+    This is an OS file lock, so the kernel drops it if the process is killed —
+    there's no stale lockfile to clean up. Only the full run takes it; the
+    --*-only scrapes (sidebar buttons, manual checks) are short and stay free.
+    """
+    global _LOCK_FH
+    import time as _time
+    fh = open(Path(__file__).with_name(".auto_import.lock"), "a+")
+    deadline = _time.monotonic() + wait_secs
+    while True:
+        try:
+            fh.seek(0)
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            if _time.monotonic() >= deadline:
+                fh.close()
+                return False
+            _time.sleep(15)
+            continue
+        _LOCK_FH = fh      # keep open for the process lifetime = hold the lock
+        return True
+
+
 def _run_guarded(fn, name, budget=240):
     """Run one scraper with a hard wall-clock budget so a single hung provider
     can't starve the rest of the run — most importantly the daily Changes email,
@@ -1874,6 +1919,16 @@ if __name__ == "__main__":
         init_db()
         run_wpe()
     else:
+        # The emailing run WAITS its turn (the Changes email must still go out even
+        # if it loses the wake-up race); the --no-email refresh just steps aside.
+        _wait = 0 if args.no_email else 2400
+        if not _acquire_single_instance_lock(wait_secs=_wait):
+            log.warning(
+                "Another full auto_import run is already in progress — exiting so "
+                "the two don't collide. (Task Scheduler releases every missed task "
+                "at once when the PC wakes; the run already going does the work.)"
+            )
+            sys.exit(0)
         run(
             run_poet_scrape=not args.no_poet,
             run_chs_scrape=not args.no_chs,
