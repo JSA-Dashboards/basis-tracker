@@ -2643,6 +2643,13 @@ with tab_railfob:
             return f'<td style="{_TDR};color:{"#16a34a" if d > 0 else "#dc2626"};font-weight:700">{d:+d}</td>'
 
         def _prior_maps(market, cur):
+            """(last update, ~1wk, ~1mo, ~1yr) prior postings for a corridor.
+
+            The first element is that corridor's PREVIOUS POSTING — not the
+            previous calendar day. Manual corridors are fed ~2x/week, so a
+            day-over-day comparison would be blank most of the time; comparing
+            to the last update is what actually moves.
+            """
             earlier = sorted(d for d in _mkt_dates.get(market, ()) if d < cur)
             if not earlier:
                 return (None, None, None, None)
@@ -2680,7 +2687,7 @@ with tab_railfob:
             h += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
             h += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
                   f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
-                  f'<td style="{_THR}">Δ Day</td><td style="{_THR}">Δ Wk</td>'
+                  f'<td style="{_THR}">Δ Last</td><td style="{_THR}">Δ Wk</td>'
                   f'<td style="{_THR}">Δ Mo</td><td style="{_THR}">Δ Yr</td></tr>')
             for c in _cells:
                 _b = c.get("bid")
@@ -2725,8 +2732,9 @@ with tab_railfob:
                         _cols[_ci].markdown(_html, unsafe_allow_html=True)
                         _mh += _html
         st.caption(f"As of {_msel} · corridors not posted that day carry forward (amber “as of M/D”) · "
-                   f"Δ = bid change vs prior posting / ~1 week / ~1 month / ~1 year (— until history "
-                   f"builds) · ? = pending side.")
+                   f"Δ Last = bid change vs that corridor’s previous posting (not the previous "
+                   f"calendar day) · Δ Wk / Mo / Yr ≈ 1 week / 1 month / 1 year back (— until "
+                   f"history builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
 
     # ── Palmetto (live CSX/NS scrape) — persisted daily so its change columns build ──
