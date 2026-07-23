@@ -2968,7 +2968,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "INCO"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -3472,22 +3472,26 @@ with tab_bids:
         else:
             grains = ["Corn"]
 
-    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett"):
+    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "INCO"):
+        # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
+        # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
+        # button to point at, and the empty-state message says so.
         _ag_cli   = {"Star of West": "--sotw-only", "Mennel": "--mennel-only",
-                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only"}[provider]
+                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only"}.get(provider)
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
-                     "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now"}[provider]
+                     "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now"}.get(provider)
         _ag_color = _PROVIDER_COLOR.get(provider, "#64748b")
         _ag_locs  = sorted(
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}
         )
         if not _ag_locs:
+            _hint = (f'Click <b>{_ag_btn}</b> in the sidebar or run:<br>'
+                     f'<code style="color:#0693e3">python auto_import.py {_ag_cli}</code>'
+                     if _ag_cli else
+                     'This location is fed in manually — paste a bid sheet to archive it.')
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
-                f'No {provider} data yet.<br><br>'
-                f'Click <b>{_ag_btn}</b> in the sidebar or run:<br>'
-                f'<code style="color:#0693e3">python auto_import.py {_ag_cli}</code>'
-                '</div>',
+                f'No {provider} data yet.<br><br>{_hint}</div>',
                 unsafe_allow_html=True,
             )
             st.stop()
