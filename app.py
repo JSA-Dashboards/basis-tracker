@@ -2151,11 +2151,29 @@ with tab_spotfwd:
         _rail_by_md.setdefault((_r["market"], _r["date"]), []).append(_r)
         _rail_mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
 
+    # Prior business day (Mon -> Fri), matching this table's "Δ = change vs prior
+    # business day" caption.
+    _prev_bd = sf_asof - timedelta(days=1)
+    while _prev_bd.weekday() >= 5:
+        _prev_bd -= timedelta(days=1)
+    _prev_bd_iso = _prev_bd.isoformat()
+
     def _rail_rows(market, prior=False):
-        _elig = sorted(d for d in _rail_mkt_dates.get(market, ()) if d <= _asof_iso)
-        if not _elig or (prior and len(_elig) < 2):
+        """Rows in EFFECT for a corridor on the as-of date (or the prior business
+        day when prior=True) — i.e. its latest posting on or before that date.
+
+        Deliberately different from the Rail FOB tab, which compares against the
+        corridor's PREVIOUS POSTING (Kolten 2026-07-23). Manual corridors are fed
+        ~2x/week, so "previous posting" can be several days back; this table is a
+        DAILY recap, so its Δ must be a true day-over-day move in the quote that
+        was in effect. A corridor with no new posting therefore shows 0, not a
+        stale multi-day change.
+        """
+        cutoff = _prev_bd_iso if prior else _asof_iso
+        _elig = sorted(d for d in _rail_mkt_dates.get(market, ()) if d <= cutoff)
+        if not _elig:
             return []
-        return _rail_by_md.get((market, _elig[-2 if prior else -1]), [])
+        return _rail_by_md.get((market, _elig[-1]), [])
 
     # Rail periods are free text ("FH July", "AUGUST", "JAS") with only a short
     # futures code, so _dp.canonical can't resolve them — pull the month name out
@@ -2968,7 +2986,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "INCO"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Alto", "INCO"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -3472,14 +3490,16 @@ with tab_bids:
         else:
             grains = ["Corn"]
 
-    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "INCO"):
+    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "See-Mor", "Alto", "INCO"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so.
         _ag_cli   = {"Star of West": "--sotw-only", "Mennel": "--mennel-only",
-                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only"}.get(provider)
+                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only",
+                     "See-Mor": "--seemor-only", "Alto": "--alto-only"}.get(provider)
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
-                     "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now"}.get(provider)
+                     "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",
+                     "See-Mor": "Scrape See-Mor now", "Alto": "Scrape Alto now"}.get(provider)
         _ag_color = _PROVIDER_COLOR.get(provider, "#64748b")
         _ag_locs  = sorted(
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}

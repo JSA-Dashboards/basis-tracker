@@ -120,6 +120,8 @@ from sdsp_scraper import fetch_sdsp_bids
 from parsers.sdsp_parser import parse_sdsp_location
 from ksethanol_scraper import fetch_ksethanol_bids
 from parsers.ksethanol_parser import parse_ksethanol_location
+from seemor_scraper import fetch_seemor_bids, parse_seemor_board
+from alto_scraper import fetch_alto_bids, parse_alto
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -452,6 +454,77 @@ def run_wpe() -> int:
     log.info("WPE done: %d location(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
              len(_snaps), total_rows, skipped, errors)
     return total_rows
+
+
+def run_seemor() -> int:
+    """Scrape See-Mor Grain (Darlington, WI) — one page, four boards (the elevator's
+    corn + soybeans plus delivered bids at Badger State Ethanol and Bunge Warren)."""
+    log.info("=" * 60)
+    log.info("See-Mor Grain scrape starting…")
+    log.info("=" * 60)
+    try:
+        boards = fetch_seemor_bids()
+    except Exception as exc:
+        log.error("See-Mor scrape failed: %s", exc)
+        return 0
+    if not boards:
+        log.warning("See-Mor scrape returned no data.")
+        return 0
+
+    total_rows = skipped = errors = 0
+    _snaps, _metas = [], []
+    for b in boards:
+        try:
+            req = parse_seemor_board(b)
+            if req is None:
+                skipped += 1
+                continue
+            _snaps.append(req)
+            _metas.append({"location": req.location, "state": b.get("state"),
+                           "facility_type": b.get("facility_type")})
+            total_rows += len(req.rows)
+            log.info("  ✓  %-26s  %-8s  %d row(s)",
+                     req.location, b.get("grain", ""), len(req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  %s: %s", b.get("board", "?"), exc)
+
+    _flush_scraper("See-Mor", "See-Mor", _snaps, _metas)
+    log.info("-" * 60)
+    log.info("See-Mor done: %d board(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
+             len(_snaps), total_rows, skipped, errors)
+    return total_rows
+
+
+def run_alto() -> int:
+    """Scrape Alto Ingredients / ICP ethanol plant (Pekin, IL) — corn only."""
+    log.info("=" * 60)
+    log.info("Alto Ingredients scrape starting…")
+    log.info("=" * 60)
+    try:
+        rows = fetch_alto_bids()
+    except Exception as exc:
+        log.error("Alto scrape failed: %s", exc)
+        return 0
+    if not rows:
+        log.warning("Alto scrape returned no data.")
+        return 0
+
+    try:
+        req = parse_alto(rows)
+    except Exception as exc:
+        log.error("Alto parse failed: %s", exc)
+        return 0
+    if req is None:
+        log.warning("Alto scrape parsed no bids.")
+        return 0
+
+    _flush_scraper("Alto", "Alto", [req],
+                   [{"location": req.location, "state": "IL",
+                     "facility_type": "Corn Processing"}])
+    log.info("  ✓  %-20s  Corn  %d row(s)", req.location, len(req.rows))
+    log.info("Alto done: 1 location  |  %d row(s)  (bulk)", len(req.rows))
+    return len(req.rows)
 
 
 def run_sotw() -> int:
@@ -1491,6 +1564,8 @@ def run(
     run_sdsp_scrape: bool = True,
     run_ksethanol_scrape: bool = True,
     run_wpe_scrape: bool = True,
+    run_seemor_scrape: bool = True,
+    run_alto_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1561,6 +1636,10 @@ def run(
         total += _run_guarded(run_ksethanol, "Kansas Ethanol")
     if run_wpe_scrape:
         total += _run_guarded(run_wpe, "WPE")
+    if run_seemor_scrape:
+        total += _run_guarded(run_seemor, "See-Mor")
+    if run_alto_scrape:
+        total += _run_guarded(run_alto, "Alto")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -1797,6 +1876,14 @@ if __name__ == "__main__":
     wpe_group.add_argument("--no-wpe", dest="no_wpe", action="store_true", help="Skip Western Plains Energy scrape")
     wpe_group.add_argument("--wpe-only", dest="wpe_only", action="store_true", help="Run Western Plains Energy scrape only")
 
+    seemor_group = parser.add_mutually_exclusive_group()
+    seemor_group.add_argument("--no-seemor", dest="no_seemor", action="store_true", help="Skip See-Mor Grain scrape")
+    seemor_group.add_argument("--seemor-only", dest="seemor_only", action="store_true", help="Run See-Mor Grain scrape only")
+
+    alto_group = parser.add_mutually_exclusive_group()
+    alto_group.add_argument("--no-alto", dest="no_alto", action="store_true", help="Skip Alto Ingredients scrape")
+    alto_group.add_argument("--alto-only", dest="alto_only", action="store_true", help="Run Alto Ingredients scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -1918,6 +2005,12 @@ if __name__ == "__main__":
     elif args.wpe_only:
         init_db()
         run_wpe()
+    elif args.seemor_only:
+        init_db()
+        run_seemor()
+    elif args.alto_only:
+        init_db()
+        run_alto()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -1959,6 +2052,8 @@ if __name__ == "__main__":
             run_sdsp_scrape=not args.no_sdsp,
             run_ksethanol_scrape=not args.no_ksethanol,
             run_wpe_scrape=not args.no_wpe,
+            run_seemor_scrape=not args.no_seemor,
+            run_alto_scrape=not args.no_alto,
             run_pruning=not args.no_prune,
         )
 
