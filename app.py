@@ -2986,7 +2986,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.radio(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Alto", "INCO"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "Alto", "INCO"],
             horizontal=True, label_visibility="collapsed",
         )
 
@@ -3490,16 +3490,20 @@ with tab_bids:
         else:
             grains = ["Corn"]
 
-    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "See-Mor", "Alto", "INCO"):
+    elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "See-Mor",
+                       "Ace", "One Earth", "Harvestone", "Big River", "Alto", "INCO"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
-        # button to point at, and the empty-state message says so.
-        _ag_cli   = {"Star of West": "--sotw-only", "Mennel": "--mennel-only",
-                     "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only",
-                     "See-Mor": "--seemor-only", "Alto": "--alto-only"}.get(provider)
+        # button to point at, and the empty-state message says so. The five Bushel
+        # white-label sites all scrape together under one CLI flag.
+        _bushel = ("See-Mor", "Ace", "One Earth", "Harvestone", "Big River")
+        _ag_cli   = ({"Star of West": "--sotw-only", "Mennel": "--mennel-only",
+                      "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only",
+                      "Alto": "--alto-only"}.get(provider)
+                     or ("--bushelsites-only" if provider in _bushel else None))
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
                      "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",
-                     "See-Mor": "Scrape See-Mor now", "Alto": "Scrape Alto now"}.get(provider)
+                     "Alto": "Scrape Alto now"}.get(provider)
         _ag_color = _PROVIDER_COLOR.get(provider, "#64748b")
         _ag_locs  = sorted(
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}

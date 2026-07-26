@@ -120,7 +120,7 @@ from sdsp_scraper import fetch_sdsp_bids
 from parsers.sdsp_parser import parse_sdsp_location
 from ksethanol_scraper import fetch_ksethanol_bids
 from parsers.ksethanol_parser import parse_ksethanol_location
-from seemor_scraper import fetch_seemor_bids, parse_seemor_board
+from bushelsites_scraper import SITES as BUSHELSITES, scrape_site as scrape_bushel_site, parse_board as parse_bushel_board
 from alto_scraper import fetch_alto_bids, parse_alto
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
@@ -456,44 +456,40 @@ def run_wpe() -> int:
     return total_rows
 
 
-def run_seemor() -> int:
-    """Scrape See-Mor Grain (Darlington, WI) — one page, four boards (the elevator's
-    corn + soybeans plus delivered bids at Badger State Ethanol and Bunge Warren)."""
+def run_bushelsites() -> int:
+    """Scrape every Bushel white-label cbCommodity site (See-Mor, Ace, One Earth,
+    Harvestone, Big River) in one pass — each is its own provider, flushed
+    separately. Config lives in bushelsites_scraper.SITES; add a site there."""
     log.info("=" * 60)
-    log.info("See-Mor Grain scrape starting…")
+    log.info("Bushel-sites scrape starting…")
     log.info("=" * 60)
-    try:
-        boards = fetch_seemor_bids()
-    except Exception as exc:
-        log.error("See-Mor scrape failed: %s", exc)
-        return 0
-    if not boards:
-        log.warning("See-Mor scrape returned no data.")
-        return 0
-
-    total_rows = skipped = errors = 0
-    _snaps, _metas = [], []
-    for b in boards:
+    grand = 0
+    for prov, cfg in BUSHELSITES.items():
         try:
-            req = parse_seemor_board(b)
-            if req is None:
-                skipped += 1
-                continue
-            _snaps.append(req)
-            _metas.append({"location": req.location, "state": b.get("state"),
-                           "facility_type": b.get("facility_type")})
-            total_rows += len(req.rows)
-            log.info("  ✓  %-26s  %-8s  %d row(s)",
-                     req.location, b.get("grain", ""), len(req.rows))
+            boards = scrape_bushel_site(cfg)
         except Exception as exc:
-            errors += 1
-            log.error("  ✗  %s: %s", b.get("board", "?"), exc)
-
-    _flush_scraper("See-Mor", "See-Mor", _snaps, _metas)
+            log.error("  ✗  %s fetch failed: %s", prov, exc)
+            continue
+        _snaps, _metas, rows = [], [], 0
+        for b in boards:
+            try:
+                req = parse_bushel_board(b, prov)
+                if req is None:
+                    continue
+                _snaps.append(req)
+                _metas.append({"location": req.location, "state": b.get("state"),
+                               "facility_type": b.get("facility_type")})
+                rows += len(req.rows)
+                log.info("  ✓  %-11s %-24s %-8s %d row(s)",
+                         prov, req.location, b.get("grain", ""), len(req.rows))
+            except Exception as exc:
+                log.error("  ✗  %s / %s: %s", prov, b.get("location", "?"), exc)
+        if _snaps:
+            _flush_scraper(prov, prov, _snaps, _metas)
+        grand += rows
     log.info("-" * 60)
-    log.info("See-Mor done: %d board(s)  |  %d row(s)  |  %d skipped  |  %d error(s)  (bulk)",
-             len(_snaps), total_rows, skipped, errors)
-    return total_rows
+    log.info("Bushel-sites done: %d row(s) across %d site(s)  (bulk)", grand, len(BUSHELSITES))
+    return grand
 
 
 def run_alto() -> int:
@@ -1564,7 +1560,7 @@ def run(
     run_sdsp_scrape: bool = True,
     run_ksethanol_scrape: bool = True,
     run_wpe_scrape: bool = True,
-    run_seemor_scrape: bool = True,
+    run_bushelsites_scrape: bool = True,
     run_alto_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
@@ -1636,8 +1632,8 @@ def run(
         total += _run_guarded(run_ksethanol, "Kansas Ethanol")
     if run_wpe_scrape:
         total += _run_guarded(run_wpe, "WPE")
-    if run_seemor_scrape:
-        total += _run_guarded(run_seemor, "See-Mor")
+    if run_bushelsites_scrape:
+        total += _run_guarded(run_bushelsites, "Bushel-sites")
     if run_alto_scrape:
         total += _run_guarded(run_alto, "Alto")
 
@@ -1876,9 +1872,9 @@ if __name__ == "__main__":
     wpe_group.add_argument("--no-wpe", dest="no_wpe", action="store_true", help="Skip Western Plains Energy scrape")
     wpe_group.add_argument("--wpe-only", dest="wpe_only", action="store_true", help="Run Western Plains Energy scrape only")
 
-    seemor_group = parser.add_mutually_exclusive_group()
-    seemor_group.add_argument("--no-seemor", dest="no_seemor", action="store_true", help="Skip See-Mor Grain scrape")
-    seemor_group.add_argument("--seemor-only", dest="seemor_only", action="store_true", help="Run See-Mor Grain scrape only")
+    bushel_group = parser.add_mutually_exclusive_group()
+    bushel_group.add_argument("--no-bushelsites", dest="no_bushelsites", action="store_true", help="Skip Bushel-sites scrape (See-Mor/Ace/One Earth/Harvestone/Big River)")
+    bushel_group.add_argument("--bushelsites-only", dest="bushelsites_only", action="store_true", help="Run Bushel-sites scrape only")
 
     alto_group = parser.add_mutually_exclusive_group()
     alto_group.add_argument("--no-alto", dest="no_alto", action="store_true", help="Skip Alto Ingredients scrape")
@@ -2005,9 +2001,9 @@ if __name__ == "__main__":
     elif args.wpe_only:
         init_db()
         run_wpe()
-    elif args.seemor_only:
+    elif args.bushelsites_only:
         init_db()
-        run_seemor()
+        run_bushelsites()
     elif args.alto_only:
         init_db()
         run_alto()
@@ -2052,7 +2048,7 @@ if __name__ == "__main__":
             run_sdsp_scrape=not args.no_sdsp,
             run_ksethanol_scrape=not args.no_ksethanol,
             run_wpe_scrape=not args.no_wpe,
-            run_seemor_scrape=not args.no_seemor,
+            run_bushelsites_scrape=not args.no_bushelsites,
             run_alto_scrape=not args.no_alto,
             run_pruning=not args.no_prune,
         )
