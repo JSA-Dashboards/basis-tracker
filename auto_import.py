@@ -121,6 +121,7 @@ from parsers.sdsp_parser import parse_sdsp_location
 from ksethanol_scraper import fetch_ksethanol_bids
 from parsers.ksethanol_parser import parse_ksethanol_location
 from bushelsites_scraper import SITES as BUSHELSITES, scrape_site as scrape_bushel_site, parse_board as parse_bushel_board
+from agricharts_scraper import fetch_agricharts_bids
 from alto_scraper import fetch_alto_bids, parse_alto
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
@@ -490,6 +491,39 @@ def run_bushelsites() -> int:
     log.info("-" * 60)
     log.info("Bushel-sites done: %d row(s) across %d site(s)  (bulk)", grand, len(BUSHELSITES))
     return grand
+
+
+def run_agricharts_tenants() -> int:
+    """Scrape AgriCharts feeds on their own domains (Mid Missouri, JBS) — each feed
+    location becomes its own snapshot, flushed per provider. Config in
+    agricharts_scraper.TENANTS."""
+    from collections import defaultdict
+    log.info("=" * 60)
+    log.info("AgriCharts tenants scrape starting…")
+    log.info("=" * 60)
+    try:
+        locs = fetch_agricharts_bids()
+    except Exception as exc:
+        log.error("AgriCharts scrape failed: %s", exc)
+        return 0
+    by_prov: dict = defaultdict(lambda: ([], []))
+    total = 0
+    for loc in locs:
+        req = parse_ksethanol_location(loc)
+        if req is None:
+            continue
+        snaps, metas = by_prov[req.provider]
+        snaps.append(req)
+        metas.append({"location": req.location, "state": loc.get("state"),
+                      "facility_type": loc.get("facility_type")})
+        total += len(req.rows)
+        log.info("  ✓  %-12s %-24s %d row(s)", req.provider, req.location, len(req.rows))
+    for prov, (snaps, metas) in by_prov.items():
+        if snaps:
+            _flush_scraper(prov, prov, snaps, metas)
+    log.info("-" * 60)
+    log.info("AgriCharts tenants done: %d row(s) across %d location(s)  (bulk)", total, len(locs))
+    return total
 
 
 def run_alto() -> int:
@@ -1561,6 +1595,7 @@ def run(
     run_ksethanol_scrape: bool = True,
     run_wpe_scrape: bool = True,
     run_bushelsites_scrape: bool = True,
+    run_agricharts_scrape: bool = True,
     run_alto_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
@@ -1634,6 +1669,8 @@ def run(
         total += _run_guarded(run_wpe, "WPE")
     if run_bushelsites_scrape:
         total += _run_guarded(run_bushelsites, "Bushel-sites")
+    if run_agricharts_scrape:
+        total += _run_guarded(run_agricharts_tenants, "AgriCharts")
     if run_alto_scrape:
         total += _run_guarded(run_alto, "Alto")
 
@@ -1876,6 +1913,10 @@ if __name__ == "__main__":
     bushel_group.add_argument("--no-bushelsites", dest="no_bushelsites", action="store_true", help="Skip Bushel-sites scrape (See-Mor/Ace/One Earth/Harvestone/Big River)")
     bushel_group.add_argument("--bushelsites-only", dest="bushelsites_only", action="store_true", help="Run Bushel-sites scrape only")
 
+    agri_group = parser.add_mutually_exclusive_group()
+    agri_group.add_argument("--no-agricharts", dest="no_agricharts", action="store_true", help="Skip AgriCharts tenants (Mid Missouri, JBS)")
+    agri_group.add_argument("--agricharts-only", dest="agricharts_only", action="store_true", help="Run AgriCharts tenants scrape only")
+
     alto_group = parser.add_mutually_exclusive_group()
     alto_group.add_argument("--no-alto", dest="no_alto", action="store_true", help="Skip Alto Ingredients scrape")
     alto_group.add_argument("--alto-only", dest="alto_only", action="store_true", help="Run Alto Ingredients scrape only")
@@ -2004,6 +2045,9 @@ if __name__ == "__main__":
     elif args.bushelsites_only:
         init_db()
         run_bushelsites()
+    elif args.agricharts_only:
+        init_db()
+        run_agricharts_tenants()
     elif args.alto_only:
         init_db()
         run_alto()
@@ -2049,6 +2093,7 @@ if __name__ == "__main__":
             run_ksethanol_scrape=not args.no_ksethanol,
             run_wpe_scrape=not args.no_wpe,
             run_bushelsites_scrape=not args.no_bushelsites,
+            run_agricharts_scrape=not args.no_agricharts,
             run_alto_scrape=not args.no_alto,
             run_pruning=not args.no_prune,
         )
