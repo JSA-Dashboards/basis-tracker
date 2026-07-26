@@ -65,6 +65,14 @@ SITES: dict[str, dict] = {
         "style": "h2", "facility": "Corn Processing",
         "locmap": {"IBEC": ("Harvestone IBEC", None, "Corn Processing")},
     },
+    "BioUrja": {
+        # akronservices.com is the BioUrja Peoria plant's live bid page (no BioUrja
+        # text on it — Kolten's call). Scrape into the EXISTING "Peoria, IL" location
+        # (DJ history 2012-2023) to revive it with live data. One "Corn" board.
+        "url": "https://akronservices.com/",
+        "style": "board", "facility": "Corn Processing",
+        "boards": {"Corn": ("Peoria, IL", "IL", "Corn Processing")},
+    },
     "Big River": {
         "url": "https://bigriverresources.com/cash-bids/",
         "style": "h2", "facility": "Corn Processing",
