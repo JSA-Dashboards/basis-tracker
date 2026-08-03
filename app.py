@@ -275,6 +275,11 @@ def _roll_spread(from_sym, to_sym):
 def get_adj(from_sym, to_sym):
     if not from_sym or not to_sym or from_sym == to_sym:
         return {"adj": 0, "rolled": False}
+    # Soybean meal (ZM) is quoted vs the ROLLING nearby contract, so a Q→U roll of
+    # the reference isn't a real basis move — and meal isn't in the ADM futures
+    # curve to spread-adjust anyway. Compare raw (adj=0) across a meal roll.
+    if from_sym[:2] == "ZM" and to_sym[:2] == "ZM":
+        return {"adj": 0, "rolled": False}
     if (len(from_sym) >= 3 and len(to_sym) >= 3
             and from_sym[2] == to_sym[2]
             and from_sym[:2] == to_sym[:2]):
@@ -353,6 +358,14 @@ def compute_changes(snapshots):
     spot_lookup:         dict = {}  # canonical_grain -> list of entries
     derived_spot_lookup: dict = {}  # canonical_grain -> list of entries (front-month per snap)
 
+    # Meal row ids embed the nearby contract (e.g. SM_ZMU26_AUGUST), which changes
+    # at every meal roll and breaks the id-keyed change history. Strip the contract
+    # so a delivery slot tracks across rolls; get_adj() compares meal raw.
+    def _match_key(r):
+        if _grain_disp(r.grain) == "Soybean Meal":
+            return re.sub(r"_ZM[FGHJKMNQUVXZ]\d\d", "", r.id)
+        return r.id
+
     for snap in snapshots:
         ts_ms = datetime.fromisoformat(
             snap.timestamp.replace("Z", "+00:00")).timestamp() * 1000
@@ -363,9 +376,7 @@ def compute_changes(snapshots):
                 if g:
                     spot_lookup.setdefault(g, []).append(entry)
             else:
-                if r.id not in row_lookup:
-                    row_lookup[r.id] = []
-                row_lookup[r.id].append(entry)
+                row_lookup.setdefault(_match_key(r), []).append(entry)
         # Build derived spot history: front-month row for each grain in this snapshot
         snap_grains = {_grain_disp(r.grain) for r in snap.rows if not r.isSpot}
         for g in snap_grains:
@@ -390,7 +401,7 @@ def compute_changes(snapshots):
     for r in latest.rows:
         if not r.isSpot:
             row_changes[r.id] = calc(
-                row_lookup.get(r.id, []), r.basisCents, r.futuresSymbol)
+                row_lookup.get(_match_key(r), []), r.basisCents, r.futuresSymbol)
 
     spot_changes = {}
     for r in latest.rows:
