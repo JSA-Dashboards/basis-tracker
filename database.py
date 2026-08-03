@@ -1437,20 +1437,34 @@ def prune_old_snapshots(dry_run: bool = False) -> dict:
     #   Tier 1 — current month: keep everything
     #   Tier 2 — anything older: keep one (most recent) per provider/location/ISO week
     #            Weekly resolution is preserved forever — no monthly rollup.
-    _KEEPERS_SQL = """
-        -- Tier 1: current calendar month — keep everything
-        SELECT id FROM snapshots
-        WHERE created_at >= DATE_TRUNC('month', NOW())
+    # NOTE: tiers key on the snapshot's DATA date (`timestamp`), NOT `created_at`.
+    # Using created_at was catastrophic: the DJ archive + jsa_history were bulk-loaded
+    # in one week, so every historical date shared a single created_at-week and Tier 2
+    # collapsed YEARS of history to one snapshot per location. Curated archival sources
+    # are also exempted entirely — they are hand-built, not high-frequency scrapes.
+    _ARCHIVE = "('dow_jones', 'jsa_history', 'historical')"
+    _TS = "(substr(timestamp, 1, 10))::date"
+    _KEEPERS_SQL = f"""
+        -- Archival sources: keep EVERYTHING, forever
+        SELECT id FROM snapshots WHERE source IN {_ARCHIVE}
 
         UNION
 
-        -- Tier 2: anything older than current month — one per provider/location/week (forever)
+        -- Tier 1: current data-month — keep everything (daily granularity)
+        SELECT id FROM snapshots
+        WHERE {_TS} >= DATE_TRUNC('month', NOW())::date
+          AND source NOT IN {_ARCHIVE}
+
+        UNION
+
+        -- Tier 2: older scraped data — one (most recent) per provider/location/data-week
         SELECT id FROM (
-            SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', created_at))
+            SELECT DISTINCT ON (provider, location, DATE_TRUNC('week', {_TS}))
                 id
             FROM snapshots
-            WHERE created_at < DATE_TRUNC('month', NOW())
-            ORDER BY provider, location, DATE_TRUNC('week', created_at), created_at DESC
+            WHERE {_TS} < DATE_TRUNC('month', NOW())::date
+              AND source NOT IN {_ARCHIVE}
+            ORDER BY provider, location, DATE_TRUNC('week', {_TS}), timestamp DESC
         ) weekly
     """
 
