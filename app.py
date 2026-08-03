@@ -3906,9 +3906,38 @@ with tab_bids:
                 _df_seas["Basis"] = _df_seas["Basis"].round(1)
 
                 _max_yr  = int(_df_seas["MktYearNum"].max())
-                _hist    = _df_seas[_df_seas["MktYearNum"] < _max_yr].copy()
                 _curr    = _df_seas[_df_seas["MktYearNum"] == _max_yr].copy()
                 _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
+
+                # 5-yr window = the five completed marketing years before the current one
+                _win  = _df_seas[(_df_seas["MktYearNum"] >= _max_yr - 5)
+                                 & (_df_seas["MktYearNum"] < _max_yr)]
+                _band = (_win.groupby("MktWeek")["Basis"]
+                         .agg(avg="mean", lo="min", hi="max").reset_index())
+                _byrs = sorted(_win["MktYear"].unique())
+
+                # Forward curve — the location's currently-posted forward bids, each
+                # placed at its delivery month's week within THAT marketing year.
+                _MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                _fwd = []
+                for _fr in viewing.rows:
+                    if (_fr.isSpot or _grain_disp(_fr.grain) != grain
+                            or _fr.basisCents is None or not _fr.futuresSymbol):
+                        continue
+                    _fym = _dp.canonical(_fr.deliveryMonth, _fr.futuresSymbol)
+                    if not _fym:
+                        continue
+                    _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
+                    _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
+                    _fwd.append({"MktWeek": max(1, min(52, _fwk)),
+                                 "Basis": _fr.basisCents, "Mon": _MONS[_fym[1] - 1]})
+                _df_fwd = _pd.DataFrame(_fwd)
+                if not _df_fwd.empty:
+                    _df_fwd = (_df_fwd.sort_values("MktWeek")
+                               .groupby("MktWeek", as_index=False)
+                               .agg(Basis=("Basis", "mean"), Mon=("Mon", "first")))
+                    _df_fwd["Basis"] = _df_fwd["Basis"].round(0)
 
                 _x_s = _alt.X("MktWeek:Q", title="Market Week",
                                scale=_alt.Scale(domain=[1, 52]),
@@ -3971,27 +4000,39 @@ with tab_bids:
                     .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Basis:Q"), text="MktYear:N")
                 )
 
-                _s_layers = ([_s_wm] if _s_wm else []) + [_s_zero, _s_curr, _s_curr_end]
+                _s_layers = ([_s_wm] if _s_wm else [])
 
-                if not _hist.empty:
-                    _s_hist = (
-                        _alt.Chart(_hist)
-                        .mark_line(strokeWidth=2, opacity=0.9)
-                        .encode(
-                            x=_x_s, y=_y_s,
-                            color=_alt.Color(
-                                "MktYear:N",
-                                sort=sorted(_hist["MktYear"].unique()),
-                                scale=_alt.Scale(scheme="tableau10"),
-                                legend=_alt.Legend(
-                                    title="Mkt Year", orient="bottom",
-                                    columns=6, labelFontSize=10, titleFontSize=10,
-                                ),
-                            ),
-                            tooltip=_tip_s,
-                        )
-                    )
-                    _s_layers.insert(2, _s_hist)
+                # 5-yr range band (shaded) + 5-yr average (dashed), under the black line.
+                if not _band.empty:
+                    _s_layers += [
+                        _alt.Chart(_band).mark_area(color="#9db98a", opacity=0.30)
+                        .encode(x=_alt.X("MktWeek:Q", scale=_alt.Scale(domain=[1, 52])),
+                                y=_alt.Y("lo:Q", title="Basis (¢)",
+                                         scale=_alt.Scale(zero=False)),
+                                y2="hi:Q"),
+                        _alt.Chart(_band).mark_line(color="#475569", strokeDash=[6, 4],
+                                                    strokeWidth=2)
+                        .encode(x=_x_s, y=_alt.Y("avg:Q"),
+                                tooltip=[_alt.Tooltip("MktWeek:Q", title="Week"),
+                                         _alt.Tooltip("avg:Q", title="5-yr avg", format=".0f")]),
+                    ]
+
+                _s_layers += [_s_zero, _s_curr, _s_curr_end]
+
+                # Forward curve — red dashed line + diamonds + value labels.
+                if not _df_fwd.empty:
+                    _fwd_base = _alt.Chart(_df_fwd).encode(x=_alt.X("MktWeek:Q"),
+                                                           y=_alt.Y("Basis:Q"))
+                    _s_layers += [
+                        _fwd_base.mark_line(color="#c0392b", strokeDash=[5, 3], strokeWidth=2),
+                        _fwd_base.mark_point(shape="diamond", filled=True, color="#c0392b",
+                                             size=70)
+                        .encode(tooltip=[_alt.Tooltip("Mon:N", title="Delivery"),
+                                         _alt.Tooltip("Basis:Q", title="Fwd basis", format=".0f")]),
+                        _fwd_base.mark_text(dy=-12, color="#c0392b", fontSize=10,
+                                            fontWeight="bold")
+                        .encode(text=_alt.Text("Basis:Q", format=".0f")),
+                    ]
 
                 # Futures-month gridlines. Corn and soybeans price against DIFFERENT
                 # contract cycles, so each gets its own set (weeks are on the same
@@ -4035,12 +4076,19 @@ with tab_bids:
                     )
                     _s_layers = [_s_vlines, _s_vlbls] + _s_layers
 
+                _leg = (f'{_curr_yr} = black' if _curr_yr else '')
+                if _byrs:
+                    _leg += (('  ·  ' if _leg else '')
+                             + f'5-yr avg = dashed · range = shaded '
+                               f'({_byrs[0]}–{_byrs[-1]})')
+                if not _df_fwd.empty:
+                    _leg += '  ·  <span style="color:#c0392b">forward = red ◆</span>'
                 st.markdown(
                     '<div style="margin-top:24px;margin-bottom:4px;font-size:10px;'
                     'color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
                     'Seasonal Basis — Marketing Year (Sep–Aug)'
-                    + (f'&nbsp;&nbsp;<span style="color:#1e293b;font-weight:900">'
-                       f'{_curr_yr} = black</span>' if _curr_yr else '')
+                    + (f'&nbsp;&nbsp;<span style="color:#1e293b;font-weight:400;'
+                       f'text-transform:none">{_leg}</span>' if _leg else '')
                     + '</div>',
                     unsafe_allow_html=True,
                 )
@@ -4048,6 +4096,23 @@ with tab_bids:
                     _alt.layer(*_s_layers).properties(height=_SEAS_H),
                     use_container_width=True,
                 )
+
+                # Forward vs 5-yr-average box (mirrors the template's annotation).
+                if not _df_fwd.empty and not _band.empty:
+                    _b_at = _band[_band["MktWeek"].isin(set(_df_fwd["MktWeek"]))]["avg"]
+                    if len(_b_at):
+                        _fa, _ba = _df_fwd["Basis"].mean(), _b_at.mean()
+                        _dd = _fa - _ba
+                        _u = "$/t" if grain == "Soybean Meal" else "¢"
+                        st.markdown(
+                            f'<div style="display:inline-block;border:1px solid #c0392b;'
+                            f'border-radius:5px;padding:4px 10px;margin-top:2px;'
+                            f"font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7f1d1d\">"
+                            f'{_df_fwd.iloc[0]["Mon"]}–{_df_fwd.iloc[-1]["Mon"]} forward avg '
+                            f'<b>{round(_fa)}{_u}</b> · 5-yr avg those months '
+                            f'{round(_ba)}{_u} <b>({"+" if _dd >= 0 else ""}{round(_dd)})</b></div>',
+                            unsafe_allow_html=True,
+                        )
 
             except Exception as _seas_err:
                 st.warning(f"Seasonal chart error: {_seas_err}")
