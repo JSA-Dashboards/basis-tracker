@@ -1407,7 +1407,8 @@ def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list
         if effective_ftype(key[0], key[1], grain, m.get("facility_type")) != facility_type:
             continue      # this grain belongs to a different (overridden) category
         stt   = m.get("state", "")
-        rd = {"region":  region_from_state(stt) or m.get("region", "") or "",
+        rd = {"provider": key[0], "location": key[1],
+              "region":  region_from_state(stt) or m.get("region", "") or "",
               "segment": river_segment(key[1])}
         for lbl, (tg, md) in targets.items():
             snap = _trend_closest(snaps, tg, md)
@@ -5138,13 +5139,38 @@ with tab_trends:
         _trend_sel = st.selectbox("Delivery Period", _trend_deliv_opts, key="trend_deliv")
     _trend_mode = "spot" if _trend_sel.startswith("Spot") else _trend_sel
 
-    for _ttl, _ft, _gr, _mode in _TREND_CATS:
-        _rows = build_trend_rows(_ft, _gr, _trend_mode)
+    # Build every category's rows once (also feeds the outlier picker below).
+    from database import get_index_excludes, set_index_excludes
+    _cat_rows = {(t, f, g, m): build_trend_rows(f, g, _trend_mode)
+                 for t, f, g, m in _TREND_CATS}
+    _all_pairs = sorted({(r["provider"], r["location"])
+                         for rows in _cat_rows.values() for r in rows})
+    _excl = get_index_excludes()
+
+    # ── Outlier picker — drop a location from the index averages ───────────────
+    if not _view_only():
+        with st.expander(f"⚙ Index outliers — exclude locations from the averages"
+                         f"{f'  ·  {len(_excl)} excluded' if _excl else ''}"):
+            st.caption("Excluded locations still scrape and show on the Bids tab; "
+                       "they're just left out of the region/segment average math here.")
+            _lbl = {f"{p} · {l}": (p, l) for p, l in _all_pairs}
+            _pre = [k for k, v in _lbl.items() if v in _excl]
+            _sel = st.multiselect("Excluded from index averages", sorted(_lbl),
+                                  default=_pre)
+            _new = {_lbl[s] for s in _sel}
+            if _new != _excl:
+                set_index_excludes(_new)
+                st.rerun()
+
+    for (_ttl, _ft, _gr, _mode), _rows_all in _cat_rows.items():
+        _rows = [r for r in _rows_all if (r["provider"], r["location"]) not in _excl]
+        _nx = len(_rows_all) - len(_rows)
         st.markdown(
             f'<div style="font-family:\'IBM Plex Mono\',monospace;font-size:13px;font-weight:800;'
             f'color:#0f172a;margin:10px 0 4px;padding-top:8px;border-top:2px solid #e2e8f0">'
             f'{_ttl} <span style="color:#94a3b8;font-weight:400;font-size:11px">'
-            f'· {len(_rows)} locations</span></div>',
+            f'· {len(_rows)} locations'
+            + (f' · {_nx} excluded' if _nx else '') + '</span></div>',
             unsafe_allow_html=True,
         )
         if not _rows:

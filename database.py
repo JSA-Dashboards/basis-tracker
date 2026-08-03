@@ -1376,6 +1376,43 @@ def get_nightly_overrides(date: str) -> dict:
         conn.close()
 
 
+def _ensure_index_excludes(conn, c) -> None:
+    c.execute("""CREATE TABLE IF NOT EXISTS index_excludes (
+        provider TEXT NOT NULL,
+        location TEXT NOT NULL,
+        PRIMARY KEY (provider, location))""")
+
+
+def get_index_excludes() -> set:
+    """Set of (provider, location) locations flagged as outliers — excluded from
+    the Trends region/segment index averages (but still scraped & shown elsewhere)."""
+    conn = get_conn()
+    c    = conn.cursor()
+    try:
+        _ensure_index_excludes(conn, c)
+        c.execute("SELECT provider, location FROM index_excludes")
+        return {(r["provider"], r["location"]) for r in c.fetchall()}
+    finally:
+        conn.close()
+
+
+def set_index_excludes(pairs) -> bool:
+    """Replace the whole outlier set with `pairs` (iterable of (provider, location))."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = "%s" if _use_pg() else "?"
+    try:
+        _ensure_index_excludes(conn, c)
+        c.execute("DELETE FROM index_excludes")
+        for prov, loc in pairs:
+            c.execute(f"INSERT INTO index_excludes (provider, location) "
+                      f"VALUES ({ph}, {ph})", (prov, loc))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
 def prune_old_snapshots(dry_run: bool = False) -> dict:
     """
     Apply tiered data retention to snapshots (PostgreSQL only).
