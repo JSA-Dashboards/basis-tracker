@@ -3939,12 +3939,19 @@ with tab_bids:
                                .agg(Basis=("Basis", "mean"), Mon=("Mon", "first")))
                     _df_fwd["Basis"] = _df_fwd["Basis"].round(0)
 
-                _x_s = _alt.X("MktWeek:Q", title="Market Week",
-                               scale=_alt.Scale(domain=[1, 52]),
-                               axis=_alt.Axis(labelFontSize=10))
-                _y_s = _alt.Y("Basis:Q", title="Spot Basis (¢)",
-                               scale=_alt.Scale(zero=False),
-                               axis=_alt.Axis(labelFontSize=10))
+                # Month labels (Sep–Aug marketing year) instead of raw week numbers,
+                # matching the JSA template. One tick at each month's first week.
+                _mlab = ("{1:'Sep',5:'Oct',10:'Nov',14:'Dec',18:'Jan',23:'Feb',"
+                         "27:'Mar',31:'Apr',36:'May',40:'Jun',45:'Jul',49:'Aug'}"
+                         "[datum.value]")
+                _x_s = _alt.X("MktWeek:Q", title=None, scale=_alt.Scale(domain=[1, 52]),
+                              axis=_alt.Axis(values=[1, 5, 10, 14, 18, 23, 27, 31, 36, 40, 45, 49],
+                                             labelExpr=_mlab, labelFontSize=11,
+                                             grid=True, gridColor="#eef2f6",
+                                             domainColor="#cbd5e1", tickColor="#cbd5e1"))
+                _y_s = _alt.Y("Basis:Q", title="Basis (¢)",
+                              scale=_alt.Scale(zero=False),
+                              axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
                 _tip_s = [
                     _alt.Tooltip("MktYear:N", title="Mkt Year"),
                     _alt.Tooltip("MktWeek:Q", title="Week"),
@@ -4006,7 +4013,7 @@ with tab_bids:
                 if not _band.empty:
                     _s_layers += [
                         _alt.Chart(_band).mark_area(color="#9db98a", opacity=0.30)
-                        .encode(x=_alt.X("MktWeek:Q", scale=_alt.Scale(domain=[1, 52])),
+                        .encode(x=_x_s,
                                 y=_alt.Y("lo:Q", title="Basis (¢)",
                                          scale=_alt.Scale(zero=False)),
                                 y2="hi:Q"),
