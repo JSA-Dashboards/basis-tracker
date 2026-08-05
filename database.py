@@ -15,6 +15,8 @@ All public functions are backend-agnostic; callers don't need to know
 which database is active.
 """
 import os
+import sys
+import time
 from pathlib import Path
 from models import Snapshot, SnapshotRow
 
@@ -238,14 +240,35 @@ def init_db():
     # Serialize init across app instances. On Streamlit Cloud a reboot can run
     # two instances briefly; both call init_db() and race on the idempotent
     # location_meta upserts, which can deadlock. A session-level Postgres
-    # advisory lock held for the whole init lets only one process seed at a time
-    # (auto-released if the holder's connection dies). No-op on SQLite.
+    # advisory lock held for the whole init lets only one process seed at a time.
+    # (Normally auto-released when the holder's connection dies, but through the
+    # Supabase pooler that reaping can lag minutes — see the bounded acquire
+    # below.) No-op on SQLite.
     _INIT_LOCK_KEY = 727274
     lock_conn = None
+    have_lock = False
     if _use_pg():
         lock_conn = get_conn()
-        lock_conn.cursor().execute("SELECT pg_advisory_lock(%s)", (_INIT_LOCK_KEY,))
-        lock_conn.commit()
+        # Bounded, NON-blocking acquire. A plain pg_advisory_lock() blocks
+        # indefinitely; through Supabase's pooler a crashed init (which grabbed
+        # the lock but died before releasing it) leaves an orphaned backend
+        # holding it for minutes, wedging every later start with a statement
+        # timeout. Poll pg_try_advisory_lock instead, and if it's still busy
+        # after the window, seed anyway — the lock only serializes idempotent
+        # seeding, so a rare race is far better than a hard startup failure.
+        _lc = lock_conn.cursor()
+        _deadline = time.time() + 30
+        while True:
+            _lc.execute("SELECT pg_try_advisory_lock(%s) AS got", (_INIT_LOCK_KEY,))
+            _row = _lc.fetchone()                      # RealDictCursor → dict
+            have_lock = bool(_row["got"] if isinstance(_row, dict) else _row[0])
+            lock_conn.commit()
+            if have_lock or time.time() >= _deadline:
+                break
+            time.sleep(1.5)
+        if not have_lock:
+            print("init_db: advisory lock busy after 30s — seeding without it.",
+                  file=sys.stderr)
     try:
         conn = get_conn()
         c    = conn.cursor()
@@ -274,9 +297,10 @@ def init_db():
     finally:
         if lock_conn is not None:
             try:
-                lock_conn.cursor().execute(
-                    "SELECT pg_advisory_unlock(%s)", (_INIT_LOCK_KEY,))
-                lock_conn.commit()
+                if have_lock:
+                    lock_conn.cursor().execute(
+                        "SELECT pg_advisory_unlock(%s)", (_INIT_LOCK_KEY,))
+                    lock_conn.commit()
             finally:
                 lock_conn.close()
 

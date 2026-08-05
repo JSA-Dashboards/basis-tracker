@@ -3885,6 +3885,11 @@ with tab_bids:
                             use_container_width=True)
 
             # ── Seasonal chart ─────────────────────────────────────────────
+            # Plain per-marketing-year lines (Sep–Aug), matching the Rail FOB
+            # seasonal chart: prior years as coloured lines, the current year as a
+            # thick black line, futures-month gridlines, JSA watermark. (The 5-yr
+            # band + forward-curve overlay was removed 2026-08 at Kolten's request
+            # — he wanted this to read like the other seasonal charts.)
             try:
                 _df_seas = _df_spot[["Date", "Basis"]].copy()
                 # Strip timezone for vectorized date arithmetic
@@ -3906,41 +3911,12 @@ with tab_bids:
                 _df_seas["Basis"] = _df_seas["Basis"].round(1)
 
                 _max_yr  = int(_df_seas["MktYearNum"].max())
+                _hist    = _df_seas[_df_seas["MktYearNum"] < _max_yr]
                 _curr    = _df_seas[_df_seas["MktYearNum"] == _max_yr].copy()
                 _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
 
-                # 5-yr window = the five completed marketing years before the current one
-                _win  = _df_seas[(_df_seas["MktYearNum"] >= _max_yr - 5)
-                                 & (_df_seas["MktYearNum"] < _max_yr)]
-                _band = (_win.groupby("MktWeek")["Basis"]
-                         .agg(avg="mean", lo="min", hi="max").reset_index())
-                _byrs = sorted(_win["MktYear"].unique())
-
-                # Forward curve — the location's currently-posted forward bids, each
-                # placed at its delivery month's week within THAT marketing year.
-                _MONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-                _fwd = []
-                for _fr in viewing.rows:
-                    if (_fr.isSpot or _grain_disp(_fr.grain) != grain
-                            or _fr.basisCents is None or not _fr.futuresSymbol):
-                        continue
-                    _fym = _dp.canonical(_fr.deliveryMonth, _fr.futuresSymbol)
-                    if not _fym:
-                        continue
-                    _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
-                    _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
-                    _fwd.append({"MktWeek": max(1, min(52, _fwk)),
-                                 "Basis": _fr.basisCents, "Mon": _MONS[_fym[1] - 1]})
-                _df_fwd = _pd.DataFrame(_fwd)
-                if not _df_fwd.empty:
-                    _df_fwd = (_df_fwd.sort_values("MktWeek")
-                               .groupby("MktWeek", as_index=False)
-                               .agg(Basis=("Basis", "mean"), Mon=("Mon", "first")))
-                    _df_fwd["Basis"] = _df_fwd["Basis"].round(0)
-
-                # Month labels (Sep–Aug marketing year) instead of raw week numbers,
-                # matching the JSA template. One tick at each month's first week.
+                # Month labels (Sep–Aug marketing year) instead of raw week numbers.
+                # One tick at each month's first week.
                 _mlab = ("{1:'Sep',5:'Oct',10:'Nov',14:'Dec',18:'Jan',23:'Feb',"
                          "27:'Mar',31:'Apr',36:'May',40:'Jun',45:'Jul',49:'Aug'}"
                          "[datum.value]")
@@ -3969,24 +3945,15 @@ with tab_bids:
                         "data:image/png;base64,"
                         + _b64.b64encode(_logo_path.read_bytes()).decode()
                     )
-                    _wm_h = int(_SEAS_H * 0.50)   # 50 % of chart height = 280 px
-                    _wm_w = int(_wm_h * 0.93)      # logo aspect ratio ≈ 0.93 : 1
+                    _wm_h = int(_SEAS_H * 0.50)   # 50 % of chart height
                     _s_wm = (
                         _alt.Chart(_pd.DataFrame({
                             "MktWeek": [26.5],
                             "url":     [_logo_uri],
                         }))
-                        .mark_image(
-                            width=_wm_w, height=_wm_h,
-                            opacity=0.20,
-                            align="center",     # centres on x data coordinate
-                            baseline="middle",  # centres on y pixel coordinate
-                        )
-                        .encode(
-                            x=_alt.X("MktWeek:Q"),           # data coord → always week 26.5
-                            y=_alt.value(_SEAS_H // 2),      # pixel coord → always vertical centre
-                            url="url:N",
-                        )
+                        .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.20,
+                                    align="center", baseline="middle")
+                        .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(_SEAS_H // 2), url="url:N")
                     )
 
                 # Zero reference line — uses same Basis field so y-axis resolves cleanly
@@ -4007,45 +3974,27 @@ with tab_bids:
                     .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Basis:Q"), text="MktYear:N")
                 )
 
-                _s_layers = ([_s_wm] if _s_wm else [])
-
-                # 5-yr range band (shaded) + 5-yr average (dashed), under the black line.
-                if not _band.empty:
-                    _s_layers += [
-                        _alt.Chart(_band).mark_area(color="#9db98a", opacity=0.30)
-                        .encode(x=_x_s,
-                                y=_alt.Y("lo:Q", title="Basis (¢)",
-                                         scale=_alt.Scale(zero=False)),
-                                y2="hi:Q"),
-                        _alt.Chart(_band).mark_line(color="#475569", strokeDash=[6, 4],
-                                                    strokeWidth=2)
-                        .encode(x=_x_s, y=_alt.Y("avg:Q"),
-                                tooltip=[_alt.Tooltip("MktWeek:Q", title="Week"),
-                                         _alt.Tooltip("avg:Q", title="5-yr avg", format=".0f")]),
-                    ]
-
-                _s_layers += [_s_zero, _s_curr, _s_curr_end]
-
-                # Forward curve — red dashed line + diamonds + value labels.
-                if not _df_fwd.empty:
-                    _fwd_base = _alt.Chart(_df_fwd).encode(x=_alt.X("MktWeek:Q"),
-                                                           y=_alt.Y("Basis:Q"))
-                    _s_layers += [
-                        _fwd_base.mark_line(color="#c0392b", strokeDash=[5, 3], strokeWidth=2),
-                        _fwd_base.mark_point(shape="diamond", filled=True, color="#c0392b",
-                                             size=70)
-                        .encode(tooltip=[_alt.Tooltip("Mon:N", title="Delivery"),
-                                         _alt.Tooltip("Basis:Q", title="Fwd basis", format=".0f")]),
-                        _fwd_base.mark_text(dy=-12, color="#c0392b", fontSize=10,
-                                            fontWeight="bold")
-                        .encode(text=_alt.Text("Basis:Q", format=".0f")),
-                    ]
+                _s_layers = ([_s_wm] if _s_wm else []) + [_s_zero]
+                # Prior marketing years — coloured lines with a bottom legend, drawn
+                # under the current-year black line.
+                if not _hist.empty:
+                    _s_layers.append(
+                        _alt.Chart(_hist).mark_line(strokeWidth=2, opacity=0.9)
+                        .encode(x=_x_s, y=_y_s,
+                                color=_alt.Color("MktYear:N",
+                                    sort=sorted(_hist["MktYear"].unique()),
+                                    scale=_alt.Scale(scheme="tableau10"),
+                                    legend=_alt.Legend(title="Mkt Year", orient="bottom",
+                                                       columns=6, labelFontSize=10,
+                                                       titleFontSize=10)),
+                                tooltip=_tip_s)
+                    )
+                _s_layers += [_s_curr, _s_curr_end]
 
                 # Futures-month gridlines. Corn and soybeans price against DIFFERENT
                 # contract cycles, so each gets its own set (weeks are on the same
-                # Sep–Aug scale as the corn markers). Soybeans add a trailing X for
-                # the new-crop Nov that late-summer bids reference. Other grains
-                # (wheat classes) get no markers.
+                # Sep–Aug scale). Soybeans add a trailing X for the new-crop Nov that
+                # late-summer bids reference. Other grains (wheat classes) get none.
                 _is_bean = grain == "Soybeans" or "Bean" in grain
                 _fut = None
                 if grain == "Corn":
@@ -4056,10 +4005,6 @@ with tab_bids:
                         {"MktWeek": 44, "code": "N"},   # Jul
                     ])
                 elif _is_bean:
-                    # Positions mirror the AgMarket "Dlvd … Soybean Basis Seasonal"
-                    # template (Kolten, 2026-07-21): letters sit ~4 weeks earlier than
-                    # the corn scale. Trailing X = new-crop Nov that late-summer bids
-                    # reference.
                     _fut = _pd.DataFrame([
                         {"MktWeek": 6,  "code": "X"},   # Nov
                         {"MktWeek": 14, "code": "F"},   # Jan
@@ -4074,7 +4019,6 @@ with tab_bids:
                         _alt.Chart(_fut).mark_rule(color="#cbd5e1", strokeWidth=1.5)
                         .encode(x="MktWeek:Q")
                     )
-                    # Labels centered on the line, pinned to the top of the plot area
                     _s_vlbls = (
                         _alt.Chart(_fut)
                         .mark_text(fontSize=12, color="#94a3b8", fontWeight="bold",
@@ -4084,12 +4028,6 @@ with tab_bids:
                     _s_layers = [_s_vlines, _s_vlbls] + _s_layers
 
                 _leg = (f'{_curr_yr} = black' if _curr_yr else '')
-                if _byrs:
-                    _leg += (('  ·  ' if _leg else '')
-                             + f'5-yr avg = dashed · range = shaded '
-                               f'({_byrs[0]}–{_byrs[-1]})')
-                if not _df_fwd.empty:
-                    _leg += '  ·  <span style="color:#c0392b">forward = red ◆</span>'
                 st.markdown(
                     '<div style="margin-top:24px;margin-bottom:4px;font-size:10px;'
                     'color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
@@ -4103,23 +4041,6 @@ with tab_bids:
                     _alt.layer(*_s_layers).properties(height=_SEAS_H),
                     use_container_width=True,
                 )
-
-                # Forward vs 5-yr-average box (mirrors the template's annotation).
-                if not _df_fwd.empty and not _band.empty:
-                    _b_at = _band[_band["MktWeek"].isin(set(_df_fwd["MktWeek"]))]["avg"]
-                    if len(_b_at):
-                        _fa, _ba = _df_fwd["Basis"].mean(), _b_at.mean()
-                        _dd = _fa - _ba
-                        _u = "$/t" if grain == "Soybean Meal" else "¢"
-                        st.markdown(
-                            f'<div style="display:inline-block;border:1px solid #c0392b;'
-                            f'border-radius:5px;padding:4px 10px;margin-top:2px;'
-                            f"font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7f1d1d\">"
-                            f'{_df_fwd.iloc[0]["Mon"]}–{_df_fwd.iloc[-1]["Mon"]} forward avg '
-                            f'<b>{round(_fa)}{_u}</b> · 5-yr avg those months '
-                            f'{round(_ba)}{_u} <b>({"+" if _dd >= 0 else ""}{round(_dd)})</b></div>',
-                            unsafe_allow_html=True,
-                        )
 
             except Exception as _seas_err:
                 st.warning(f"Seasonal chart error: {_seas_err}")

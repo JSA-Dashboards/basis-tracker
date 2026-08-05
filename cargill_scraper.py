@@ -15,11 +15,12 @@ Returns a list of location dicts ready for parsers/cargill_parser.py.
 """
 import json
 import logging
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +38,11 @@ _HEADERS = {
     "Accept":  "application/json, */*",
 }
 
-REQUEST_DELAY = 0.25  # seconds between location requests
+# Barchart's WebSol endpoint answers each location in ~8–10 s. Fetching ~80
+# locations sequentially blows the caller's 240 s budget, so we fan the
+# (independent) requests out across a small thread pool. 8 is polite to the
+# shared Barchart CDN and brings a full sweep to ~1–1.5 min.
+_MAX_WORKERS = 8
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -46,6 +51,63 @@ def _load_locations() -> dict:
     """Load the cargill_locations.json static map."""
     with open(_LOCATIONS_JSON, encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def _fetch_location(session, slug, meta, today_utc) -> dict | None:
+    """Fetch + shape one Cargill location. Returns its result dict, or None on
+    a request/parse error (logged). Safe to call from worker threads."""
+    barchart_id  = meta["barchart_id"]
+    display_name = meta["display_name"]
+    comm_roots   = meta.get("comm_roots") or ["ZC"]
+
+    # Build comma-separated commRoots param (leading comma is required by API)
+    comm_roots_param = "," + ",".join(comm_roots)
+    params = {
+        "module":                 "cashbids",
+        "location":               barchart_id,
+        "output":                 "json",
+        "commOverviewByLocation": "1",
+        "commRoots":              comm_roots_param,
+    }
+
+    try:
+        r = session.get(_BARCHART_URL, params=params, timeout=25)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as exc:
+        log.error("Cargill fetch failed for %s (id=%s): %s", slug, barchart_id, exc)
+        return None
+
+    # ── Extract location metadata from API response ────────────────────
+    loc_details = (data.get("locationDetails", {}).get(str(barchart_id), {}) or {})
+    state = loc_details.get("state") or ""
+    city  = loc_details.get("city")  or ""
+
+    # ── Extract cashbids from bigGroups ───────────────────────────────
+    cashbids: list[dict] = []
+    for bg in data.get("bigGroups") or []:
+        grain_raw = bg.get("name") or ""
+        for bid in bg.get("cashbids") or []:
+            basis_str    = bid.get("basis")
+            barchart_sym = bid.get("futuresymbol") or ""
+            if basis_str is None or not barchart_sym:
+                continue
+            cashbids.append({
+                "grain":           grain_raw,
+                "barchart_symbol": barchart_sym,
+                "basis_str":       str(basis_str),
+                "delivery_start":  bid.get("delivery_start") or "",
+                "delivery_end":    bid.get("delivery_end")   or "",
+            })
+
+    return {
+        "slug":          slug,
+        "location_name": display_name,
+        "state":         state,
+        "city":          city,
+        "timestamp":     today_utc,
+        "cashbids":      cashbids,
+    }
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -84,79 +146,25 @@ def fetch_cargill_bids(slugs: list[str] | None = None) -> list[dict]:
     today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
     session   = requests.Session()
     session.headers.update(_HEADERS)
+    # Size the connection pool to the worker count so concurrent requests reuse
+    # sockets instead of each opening (and discarding) its own.
+    _adapter = HTTPAdapter(pool_connections=_MAX_WORKERS, pool_maxsize=_MAX_WORKERS)
+    session.mount("https://", _adapter)
+    session.mount("http://", _adapter)
 
     results: list[dict] = []
-
-    for slug, meta in all_locs.items():
-        barchart_id  = meta["barchart_id"]
-        display_name = meta["display_name"]
-        comm_roots   = meta.get("comm_roots") or ["ZC"]
-
-        # Build comma-separated commRoots param (leading comma is required by API)
-        comm_roots_param = "," + ",".join(comm_roots)
-
-        params = {
-            "module":               "cashbids",
-            "location":             barchart_id,
-            "output":               "json",
-            "commOverviewByLocation": "1",
-            "commRoots":            comm_roots_param,
-        }
-
-        try:
-            r = session.get(_BARCHART_URL, params=params, timeout=25)
-            r.raise_for_status()
-            data = r.json()
-        except Exception as exc:
-            log.error(
-                "Cargill fetch failed for %s (id=%s): %s",
-                slug, barchart_id, exc,
+    with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as pool:
+        futs = {pool.submit(_fetch_location, session, slug, meta, today_utc): slug
+                for slug, meta in all_locs.items()}
+        for fut in as_completed(futs):
+            res = fut.result()
+            if res is None:
+                continue
+            results.append(res)
+            log.info(
+                "  Cargill %-40s  %-2s  %d bid(s)",
+                res["location_name"], res["state"], len(res["cashbids"]),
             )
-            time.sleep(REQUEST_DELAY)
-            continue
-
-        # ── Extract location metadata from API response ────────────────────
-        loc_details = (
-            data.get("locationDetails", {}).get(str(barchart_id), {}) or {}
-        )
-        state = loc_details.get("state") or ""
-        city  = loc_details.get("city")  or ""
-
-        # ── Extract cashbids from bigGroups ───────────────────────────────
-        cashbids: list[dict] = []
-        for bg in data.get("bigGroups") or []:
-            grain_raw = bg.get("name") or ""
-            for bid in bg.get("cashbids") or []:
-                basis_str    = bid.get("basis")
-                barchart_sym = bid.get("futuresymbol") or ""
-                del_start    = bid.get("delivery_start") or ""
-                del_end      = bid.get("delivery_end")   or ""
-
-                if basis_str is None or not barchart_sym:
-                    continue
-
-                cashbids.append({
-                    "grain":          grain_raw,
-                    "barchart_symbol": barchart_sym,
-                    "basis_str":      str(basis_str),
-                    "delivery_start": del_start,
-                    "delivery_end":   del_end,
-                })
-
-        results.append({
-            "slug":          slug,
-            "location_name": display_name,
-            "state":         state,
-            "city":          city,
-            "timestamp":     today_utc,
-            "cashbids":      cashbids,
-        })
-
-        log.info(
-            "  Cargill %-40s  %-2s  %d bid(s)",
-            display_name, state, len(cashbids),
-        )
-        time.sleep(REQUEST_DELAY)
 
     log.info("Cargill scrape complete: %d location(s) returned", len(results))
     return results
