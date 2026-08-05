@@ -2998,7 +2998,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.selectbox(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "INCO"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "INCO"],
             label_visibility="collapsed",
         )
 
@@ -3505,7 +3505,8 @@ with tab_bids:
     elif provider in ("Star of West", "Mennel", "Agtegra", "Bartlett", "See-Mor",
                        "Ace", "One Earth", "Harvestone", "Big River", "BioUrja",
                        "Mid Missouri", "JBS", "Heartland Coop", "Alto",
-                       "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "INCO"):
+                       "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag",
+                       "Garden City Coop", "INCO"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so. The five Bushel
@@ -3515,6 +3516,7 @@ with tab_bids:
                       "Agtegra": "--agtegra-only", "Bartlett": "--bartlett-only",
                       "Alto": "--alto-only", "Mid Missouri": "--agricharts-only",
                       "JBS": "--agricharts-only", "Heartland Coop": "--heartland-only",
+                      "Garden City Coop": "--agricharts-only",
                       "Cardinal Ethanol": "--cihedging-only",
                       "Sandhills Renewables": "--cihedging-only",
                       "Husker Ag": "--cihedging-only"}.get(provider)

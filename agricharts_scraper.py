@@ -41,6 +41,8 @@ TENANTS: list[dict] = [
      "facility": "Corn Processing"},
     {"provider": "JBS", "host": "https://jbslivepork.com",
      "shape": "multi", "state": None},
+    {"provider": "Garden City Coop", "host": "https://gccoop.agricharts.com",
+     "shape": "multi", "state": "KS"},
 ]
 
 
@@ -77,6 +79,10 @@ def fetch_agricharts_bids() -> list[dict]:
             continue
 
         for loc in feed:
+            # feed-flagged not-for-publication (value is a STRING "0"/"1", so
+            # a bare truthiness check would drop everyone).
+            if str(loc.get("hide_on_sites_and_apis") or "").strip().lower() in ("1", "true", "yes"):
+                continue
             cashbids = loc.get("cashbids") or []
             if not cashbids:
                 continue
@@ -88,7 +94,15 @@ def fetch_agricharts_bids() -> list[dict]:
                     continue                       # skip the futures-only pseudo row
                 location = _clean_loc(raw_name)
                 state = loc.get("state") or t.get("state")
-                facility = _facility_from_name(raw_name)
+                # Some feeds (JBS) embed the state in the name ("Hedrick, IA Feed
+                # Mill"); others (Garden City Coop) don't — append it so every
+                # location reads "Town, ST".
+                if state and "," not in location:
+                    location = f"{location}, {state}"
+                # Prefer the feed's own facility_type (authoritative — e.g. Garden
+                # City Coop's "River Valley" has no "Elevator" in its name but the
+                # feed labels it Country Elevator); fall back to the name heuristic.
+                facility = (loc.get("facility_type") or "").strip() or _facility_from_name(raw_name)
             out.append({
                 "provider": t["provider"], "location_name": location,
                 "state": state, "city": loc.get("city") or "",
