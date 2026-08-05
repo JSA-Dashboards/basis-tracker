@@ -2997,9 +2997,9 @@ with tab_bids:
     # ── Provider + Location selector ─────────────────────────────────────────────
     prov_col, _ = st.columns([3, 7])
     with prov_col:
-        provider = st.radio(
+        provider = st.selectbox(
             "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "INCO"],
-            horizontal=True, label_visibility="collapsed",
+            label_visibility="collapsed",
         )
 
     if provider == "CHS":
