@@ -53,6 +53,9 @@ SITES: list[dict] = [
     {"provider": "Sandhills Renewables", "location": "Atkinson, NE", "state": "NE",
      "facility_type": "Corn Processing", "company_id": 146145, "commodity_ids": "",
      "origin": "https://www.sandhillsrenewables.com"},
+    {"provider": "Husker Ag", "location": "Plainview, NE", "state": "NE",
+     "facility_type": "Corn Processing", "company_id": 106378, "commodity_ids": "",
+     "origin": "https://huskerag.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
