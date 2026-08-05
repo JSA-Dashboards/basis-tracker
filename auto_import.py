@@ -124,6 +124,7 @@ from bushelsites_scraper import SITES as BUSHELSITES, scrape_site as scrape_bush
 from agricharts_scraper import fetch_agricharts_bids
 from heartland_scraper import fetch_heartland_bids, parse_heartland
 from alto_scraper import fetch_alto_bids, parse_alto
+from cihedging_scraper import fetch_cihedging
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -584,6 +585,46 @@ def run_alto() -> int:
     log.info("  ✓  %-20s  Corn  %d row(s)", req.location, len(req.rows))
     log.info("Alto done: 1 location  |  %d row(s)  (bulk)", len(req.rows))
     return len(req.rows)
+
+
+def run_cihedging() -> int:
+    """Scrape the CIHedging-widget plants (Cardinal Ethanol Colwich/Union City,
+    Sandhills Renewables). Multiple providers, so metas are grouped per provider."""
+    log.info("=" * 60)
+    log.info("CIHedging plants scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_cihedging()
+    except Exception as exc:
+        log.error("CIHedging scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("CIHedging scrape returned no data.")
+        return 0
+
+    # Snapshots carry their own provider — one bulk upsert covers all sites.
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("CIHedging bulk snapshot upsert failed: %s", exc)
+    # Location metas: upsert_location_metas takes ONE provider, so group by it.
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("CIHedging meta upsert failed for %s: %s", prov, exc)
+
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("CIHedging done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
 
 
 def run_sotw() -> int:
@@ -1627,6 +1668,7 @@ def run(
     run_agricharts_scrape: bool = True,
     run_heartland_scrape: bool = True,
     run_alto_scrape: bool = True,
+    run_cihedging_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1705,6 +1747,8 @@ def run(
         total += _run_guarded(run_heartland, "Heartland")
     if run_alto_scrape:
         total += _run_guarded(run_alto, "Alto")
+    if run_cihedging_scrape:
+        total += _run_guarded(run_cihedging, "CIHedging")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -1957,6 +2001,10 @@ if __name__ == "__main__":
     alto_group.add_argument("--no-alto", dest="no_alto", action="store_true", help="Skip Alto Ingredients scrape")
     alto_group.add_argument("--alto-only", dest="alto_only", action="store_true", help="Run Alto Ingredients scrape only")
 
+    cih_group = parser.add_mutually_exclusive_group()
+    cih_group.add_argument("--no-cihedging", dest="no_cihedging", action="store_true", help="Skip CIHedging plants (Cardinal, Sandhills) scrape")
+    cih_group.add_argument("--cihedging-only", dest="cihedging_only", action="store_true", help="Run CIHedging plants (Cardinal, Sandhills) scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -2090,6 +2138,9 @@ if __name__ == "__main__":
     elif args.alto_only:
         init_db()
         run_alto()
+    elif args.cihedging_only:
+        init_db()
+        run_cihedging()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2135,6 +2186,7 @@ if __name__ == "__main__":
             run_agricharts_scrape=not args.no_agricharts,
             run_heartland_scrape=not args.no_heartland,
             run_alto_scrape=not args.no_alto,
+            run_cihedging_scrape=not args.no_cihedging,
             run_pruning=not args.no_prune,
         )
 
