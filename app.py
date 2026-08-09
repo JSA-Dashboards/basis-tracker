@@ -2565,6 +2565,32 @@ with tab_railfob:
         _curr = _sel[_sel["MktYearNum"] == _mx]
         _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
 
+        # 5-yr range band + average for THIS period (five completed years before current)
+        _rwin  = _sel[(_sel["MktYearNum"] >= _mx - 5) & (_sel["MktYearNum"] < _mx)]
+        _rband = (_rwin.groupby("MktWeek")["Bid"]
+                  .agg(avg="mean", lo="min", hi="max").reset_index())
+        _rbyrs = sorted(_rwin["MktYear"].unique())
+
+        # Forward curve = the corridor's LATEST full rundown, each period placed at its
+        # delivery-month week (dashed same-colour line over the historical band).
+        _MON_WK = {"Sep": 1, "Oct": 5, "Nov": 10, "Dec": 14, "Jan": 18, "Feb": 23,
+                   "Mar": 27, "Apr": 31, "May": 36, "Jun": 40, "Jul": 45, "Aug": 49}
+        _PKG_WK = {"OND": 5, "JFM": 18, "AM": 31, "JJ": 40, "AMJJ": 31, "Jan-Jul": 18, "AS": 49}
+        _lastdate = _pv["Date"].max()
+        _rfw = []
+        for _, _rr in _pv[_pv["Date"] == _lastdate].iterrows():
+            if _rr["Bid"] is None:
+                continue
+            _bk = _seasonal_bucket(_rr["Period"])
+            _wk = _MON_WK.get(_bk) or _PKG_WK.get(_bk)
+            if _wk:
+                _rfw.append({"MktWeek": _wk, "Bid": float(_rr["Bid"])})
+        _df_rfwd = _pd.DataFrame(_rfw)
+        if not _df_rfwd.empty:
+            _df_rfwd = (_df_rfwd.groupby("MktWeek", as_index=False)["Bid"].mean()
+                        .sort_values("MktWeek"))
+            _df_rfwd["Bid"] = _df_rfwd["Bid"].round(1)
+
         _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
                     axis=_alt.Axis(labelFontSize=10))
         _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_alt.Scale(zero=False),
@@ -2596,9 +2622,18 @@ with tab_railfob:
                               color="#000000")
                    .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Bid:Q"), text="MktYear:N"))
 
-        _layers = ([_wm] if _wm else []) + [_zero, _cur_ln, _cur_lb]
+        _layers = ([_wm] if _wm else []) + [_zero]
+        # 5-yr range band (gray) + average, behind the year lines.
+        if not _rband.empty:
+            _layers += [
+                _alt.Chart(_rband).mark_area(color="#9ca3af", opacity=0.22)
+                .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("lo:Q", title="Bid (¢)",
+                                                         scale=_alt.Scale(zero=False)), y2="hi:Q"),
+                _alt.Chart(_rband).mark_line(color="#6b7280", strokeDash=[5, 3], strokeWidth=1.5)
+                .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q")),
+            ]
         if not _hist.empty:
-            _layers.insert(2, _alt.Chart(_hist).mark_line(strokeWidth=2, opacity=0.9)
+            _layers.append(_alt.Chart(_hist).mark_line(strokeWidth=2, opacity=0.9)
                            .encode(x=_x, y=_y,
                                    color=_alt.Color("MktYear:N",
                                        sort=sorted(_hist["MktYear"].unique()),
@@ -2607,6 +2642,17 @@ with tab_railfob:
                                                           columns=6, labelFontSize=10,
                                                           titleFontSize=10)),
                                    tooltip=_tip))
+        _layers += [_cur_ln, _cur_lb]
+        # Forward curve — dashed same-colour (black) line of the latest rundown.
+        if not _df_rfwd.empty:
+            _rfwd_tip = [_alt.Tooltip("MktWeek:Q", title="Week"),
+                         _alt.Tooltip("Bid:Q", title="Fwd bid (¢)", format=".0f")]
+            _layers += [
+                _alt.Chart(_df_rfwd).mark_line(strokeWidth=2, color="#000000", strokeDash=[6, 4])
+                .encode(x=_x, y=_y),
+                _alt.Chart(_df_rfwd).mark_point(filled=True, color="#000000", size=34)
+                .encode(x=_x, y=_y, tooltip=_rfwd_tip),
+            ]
         _fut = _pd.DataFrame([{"MktWeek": 13, "code": "Z"}, {"MktWeek": 27, "code": "H"},
                               {"MktWeek": 35, "code": "K"}, {"MktWeek": 44, "code": "N"}])
         _layers = [_alt.Chart(_fut).mark_rule(color="#cbd5e1", strokeWidth=1.5)
@@ -3921,6 +3967,33 @@ with tab_bids:
                 _curr    = _df_seas[_df_seas["MktYearNum"] == _max_yr].copy()
                 _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
 
+                # 5-yr window = the five completed marketing years before the current one
+                _win  = _df_seas[(_df_seas["MktYearNum"] >= _max_yr - 5)
+                                 & (_df_seas["MktYearNum"] < _max_yr)]
+                _band = (_win.groupby("MktWeek")["Basis"]
+                         .agg(avg="mean", lo="min", hi="max").reset_index())
+                _byrs = sorted(_win["MktYear"].unique())
+
+                # Forward-curve points — the location's currently-posted forward bids,
+                # each placed at its delivery month's week within THAT marketing year.
+                _fwd_pts = []
+                for _fr in viewing.rows:
+                    if (_fr.isSpot or _grain_disp(_fr.grain) != grain
+                            or _fr.basisCents is None or not _fr.futuresSymbol):
+                        continue
+                    _fym = _dp.canonical(_fr.deliveryMonth, _fr.futuresSymbol)
+                    if not _fym:
+                        continue
+                    _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
+                    _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
+                    _fwd_pts.append({"MktYearNum": _fmy, "MktWeek": max(1, min(52, _fwk)),
+                                     "Basis": float(_fr.basisCents)})
+                _df_fwdc = _pd.DataFrame(_fwd_pts)
+                if not _df_fwdc.empty:
+                    _df_fwdc = (_df_fwdc.sort_values("MktWeek")
+                                .groupby(["MktYearNum", "MktWeek"], as_index=False)["Basis"].mean())
+                    _df_fwdc["Basis"] = _df_fwdc["Basis"].round(1)
+
                 # Month labels (Sep–Aug marketing year) instead of raw week numbers.
                 # One tick at each month's first week.
                 _mlab = ("{1:'Sep',5:'Oct',10:'Nov',14:'Dec',18:'Jan',23:'Feb',"
@@ -3981,6 +4054,18 @@ with tab_bids:
                 )
 
                 _s_layers = ([_s_wm] if _s_wm else []) + [_s_zero]
+                # 5-yr range band (gray shade) + 5-yr average line, behind the year lines.
+                if not _band.empty:
+                    _s_layers += [
+                        _alt.Chart(_band).mark_area(color="#9ca3af", opacity=0.22)
+                        .encode(x=_x_s, y=_alt.Y("lo:Q", title="Basis (¢)",
+                                                 scale=_alt.Scale(zero=False)), y2="hi:Q"),
+                        _alt.Chart(_band).mark_line(color="#6b7280", strokeDash=[5, 3],
+                                                    strokeWidth=1.5)
+                        .encode(x=_x_s, y=_alt.Y("avg:Q"),
+                                tooltip=[_alt.Tooltip("MktWeek:Q", title="Week"),
+                                         _alt.Tooltip("avg:Q", title="5-yr avg", format=".0f")]),
+                    ]
                 # Prior marketing years — coloured lines with a bottom legend, drawn
                 # under the current-year black line.
                 if not _hist.empty:
@@ -3996,6 +4081,26 @@ with tab_bids:
                                 tooltip=_tip_s)
                     )
                 _s_layers += [_s_curr, _s_curr_end]
+                # Forward-curve extension — DASHED same-colour (black) continuation of the
+                # current-year line via posted forward bids. Bids that roll past Aug start
+                # the next marketing year (a fresh dashed segment at the Sep side).
+                if not _df_fwdc.empty:
+                    _cur_fwd = _df_fwdc[_df_fwdc["MktYearNum"] == _max_yr][["MktWeek", "Basis"]]
+                    if not _cur_fwd.empty and not _curr.empty:
+                        _anch = _curr.nlargest(1, "MktWeek")[["MktWeek", "Basis"]]
+                        _cur_fwd = _pd.concat([_anch, _cur_fwd]).sort_values("MktWeek")
+                    _nxt_fwd = _df_fwdc[_df_fwdc["MktYearNum"] == _max_yr + 1][["MktWeek", "Basis"]]
+                    _fwd_tip = [_alt.Tooltip("MktWeek:Q", title="Week"),
+                                _alt.Tooltip("Basis:Q", title="Fwd basis (¢)", format=".0f")]
+                    for _seg in (_cur_fwd, _nxt_fwd):
+                        if _seg is not None and not _seg.empty:
+                            _s_layers += [
+                                _alt.Chart(_seg).mark_line(strokeWidth=2, color="#000000",
+                                                           strokeDash=[6, 4])
+                                .encode(x=_x_s, y=_y_s),
+                                _alt.Chart(_seg).mark_point(filled=True, color="#000000", size=34)
+                                .encode(x=_x_s, y=_y_s, tooltip=_fwd_tip),
+                            ]
 
                 # Futures-month gridlines. Corn and soybeans price against DIFFERENT
                 # contract cycles, so each gets its own set (weeks are on the same
@@ -4034,6 +4139,11 @@ with tab_bids:
                     _s_layers = [_s_vlines, _s_vlbls] + _s_layers
 
                 _leg = (f'{_curr_yr} = black' if _curr_yr else '')
+                if _byrs:
+                    _leg += (('  ·  ' if _leg else '')
+                             + f'5-yr avg = dashed · range = gray band ({_byrs[0]}–{_byrs[-1]})')
+                if not _df_fwdc.empty:
+                    _leg += '  ·  forward = dashed ●'
                 st.markdown(
                     '<div style="margin-top:24px;margin-bottom:4px;font-size:10px;'
                     'color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
