@@ -2585,11 +2585,18 @@ with tab_railfob:
             _wk = _MON_WK.get(_bk) or _PKG_WK.get(_bk)
             if _wk:
                 _rfw.append({"MktWeek": _wk, "Bid": float(_rr["Bid"])})
+        # Today's marketing week — periods whose week has already passed this year roll
+        # to the NEXT marketing year (a separate segment starting back at the Sep side).
+        _t = date.today()
+        _tmy = _t.year if _t.month >= 9 else _t.year - 1
+        _twk = min(52, max(1, ((_t - date(_tmy, 9, 1)).days // 7) + 1))
         _df_rfwd = _pd.DataFrame(_rfw)
+        _rfwd_cur = _rfwd_nxt = None
         if not _df_rfwd.empty:
-            _df_rfwd = (_df_rfwd.groupby("MktWeek", as_index=False)["Bid"].mean()
-                        .sort_values("MktWeek"))
+            _df_rfwd = _df_rfwd.groupby("MktWeek", as_index=False)["Bid"].mean()
             _df_rfwd["Bid"] = _df_rfwd["Bid"].round(1)
+            _rfwd_cur = _df_rfwd[_df_rfwd["MktWeek"] >= _twk].sort_values("MktWeek")
+            _rfwd_nxt = _df_rfwd[_df_rfwd["MktWeek"] < _twk].sort_values("MktWeek")
 
         _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
                     axis=_alt.Axis(labelFontSize=10))
@@ -2643,16 +2650,19 @@ with tab_railfob:
                                                           titleFontSize=10)),
                                    tooltip=_tip))
         _layers += [_cur_ln, _cur_lb]
-        # Forward curve — dashed same-colour (black) line of the latest rundown.
-        if not _df_rfwd.empty:
-            _rfwd_tip = [_alt.Tooltip("MktWeek:Q", title="Week"),
-                         _alt.Tooltip("Bid:Q", title="Fwd bid (¢)", format=".0f")]
-            _layers += [
-                _alt.Chart(_df_rfwd).mark_line(strokeWidth=2, color="#000000", strokeDash=[6, 4])
-                .encode(x=_x, y=_y),
-                _alt.Chart(_df_rfwd).mark_point(filled=True, color="#000000", size=34)
-                .encode(x=_x, y=_y, tooltip=_rfwd_tip),
-            ]
+        # Forward curve — dashed same-colour (black) line of the latest rundown. The
+        # next-marketing-year stretch is drawn as a separate segment (starts back at
+        # the Sep/left side) so it never draws a line back across the whole chart.
+        _rfwd_tip = [_alt.Tooltip("MktWeek:Q", title="Week"),
+                     _alt.Tooltip("Bid:Q", title="Fwd bid (¢)", format=".0f")]
+        for _seg in (_rfwd_cur, _rfwd_nxt):
+            if _seg is not None and not _seg.empty:
+                _layers += [
+                    _alt.Chart(_seg).mark_line(strokeWidth=2, color="#000000", strokeDash=[6, 4])
+                    .encode(x=_x, y=_y),
+                    _alt.Chart(_seg).mark_point(filled=True, color="#000000", size=34)
+                    .encode(x=_x, y=_y, tooltip=_rfwd_tip),
+                ]
         _fut = _pd.DataFrame([{"MktWeek": 13, "code": "Z"}, {"MktWeek": 27, "code": "H"},
                               {"MktWeek": 35, "code": "K"}, {"MktWeek": 44, "code": "N"}])
         _layers = [_alt.Chart(_fut).mark_rule(color="#cbd5e1", strokeWidth=1.5)
