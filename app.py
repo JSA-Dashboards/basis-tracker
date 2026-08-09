@@ -2579,8 +2579,10 @@ with tab_railfob:
                                                     titleFontSize=10))
         _PREV_CLR, _AVG_CLR = "#2563eb", "#d97706"   # hero blue / amber
 
-        # 5-yr range band + average for THIS period (five completed years before current)
-        _rwin  = _sel[(_sel["MktYearNum"] >= _mx - 5) & (_sel["MktYearNum"] < _mx)]
+        # 5-yr range band + average for THIS period — the five most recent COMPLETED
+        # years that actually have data (skips gaps, so the band spans 5 real years).
+        _rwin_yrs = sorted(y for y in _sel["MktYearNum"].unique() if y < _mx)[-5:]
+        _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
         _rband = (_rwin.groupby("MktWeek")["Bid"]
                   .agg(avg="mean", lo="min", hi="max").reset_index())
         _rbyrs = sorted(_rwin["MktYear"].unique())
@@ -4042,9 +4044,12 @@ with tab_bids:
                 # pulled OUT of that scale and drawn as a fixed hero colour instead.
                 _old_years = sorted(_hist_old["MktYear"].unique())
 
-                # 5-yr window = the five completed marketing years before the current one
-                _win  = _df_seas[(_df_seas["MktYearNum"] >= _max_yr - 5)
-                                 & (_df_seas["MktYearNum"] < _max_yr)]
+                # 5-yr window = the five most recent COMPLETED marketing years that
+                # actually have data (skips gaps, so the band always spans 5 real years
+                # when 5 exist — not just whichever fall in a fixed calendar window).
+                _win_yrs = sorted(y for y in _df_seas["MktYearNum"].unique()
+                                  if y < _max_yr)[-5:]
+                _win  = _df_seas[_df_seas["MktYearNum"].isin(_win_yrs)]
                 _band = (_win.groupby("MktWeek")["Basis"]
                          .agg(avg="mean", lo="min", hi="max").reset_index())
                 _byrs = sorted(_win["MktYear"].unique())
