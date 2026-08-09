@@ -2585,15 +2585,23 @@ with tab_railfob:
         # delivery-month week (dashed same-colour line over the historical band).
         _MON_WK = {"Sep": 1, "Oct": 5, "Nov": 10, "Dec": 14, "Jan": 18, "Feb": 23,
                    "Mar": 27, "Apr": 31, "May": 36, "Jun": 40, "Jul": 45, "Aug": 49}
-        _PKG_WK = {"OND": 5, "JFM": 18, "AM": 31, "JJ": 40, "AMJJ": 31, "Jan-Jul": 18, "AS": 49}
+        # A package bid covers EVERY month it spans, so the forward curve plots that
+        # bid at each of those months' weeks (JFM → Jan+Feb+Mar, AMJJ → Apr…Jul),
+        # rather than dropping the whole package onto a single week.
+        _PKG_MON = {"OND": ["Oct", "Nov", "Dec"], "JFM": ["Jan", "Feb", "Mar"],
+                    "AM": ["Apr", "May"], "JJ": ["Jun", "Jul"],
+                    "AMJJ": ["Apr", "May", "Jun", "Jul"],
+                    "Jan-Jul": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+                    "AS": ["Aug", "Sep"]}
         _lastdate = _pv["Date"].max()
         _rfw = []
         for _, _rr in _pv[_pv["Date"] == _lastdate].iterrows():
             if _rr["Bid"] is None:
                 continue
             _bk = _seasonal_bucket(_rr["Period"])
-            _wk = _MON_WK.get(_bk) or _PKG_WK.get(_bk)
-            if _wk:
+            _wks = ([_MON_WK[_bk]] if _bk in _MON_WK
+                    else [_MON_WK[_m] for _m in _PKG_MON.get(_bk, [])])
+            for _wk in _wks:
                 _rfw.append({"MktWeek": _wk, "Bid": float(_rr["Bid"])})
         # Today's marketing week — periods whose week has already passed this year roll
         # to the NEXT marketing year (a separate segment starting back at the Sep side).
