@@ -2598,9 +2598,23 @@ with tab_railfob:
             _rfwd_cur = _df_rfwd[_df_rfwd["MktWeek"] >= _twk].sort_values("MktWeek")
             _rfwd_nxt = _df_rfwd[_df_rfwd["MktWeek"] < _twk].sort_values("MktWeek")
 
+        # Auto-fit the y-axis to the central ~95% of bids so outlier days don't squash
+        # the chart; outliers clamp to the edge.
+        _ryvals = list(_sel["Bid"])
+        if not _df_rfwd.empty:
+            _ryvals += list(_df_rfwd["Bid"])
+        _rydom = None
+        if len(_ryvals) >= 8:
+            _rq = _pd.Series(_ryvals).quantile([0.025, 0.975])
+            _rqlo, _rqhi = float(_rq.iloc[0]), float(_rq.iloc[1])
+            if _rqhi > _rqlo:
+                _rpad = (_rqhi - _rqlo) * 0.08
+                _rydom = [round(_rqlo - _rpad), round(_rqhi + _rpad)]
+        _ry_scale = (_alt.Scale(zero=False, domain=_rydom, clamp=True) if _rydom
+                     else _alt.Scale(zero=False))
         _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
                     axis=_alt.Axis(labelFontSize=10))
-        _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_alt.Scale(zero=False),
+        _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_ry_scale,
                     axis=_alt.Axis(labelFontSize=10))
         _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
                 _alt.Tooltip("MktWeek:Q", title="Week"),
@@ -2635,9 +2649,9 @@ with tab_railfob:
             _layers += [
                 _alt.Chart(_rband).mark_area(color="#9ca3af", opacity=0.22)
                 .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("lo:Q", title="Bid (¢)",
-                                                         scale=_alt.Scale(zero=False)), y2="hi:Q"),
+                                                         scale=_ry_scale), y2="hi:Q"),
                 _alt.Chart(_rband).mark_line(color="#6b7280", strokeDash=[5, 3], strokeWidth=1.5)
-                .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q")),
+                .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q", scale=_ry_scale)),
             ]
         if not _hist.empty:
             _layers.append(_alt.Chart(_hist).mark_line(strokeWidth=2, opacity=0.9)
@@ -4014,8 +4028,21 @@ with tab_bids:
                                              labelExpr=_mlab, labelFontSize=11,
                                              grid=True, gridColor="#eef2f6",
                                              domainColor="#cbd5e1", tickColor="#cbd5e1"))
-                _y_s = _alt.Y("Basis:Q", title="Basis (¢)",
-                              scale=_alt.Scale(zero=False),
+                # Auto-fit the y-axis to the central ~95% of values so a few outlier
+                # days don't squash the chart; outliers clamp to the edge (clamp=True).
+                _yvals = list(_df_seas["Basis"])
+                if not _df_fwdc.empty:
+                    _yvals += list(_df_fwdc["Basis"])
+                _ydom = None
+                if len(_yvals) >= 8:
+                    _q = _pd.Series(_yvals).quantile([0.025, 0.975])
+                    _qlo, _qhi = float(_q.iloc[0]), float(_q.iloc[1])
+                    if _qhi > _qlo:
+                        _pad = (_qhi - _qlo) * 0.08
+                        _ydom = [round(_qlo - _pad), round(_qhi + _pad)]
+                _y_scale = (_alt.Scale(zero=False, domain=_ydom, clamp=True) if _ydom
+                            else _alt.Scale(zero=False))
+                _y_s = _alt.Y("Basis:Q", title="Basis (¢)", scale=_y_scale,
                               axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
                 _tip_s = [
                     _alt.Tooltip("MktYear:N", title="Mkt Year"),
@@ -4069,10 +4096,10 @@ with tab_bids:
                     _s_layers += [
                         _alt.Chart(_band).mark_area(color="#9ca3af", opacity=0.22)
                         .encode(x=_x_s, y=_alt.Y("lo:Q", title="Basis (¢)",
-                                                 scale=_alt.Scale(zero=False)), y2="hi:Q"),
+                                                 scale=_y_scale), y2="hi:Q"),
                         _alt.Chart(_band).mark_line(color="#6b7280", strokeDash=[5, 3],
                                                     strokeWidth=1.5)
-                        .encode(x=_x_s, y=_alt.Y("avg:Q"),
+                        .encode(x=_x_s, y=_alt.Y("avg:Q", scale=_y_scale),
                                 tooltip=[_alt.Tooltip("MktWeek:Q", title="Week"),
                                          _alt.Tooltip("avg:Q", title="5-yr avg", format=".0f")]),
                     ]
