@@ -2585,24 +2585,31 @@ with tab_railfob:
         # delivery-month week (dashed same-colour line over the historical band).
         _MON_WK = {"Sep": 1, "Oct": 5, "Nov": 10, "Dec": 14, "Jan": 18, "Feb": 23,
                    "Mar": 27, "Apr": 31, "May": 36, "Jun": 40, "Jul": 45, "Aug": 49}
-        # A package bid covers EVERY month it spans, so the forward curve plots that
-        # bid at each of those months' weeks (JFM → Jan+Feb+Mar, AMJJ → Apr…Jul),
-        # rather than dropping the whole package onto a single week.
+        # A package bid is the AVERAGE across the months it spans; the forward curve
+        # spreads it into a per-month carry — later months bid higher by _CARRY ¢/mo,
+        # centered so the months still average back to the package bid. E.g. JFM +0 →
+        # Jan −2 / Feb 0 / Mar +2; AMJJ +0 → Apr −3 / May −1 / Jun +1 / Jul +3.
         _PKG_MON = {"OND": ["Oct", "Nov", "Dec"], "JFM": ["Jan", "Feb", "Mar"],
                     "AM": ["Apr", "May"], "JJ": ["Jun", "Jul"],
                     "AMJJ": ["Apr", "May", "Jun", "Jul"],
                     "Jan-Jul": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
                     "AS": ["Aug", "Sep"]}
+        _CARRY = 2.0                                        # ¢ of carry per month
         _lastdate = _pv["Date"].max()
         _rfw = []
         for _, _rr in _pv[_pv["Date"] == _lastdate].iterrows():
             if _rr["Bid"] is None:
                 continue
             _bk = _seasonal_bucket(_rr["Period"])
-            _wks = ([_MON_WK[_bk]] if _bk in _MON_WK
-                    else [_MON_WK[_m] for _m in _PKG_MON.get(_bk, [])])
-            for _wk in _wks:
-                _rfw.append({"MktWeek": _wk, "Bid": float(_rr["Bid"])})
+            _bid = float(_rr["Bid"])
+            if _bk in _MON_WK:
+                _rfw.append({"MktWeek": _MON_WK[_bk], "Bid": _bid})
+            elif _bk in _PKG_MON:
+                _mons = _PKG_MON[_bk]
+                _ctr = (len(_mons) - 1) / 2.0
+                for _i, _m in enumerate(_mons):
+                    _rfw.append({"MktWeek": _MON_WK[_m],
+                                 "Bid": round(_bid + _CARRY * (_i - _ctr), 1)})
         # Today's marketing week — periods whose week has already passed this year roll
         # to the NEXT marketing year (a separate segment starting back at the Sep side).
         _t = date.today()
