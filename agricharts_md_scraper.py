@@ -39,6 +39,9 @@ SITES: list[dict] = [
     {"provider": "Siouxland Energy", "location": "Sioux Center, IA", "state": "IA",
      "facility_type": "Corn Processing",
      "url": "https://www.siouxlandenergy.com/markets/cash.php"},
+    {"provider": "Plymouth Energy", "location": "Merrill, IA", "state": "IA",
+     "facility_type": "Corn Processing",
+     "url": "https://cvacoop365.agricharts.com/markets/cash.php?location_filter=83175"},
 ]
 
 _COMMODITY = {"CORN": ("ZC", "Corn"), "SOYBEANS": ("ZS", "Soybeans"),

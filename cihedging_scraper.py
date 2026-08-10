@@ -68,6 +68,9 @@ SITES: list[dict] = [
     {"provider": "Siouxland Ethanol", "location": "Jackson, NE", "state": "NE",
      "facility_type": "Corn Processing", "company_id": 15601, "commodity_ids": "",
      "origin": "https://siouxlandethanol.com"},
+    {"provider": "Elite Octane", "location": "Atlantic, IA", "state": "IA",
+     "facility_type": "Corn Processing", "company_id": 22641, "commodity_ids": "",
+     "origin": "https://www.eliteoctane.net"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
