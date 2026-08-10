@@ -44,6 +44,13 @@ LOCATION_ID_OVERRIDES = {
     "6f7e42d6-398c-40ea-a1a9-aa5053b20b11": "Morris, MN",
 }
 
+# A few CHS delivery points are third-party plants we track under their OWN
+# company name. Map the UUID to (provider, location) so their bids join that
+# series instead of showing under "CHS".
+PROVIDER_OVERRIDES = {
+    "763c2bfb-10d8-44ca-9f4d-50e3a6647964": ("Absolute Energy", "St. Ansgar, IA"),
+}
+
 
 def _basis_to_cents(value_str: str) -> Optional[int]:
     """Convert USD/bu string (e.g., '-0.03', '0.24') to integer cents (-3, 24)."""
@@ -125,10 +132,11 @@ def parse_bids_response(
             if not rows:
                 continue
 
+            _prov, _loc = PROVIDER_OVERRIDES.get(loc_id, ("CHS", loc_name))
             snapshots.append(NewSnapshotRequest(
                 timestamp=timestamp,
-                provider="CHS",
-                location=loc_name,
+                provider=_prov,
+                location=_loc,
                 source="web",
                 rows=rows,
             ))
