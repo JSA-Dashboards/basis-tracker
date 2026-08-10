@@ -126,6 +126,7 @@ from heartland_scraper import fetch_heartland_bids, parse_heartland
 from alto_scraper import fetch_alto_bids, parse_alto
 from cihedging_scraper import fetch_cihedging
 from vistacomm_scraper import fetch_vistacomm
+from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -661,6 +662,43 @@ def run_vistacomm() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("VistaComm done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_dtn_playwright() -> int:
+    """Scrape DTN/aghost plants whose basis is client-injected (no JSON endpoint) by
+    rendering them in headless Chromium — e.g. Heron Lake. Local-only (playwright is
+    a dev dep); guarded on a larger budget since a render is seconds, not ms."""
+    log.info("=" * 60)
+    log.info("DTN (headless render) plants scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_dtn_playwright()
+    except Exception as exc:
+        log.error("DTN(pw) scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("DTN(pw) scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("DTN(pw) bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("DTN(pw) meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("DTN(pw) done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1707,6 +1745,7 @@ def run(
     run_alto_scrape: bool = True,
     run_cihedging_scrape: bool = True,
     run_vistacomm_scrape: bool = True,
+    run_dtn_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1789,6 +1828,8 @@ def run(
         total += _run_guarded(run_cihedging, "CIHedging")
     if run_vistacomm_scrape:
         total += _run_guarded(run_vistacomm, "VistaComm")
+    if run_dtn_scrape:
+        total += _run_guarded(run_dtn_playwright, "DTN", 300)
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -2047,6 +2088,9 @@ if __name__ == "__main__":
     vc_group = parser.add_mutually_exclusive_group()
     vc_group.add_argument("--no-vistacomm", dest="no_vistacomm", action="store_true", help="Skip VistaComm/DTN plants (Fox River) scrape")
     vc_group.add_argument("--vistacomm-only", dest="vistacomm_only", action="store_true", help="Run VistaComm/DTN plants (Fox River) scrape only")
+    dtn_group = parser.add_mutually_exclusive_group()
+    dtn_group.add_argument("--no-dtn", dest="no_dtn", action="store_true", help="Skip DTN headless-render plants (Heron Lake) scrape")
+    dtn_group.add_argument("--dtn-only", dest="dtn_only", action="store_true", help="Run DTN headless-render plants (Heron Lake) scrape only")
 
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
@@ -2187,6 +2231,9 @@ if __name__ == "__main__":
     elif args.vistacomm_only:
         init_db()
         run_vistacomm()
+    elif args.dtn_only:
+        init_db()
+        run_dtn_playwright()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2234,6 +2281,7 @@ if __name__ == "__main__":
             run_alto_scrape=not args.no_alto,
             run_cihedging_scrape=not args.no_cihedging,
             run_vistacomm_scrape=not args.no_vistacomm,
+            run_dtn_scrape=not args.no_dtn,
             run_pruning=not args.no_prune,
         )
 
