@@ -30,6 +30,12 @@ SITES: list[dict] = [
     {"provider": "Homeland Energy", "location": "Lawler, IA", "state": "IA",
      "facility_type": "Corn Processing",
      "url": "https://www.farmerswin.com/markets/cash.php?location_filter=12602"},
+    {"provider": "KAAPA", "location": "Aurora, NE", "state": "NE", "facility_type": "Corn Processing",
+     "url": "https://kaapagrains.agricharts.com/markets/cash.php?location_filter=83493"},
+    {"provider": "KAAPA", "location": "Minden, NE", "state": "NE", "facility_type": "Corn Processing",
+     "url": "https://kaapagrains.agricharts.com/markets/cash.php?location_filter=2893"},
+    {"provider": "KAAPA", "location": "Ravenna, NE", "state": "NE", "facility_type": "Corn Processing",
+     "url": "https://kaapagrains.agricharts.com/markets/cash.php?location_filter=46768"},
 ]
 
 _COMMODITY = {"CORN": ("ZC", "Corn"), "SOYBEANS": ("ZS", "Soybeans"),
@@ -69,6 +75,15 @@ def _args(call: str) -> list[str]:
     return [a or b or c for a, b, c in _ARG_RE.findall(call)]
 
 
+def _commodity_of(name: str):
+    """Match a bid's commodity by substring ('#2 Yellow Corn' → Corn)."""
+    up = (name or "").upper()
+    for key, val in _COMMODITY.items():
+        if key in up:
+            return val
+    return None
+
+
 def parse_site(cfg: dict) -> NewSnapshotRequest | None:
     try:
         html = requests.get(cfg["url"], headers=_HEADERS, timeout=25).text
@@ -81,7 +96,7 @@ def parse_site(cfg: dict) -> NewSnapshotRequest | None:
         a = _args(call)
         if len(a) < 14:
             continue
-        info = _COMMODITY.get((a[0] or "").strip().upper())
+        info = _commodity_of(a[0])
         if not info:
             continue
         root, grain = info
@@ -89,6 +104,8 @@ def parse_site(cfg: dict) -> NewSnapshotRequest | None:
             basis = int(round(float(a[1])))
         except (ValueError, TypeError):
             continue
+        if basis == 0:
+            continue          # these pages post 0 for months a plant isn't bidding
         m = _D_RE.search(a[13] or "")
         if not m:
             continue

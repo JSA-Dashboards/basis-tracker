@@ -3190,7 +3190,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.selectbox(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "INCO"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "INCO"],
             label_visibility="collapsed",
         )
 
@@ -3699,7 +3699,7 @@ with tab_bids:
                        "Mid Missouri", "JBS", "Heartland Coop", "Alto",
                        "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag",
                        "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio",
-                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "INCO"):
+                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "INCO"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so. The five Bushel
@@ -3719,7 +3719,8 @@ with tab_bids:
                       "Fox River Valley Energy": "--vistacomm-only",
                       "Heron Lake BioEnergy": "--dtn-only",
                       "Glacial Lakes": "--dtn-only",
-                      "Homeland Energy": "--agmd-only"}.get(provider)
+                      "Homeland Energy": "--agmd-only",
+                      "KAAPA": "--agmd-only"}.get(provider)
                      or ("--bushelsites-only" if provider in _bushel else None))
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
                      "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",
