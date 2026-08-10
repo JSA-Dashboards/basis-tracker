@@ -42,6 +42,8 @@ SITES: list[dict] = [
     {"provider": "Plymouth Energy", "location": "Merrill, IA", "state": "IA",
      "facility_type": "Corn Processing",
      "url": "https://cvacoop365.agricharts.com/markets/cash.php?location_filter=83175"},
+    {"provider": "WGM", "location": "Adair, IL", "state": "IL", "facility_type": "Rail Terminal",
+     "url": "https://www.westerngrainmarketing.com/markets/cash.php?location_filter=86697"},
 ]
 
 _COMMODITY = {"CORN": ("ZC", "Corn"), "SOYBEANS": ("ZS", "Soybeans"),
