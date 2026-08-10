@@ -31,6 +31,12 @@ SITES: list[dict] = [
     {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
      "grain": "Corn", "layout": "columnar",
      "url": "https://corn.glaciallakesenergy.com/"},
+    {"provider": "E Energy", "location": "Adams, NE", "state": "NE",
+     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
+     "url": "https://corn.eenergyadams.com/index.cfm?show=11&mid=6"},
+    {"provider": "Dakota Ethanol", "location": "Wentworth, SD", "state": "SD",
+     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
+     "url": "https://www.dakotaethanol.com/index.cfm?show=11&mid=3"},
 ]
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>
@@ -39,14 +45,20 @@ SITES: list[dict] = [
 _EXTRACT_JS = r"""
 () => {
   const out = [];
-  const rows = document.querySelectorAll('tr');
-  for (const tr of rows) {
+  for (const tr of document.querySelectorAll('tr')) {
     const cells = [...tr.querySelectorAll('th,td')].map(c => (c.innerText||'').trim());
     if (cells.length < 4) continue;
     const fi = cells.findIndex(c => /^@[A-Z]{1,2}\d[FGHJKMNQUVXZ]$/.test(c));
     if (fi < 0) continue;
     const delivery = cells[0];
-    const basis = (cells[fi+1] || '').replace(/[^0-9.\-]/g, '');
+    // basis column order varies across aghost pages (before OR after the symbol),
+    // so pick the small signed decimal (|v|<2) — distinct from cash (~4.xx) and
+    // the tick-format futures price (438'2).
+    let basis = '';
+    for (const c of cells) {
+      const m = c.match(/^(-?\d+\.\d\d)$/);
+      if (m && Math.abs(parseFloat(m[1])) < 2) { basis = m[1]; break; }
+    }
     if (delivery && basis !== '') out.push({delivery, symbol: cells[fi], basis});
   }
   return out;
