@@ -2579,9 +2579,11 @@ with tab_railfob:
                                                     titleFontSize=10))
         _PREV_CLR, _AVG_CLR = "#2563eb", "#d97706"   # hero blue / amber
 
-        # 5-yr range band + average for THIS period — the five most recent COMPLETED
-        # years that actually have data (skips gaps, so the band spans 5 real years).
-        _rwin_yrs = sorted(y for y in _sel["MktYearNum"].unique() if y < _mx)[-5:]
+        # 5-yr range band + average for THIS period — the five completed crop years
+        # immediately before the CURRENT calendar marketing year (anchored to today,
+        # not the corridor's max year, so recent gaps don't drag the band to old years).
+        _rcur_my = date.today().year if date.today().month >= 9 else date.today().year - 1
+        _rwin_yrs = list(range(_rcur_my - 5, _rcur_my))
         _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
         _rband = (_rwin.groupby("MktWeek")["Bid"]
                   .agg(avg="mean", lo="min", hi="max").reset_index())
@@ -4044,11 +4046,13 @@ with tab_bids:
                 # pulled OUT of that scale and drawn as a fixed hero colour instead.
                 _old_years = sorted(_hist_old["MktYear"].unique())
 
-                # 5-yr window = the five most recent COMPLETED marketing years that
-                # actually have data (skips gaps, so the band always spans 5 real years
-                # when 5 exist — not just whichever fall in a fixed calendar window).
-                _win_yrs = sorted(y for y in _df_seas["MktYearNum"].unique()
-                                  if y < _max_yr)[-5:]
+                # 5-yr window = the five completed crop years immediately before the
+                # CURRENT calendar marketing year (Sep–Aug), e.g. today→2020/21..2024/25.
+                # Anchored to today, NOT to the series' max year, so a gap in recent
+                # years (archive ends, live scrape resumes) doesn't make the band reach
+                # back to old years to "find" five — it just shows the recent window.
+                _cur_my = date.today().year if date.today().month >= 9 else date.today().year - 1
+                _win_yrs = list(range(_cur_my - 5, _cur_my))
                 _win  = _df_seas[_df_seas["MktYearNum"].isin(_win_yrs)]
                 _band = (_win.groupby("MktWeek")["Basis"]
                          .agg(avg="mean", lo="min", hi="max").reset_index())
