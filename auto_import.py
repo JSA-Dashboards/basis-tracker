@@ -125,6 +125,7 @@ from agricharts_scraper import fetch_agricharts_bids
 from heartland_scraper import fetch_heartland_bids, parse_heartland
 from alto_scraper import fetch_alto_bids, parse_alto
 from cihedging_scraper import fetch_cihedging
+from vistacomm_scraper import fetch_vistacomm
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -624,6 +625,42 @@ def run_cihedging() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("CIHedging done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_vistacomm() -> int:
+    """Scrape the VistaComm/vc-dtn cash-bid plants (DTN behind a JSON proxy —
+    e.g. Fox River Valley Energy). One bulk upsert; metas grouped per provider."""
+    log.info("=" * 60)
+    log.info("VistaComm (DTN) plants scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_vistacomm()
+    except Exception as exc:
+        log.error("VistaComm scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("VistaComm scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("VistaComm bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("VistaComm meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("VistaComm done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1669,6 +1706,7 @@ def run(
     run_heartland_scrape: bool = True,
     run_alto_scrape: bool = True,
     run_cihedging_scrape: bool = True,
+    run_vistacomm_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1749,6 +1787,8 @@ def run(
         total += _run_guarded(run_alto, "Alto")
     if run_cihedging_scrape:
         total += _run_guarded(run_cihedging, "CIHedging")
+    if run_vistacomm_scrape:
+        total += _run_guarded(run_vistacomm, "VistaComm")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -2004,6 +2044,9 @@ if __name__ == "__main__":
     cih_group = parser.add_mutually_exclusive_group()
     cih_group.add_argument("--no-cihedging", dest="no_cihedging", action="store_true", help="Skip CIHedging plants (Cardinal, Sandhills) scrape")
     cih_group.add_argument("--cihedging-only", dest="cihedging_only", action="store_true", help="Run CIHedging plants (Cardinal, Sandhills) scrape only")
+    vc_group = parser.add_mutually_exclusive_group()
+    vc_group.add_argument("--no-vistacomm", dest="no_vistacomm", action="store_true", help="Skip VistaComm/DTN plants (Fox River) scrape")
+    vc_group.add_argument("--vistacomm-only", dest="vistacomm_only", action="store_true", help="Run VistaComm/DTN plants (Fox River) scrape only")
 
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
@@ -2141,6 +2184,9 @@ if __name__ == "__main__":
     elif args.cihedging_only:
         init_db()
         run_cihedging()
+    elif args.vistacomm_only:
+        init_db()
+        run_vistacomm()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2187,6 +2233,7 @@ if __name__ == "__main__":
             run_heartland_scrape=not args.no_heartland,
             run_alto_scrape=not args.no_alto,
             run_cihedging_scrape=not args.no_cihedging,
+            run_vistacomm_scrape=not args.no_vistacomm,
             run_pruning=not args.no_prune,
         )
 
