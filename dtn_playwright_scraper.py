@@ -37,6 +37,9 @@ SITES: list[dict] = [
     {"provider": "Dakota Ethanol", "location": "Wentworth, SD", "state": "SD",
      "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
      "url": "https://www.dakotaethanol.com/index.cfm?show=11&mid=3"},
+    {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
+     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
+     "url": "https://greenamericabiofuels.com/corn-bids"},
 ]
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>
@@ -50,7 +53,12 @@ _EXTRACT_JS = r"""
     if (cells.length < 4) continue;
     const fi = cells.findIndex(c => /^@[A-Z]{1,2}\d[FGHJKMNQUVXZ]$/.test(c));
     if (fi < 0) continue;
-    const delivery = cells[0];
+    // delivery = a month/period-looking cell before the symbol (some pages put a
+    // commodity name in cell 0, so it isn't always cells[0]).
+    const DEL = /\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)\b|FH |LH |NC |Balance|By |Split|OND|\bND\b|JFM|AMJJ/i;
+    let delivery = '';
+    for (let i = fi - 1; i >= 0; i--) { if (DEL.test(cells[i])) { delivery = cells[i]; break; } }
+    if (!delivery) delivery = cells[0];
     // basis column order varies across aghost pages (before OR after the symbol),
     // so pick the small signed decimal (|v|<2) — distinct from cash (~4.xx) and
     // the tick-format futures price (438'2).
