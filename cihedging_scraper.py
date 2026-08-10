@@ -71,6 +71,9 @@ SITES: list[dict] = [
     {"provider": "Elite Octane", "location": "Atlantic, IA", "state": "IA",
      "facility_type": "Corn Processing", "company_id": 22641, "commodity_ids": "",
      "origin": "https://www.eliteoctane.net"},
+    {"provider": "Golden Grain", "location": "Mason City, IA", "state": "IA",
+     "facility_type": "Corn Processing", "company_id": 98951, "commodity_ids": "",
+     "origin": "https://www.ggecorn.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
