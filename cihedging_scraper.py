@@ -62,6 +62,12 @@ SITES: list[dict] = [
     {"provider": "Aztalan Bio", "location": "Jefferson, WI", "state": "WI",
      "facility_type": "Corn Processing", "company_id": 134941, "commodity_ids": "",
      "origin": "https://www.aztalanbio.com"},
+    {"provider": "Little Sioux", "location": "Marcus, IA", "state": "IA",
+     "facility_type": "Corn Processing", "company_id": 15569, "commodity_ids": "",
+     "origin": "https://littlesiouxcornprocessors.com"},
+    {"provider": "Siouxland Ethanol", "location": "Jackson, NE", "state": "NE",
+     "facility_type": "Corn Processing", "company_id": 15601, "commodity_ids": "",
+     "origin": "https://siouxlandethanol.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
