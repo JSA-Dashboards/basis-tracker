@@ -127,6 +127,7 @@ from alto_scraper import fetch_alto_bids, parse_alto
 from cihedging_scraper import fetch_cihedging
 from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
+from agricharts_md_scraper import fetch_agricharts_md
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -699,6 +700,40 @@ def run_dtn_playwright() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("DTN(pw) done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_agricharts_md() -> int:
+    """Scrape AgriCharts 'marketdata' writeBidRow plants (e.g. Homeland Energy)."""
+    log.info("=" * 60)
+    log.info("AgriCharts-MD plants scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_agricharts_md()
+    except Exception as exc:
+        log.error("AgriCharts-MD scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("AgriCharts-MD scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("AgriCharts-MD bulk snapshot upsert failed: %s", exc)
+    by_prov = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"), "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("AgriCharts-MD meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("AgriCharts-MD done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1746,6 +1781,7 @@ def run(
     run_cihedging_scrape: bool = True,
     run_vistacomm_scrape: bool = True,
     run_dtn_scrape: bool = True,
+    run_agmd_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1830,6 +1866,8 @@ def run(
         total += _run_guarded(run_vistacomm, "VistaComm")
     if run_dtn_scrape:
         total += _run_guarded(run_dtn_playwright, "DTN", 300)
+    if run_agmd_scrape:
+        total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -2091,6 +2129,9 @@ if __name__ == "__main__":
     dtn_group = parser.add_mutually_exclusive_group()
     dtn_group.add_argument("--no-dtn", dest="no_dtn", action="store_true", help="Skip DTN headless-render plants (Heron Lake) scrape")
     dtn_group.add_argument("--dtn-only", dest="dtn_only", action="store_true", help="Run DTN headless-render plants (Heron Lake) scrape only")
+    agmd_group = parser.add_mutually_exclusive_group()
+    agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
+    agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
 
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
@@ -2234,6 +2275,9 @@ if __name__ == "__main__":
     elif args.dtn_only:
         init_db()
         run_dtn_playwright()
+    elif args.agmd_only:
+        init_db()
+        run_agricharts_md()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2282,6 +2326,7 @@ if __name__ == "__main__":
             run_cihedging_scrape=not args.no_cihedging,
             run_vistacomm_scrape=not args.no_vistacomm,
             run_dtn_scrape=not args.no_dtn,
+            run_agmd_scrape=not args.no_agmd,
             run_pruning=not args.no_prune,
         )
 
