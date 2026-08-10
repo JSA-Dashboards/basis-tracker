@@ -43,6 +43,11 @@ TENANTS: list[dict] = [
      "shape": "multi", "state": None},
     {"provider": "Garden City Coop", "host": "https://gccoop.agricharts.com",
      "shape": "multi", "state": "KS"},
+    # Gold Eagle Coop posts its whole co-op; we only track the Goldfield plant.
+    # `want` filters a multi feed to specific locations and renames/reclassifies them.
+    {"provider": "Gold Eagle Coop", "host": "https://goldeagle.agricharts.com",
+     "shape": "multi", "state": "IA",
+     "want": {"GOLDFIELD": ("Goldfield, IA", "Corn Processing")}},
 ]
 
 
@@ -89,6 +94,13 @@ def fetch_agricharts_bids() -> list[dict]:
             raw_name = (loc.get("name") or "").strip()
             if t["shape"] == "single":
                 location, state, facility = t["location"], t["state"], t["facility"]
+            elif t.get("want") is not None:
+                # multi feed, but only the configured locations are kept + renamed.
+                hit = t["want"].get(raw_name.strip().upper())
+                if not hit:
+                    continue
+                location, facility = hit
+                state = t.get("state")
             else:
                 if not raw_name or raw_name.lower() in ("futures only", ""):
                     continue                       # skip the futures-only pseudo row

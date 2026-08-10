@@ -56,6 +56,12 @@ SITES: list[dict] = [
     {"provider": "Husker Ag", "location": "Plainview, NE", "state": "NE",
      "facility_type": "Corn Processing", "company_id": 106378, "commodity_ids": "",
      "origin": "https://huskerag.com"},
+    {"provider": "UWGP", "location": "Friesland, WI", "state": "WI",
+     "facility_type": "Corn Processing", "company_id": 15603, "commodity_ids": "",
+     "origin": "https://uwgp.com"},
+    {"provider": "Aztalan Bio", "location": "Jefferson, WI", "state": "WI",
+     "facility_type": "Corn Processing", "company_id": 134941, "commodity_ids": "",
+     "origin": "https://www.aztalanbio.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
