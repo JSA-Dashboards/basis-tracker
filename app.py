@@ -1945,6 +1945,55 @@ def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
     """, height=height)
 
 
+def _chart_png(chart, width: int = 1100, height: int = 560, scale: float = 2.0):
+    """Render an Altair chart to PNG bytes via vl-convert (Cloud-safe, Rust-based).
+    to_dict(default=str) sidesteps the 'date is not JSON serializable' bug that
+    kills export when a spec holds datetime.date objects. None on failure."""
+    try:
+        import vl_convert as _vlc, json as _json
+        spec = _json.dumps(chart.properties(width=width, height=height).to_dict(), default=str)
+        return _vlc.vegalite_to_png(spec, scale=scale)
+    except Exception:
+        return None
+
+
+def _chart_download_copy(png: "bytes | None", fname: str, key: str) -> None:
+    """⬇️ PNG download + 📋 Copy-image buttons under a chart. Copy writes the PNG to
+    the clipboard as an image (pastes into Outlook/Slack). Silent-fail shows a note."""
+    if png is None:
+        st.caption("PNG export unavailable")
+        return
+    import base64 as _b64
+    import streamlit.components.v1 as _components
+    _c1, _c2 = st.columns([1, 4])
+    with _c1:
+        st.download_button("⬇️  PNG", png, file_name=fname, mime="image/png",
+                           key=f"dl_{key}", use_container_width=True)
+    if _view_only():
+        return
+    _b64png = _b64.b64encode(png).decode()
+    _btn_css = ("font-family:Arial,sans-serif;font-size:12px;font-weight:600;"
+                f"background:{JPSI_BLUE};color:#fff;border:none;border-radius:6px;"
+                "padding:6px 14px;cursor:pointer")
+    with _c2:
+        _components.html(f"""
+          <button id="b" onclick="c()" style="{_btn_css}">📋 Copy image</button>
+          <span id="m" style="font-family:Arial,sans-serif;font-size:12px;color:#16a34a;
+                font-weight:600;margin-left:8px"></span>
+          <script>
+            async function c() {{
+              try {{
+                const r = await fetch("data:image/png;base64,{_b64png}");
+                const b = await r.blob();
+                await navigator.clipboard.write([new ClipboardItem({{'image/png': b}})]);
+                document.getElementById('m').textContent = 'Copied!';
+              }} catch(e) {{ document.getElementById('m').textContent = 'Copy not supported'; }}
+              setTimeout(() => {{ document.getElementById('m').textContent = ''; }}, 1800);
+            }}
+          </script>
+        """, height=44)
+
+
 def _paste_clean(html: str) -> str:
     """Make an on-screen table paste cleanly into Outlook / Word / Excel: drop the
     scroll wrapper and min-width (so it isn't forced 900px wide), unstick the header,
@@ -2561,12 +2610,23 @@ with tab_railfob:
         _sel["Bid"] = _sel["Bid"].round(1)
 
         _mx = int(_sel["MktYearNum"].max())
-        # Default to the most recent 10 marketing years so dense corridors stay readable.
-        _sel = _sel[_sel["MktYearNum"] >= _mx - 9]
-        _hist = _sel[_sel["MktYearNum"] < _mx]
+        # Year picker — defaults to the most recent 10 marketing years (prior behaviour);
+        # user can pare to one or add older ones. Band/average stay on calendar trailing-5.
+        _all_yrs = sorted(_sel["MktYearNum"].unique(), reverse=True)
+        _default_yrs = [y for y in _all_yrs if y >= _mx - 9]
+        _yr_lab = {y: f"{y}/{str(y + 1)[-2:]}" for y in _all_yrs}
+        with _c3:
+            if len(_all_yrs) > 1:
+                _pick = st.multiselect("Years shown", _all_yrs, default=_default_yrs,
+                                       format_func=lambda y: _yr_lab[y], key="rail_seas_yrs")
+                _sel_yrs = sorted(_pick) if _pick else _default_yrs
+            else:
+                _sel_yrs = _all_yrs
+        _drawn = _sel[_sel["MktYearNum"].isin(_sel_yrs)]
+        _hist = _drawn[_drawn["MktYearNum"] < _mx]
         _hist_prev = _hist[_hist["MktYearNum"] == _mx - 1]     # most recent complete year
         _hist_old = _hist[_hist["MktYearNum"] < _mx - 1]
-        _curr = _sel[_sel["MktYearNum"] == _mx]
+        _curr = _drawn[_drawn["MktYearNum"] == _mx]
         _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
         _prev_yr = _hist_prev["MktYear"].iloc[0] if not _hist_prev.empty else ""
         # Faded context years use the shared colour scale; the prior year is pulled
@@ -2633,7 +2693,7 @@ with tab_railfob:
 
         # Auto-fit the y-axis to the central ~95% of bids so outlier days don't squash
         # the chart; outliers clamp to the edge.
-        _ryvals = list(_sel["Bid"])
+        _ryvals = list(_drawn["Bid"]) + list(_rband["lo"]) + list(_rband["hi"])
         if not _df_rfwd.empty:
             _ryvals += list(_df_rfwd["Bid"])
         _rydom = None
@@ -2728,16 +2788,24 @@ with tab_railfob:
                                               align="center", baseline="top")
                    .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(6), text="code:N")] + _layers
 
+        _rail_title = f"{_RAIL_DISPLAY.get(_mk, _mk)} · {_pd_sel} · Corn"
         st.markdown(
-            '<div style="margin-top:8px;margin-bottom:4px;font-size:10px;color:#64748b;'
+            '<div style="margin-top:8px;margin-bottom:2px;font-size:14px;color:#1e293b;'
+            'font-weight:800;letter-spacing:.01em">' + _rail_title + '</div>'
+            '<div style="margin-bottom:4px;font-size:10px;color:#64748b;'
             'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
-            f'Seasonal Bid — {_RAIL_DISPLAY.get(_mk, _mk)} · {_pd_sel} · Marketing Year (Sep–Aug)'
+            'Seasonal Bid — Marketing Year (Sep–Aug)'
             + '&nbsp;&nbsp;<span style="font-weight:400;text-transform:none">'
             + (f'<b style="color:#000">{_curr_yr} = black</b>' if _curr_yr else '')
             + (f'  ·  <b style="color:#2563eb">{_prev_yr} = blue</b>' if _prev_yr else '')
             + (f'  ·  <b style="color:#d97706">5-yr avg = amber dash</b>' if not _rband.empty else '')
             + '</span></div>', unsafe_allow_html=True)
-        st.altair_chart(_alt.layer(*_layers).properties(height=_H), use_container_width=True)
+        _rail_chart = _alt.layer(*_layers).properties(height=_H)
+        st.altair_chart(_rail_chart, use_container_width=True)
+        _rail_fname = (f"rail_seasonal_{_mk}_{_pd_sel}.png"
+                       .replace(" ", "_").replace("/", "-").replace(",", ""))
+        _chart_download_copy(_chart_png(_rail_chart, width=1100, height=_H), _rail_fname,
+                             key=f"rail_seas_{_mk}_{_pd_sel}")
         st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
                    f"than once · partial windows fold into their month (FH/LH/Split Oct, "
                    f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted.")
@@ -4037,13 +4105,25 @@ with tab_bids:
                 _df_seas["Basis"] = _df_seas["Basis"].round(1)
 
                 _max_yr  = int(_df_seas["MktYearNum"].max())
-                # Default to the most recent 10 marketing years (older data is kept in
-                # the DB, just not drawn) so decades-deep corridors stay readable.
-                _df_seas = _df_seas[_df_seas["MktYearNum"] >= _max_yr - 9]
-                _hist      = _df_seas[_df_seas["MktYearNum"] < _max_yr]
+                # Year picker — which marketing years to draw. Defaults to the most
+                # recent 10 (the prior behaviour); the user can pare to one year or add
+                # older ones. Band/average stay on the calendar trailing-5 regardless.
+                _all_yrs = sorted(_df_seas["MktYearNum"].unique(), reverse=True)
+                _default_yrs = [y for y in _all_yrs if y >= _max_yr - 9]
+                _yr_lab = {y: f"{y}/{str(y + 1)[-2:]}" for y in _all_yrs}
+                if len(_all_yrs) > 1:
+                    _pick = st.multiselect(
+                        "Years shown", _all_yrs, default=_default_yrs,
+                        format_func=lambda y: _yr_lab[y],
+                        key=f"seas_yrs_{provider}_{loc_key}_{grain}")
+                    _sel_yrs = sorted(_pick) if _pick else _default_yrs
+                else:
+                    _sel_yrs = _all_yrs
+                _drawn     = _df_seas[_df_seas["MktYearNum"].isin(_sel_yrs)]
+                _hist      = _drawn[_drawn["MktYearNum"] < _max_yr]
                 _hist_prev = _hist[_hist["MktYearNum"] == _max_yr - 1]     # most recent complete year
                 _hist_old  = _hist[_hist["MktYearNum"] < _max_yr - 1]
-                _curr    = _df_seas[_df_seas["MktYearNum"] == _max_yr].copy()
+                _curr    = _drawn[_drawn["MktYearNum"] == _max_yr].copy()
                 _curr_yr = _curr["MktYear"].iloc[0] if not _curr.empty else ""
                 _prev_yr = _hist_prev["MktYear"].iloc[0] if not _hist_prev.empty else ""
                 # Faded context years use the shared colour scale; the prior year is
@@ -4111,7 +4191,7 @@ with tab_bids:
                                              domainColor="#cbd5e1", tickColor="#cbd5e1"))
                 # Auto-fit the y-axis to the central ~95% of values so a few outlier
                 # days don't squash the chart; outliers clamp to the edge (clamp=True).
-                _yvals = list(_df_seas["Basis"])
+                _yvals = list(_drawn["Basis"]) + list(_band["lo"]) + list(_band["hi"])
                 if not _df_fwdc.empty:
                     _yvals += list(_df_fwdc["Basis"])
                 _ydom = None
@@ -4284,19 +4364,26 @@ with tab_bids:
                              + f' · range = gray band ({_byrs[0]}–{_byrs[-1]})')
                 if not _df_fwdc.empty:
                     _leg += '  ·  forward = dashed ●'
+                _seas_title = f"{loc_key} · Spot · {grain}"
                 st.markdown(
-                    '<div style="margin-top:24px;margin-bottom:4px;font-size:10px;'
-                    'color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
+                    '<div style="margin-top:24px;margin-bottom:2px;font-size:14px;'
+                    'color:#1e293b;font-weight:800;letter-spacing:.01em">'
+                    + _seas_title + '</div>'
+                    '<div style="margin-bottom:4px;font-size:10px;color:#64748b;'
+                    'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
                     'Seasonal Basis — Marketing Year (Sep–Aug)'
                     + (f'&nbsp;&nbsp;<span style="color:#1e293b;font-weight:400;'
                        f'text-transform:none">{_leg}</span>' if _leg else '')
                     + '</div>',
                     unsafe_allow_html=True,
                 )
-                st.altair_chart(
-                    _alt.layer(*_s_layers).properties(height=_SEAS_H),
-                    use_container_width=True,
-                )
+                _seas_chart = _alt.layer(*_s_layers).properties(height=_SEAS_H)
+                st.altair_chart(_seas_chart, use_container_width=True)
+                _seas_fname = (f"seasonal_{loc_key}_{grain}.png"
+                               .replace(" ", "_").replace("/", "-").replace(",", ""))
+                _chart_download_copy(
+                    _chart_png(_seas_chart, width=1100, height=_SEAS_H), _seas_fname,
+                    key=f"seas_{provider}_{loc_key}_{grain}")
 
             except Exception as _seas_err:
                 st.warning(f"Seasonal chart error: {_seas_err}")
