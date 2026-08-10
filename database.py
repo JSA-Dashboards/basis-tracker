@@ -1437,6 +1437,104 @@ def set_index_excludes(pairs) -> bool:
         conn.close()
 
 
+# ── Client basis-report subscriptions (personalized daily/weekly/monthly emails) ──
+def _ensure_client_reports(conn, c) -> None:
+    c.execute("""CREATE TABLE IF NOT EXISTS client_reports (
+        id           TEXT PRIMARY KEY,
+        client_name  TEXT NOT NULL,
+        email        TEXT NOT NULL,
+        cc           TEXT,
+        frequency    TEXT NOT NULL,          -- 'daily' | 'weekly' | 'monthly'
+        day_of_week  INTEGER,                -- 0=Mon..6=Sun (weekly); else NULL
+        locations    TEXT NOT NULL,          -- JSON [{"provider","location","grain"}]
+        active       INTEGER NOT NULL DEFAULT 1,
+        created_at   TEXT)""")
+    conn.commit()
+
+
+def get_client_reports(active_only: bool = False) -> list[dict]:
+    """All client report subscriptions; `locations` parsed from JSON to a list."""
+    import json as _json
+    conn = get_conn(); c = conn.cursor()
+    try:
+        _ensure_client_reports(conn, c)
+        c.execute("SELECT id, client_name, email, cc, frequency, day_of_week, "
+                  "locations, active, created_at FROM client_reports"
+                  + (" WHERE active=1" if active_only else "")
+                  + " ORDER BY client_name")
+        out = []
+        for r in c.fetchall():
+            d = dict(r)
+            try:
+                d["locations"] = _json.loads(d["locations"] or "[]")
+            except Exception:
+                d["locations"] = []
+            d["active"] = bool(d["active"])
+            out.append(d)
+        return out
+    finally:
+        conn.close()
+
+
+def upsert_client_report(rec: dict) -> bool:
+    """Insert or update one subscription by `id`. rec: {id, client_name, email, cc,
+    frequency, day_of_week, locations(list of dicts), active, created_at}."""
+    import json as _json
+    conn = get_conn(); c = conn.cursor()
+    ph = "%s" if _use_pg() else "?"
+    try:
+        _ensure_client_reports(conn, c)
+        locs = _json.dumps(rec.get("locations") or [])
+        vals = (rec["id"], rec["client_name"], rec["email"], rec.get("cc"),
+                rec["frequency"], rec.get("day_of_week"), locs,
+                1 if rec.get("active", True) else 0, rec.get("created_at"))
+        if _use_pg():
+            c.execute(f"""INSERT INTO client_reports
+                (id, client_name, email, cc, frequency, day_of_week, locations, active, created_at)
+                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
+                ON CONFLICT (id) DO UPDATE SET
+                    client_name=EXCLUDED.client_name, email=EXCLUDED.email, cc=EXCLUDED.cc,
+                    frequency=EXCLUDED.frequency, day_of_week=EXCLUDED.day_of_week,
+                    locations=EXCLUDED.locations, active=EXCLUDED.active""", vals)
+        else:
+            c.execute(f"""INSERT INTO client_reports
+                (id, client_name, email, cc, frequency, day_of_week, locations, active, created_at)
+                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
+                ON CONFLICT(id) DO UPDATE SET
+                    client_name=excluded.client_name, email=excluded.email, cc=excluded.cc,
+                    frequency=excluded.frequency, day_of_week=excluded.day_of_week,
+                    locations=excluded.locations, active=excluded.active""", vals)
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def delete_client_report(report_id: str) -> bool:
+    conn = get_conn(); c = conn.cursor()
+    ph = "%s" if _use_pg() else "?"
+    try:
+        _ensure_client_reports(conn, c)
+        c.execute(f"DELETE FROM client_reports WHERE id={ph}", (report_id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def get_location_grain_options() -> list[tuple]:
+    """Distinct (provider, location, grain) combos that have basis data — the pool
+    a client picks their report locations from. Sorted for a stable picker."""
+    conn = get_conn(); c = conn.cursor()
+    try:
+        c.execute("""SELECT DISTINCT s.provider, s.location, sr.grain
+                     FROM snapshot_rows sr JOIN snapshots s ON s.id = sr.snapshot_id
+                     WHERE sr.basis_cents IS NOT NULL""")
+        return sorted((r["provider"], r["location"], r["grain"]) for r in c.fetchall())
+    finally:
+        conn.close()
+
+
 def prune_old_snapshots(dry_run: bool = False) -> dict:
     """
     Apply tiered data retention to snapshots (PostgreSQL only).

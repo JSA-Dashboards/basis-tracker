@@ -2011,10 +2011,12 @@ _tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB
                "🗺️ Map", "📊 Summary", "📈 Trends"]
 if not _view_only():
     _tab_labels.append("📥 Export")          # no download tab in the read-only build
+    _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
 _tabs = st.tabs(_tab_labels)
 (tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
  tab_summary, tab_trends) = _tabs[:8]
 tab_export = _tabs[8] if not _view_only() else None
+tab_clients = _tabs[9] if not _view_only() else None
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -5671,6 +5673,88 @@ if not _view_only():
                         st.download_button("⬇️  Download Excel", _buf.getvalue(), file_name=_fname,
                                            mime=("application/vnd.openxmlformats-officedocument"
                                                  ".spreadsheetml.sheet"))
+
+# ═══════════════════════════════════════════════════════════════════════════════
+if not _view_only():
+    with tab_clients:
+        import uuid as _uuid
+        from database import (get_client_reports, upsert_client_report,
+                              delete_client_report, get_location_grain_options)
+        import client_report as _cr
+
+        st.caption("Personalized basis emails for clients. Pick each client's locations; "
+                   "they get current basis, Day/Week/Month change, and a trend arrow, "
+                   "emailed on their chosen cadence after the daily scrape.")
+
+        @st.cache_data(ttl=300, show_spinner=False)
+        def _loc_grain_opts():
+            return get_location_grain_options()
+
+        _opt_label = {f'{p} · {l} · {g}': {"provider": p, "location": l, "grain": g}
+                      for p, l, g in _loc_grain_opts()}
+        _clients = get_client_reports()
+        _by_name = {c["client_name"]: c for c in _clients}
+        if _clients:
+            st.markdown("**Current subscriptions:** " + " · ".join(
+                f'{c["client_name"]} ({c["frequency"]}, {len(c["locations"])} locs'
+                + ("" if c["active"] else ", off") + ")" for c in _clients))
+
+        _pick = st.selectbox("Client", ["➕ New client…"] + sorted(_by_name), key="cr_pick")
+        _ed = _by_name.get(_pick) or {}
+        _k = f"_{_pick}"          # suffix keys with the pick so switching clients resets fields
+
+        _c1, _c2 = st.columns(2)
+        with _c1:
+            _name = st.text_input("Client name", value=_ed.get("client_name", ""), key="cr_name" + _k)
+            _email = st.text_input("Email", value=_ed.get("email", ""), key="cr_email" + _k)
+        with _c2:
+            _cc = st.text_input("CC (optional)", value=_ed.get("cc") or "", key="cr_cc" + _k)
+            _freq = st.selectbox("Frequency", ["daily", "weekly", "monthly"],
+                                 index=["daily", "weekly", "monthly"].index(_ed.get("frequency", "daily")),
+                                 key="cr_freq" + _k)
+        _dow = None
+        if _freq == "weekly":
+            _days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            _dow = st.selectbox("Day of week", list(range(5)), format_func=lambda i: _days[i],
+                                index=int(_ed.get("day_of_week") or 0), key="cr_dow" + _k)
+        _active = st.checkbox("Active", value=_ed.get("active", True), key="cr_active" + _k)
+
+        _cur = [f'{x["provider"]} · {x["location"]} · {x["grain"]}' for x in _ed.get("locations", [])
+                if f'{x["provider"]} · {x["location"]} · {x["grain"]}' in _opt_label]
+        _sel = st.multiselect("Locations (Provider · Location · Grain)", sorted(_opt_label),
+                              default=_cur, key="cr_locs" + _k)
+        _sel_locs = [_opt_label[s] for s in _sel]
+
+        _b1, _b2, _b3, _b4, _ = st.columns([2, 2, 2, 2, 3])
+        if _b1.button("💾 Save", key="cr_save" + _k):
+            if not _name or not _email or not _sel_locs:
+                st.warning("Name, email, and at least one location are required.")
+            else:
+                _rid = _ed.get("id") or _uuid.uuid4().hex
+                upsert_client_report({"id": _rid, "client_name": _name, "email": _email,
+                    "cc": _cc or None, "frequency": _freq, "day_of_week": _dow,
+                    "locations": _sel_locs, "active": _active,
+                    "created_at": _ed.get("created_at") or datetime.utcnow().isoformat()})
+                st.success(f"Saved {_name}.")
+                st.rerun()
+        if _ed and _b2.button("🗑️ Delete", key="cr_del" + _k):
+            delete_client_report(_ed["id"])
+            st.success("Deleted.")
+            st.rerun()
+        if _b3.button("👁️ Preview", key="cr_prev" + _k):
+            if _sel_locs:
+                import streamlit.components.v1 as _comp
+                _comp.html(_cr.build_client_html(
+                    {"client_name": _name or "Client", "locations": _sel_locs}),
+                    height=520, scrolling=True)
+            else:
+                st.info("Pick at least one location to preview.")
+        if _ed and _b4.button("✉️ Send now", key="cr_send" + _k):
+            try:
+                _cr.send_client_report(_ed)
+                st.success(f"Sent to {_ed['email']}.")
+            except Exception as _e:
+                st.error(f"Send failed (Outlook must be running locally): {_e}")
 
 
 # ── Branded footer (JPSI) ─────────────────────────────────────────────────────

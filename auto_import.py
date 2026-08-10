@@ -2152,6 +2152,10 @@ if __name__ == "__main__":
         "--no-email", dest="no_email", action="store_true",
         help="Skip emailing the Daily Basis Changes report after a full scrape",
     )
+    parser.add_argument(
+        "--no-client-emails", dest="no_client_emails", action="store_true",
+        help="Skip the personalized per-client basis reports after a full scrape",
+    )
 
     args = parser.parse_args()
 
@@ -2337,6 +2341,16 @@ if __name__ == "__main__":
                 send_daily_changes_email()
             except Exception as exc:
                 log.warning("Daily Changes email failed (scrape unaffected): %s", exc)
+
+            # Personalized client basis reports — mail every active client whose
+            # cadence (daily/weekly/monthly) matches today. Independent of the
+            # Changes email so one failing doesn't block the other.
+            if not args.no_client_emails:
+                try:
+                    from client_report import send_due_reports
+                    send_due_reports()
+                except Exception as exc:
+                    log.warning("Client reports failed (scrape unaffected): %s", exc)
 
             # Heads-up alert to the operator if any scraper failed today (e.g. CHS
             # hanging). Only on email runs, so the nightly --no-email refresh and
