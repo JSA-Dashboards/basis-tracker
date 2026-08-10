@@ -2134,9 +2134,11 @@ with tab_spotfwd:
 
     _e1, _e2, _ = st.columns([2, 2, 6])
     with _e1:
-        chi_eth_input = st.number_input("Chi Eth (¢)", value=0, step=1, key="chi_eth")
+        chi_eth_input = st.number_input("Chi Platts Eth ($/gal)", value=0.0, step=0.0001,
+                                        format="%.4f", key="chi_eth")
     with _e2:
-        ny_eth_input = st.number_input("NY Eth (¢)", value=0, step=1, key="ny_eth")
+        ny_eth_input = st.number_input("NY Platts Eth ($/gal)", value=0.0, step=0.0001,
+                                       format="%.4f", key="ny_eth")
     if _riv_dates:
         _riv_cap_d = f"{_riv_cur} vs {_riv_prev}" if _riv_prev else f"{_riv_cur}"
         st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
@@ -2378,12 +2380,16 @@ with tab_spotfwd:
             continue
         _is_pct = (name == "IL Barge Freight")        # % of tariff, not a ¢ basis
         _is_dollar = (name == "BN Shuttle Freight")   # freight $/car
+        _is_price = name in ("Chi Platts Eth", "NY Platts Eth")  # $/gal Platts, 4 dp
         _dol = lambda v: ("—" if v is None else f"{v:+,d}")
         if _is_pct:
             spot_str  = f"{spot:.0f}%" if spot is not None else "—"
             spot_col  = "#1e293b"
         elif _is_dollar:
             spot_str  = _dol(spot)
+            spot_col  = "#1e293b"
+        elif _is_price:
+            spot_str  = f"{spot:.4f}" if spot is not None else "—"
             spot_col  = "#1e293b"
         else:
             spot_str  = f'{spot:+d}' if spot is not None else "—"
@@ -2392,9 +2398,11 @@ with tab_spotfwd:
             nxt_str = _dol(nxt)
         elif _is_pct:
             nxt_str = f"{nxt:.0f}%" if nxt is not None else "—"
+        elif _is_price:
+            nxt_str = f"{nxt:.4f}" if nxt is not None else "—"
         else:
             nxt_str = f'{nxt:+d}' if nxt is not None else "—"
-        nxt_col = ("#1e293b" if (_is_pct or _is_dollar)
+        nxt_col = ("#1e293b" if (_is_pct or _is_dollar or _is_price)
                    else ("#16a34a" if nxt is not None and nxt >= 0 else "#dc2626"))
         fut_str = _fut_short(fut) or "—"
         _du = "%" if _is_pct else ""
