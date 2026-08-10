@@ -22,11 +22,15 @@ from vistacomm_scraper import _fut_symbol, _basis_cents, _PFX, _DTN_RE
 
 log = logging.getLogger(__name__)
 
-# One row per plant page. `grain` is what the page's default commodity table is.
+# `layout`: "single" (one plant per page) or "columnar" (one grid, several plants
+# side by side — locations read from the header). `grain` = the page's default table.
 SITES: list[dict] = [
     {"provider": "Heron Lake BioEnergy", "location": "Heron Lake, MN", "state": "MN",
-     "facility_type": "Corn Processing", "grain": "Corn",
+     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
      "url": "http://www.heronlakebioenergy.com/index.cfm?show=11&mid=8"},
+    {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
+     "grain": "Corn", "layout": "columnar",
+     "url": "https://corn.glaciallakesenergy.com/"},
 ]
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>
@@ -50,8 +54,43 @@ _EXTRACT_JS = r"""
 """
 
 
-def _rows_to_snapshot(cfg: dict, raw: list[dict]) -> NewSnapshotRequest | None:
-    grain = cfg["grain"]
+# Columnar grid (several plants side by side): each data row is
+# delivery, then repeating [futures price, @sym, basis, cash] per plant. Plant names
+# come from a header row of location-looking cells ("GLE - Watertown, SD").
+_EXTRACT_COLUMNAR_JS = r"""
+() => {
+  const tables = [...document.querySelectorAll('table')]
+    .filter(t => /@[A-Z]{1,2}\d/.test(t.innerText) && /basis/i.test(t.innerText));
+  let best = null, bc = 0;
+  for (const t of tables) { const n = (t.innerText.match(/@[A-Z]{1,2}\d[FGHJKMNQUVXZ]/g)||[]).length; if (n > bc) { bc = n; best = t; } }
+  if (!best) return {plants: [], rows: []};
+  const grid = [...best.querySelectorAll('tr')].map(tr => [...tr.querySelectorAll('th,td')].map(c => (c.innerText||'').trim()));
+  // header row = the one with the MOST clean "City, ST" (or "GLE - City, ST") cells
+  let plants = [], bestCount = 0;
+  for (const r of grid) {
+    const locs = r.filter(c => /^([A-Za-z]+\s*-\s*)?[A-Za-z][A-Za-z .]*,\s*[A-Z]{2}$/.test(c));
+    if (locs.length > bestCount) { bestCount = locs.length; plants = locs.map(c => c.replace(/^[A-Za-z]+\s*-\s*/, '').trim()); }
+  }
+  const out = [];
+  for (const r of grid) {
+    const delivery = r[0];
+    if (!delivery || delivery.length > 18 || /futures|basis|delivery/i.test(delivery)) continue;
+    let k = 0;
+    for (let i = 0; i < r.length; i++) {
+      if (/^@[A-Z]{1,2}\d[FGHJKMNQUVXZ]$/.test(r[i])) {
+        const basis = (r[i+1] || '').replace(/[^0-9.\-]/g, '');
+        const plant = plants[k] || ('col' + k); k++;
+        if (basis !== '') out.push({plant, delivery, symbol: r[i], basis});
+      }
+    }
+  }
+  return {plants, rows: out};
+}
+"""
+
+
+def _build_snapshot(provider: str, location: str, grain: str,
+                    raw: list[dict]) -> NewSnapshotRequest | None:
     pfx = _PFX.get({"Corn": "ZC", "Soybeans": "ZS"}.get(grain, ""), "XX")
     rows: list[SnapshotRow] = []
     seen: set[str] = set()
@@ -63,7 +102,6 @@ def _rows_to_snapshot(cfg: dict, raw: list[dict]) -> NewSnapshotRequest | None:
         if not cme or basis is None:
             continue
         delivery = (r["delivery"] or "").strip()
-        # skip the nested-table wrapper / header rows (a real delivery is short)
         if len(delivery) > 18 or "delivery" in delivery.lower():
             continue
         del_key = "".join(ch for ch in delivery.upper() if ch.isalnum()) or cme
@@ -76,8 +114,8 @@ def _rows_to_snapshot(cfg: dict, raw: list[dict]) -> NewSnapshotRequest | None:
     if not rows:
         return None
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
-    return NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
-                              location=cfg["location"], source="web", rows=rows)
+    return NewSnapshotRequest(timestamp=ts, provider=provider, location=location,
+                              source="web", rows=rows)
 
 
 def fetch_dtn_playwright(timeout_ms: int = 25000) -> tuple[list[NewSnapshotRequest], list[dict]]:
@@ -98,19 +136,37 @@ def fetch_dtn_playwright(timeout_ms: int = 25000) -> tuple[list[NewSnapshotReque
                     "() => [...document.querySelectorAll('td')].some(c => /^@[A-Z]{1,2}\\d[FGHJKMNQUVXZ]$/.test((c.innerText||'').trim()))",
                     timeout=timeout_ms)
                 page.wait_for_timeout(1500)      # let the basis cells fill
-                raw = page.evaluate(_EXTRACT_JS)
+                raw = page.evaluate(
+                    _EXTRACT_COLUMNAR_JS if cfg.get("layout") == "columnar" else _EXTRACT_JS)
             except Exception as exc:
                 log.error("DTN(pw) render failed for %s: %s", cfg["location"], exc)
                 page.close()
                 continue
             page.close()
-            req = _rows_to_snapshot(cfg, raw or [])
-            if req is None:
-                log.warning("DTN(pw): no bids parsed for %s", cfg["location"])
-                continue
-            reqs.append(req)
-            metas.append({"provider": cfg["provider"], "location": cfg["location"],
-                          "state": cfg.get("state"), "facility_type": cfg.get("facility_type")})
+            if cfg.get("layout") == "columnar":
+                plants = {}
+                for row in (raw or {}).get("rows", []):
+                    plants.setdefault(row["plant"], []).append(row)
+                built = 0
+                for plant, rws in plants.items():
+                    loc = plant.strip()
+                    req = _build_snapshot(cfg["provider"], loc, cfg["grain"], rws)
+                    if req is None:
+                        continue
+                    reqs.append(req)
+                    metas.append({"provider": cfg["provider"], "location": loc,
+                                  "state": cfg.get("state"), "facility_type": cfg.get("facility_type")})
+                    built += 1
+                if not built:
+                    log.warning("DTN(pw): no bids parsed for %s", cfg["provider"])
+            else:
+                req = _build_snapshot(cfg["provider"], cfg["location"], cfg["grain"], raw or [])
+                if req is None:
+                    log.warning("DTN(pw): no bids parsed for %s", cfg["location"])
+                    continue
+                reqs.append(req)
+                metas.append({"provider": cfg["provider"], "location": cfg["location"],
+                              "state": cfg.get("state"), "facility_type": cfg.get("facility_type")})
         browser.close()
     return reqs, metas
 
