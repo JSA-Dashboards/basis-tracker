@@ -4061,17 +4061,34 @@ with tab_bids:
                 # Forward-curve points — the location's currently-posted forward bids,
                 # each placed at its delivery month's week within THAT marketing year.
                 _fwd_pts = []
+                _present = {}       # crop year -> {months explicitly posted}
+                _fall_bids = []     # (crop year, basis) for "Fall" labels
                 for _fr in viewing.rows:
                     if (_fr.isSpot or _grain_disp(_fr.grain) != grain
                             or _fr.basisCents is None or not _fr.futuresSymbol):
                         continue
-                    _fym = _dp.canonical(_fr.deliveryMonth, _fr.futuresSymbol)
-                    if not _fym:
-                        continue
-                    _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
-                    _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
-                    _fwd_pts.append({"MktYearNum": _fmy, "MktWeek": max(1, min(52, _fwk)),
-                                     "Basis": float(_fr.basisCents)})
+                    _dm = _fr.deliveryMonth or ""
+                    _fym = _dp.canonical(_dm, _fr.futuresSymbol)
+                    if _fym:
+                        _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
+                        _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
+                        _fwd_pts.append({"MktYearNum": _fmy, "MktWeek": max(1, min(52, _fwk)),
+                                         "Basis": float(_fr.basisCents)})
+                        _present.setdefault(_fmy, set()).add(_fym[1])
+                    elif re.search(r"fall", _dm, re.I) and _fr.futuresSymbol[-2:].isdigit():
+                        # "Fall" bid = an October delivery; crop year from the ref symbol.
+                        _fall_bids.append((2000 + int(_fr.futuresSymbol[-2:]),
+                                           float(_fr.basisCents)))
+                # A Fall bid stands in for Oct, and also Sep/Nov, but ONLY where that
+                # month has no actual posting — never overriding a real Sep/Oct/Nov bid.
+                for _fy, _fb in _fall_bids:
+                    for _mo in (9, 10, 11):
+                        if _mo in _present.get(_fy, set()):
+                            continue
+                        _wk = ((date(_fy, _mo, 1) - date(_fy, 9, 1)).days // 7) + 1
+                        _fwd_pts.append({"MktYearNum": _fy, "MktWeek": max(1, min(52, _wk)),
+                                         "Basis": _fb})
+                        _present.setdefault(_fy, set()).add(_mo)
                 _df_fwdc = _pd.DataFrame(_fwd_pts)
                 if not _df_fwdc.empty:
                     _df_fwdc = (_df_fwdc.sort_values("MktWeek")
