@@ -128,6 +128,7 @@ from cihedging_scraper import fetch_cihedging
 from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
 from agricharts_md_scraper import fetch_agricharts_md
+from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -734,6 +735,41 @@ def run_agricharts_md() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("AgriCharts-MD done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_agrex() -> int:
+    """Scrape the Agrex FarmCentric cash-bids terminal (Agrex AL/NE, WNY Energy,
+    Oracle Pork Nutrition) — corn/soybeans/wheat by location, one call each."""
+    log.info("=" * 60)
+    log.info("Agrex cash-bids scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_agrex_bids()
+    except Exception as exc:
+        log.error("Agrex scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("Agrex scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("Agrex bulk snapshot upsert failed: %s", exc)
+    by_prov = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"), "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("Agrex meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-34s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("Agrex done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1782,6 +1818,7 @@ def run(
     run_vistacomm_scrape: bool = True,
     run_dtn_scrape: bool = True,
     run_agmd_scrape: bool = True,
+    run_agrex_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -1868,6 +1905,8 @@ def run(
         total += _run_guarded(run_dtn_playwright, "DTN", 300)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
+    if run_agrex_scrape:
+        total += _run_guarded(run_agrex, "Agrex")
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -2132,6 +2171,9 @@ if __name__ == "__main__":
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
+    agrex_group = parser.add_mutually_exclusive_group()
+    agrex_group.add_argument("--no-agrex", dest="no_agrex", action="store_true", help="Skip Agrex cash-bids terminal (Agrex, WNY Energy, Oracle Pork) scrape")
+    agrex_group.add_argument("--agrex-only", dest="agrex_only", action="store_true", help="Run Agrex cash-bids terminal scrape only")
 
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
@@ -2282,6 +2324,9 @@ if __name__ == "__main__":
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
+    elif args.agrex_only:
+        init_db()
+        run_agrex()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2331,6 +2376,7 @@ if __name__ == "__main__":
             run_vistacomm_scrape=not args.no_vistacomm,
             run_dtn_scrape=not args.no_dtn,
             run_agmd_scrape=not args.no_agmd,
+            run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
         )
 

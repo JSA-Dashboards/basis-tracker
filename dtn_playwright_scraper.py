@@ -40,6 +40,9 @@ SITES: list[dict] = [
     {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
      "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
      "url": "https://greenamericabiofuels.com/corn-bids"},
+    {"provider": "Pennsylvania Grain Processing", "location": "Clymer, PA", "state": "PA",
+     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
+     "url": "http://dtn.pagrain.com/index.cfm?show=11&mid=3"},
 ]
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>
