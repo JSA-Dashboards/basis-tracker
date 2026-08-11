@@ -5682,16 +5682,20 @@ if not _view_only():
                               delete_client_report, get_location_grain_options)
         import client_report as _cr
 
-        st.caption("Personalized basis emails for clients. Pick each client's locations; "
-                   "they get current basis, Day/Week/Month change, and a trend arrow, "
-                   "emailed on their chosen cadence after the daily scrape.")
+        st.caption("Personalized basis emails for clients. Pick each client's locations "
+                   "and (optionally) which commodities; they get basis by delivery period, "
+                   "Day/Week/Month change, and a trend arrow, emailed on their cadence "
+                   "after the daily scrape.")
 
         @st.cache_data(ttl=300, show_spinner=False)
         def _loc_grain_opts():
             return get_location_grain_options()
 
-        _opt_label = {f'{p} · {l} · {g}': {"provider": p, "location": l, "grain": g}
-                      for p, l, g in _loc_grain_opts()}
+        _lg = _loc_grain_opts()
+        # Locations picked as Provider · Location; commodities filtered separately.
+        _opt_label = {f'{p} · {l}': {"provider": p, "location": l}
+                      for p, l, _g in _lg}
+        _grain_opts = sorted({g for _p, _l, g in _lg})
         _clients = get_client_reports()
         _by_name = {c["client_name"]: c for c in _clients}
         if _clients:
@@ -5719,22 +5723,42 @@ if not _view_only():
                                 index=int(_ed.get("day_of_week") or 0), key="cr_dow" + _k)
         _active = st.checkbox("Active", value=_ed.get("active", True), key="cr_active" + _k)
 
-        _cur = [f'{x["provider"]} · {x["location"]} · {x["grain"]}' for x in _ed.get("locations", [])
-                if f'{x["provider"]} · {x["location"]} · {x["grain"]}' in _opt_label]
-        _sel = st.multiselect("Locations (Provider · Location · Grain)", sorted(_opt_label),
+        # Existing subscriptions may have stored grain per location — collapse to
+        # the Provider · Location label the picker now uses.
+        _cur = []
+        for x in _ed.get("locations", []):
+            _lbl = f'{x["provider"]} · {x["location"]}'
+            if _lbl in _opt_label and _lbl not in _cur:
+                _cur.append(_lbl)
+        _sel = st.multiselect("Locations (Provider · Location)", sorted(_opt_label),
                               default=_cur, key="cr_locs" + _k)
         _sel_locs = [_opt_label[s] for s in _sel]
+
+        _cc1, _cc2 = st.columns([3, 2])
+        with _cc1:
+            _sel_coms = st.multiselect(
+                "Commodities (leave empty = all posted at each location)", _grain_opts,
+                default=[g for g in (_ed.get("commodities") or []) if g in _grain_opts],
+                key="cr_coms" + _k)
+        with _cc2:
+            _depth_lbl = {"curve": "Full forward curve", "spot": "Spot only"}
+            _depth = st.radio("Delivery periods", ["curve", "spot"],
+                              index=["curve", "spot"].index(_ed.get("depth", "curve")),
+                              format_func=lambda d: _depth_lbl[d], key="cr_depth" + _k)
+
+        def _client_rec():
+            return {"id": _ed.get("id") or _uuid.uuid4().hex, "client_name": _name,
+                    "email": _email, "cc": _cc or None, "frequency": _freq,
+                    "day_of_week": _dow, "locations": _sel_locs, "depth": _depth,
+                    "commodities": _sel_coms, "active": _active,
+                    "created_at": _ed.get("created_at") or datetime.utcnow().isoformat()}
 
         _b1, _b2, _b3, _b4, _ = st.columns([2, 2, 2, 2, 3])
         if _b1.button("💾 Save", key="cr_save" + _k):
             if not _name or not _email or not _sel_locs:
                 st.warning("Name, email, and at least one location are required.")
             else:
-                _rid = _ed.get("id") or _uuid.uuid4().hex
-                upsert_client_report({"id": _rid, "client_name": _name, "email": _email,
-                    "cc": _cc or None, "frequency": _freq, "day_of_week": _dow,
-                    "locations": _sel_locs, "active": _active,
-                    "created_at": _ed.get("created_at") or datetime.utcnow().isoformat()})
+                upsert_client_report(_client_rec())
                 st.success(f"Saved {_name}.")
                 st.rerun()
         if _ed and _b2.button("🗑️ Delete", key="cr_del" + _k):
@@ -5745,7 +5769,7 @@ if not _view_only():
             if _sel_locs:
                 import streamlit.components.v1 as _comp
                 _comp.html(_cr.build_client_html(
-                    {"client_name": _name or "Client", "locations": _sel_locs}),
+                    {**_client_rec(), "client_name": _name or "Client"}),
                     height=520, scrolling=True)
             else:
                 st.info("Pick at least one location to preview.")

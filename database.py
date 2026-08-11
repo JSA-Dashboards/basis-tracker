@@ -1446,9 +1446,21 @@ def _ensure_client_reports(conn, c) -> None:
         cc           TEXT,
         frequency    TEXT NOT NULL,          -- 'daily' | 'weekly' | 'monthly'
         day_of_week  INTEGER,                -- 0=Mon..6=Sun (weekly); else NULL
-        locations    TEXT NOT NULL,          -- JSON [{"provider","location","grain"}]
+        locations    TEXT NOT NULL,          -- JSON [{"provider","location"}]
+        depth        TEXT DEFAULT 'curve',   -- 'curve' (full forward) | 'spot'
+        commodities  TEXT DEFAULT '[]',      -- JSON grain list; [] = all commodities
         active       INTEGER NOT NULL DEFAULT 1,
         created_at   TEXT)""")
+    # Migrate tables created before depth/commodities existed.
+    for _col, _decl in (("depth", "TEXT DEFAULT 'curve'"),
+                        ("commodities", "TEXT DEFAULT '[]'")):
+        try:
+            if _use_pg():
+                c.execute(f"ALTER TABLE client_reports ADD COLUMN IF NOT EXISTS {_col} {_decl}")
+            else:
+                c.execute(f"ALTER TABLE client_reports ADD COLUMN {_col} {_decl}")
+        except Exception:
+            conn.rollback()          # column already present (SQLite raises)
     conn.commit()
 
 
@@ -1459,7 +1471,7 @@ def get_client_reports(active_only: bool = False) -> list[dict]:
     try:
         _ensure_client_reports(conn, c)
         c.execute("SELECT id, client_name, email, cc, frequency, day_of_week, "
-                  "locations, active, created_at FROM client_reports"
+                  "locations, depth, commodities, active, created_at FROM client_reports"
                   + (" WHERE active=1" if active_only else "")
                   + " ORDER BY client_name")
         out = []
@@ -1469,6 +1481,11 @@ def get_client_reports(active_only: bool = False) -> list[dict]:
                 d["locations"] = _json.loads(d["locations"] or "[]")
             except Exception:
                 d["locations"] = []
+            try:
+                d["commodities"] = _json.loads(d.get("commodities") or "[]")
+            except Exception:
+                d["commodities"] = []
+            d["depth"] = d.get("depth") or "curve"
             d["active"] = bool(d["active"])
             out.append(d)
         return out
@@ -1485,25 +1502,31 @@ def upsert_client_report(rec: dict) -> bool:
     try:
         _ensure_client_reports(conn, c)
         locs = _json.dumps(rec.get("locations") or [])
+        coms = _json.dumps(rec.get("commodities") or [])
+        depth = (rec.get("depth") or "curve")
         vals = (rec["id"], rec["client_name"], rec["email"], rec.get("cc"),
-                rec["frequency"], rec.get("day_of_week"), locs,
+                rec["frequency"], rec.get("day_of_week"), locs, depth, coms,
                 1 if rec.get("active", True) else 0, rec.get("created_at"))
         if _use_pg():
             c.execute(f"""INSERT INTO client_reports
-                (id, client_name, email, cc, frequency, day_of_week, locations, active, created_at)
-                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
+                (id, client_name, email, cc, frequency, day_of_week, locations, depth,
+                 commodities, active, created_at)
+                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
                 ON CONFLICT (id) DO UPDATE SET
                     client_name=EXCLUDED.client_name, email=EXCLUDED.email, cc=EXCLUDED.cc,
                     frequency=EXCLUDED.frequency, day_of_week=EXCLUDED.day_of_week,
-                    locations=EXCLUDED.locations, active=EXCLUDED.active""", vals)
+                    locations=EXCLUDED.locations, depth=EXCLUDED.depth,
+                    commodities=EXCLUDED.commodities, active=EXCLUDED.active""", vals)
         else:
             c.execute(f"""INSERT INTO client_reports
-                (id, client_name, email, cc, frequency, day_of_week, locations, active, created_at)
-                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
+                (id, client_name, email, cc, frequency, day_of_week, locations, depth,
+                 commodities, active, created_at)
+                VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})
                 ON CONFLICT(id) DO UPDATE SET
                     client_name=excluded.client_name, email=excluded.email, cc=excluded.cc,
                     frequency=excluded.frequency, day_of_week=excluded.day_of_week,
-                    locations=excluded.locations, active=excluded.active""", vals)
+                    locations=excluded.locations, depth=excluded.depth,
+                    commodities=excluded.commodities, active=excluded.active""", vals)
         conn.commit()
         return True
     finally:

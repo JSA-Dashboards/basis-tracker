@@ -21,7 +21,7 @@ import os
 from datetime import datetime, timedelta
 
 from changes_report import (_trend_extract, _trend_closest, _trend_ts, _curve_map,
-                            signature_html, send_via_outlook,
+                            _grain_disp, signature_html, send_via_outlook,
                             JPSI_DARK, JPSI_BLUE, _GAIN, _LOSS,
                             _SIG_LOGO, _SIG_LOGO_CID)
 import delivery_period as _dp
@@ -30,17 +30,23 @@ from database import get_snapshots_bulk, get_client_reports
 log = logging.getLogger(__name__)
 
 
-# ── per-location forward curve: every delivery period + Day/Week/Month change ──
-def _loc_periods(l: dict, data: dict, today_noon) -> dict:
-    """One location expanded into all its posted delivery periods (Spot first, then
-    the forward curve chronologically). Each period carries its own Day/Wk/Mo change,
-    computed against the SAME delivery slot in the prior snapshots."""
-    grain = l["grain"]
-    snaps = data.get((l["provider"], l["location"]), [])
-    cur_snaps = [s for s in snaps if _trend_ts(s.timestamp) <= today_noon]
-    cur = max(cur_snaps, key=lambda s: _trend_ts(s.timestamp)) if cur_snaps else None
-    if cur is None:
-        return {**l, "as_of": None, "periods": []}
+# ── per-location-grain forward curve: every delivery period + Day/Week/Month change ──
+def _grains_in(snap) -> list:
+    """Display grains that this snapshot actually posts a basis for, in first-seen order."""
+    out, seen = [], set()
+    for r in snap.rows:
+        if r.basisCents is None:
+            continue
+        g = _grain_disp(r.grain)
+        if g and g not in seen:
+            seen.add(g)
+            out.append(g)
+    return out
+
+
+def _periods_for(prov: str, loc: str, grain: str, cur, snaps: list, depth: str) -> dict:
+    """One (location, grain) block: a Spot row plus — unless depth='spot' — the full
+    forward curve, each period carrying its own Day/Wk/Mo change vs the same slot."""
     as_of  = _trend_ts(cur.timestamp).date()
     now_dt = datetime(*as_of.timetuple()[:3], 12)
     older  = [s for s in snaps if _trend_ts(s.timestamp) < now_dt]
@@ -49,17 +55,7 @@ def _loc_periods(l: dict, data: dict, today_noon) -> dict:
         return _trend_closest(older, now_dt - timedelta(days=days), maxd)
     p_d, p_w, p_m = _past(1, 2.0), _past(7, 4.5), _past(30, 14.0)
 
-    cur_curve = _curve_map(cur, grain)
-    d_curve = _curve_map(p_d, grain) if p_d else {}
-    w_curve = _curve_map(p_w, grain) if p_w else {}
-    m_curve = _curve_map(p_m, grain) if p_m else {}
-
-    def _delta(b, key, past_curve):
-        pb = past_curve.get(key)
-        return (b - pb) if (b is not None and pb is not None) else None
-
     periods = []
-    # Spot (nearest cash) first — always list it if the location posts one.
     spot = _trend_extract(cur, grain, "spot")
     if spot is not None:
         def _sdelta(past):
@@ -67,22 +63,61 @@ def _loc_periods(l: dict, data: dict, today_noon) -> dict:
             return (spot - pb) if (pb is not None) else None
         periods.append({"label": "Spot", "basis": spot,
                         "d": _sdelta(p_d), "w": _sdelta(p_w), "m": _sdelta(p_m)})
-    # Forward curve, chronological (Sep 2026 → …).
-    for key in sorted(cur_curve):
-        b = cur_curve[key]
-        periods.append({"label": _dp.label(key), "basis": b,
-                        "d": _delta(b, key, d_curve),
-                        "w": _delta(b, key, w_curve),
-                        "m": _delta(b, key, m_curve)})
-    return {**l, "as_of": as_of, "periods": periods}
+
+    if depth != "spot":
+        cur_curve = _curve_map(cur, grain)
+        d_curve = _curve_map(p_d, grain) if p_d else {}
+        w_curve = _curve_map(p_w, grain) if p_w else {}
+        m_curve = _curve_map(p_m, grain) if p_m else {}
+
+        def _delta(b, key, past_curve):
+            pb = past_curve.get(key)
+            return (b - pb) if (b is not None and pb is not None) else None
+
+        for key in sorted(cur_curve):
+            b = cur_curve[key]
+            periods.append({"label": _dp.label(key), "basis": b,
+                            "d": _delta(b, key, d_curve),
+                            "w": _delta(b, key, w_curve),
+                            "m": _delta(b, key, m_curve)})
+    return {"provider": prov, "location": loc, "grain": grain,
+            "as_of": as_of, "periods": periods}
 
 
-def _rows_for(locations: list[dict]) -> list[dict]:
-    """One entry per subscribed location, each with its full list of delivery periods."""
-    pairs = sorted({(l["provider"], l["location"]) for l in locations})
-    data = get_snapshots_bulk(pairs, since_days=45) if pairs else {}
+def _rows_for(client: dict) -> list[dict]:
+    """One block per (subscribed location × commodity). Commodities empty → every
+    commodity the location posts; depth 'spot' → just the cash bid, else full curve."""
+    locations   = client.get("locations", []) or []
+    commodities = client.get("commodities") or []          # empty = all commodities
+    depth       = (client.get("depth") or "curve").lower()
+    want = {str(c).lower() for c in commodities}
+
+    # De-dupe to (provider, location) in the order the client listed them.
+    pairs, seen = [], set()
+    for l in locations:
+        key = (l["provider"], l["location"])
+        if key not in seen:
+            seen.add(key)
+            pairs.append(key)
+
+    data = get_snapshots_bulk(sorted(pairs), since_days=45) if pairs else {}
     today_noon = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
-    return [_loc_periods(l, data, today_noon) for l in locations]
+
+    blocks = []
+    for prov, loc in pairs:
+        snaps = data.get((prov, loc), [])
+        cur_snaps = [s for s in snaps if _trend_ts(s.timestamp) <= today_noon]
+        cur = max(cur_snaps, key=lambda s: _trend_ts(s.timestamp)) if cur_snaps else None
+        if cur is None:
+            blocks.append({"provider": prov, "location": loc, "grain": None,
+                           "as_of": None, "periods": []})
+            continue
+        grains = _grains_in(cur)
+        if want:
+            grains = [g for g in grains if g.lower() in want]
+        for g in grains:
+            blocks.append(_periods_for(prov, loc, g, cur, snaps, depth))
+    return blocks
 
 
 # ── cell formatters ─────────────────────────────────────────────────────────
@@ -113,7 +148,7 @@ def _trend_cell(row) -> str:
 
 
 def build_client_html(client: dict) -> str:
-    locs = _rows_for(client.get("locations", []))
+    locs = _rows_for(client)
     th = ("background:#f1f5f9;color:#475569;font-size:11px;text-transform:uppercase;"
           "letter-spacing:.03em;padding:7px 10px;text-align:left;font-weight:700;"
           "border-bottom:2px solid #e2e8f0;font-family:Arial,sans-serif")
@@ -138,7 +173,8 @@ def build_client_html(client: dict) -> str:
     for loc in locs:
         _ao = loc.get("as_of")
         aod = f' &middot; as of {_ao.month}/{_ao.day}' if _ao else ""
-        head = f'{loc["provider"]} &middot; {loc["location"]} &mdash; {loc["grain"]}{aod}'
+        gtxt = f' &mdash; {loc["grain"]}' if loc.get("grain") else ""
+        head = f'{loc["provider"]} &middot; {loc["location"]}{gtxt}{aod}'
         body += f'<tr><td colspan="6" style="{grp}">{head}</td></tr>'
         periods = loc.get("periods") or []
         if not periods:
