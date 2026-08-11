@@ -46,6 +46,17 @@ SITES: list[dict] = [
      "url": "https://www.westerngrainmarketing.com/markets/cash.php?location_filter=86697"},
 ]
 
+# A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
+# prints each row via a run of document.write() calls — commodity, delivery
+# start/end (MM/DD/YYYY), and the basis as a bare decimal-dollar literal
+# (document.write('-0.08')). The futures contract is the `quote = quotevarNNN['ZCU26']`
+# assignment emitted just before each row. Parsed by parse_bidlist_site().
+BIDLIST_SITES: list[dict] = [
+    {"provider": "Lincolnland Agri-Energy", "location": "Palestine, IL", "state": "IL",
+     "facility_type": "Corn Processing",
+     "url": "https://www.lincolnlandagrienergy.com/bidlist"},
+]
+
 _COMMODITY = {"CORN": ("ZC", "Corn"), "SOYBEANS": ("ZS", "Soybeans"),
               "SOYBEAN": ("ZS", "Soybeans"), "WHEAT": ("ZW", "Wheat"),
               "MILO": ("ZC", "Sorghum"), "SORGHUM": ("ZC", "Sorghum")}
@@ -137,10 +148,81 @@ def parse_site(cfg: dict) -> NewSnapshotRequest | None:
                               location=cfg["location"], source="web", rows=rows)
 
 
+# ── "/bidlist" variant (document.write rows) ────────────────────────────────────
+_TR_SPLIT = "document.write('<tr>')"
+_DW_RE   = re.compile(r"document\.write\('((?:\\.|[^'])*)'\)")
+_TAG_RE  = re.compile(r"<[^>]+>")
+_DATE_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
+_DEC_RE  = re.compile(r"^[+-]?\d+\.\d+$")
+_SYM_RE  = re.compile(r"quotevar\d+\['([A-Z]{2}[FGHJKMNQUVXZ]\d{2})'\]")
+_ROOT_GRAIN = {"ZC": "Corn", "ZS": "Soybeans", "ZW": "Wheat"}
+
+
+def parse_bidlist_site(cfg: dict) -> NewSnapshotRequest | None:
+    try:
+        html = requests.get(cfg["url"], headers=_HEADERS, timeout=25).text
+    except Exception as exc:
+        log.error("AgriCharts-bidlist fetch failed for %s: %s", cfg["location"], exc)
+        return None
+    segs = html.split(_TR_SPLIT)
+    rows: list[SnapshotRow] = []
+    seen: set[str] = set()
+    for j in range(1, len(segs)):
+        seg = segs[j]
+        writes = [m.group(1) for m in _DW_RE.finditer(seg)]
+
+        grain = None
+        for w in writes:                                   # commodity from first <td>text</td>
+            info = _commodity_of(_TAG_RE.sub("", w).strip())
+            if info:
+                grain = info[1]
+                break
+        if grain is None:
+            continue
+
+        dm = _DATE_RE.search(seg)                          # delivery-start month/year
+        if not dm:
+            continue
+        month, year = int(dm.group(1)), int(dm.group(3))
+        if month not in _MON_NAME:
+            continue
+
+        basis = None                                       # bare decimal-dollar literal
+        for w in writes:
+            ws = w.strip()
+            if _DEC_RE.match(ws) and abs(float(ws)) < 3:
+                basis = int(round(float(ws) * 100))
+                break
+        if basis is None:
+            continue
+
+        prev_syms = _SYM_RE.findall(segs[j - 1])           # futures = quote set just before this row
+        cme = prev_syms[-1] if prev_syms else None
+        if not cme:
+            continue
+        root = cme[:2]
+        grain = _ROOT_GRAIN.get(root, grain)               # trust the actual quoted contract
+        delivery = f"{_MON_NAME[month]} {year}"
+        pfx = _PFX.get(root, "XX")
+        row_id = f"{pfx}_{cme}_{delivery.replace(' ', '').upper()}"
+        if row_id in seen:
+            continue
+        seen.add(row_id)
+        rows.append(SnapshotRow(id=row_id, grain=grain, deliveryMonth=delivery,
+                                futuresSymbol=cme, basisCents=basis, isSpot=False))
+    if not rows:
+        log.warning("AgriCharts-bidlist: no bids parsed for %s", cfg["location"])
+        return None
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    return NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
+                              location=cfg["location"], source="web", rows=rows)
+
+
 def fetch_agricharts_md() -> tuple[list[NewSnapshotRequest], list[dict]]:
     reqs, metas = [], []
-    for cfg in SITES:
-        req = parse_site(cfg)
+    for cfg, parser in ([(c, parse_site) for c in SITES]
+                        + [(c, parse_bidlist_site) for c in BIDLIST_SITES]):
+        req = parser(cfg)
         if req is None:
             continue
         reqs.append(req)
