@@ -30,6 +30,18 @@ from database import get_snapshots_bulk, get_client_reports
 log = logging.getLogger(__name__)
 
 
+def _ensure_grain_map() -> None:
+    """`_grain_disp` reads changes_report's module-global `_GM`, which is only
+    populated as a side effect of the Changes report running. In the client-report
+    path (nightly send or the admin Preview) nothing else loads it, so without this
+    the grain names come back RAW ("Yellow Corn") and never match a client's
+    canonical commodity filter ("Corn"). Load it once, here."""
+    import changes_report as _ch
+    if not _ch._GM:
+        from database import get_grain_map
+        _ch._GM = get_grain_map()
+
+
 # ── per-location-grain forward curve: every delivery period + Day/Week/Month change ──
 def _grains_in(snap) -> list:
     """Display grains that this snapshot actually posts a basis for, in first-seen order."""
@@ -37,7 +49,10 @@ def _grains_in(snap) -> list:
     for r in snap.rows:
         if r.basisCents is None:
             continue
-        g = _grain_disp(r.grain)
+        try:
+            g = _grain_disp(r.grain)
+        except Exception:               # never let one odd grain crash the whole report
+            g = r.grain
         if g and g not in seen:
             seen.add(g)
             out.append(g)
@@ -87,6 +102,7 @@ def _periods_for(prov: str, loc: str, grain: str, cur, snaps: list, depth: str) 
 def _rows_for(client: dict) -> list[dict]:
     """One block per (subscribed location × commodity). Commodities empty → every
     commodity the location posts; depth 'spot' → just the cash bid, else full curve."""
+    _ensure_grain_map()
     locations   = client.get("locations", []) or []
     commodities = client.get("commodities") or []          # empty = all commodities
     depth       = (client.get("depth") or "curve").lower()
