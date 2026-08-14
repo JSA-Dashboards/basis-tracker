@@ -1902,7 +1902,7 @@ def run(
     if run_vistacomm_scrape:
         total += _run_guarded(run_vistacomm, "VistaComm")
     if run_dtn_scrape:
-        total += _run_guarded(run_dtn_playwright, "DTN", 300)
+        total += _run_guarded(run_dtn_playwright, "DTN", 480)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:

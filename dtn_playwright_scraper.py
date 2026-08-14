@@ -141,31 +141,58 @@ def _build_snapshot(provider: str, location: str, grain: str,
                               source="web", rows=rows)
 
 
-def fetch_dtn_playwright(timeout_ms: int = 25000) -> tuple[list[NewSnapshotRequest], list[dict]]:
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+# wait for the DTN JS to inject a basis (an @-symbol row appears in a <td>)
+_WAIT_JS = ("() => [...document.querySelectorAll('td')].some(c => "
+            "/^@[A-Z]{1,2}\\d[FGHJKMNQUVXZ]$/.test((c.innerText||'').trim()))")
+
+
+def fetch_dtn_playwright(timeout_ms: int = 40000, attempts: int = 2
+                         ) -> tuple[list[NewSnapshotRequest], list[dict]]:
     """Render each SITES page in headless Chromium, read the grid. Returns
-    (snapshot requests, location metas). One browser for all sites."""
+    (snapshot requests, location metas). One browser for all sites.
+
+    Robustness (aghost renders are slow/flaky — Heron Lake especially): each site
+    gets a generous per-render wait and one retry on a fresh page, and the Chromium
+    launch itself is retried once. So a single slow site — or a cold-launch hiccup in
+    the non-interactive Task Scheduler context — no longer blanks the whole batch."""
     from playwright.sync_api import sync_playwright
     reqs, metas = [], []
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        for cfg in SITES:
-            page = browser.new_page(user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"))
+        browser = None
+        for launch_try in range(1, 3):
             try:
-                page.goto(cfg["url"], timeout=timeout_ms, wait_until="domcontentloaded")
-                # wait for the DTN JS to inject a basis (an @-symbol row with a number)
-                page.wait_for_function(
-                    "() => [...document.querySelectorAll('td')].some(c => /^@[A-Z]{1,2}\\d[FGHJKMNQUVXZ]$/.test((c.innerText||'').trim()))",
-                    timeout=timeout_ms)
-                page.wait_for_timeout(1500)      # let the basis cells fill
-                raw = page.evaluate(
-                    _EXTRACT_COLUMNAR_JS if cfg.get("layout") == "columnar" else _EXTRACT_JS)
+                browser = p.chromium.launch(headless=True)
+                break
             except Exception as exc:
-                log.error("DTN(pw) render failed for %s: %s", cfg["location"], exc)
-                page.close()
+                log.warning("DTN(pw) Chromium launch attempt %d/2 failed: %s", launch_try, exc)
+        if browser is None:
+            log.error("DTN(pw) could not launch Chromium — skipping the DTN render batch")
+            return reqs, metas
+        for cfg in SITES:
+            _label = cfg.get("location") or cfg.get("provider")
+            raw = None
+            for attempt in range(1, attempts + 1):
+                page = browser.new_page(user_agent=_UA)
+                try:
+                    page.goto(cfg["url"], timeout=timeout_ms, wait_until="domcontentloaded")
+                    page.wait_for_function(_WAIT_JS, timeout=timeout_ms)
+                    page.wait_for_timeout(1500)      # let the basis cells fill
+                    raw = page.evaluate(
+                        _EXTRACT_COLUMNAR_JS if cfg.get("layout") == "columnar" else _EXTRACT_JS)
+                    break
+                except Exception as exc:
+                    if attempt < attempts:
+                        log.warning("DTN(pw) %s attempt %d/%d failed (%s) — retrying",
+                                    _label, attempt, attempts, exc)
+                    else:
+                        log.error("DTN(pw) render failed for %s after %d attempts: %s",
+                                  _label, attempts, exc)
+                finally:
+                    page.close()
+            if raw is None:
                 continue
-            page.close()
             if cfg.get("layout") == "columnar":
                 plants = {}
                 for row in (raw or {}).get("rows", []):
