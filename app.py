@@ -1945,6 +1945,13 @@ def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
     """, height=height)
 
 
+# Breathing room between the plotting rectangle and the SVG edge. Without it the
+# newest data point sits flush on the right border and its marker + end-of-line year
+# label get clipped ("rolling off the edge"); the extra right pad leaves room for the
+# terminal label, and marks overflow into the pad rather than being sliced.
+_CHART_PAD = {"left": 6, "right": 22, "top": 8, "bottom": 6}
+
+
 def _chart_png(chart, width: int = 1100, height: int = 560, scale: float = 2.0):
     """Render an Altair chart to PNG bytes via vl-convert (Cloud-safe, Rust-based).
     to_dict(default=str) sidesteps the 'date is not JSON serializable' bug that
@@ -2810,7 +2817,7 @@ with tab_railfob:
             + (f'  ·  <b style="color:#2563eb">{_prev_yr} = blue</b>' if _prev_yr else '')
             + (f'  ·  <b style="color:#d97706">5-yr avg = amber dash</b>' if not _rband.empty else '')
             + '</span></div>', unsafe_allow_html=True)
-        _rail_chart = _alt.layer(*_layers).properties(height=_H)
+        _rail_chart = _alt.layer(*_layers).properties(height=_H, padding=_CHART_PAD)
         st.altair_chart(_rail_chart, use_container_width=True)
         _rail_fname = (f"rail_seasonal_{_mk}_{_pd_sel}.png"
                        .replace(" ", "_").replace("/", "-").replace(",", ""))
@@ -4028,7 +4035,7 @@ with tab_bids:
                     ],
                 )
             )
-            st.altair_chart((_fwd_zero + _fwd_line).properties(height=200),
+            st.altair_chart((_fwd_zero + _fwd_line).properties(height=200, padding=_CHART_PAD),
                             use_container_width=True)
 
         # ── Spot basis history chart ──────────────────────────────────────────
@@ -4100,7 +4107,7 @@ with tab_bids:
                 'Spot Basis History (front-month)</div>',
                 unsafe_allow_html=True,
             )
-            st.altair_chart((_zero_rule + _spot_line).properties(height=200),
+            st.altair_chart((_zero_rule + _spot_line).properties(height=200, padding=_CHART_PAD),
                             use_container_width=True)
 
             # ── Seasonal chart ─────────────────────────────────────────────
@@ -4402,7 +4409,7 @@ with tab_bids:
                     + '</div>',
                     unsafe_allow_html=True,
                 )
-                _seas_chart = _alt.layer(*_s_layers).properties(height=_SEAS_H)
+                _seas_chart = _alt.layer(*_s_layers).properties(height=_SEAS_H, padding=_CHART_PAD)
                 st.altair_chart(_seas_chart, use_container_width=True)
                 _seas_fname = (f"seasonal_{loc_key}_{grain}.png"
                                .replace(" ", "_").replace("/", "-").replace(",", ""))
