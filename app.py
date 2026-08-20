@@ -5803,9 +5803,20 @@ st.markdown(f"""
     &nbsp;·&nbsp;877-671-1670
   </span>
 </div>
-<div style="font-size:10px;color:#94a3b8;padding:2px 6px 12px;
-     font-family:'Source Sans Pro',system-ui,sans-serif">
-  Cash bids aggregated from public sources for informational purposes only — not an
-  offer to buy or sell. © {datetime.now():%Y} John Stewart &amp; Associates.
+<div style="font-size:10px;color:#94a3b8;padding:2px 6px 14px;line-height:1.5;
+     font-family:'Source Sans Pro',system-ui,sans-serif;text-align:justify">
+  Trading commodity futures, options on futures, cash commodities, and over-the-counter
+  derivative products involves substantial risk of loss and may not be suitable for all
+  investors. This communication is provided for informational purposes only and does not
+  constitute investment advice, a recommendation, or an offer or solicitation to buy or
+  sell any futures, options, cash commodities, or derivative products. John Stewart &amp;
+  Associates, Inc. does not accept orders to buy or sell any financial instruments via
+  email. The information contained herein has been obtained from sources believed to be
+  reliable; however, its accuracy and completeness are not guaranteed. Any opinions
+  expressed are solely those of the author, are subject to change without notice, and
+  should not be relied upon as a basis for investment decisions. Past performance is not
+  indicative of future results. This message may contain confidential or proprietary
+  information intended solely for the use of the designated recipient.
+  © John Stewart &amp; Associates, Inc. {datetime.now():%Y}
 </div>
 """, unsafe_allow_html=True)
