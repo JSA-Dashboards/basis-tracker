@@ -565,6 +565,76 @@ def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = Non
     mail.Send()
 
 
+def _email_cfg(key: str, default=None):
+    """Read an SMTP setting from the environment, falling back to st.secrets (Cloud)."""
+    v = os.getenv(key)
+    if v:
+        return v
+    try:
+        import streamlit as st
+        if key in st.secrets:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return default
+
+
+def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
+                  inline_images: dict | None = None) -> None:
+    """Send the HTML email over SMTP (for environments without Outlook, e.g. Streamlit
+    Cloud). Config from env or st.secrets: SMTP_HOST, SMTP_PORT (default 587),
+    SMTP_USER, SMTP_PASS, SMTP_FROM (defaults to SMTP_USER). Inline images embed by
+    Content-ID exactly like the Outlook path."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.image import MIMEImage
+
+    host = _email_cfg("SMTP_HOST")
+    user = _email_cfg("SMTP_USER")
+    pw   = _email_cfg("SMTP_PASS")
+    port = int(_email_cfg("SMTP_PORT", "587"))
+    frm  = _email_cfg("SMTP_FROM") or user
+    if not (host and user and pw):
+        raise RuntimeError("SMTP not configured (need SMTP_HOST, SMTP_USER, SMTP_PASS).")
+
+    root = MIMEMultipart("related")
+    root["Subject"], root["From"], root["To"] = subject, frm, to_addr
+    if cc:
+        root["Cc"] = cc
+    alt = MIMEMultipart("alternative"); root.attach(alt)
+    alt.attach(MIMEText("This message is best viewed in an HTML-capable email client.", "plain"))
+    alt.attach(MIMEText(html, "html"))
+    for cid, path in (inline_images or {}).items():
+        if os.path.exists(path):
+            with open(path, "rb") as fh:
+                img = MIMEImage(fh.read())
+            img.add_header("Content-ID", f"<{cid}>")
+            img.add_header("Content-Disposition", "inline", filename=os.path.basename(path))
+            root.attach(img)
+    rcpts = [to_addr] + ([cc] if cc else [])
+    with smtplib.SMTP(host, port, timeout=30) as s:
+        s.starttls()
+        s.login(user, pw)
+        s.sendmail(frm, rcpts, root.as_string())
+
+
+def send_email(subject: str, html: str, to_addr: str, cc: str | None = None,
+               inline_images: dict | None = None) -> str:
+    """Dispatch: send via local Outlook if available, else fall back to SMTP (Cloud).
+    Returns which path was used ('outlook' | 'smtp'); raises if both fail."""
+    try:
+        import win32com.client  # noqa: F401  (present only on the local machine)
+        send_via_outlook(subject, html, to_addr, cc=cc, inline_images=inline_images)
+        return "outlook"
+    except Exception as e_out:
+        try:
+            send_via_smtp(subject, html, to_addr, cc=cc, inline_images=inline_images)
+            return "smtp"
+        except Exception as e_smtp:
+            raise RuntimeError(f"Email send failed — Outlook: {e_out}; SMTP: {e_smtp}")
+
+
 def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
                              mode: str = "spot") -> bool:
     """Build the daily Changes report and email it via Outlook. Returns True on success.
