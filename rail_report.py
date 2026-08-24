@@ -154,10 +154,10 @@ def _seasonal_png(market, by_md, mkt_dates):
         layers.append(alt.Chart(cur).mark_line(strokeWidth=4, color="#000000").encode(
             x="MktWeek:Q", y="Bid:Q"))
     chart = alt.layer(*layers).properties(
-        width=760, height=300, padding={"left": 6, "right": 22, "top": 10, "bottom": 6},
+        width=640, height=225, padding={"left": 6, "right": 20, "top": 8, "bottom": 6},
         title=f"{_RAIL_DISPLAY.get(market, market)} · Spot basis seasonal")
     try:
-        return vlc.vegalite_to_png(json.dumps(chart.to_dict(), default=str), scale=2)
+        return vlc.vegalite_to_png(json.dumps(chart.to_dict(), default=str), scale=1.5)
     except Exception as exc:
         log.warning("rail seasonal PNG failed for %s: %s", market, exc)
         return None
@@ -192,7 +192,8 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
         f'Manual rail FOB corridors · {datetime.now():%A, %B %d, %Y}</div></div>'
         f'<div style="padding:4px 2px 0">')
 
-    for m in markets:
+    imgs = {}
+    for idx, m in enumerate(markets):
         elig = sorted(mkt_dates[m])
         eff = elig[-1]
         cells = sorted(by_md.get((m, eff), {}).values(),
@@ -224,19 +225,17 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
                      + '</tr>')
         body += '</table>'
 
-    imgs = {}
-    seas_market = seasonal_market or (max(markets, key=lambda m: len(mkt_dates[m])) if markets else None)
-    if seas_market:
-        png = _seasonal_png(seas_market, by_md, mkt_dates)
-        if png:
-            fh = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            fh.write(png); fh.close()
-            imgs[_SEAS_CID] = fh.name
-            body += (f'<div style="margin-top:22px;border-top:2px solid #e2e8f0;padding-top:10px">'
-                     f'<div style="font-size:11px;font-weight:700;color:{JPSI_DARK};margin-bottom:4px">'
-                     f'Spot Seasonal Basis</div>'
-                     f'<img src="cid:{_SEAS_CID}" style="max-width:100%;border:1px solid #e2e8f0;'
-                     f'border-radius:6px"></div>')
+        # Spot seasonal chart for this corridor (skipped if not enough history, or if a
+        # single seasonal_market was requested and this isn't it).
+        if seasonal_market is None or m == seasonal_market:
+            png = _seasonal_png(m, by_md, mkt_dates)
+            if png:
+                cid = f"seas_{idx}"
+                fh = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+                fh.write(png); fh.close()
+                imgs[cid] = fh.name
+                body += (f'<div style="margin:6px 0 2px"><img src="cid:{cid}" '
+                         f'style="max-width:100%;border:1px solid #e2e8f0;border-radius:6px"></div>')
 
     body += (f'<div style="font-size:11px;color:#94a3b8;margin-top:10px;font-family:Arial,sans-serif">'
              'Rail FOB corn basis (¢/bu) vs the referenced futures. Δ = bid change vs the corridor\'s '
