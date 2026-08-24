@@ -30,6 +30,9 @@ SUBJECT    = "JSA Rail Basis Update"
 _SEAS_CID  = "rail_seasonal"
 # Corridors to leave OFF the rail email (kept in the DB, just not reported).
 _EXCLUDE = {"UP Illinois (Dom)"}     # Allen Station (Dom) — dropped 2026-08-24
+# Corridors to ALWAYS include (user-requested freight series that update less often
+# than the twice-weekly basis rundowns, so the freshness filter shouldn't drop them).
+_ALWAYS  = {"BN Freight", "UP Freight"}
 
 try:
     from rail_corridors import CORRIDORS, CORRIDOR_ORDER
@@ -174,7 +177,8 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
     _all_latest = max((max(ds) for ds in mkt_dates.values()), default=None)
     _cutoff = ((datetime.fromisoformat(_all_latest).date() - timedelta(days=21)).isoformat()
                if _all_latest else "0000")
-    _active = [m for m, ds in mkt_dates.items() if max(ds) >= _cutoff and m not in _EXCLUDE]
+    _active = [m for m, ds in mkt_dates.items()
+               if (max(ds) >= _cutoff or m in _ALWAYS) and m not in _EXCLUDE]
     markets = sorted(_active, key=lambda m: (CORRIDOR_ORDER.get(m, 99), m))
 
     th  = ("background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase;"
