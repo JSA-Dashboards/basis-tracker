@@ -3009,11 +3009,11 @@ with tab_railfob:
         ]),
         ("UP Western Rail", [
             ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],
-            ["UP 110 Shuttle"],
+            ["UP Freight"],
         ]),
         ("BN Western Rail", [
             ["BN Hereford", "BN PNW", "BN COBO"],
-            ["BN 110 Shuttle"],
+            ["BN Freight"],
             ["BN PNW BE"],
             ["BN PNW CP"],   # → "CP PNW", very bottom
         ]),
