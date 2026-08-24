@@ -3020,6 +3020,34 @@ with tab_railfob:
     ]
     _rail_board("manual", _MANUAL_SECTIONS, "man")
 
+    # ── Email the rail board on demand (full build only; sends via local Outlook) ──
+    if not _view_only():
+        st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
+        _re1, _re2, _ = st.columns([3, 3, 6])
+        with _re1:
+            if st.button("📧 Email full recap", key="rail_email_recap",
+                         help="Email the whole rail board (every corridor + seasonal charts) to your inbox now"):
+                try:
+                    import rail_report as _rr
+                    _rr.send_rail_recap_email()
+                    st.success("Rail recap emailed.")
+                except Exception as _e:
+                    st.error(f"Send failed (Outlook must be running locally): {_e}")
+        with _re2:
+            if st.button("📧 Email latest update", key="rail_email_update",
+                         help="Email just the corridors posted on the selected board date"):
+                try:
+                    import rail_report as _rr
+                    from database import get_rail_fob as _grf
+                    _d = st.session_state.get("rail_date_man")
+                    _mk = sorted({r["market"] for r in _grf("manual", _d)}) if _d else None
+                    if _rr.send_rail_update_email(markets=_mk):
+                        st.success(f"Update emailed ({len(_mk)} corridor(s)).")
+                    else:
+                        st.info("No corridors on that date to email.")
+                except Exception as _e:
+                    st.error(f"Send failed (Outlook must be running locally): {_e}")
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RIVER FOB  (read-only view of the JSA FOB Sheet, shared Supabase archive)
 # ═══════════════════════════════════════════════════════════════════════════════
