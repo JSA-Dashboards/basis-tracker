@@ -169,8 +169,13 @@ def _seasonal_png(market, by_md, mkt_dates):
 
 
 # ── HTML ─────────────────────────────────────────────────────────────────────
-def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
-    """(html, inline_images). inline_images maps cid->filepath for send_via_outlook."""
+def build_rail_html(markets: list | None = None, charts: bool = True,
+                    title: str = "Rail Basis Update") -> tuple[str, dict]:
+    """(html, inline_images) for the rail email; inline_images maps cid->filepath.
+
+    `markets`: restrict to just these corridors (an UPDATE email of what was posted);
+    None = the full active board (the weekly RECAP). `charts`: include the per-corridor
+    seasonal images (kept for the recap, dropped for the lean update)."""
     by_md, mkt_dates = _load("manual")
     # Only corridors actively being posted — drop long-dead historical markets
     # (KC/KCS 2015, BN MN 2018, BN PNW Beans 2020, …) so the email stays current.
@@ -179,7 +184,10 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
                if _all_latest else "0000")
     _active = [m for m, ds in mkt_dates.items()
                if (max(ds) >= _cutoff or m in _ALWAYS) and m not in _EXCLUDE]
-    markets = sorted(_active, key=lambda m: (CORRIDOR_ORDER.get(m, 99), m))
+    if markets is not None:                       # update email → only these corridors
+        _sel = {m for m in markets}
+        _active = [m for m in _active if m in _sel]
+    _ordered = sorted(_active, key=lambda m: (CORRIDOR_ORDER.get(m, 99), m))
 
     th  = ("background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase;"
            "letter-spacing:.04em;padding:4px 7px;font-weight:700;border-bottom:2px solid #e2e8f0;"
@@ -193,13 +201,13 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
     body = (
         f'<div style="font-family:Arial,Helvetica,sans-serif;color:{JPSI_DARK};max-width:820px">'
         f'<div style="background:{JPSI_DARK};padding:16px 20px;border-radius:8px 8px 0 0">'
-        f'<div style="color:#fff;font-size:18px;font-weight:800">Rail Basis Update</div>'
+        f'<div style="color:#fff;font-size:18px;font-weight:800">{title}</div>'
         f'<div style="color:{JPSI_BLUE};font-size:13px;font-weight:600;margin-top:2px">'
         f'Manual rail FOB corridors · {datetime.now():%A, %B %d, %Y}</div></div>'
         f'<div style="padding:4px 2px 0">')
 
     imgs = {}
-    for idx, m in enumerate(markets):
+    for idx, m in enumerate(_ordered):
         elig = sorted(mkt_dates[m])
         eff = elig[-1]
         cells = sorted(by_md.get((m, eff), {}).values(),
@@ -231,9 +239,9 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
                      + '</tr>')
         body += '</table>'
 
-        # Spot seasonal chart for this corridor (skipped if not enough history, or if a
-        # single seasonal_market was requested and this isn't it).
-        if seasonal_market is None or m == seasonal_market:
+        # Spot seasonal chart for this corridor (skipped if not enough history, or in
+        # the lean update email where charts=False).
+        if charts:
             png = _seasonal_png(m, by_md, mkt_dates)
             if png:
                 cid = f"seas_{idx}"
@@ -252,10 +260,27 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
     return body + signature_html(), imgs
 
 
-def send_rail_update_email(to_addr: str | None = None, seasonal_market: str | None = None) -> bool:
-    html, imgs = build_rail_html(seasonal_market)
-    send_via_outlook(SUBJECT, html, to_addr or DEFAULT_TO, inline_images=imgs or None)
-    log.info("Rail Basis Update emailed to %s", to_addr or DEFAULT_TO)
+def send_rail_update_email(markets: list | None = None, to_addr: str | None = None) -> bool:
+    """Lean UPDATE email: just the corridors in `markets` (what was posted), no charts.
+    `markets=None` falls back to the full board (kept for compatibility)."""
+    if markets is not None and not markets:
+        log.info("Rail update email: no corridors to report — skipped.")
+        return False
+    n = len(markets) if markets else 0
+    title = (f"Rail Basis Update · {n} corridor{'s' if n != 1 else ''}") if markets else "Rail Basis Update"
+    subj  = (f"JSA Rail Update — {', '.join(markets)}"[:150]) if markets else SUBJECT
+    html, imgs = build_rail_html(markets=markets, charts=False, title=title)
+    send_via_outlook(subj, html, to_addr or DEFAULT_TO, inline_images=imgs or None)
+    log.info("Rail update email (%s) sent to %s", ", ".join(markets) if markets else "full", to_addr or DEFAULT_TO)
+    return True
+
+
+def send_rail_recap_email(to_addr: str | None = None) -> bool:
+    """Full weekly RECAP: every active corridor + a spot seasonal chart each."""
+    html, imgs = build_rail_html(markets=None, charts=True, title="Rail Basis Weekly Recap")
+    send_via_outlook("JSA Rail Basis — Weekly Recap", html, to_addr or DEFAULT_TO,
+                     inline_images=imgs or None)
+    log.info("Rail weekly recap emailed to %s", to_addr or DEFAULT_TO)
     return True
 
 
@@ -267,13 +292,18 @@ if __name__ == "__main__":
                         handlers=[logging.StreamHandler(sys.stdout)])
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", action="store_true")
-    ap.add_argument("--send", action="store_true")
-    ap.add_argument("--market", default=None, help="corridor for the seasonal chart")
+    ap.add_argument("--send", action="store_true", help="send an update email")
+    ap.add_argument("--recap", action="store_true", help="send the full weekly recap")
+    ap.add_argument("--markets", default=None, help="comma-separated corridors for the update email")
     a = ap.parse_args()
-    if a.send:
-        send_rail_update_email(seasonal_market=a.market)
+    _mkts = [m.strip() for m in a.markets.split(",")] if a.markets else None
+    if a.recap:
+        send_rail_recap_email()
+        print("recap sent")
+    elif a.send:
+        send_rail_update_email(markets=_mkts)
         print("sent")
     else:
-        html, imgs = build_rail_html(a.market)
+        html, imgs = build_rail_html(markets=_mkts, charts=a.recap)
         open("_rail_preview.html", "w", encoding="utf-8").write("<html><body>" + html + "</body></html>")
         print(f"wrote _rail_preview.html ({len(html)} chars, {len(imgs)} inline image(s))")
