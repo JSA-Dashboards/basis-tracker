@@ -28,6 +28,8 @@ log = logging.getLogger(__name__)
 DEFAULT_TO = "kpostin@jpsi.com"
 SUBJECT    = "JSA Rail Basis Update"
 _SEAS_CID  = "rail_seasonal"
+# Corridors to leave OFF the rail email (kept in the DB, just not reported).
+_EXCLUDE = {"UP Illinois (Dom)"}     # Allen Station (Dom) — dropped 2026-08-24
 
 try:
     from rail_corridors import CORRIDORS, CORRIDOR_ORDER
@@ -133,7 +135,7 @@ def _seasonal_png(market, by_md, mkt_dates):
         rows.append({"MktYear": f"{my}/{str(my + 1)[-2:]}", "MyNum": my, "MktWeek": wk, "Bid": bid})
     df = pd.DataFrame(rows).groupby(["MktYear", "MyNum", "MktWeek"], as_index=False)["Bid"].mean()
     mx = int(df["MyNum"].max())
-    df = df[df["MyNum"] >= mx - 5]                      # last 6 marketing years
+    df = df[df["MyNum"] >= mx - 9]                      # last 10 marketing years (all if fewer)
     if df["MyNum"].nunique() < 2:
         return None
 
@@ -172,7 +174,7 @@ def build_rail_html(seasonal_market: str | None = None) -> tuple[str, dict]:
     _all_latest = max((max(ds) for ds in mkt_dates.values()), default=None)
     _cutoff = ((datetime.fromisoformat(_all_latest).date() - timedelta(days=21)).isoformat()
                if _all_latest else "0000")
-    _active = [m for m, ds in mkt_dates.items() if max(ds) >= _cutoff]
+    _active = [m for m, ds in mkt_dates.items() if max(ds) >= _cutoff and m not in _EXCLUDE]
     markets = sorted(_active, key=lambda m: (CORRIDOR_ORDER.get(m, 99), m))
 
     th  = ("background:#f1f5f9;color:#475569;font-size:9px;text-transform:uppercase;"
