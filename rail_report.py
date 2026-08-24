@@ -261,15 +261,15 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
 
 
 def send_rail_update_email(markets: list | None = None, to_addr: str | None = None) -> bool:
-    """Lean UPDATE email: just the corridors in `markets` (what was posted), no charts.
-    `markets=None` falls back to the full board (kept for compatibility)."""
+    """UPDATE email: just the corridors in `markets` (what was posted), each with its
+    spot seasonal chart. `markets=None` falls back to the full board."""
     if markets is not None and not markets:
         log.info("Rail update email: no corridors to report — skipped.")
         return False
     n = len(markets) if markets else 0
     title = (f"Rail Basis Update · {n} corridor{'s' if n != 1 else ''}") if markets else "Rail Basis Update"
     subj  = (f"JSA Rail Update — {', '.join(markets)}"[:150]) if markets else SUBJECT
-    html, imgs = build_rail_html(markets=markets, charts=False, title=title)
+    html, imgs = build_rail_html(markets=markets, charts=True, title=title)
     send_via_outlook(subj, html, to_addr or DEFAULT_TO, inline_images=imgs or None)
     log.info("Rail update email (%s) sent to %s", ", ".join(markets) if markets else "full", to_addr or DEFAULT_TO)
     return True
