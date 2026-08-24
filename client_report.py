@@ -21,7 +21,7 @@ import os
 from datetime import datetime, timedelta
 
 from changes_report import (_trend_extract, _trend_closest, _trend_ts, _curve_map,
-                            _grain_disp, signature_html, send_via_outlook,
+                            _grain_disp, signature_html, send_email,
                             JPSI_DARK, JPSI_BLUE, _GAIN, _LOSS,
                             _SIG_LOGO, _SIG_LOGO_CID)
 import delivery_period as _dp
@@ -247,8 +247,8 @@ def send_client_report(client: dict) -> bool:
     html = build_client_html(client)
     subject = f"JSA Daily Basis Update - {datetime.now():%b %d, %Y}"
     imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else None
-    send_via_outlook(subject, html, client["email"], cc=client.get("cc") or None,
-                     inline_images=imgs)
+    send_email(subject, html, client["email"], cc=client.get("cc") or None,
+               inline_images=imgs)
     log.info("Client report sent to %s <%s>", client["client_name"], client["email"])
     return True
 

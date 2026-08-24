@@ -647,8 +647,8 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
     html = build_changes_email_html(mode) + signature_html()
     subject = f"JSA Daily Basis Changes - {datetime.now():%b %d, %Y}"
     imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else None
-    send_via_outlook(subject, html, to_addr, cc=cc, inline_images=imgs)
-    log.info("Daily Changes email sent to %s (cc %s)", to_addr, cc or "—")
+    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs)
+    log.info("Daily Changes email sent via %s to %s (cc %s)", _via, to_addr, cc or "—")
     return True
 
 
