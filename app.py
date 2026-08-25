@@ -2015,15 +2015,15 @@ def _paste_clean(html: str) -> str:
 
 
 _tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
-               "🗺️ Map", "📊 Summary", "📈 Trends"]
+               "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
 if not _view_only():
     _tab_labels.append("📥 Export")          # no download tab in the read-only build
     _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
 _tabs = st.tabs(_tab_labels)
 (tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
- tab_summary, tab_trends) = _tabs[:8]
-tab_export = _tabs[8] if not _view_only() else None
-tab_clients = _tabs[9] if not _view_only() else None
+ tab_summary, tab_trends, tab_spread) = _tabs[:9]
+tab_export = _tabs[9] if not _view_only() else None
+tab_clients = _tabs[10] if not _view_only() else None
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -5594,6 +5594,202 @@ with tab_trends:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# TAB: SPREAD  (seasonal basis spread between two locations, A − B)
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_spread:
+    import pandas as _pd
+    import altair as _alt
+    import base64 as _b64, pathlib as _pl
+
+    st.caption("Seasonal **basis spread** between two locations — **Location A − Location B** "
+               "(front-month spot basis) across the marketing year (Sep–Aug), against the "
+               "5-year range and average.")
+
+    def _spread_series(_provider, _location, _grain):
+        # Front-month bid where available; fall back to the explicit spot row for
+        # historical snapshots that predate forward postings (matches the Bids seasonal),
+        # so deep-history locations get a full 5-yr band.
+        _pts = []
+        for _s in _cached_get_snapshots(_provider, _location):
+            _r = _front_month_row(_s.rows, _grain)
+            if _r is None:
+                _r = next((_x for _x in _s.rows if _x.isSpot
+                           and _grain_disp(_x.spotGrain or _x.grain) == _grain), None)
+            if _r and _r.basisCents is not None:
+                _pts.append((_trend_ts(_s.timestamp).date(), float(_r.basisCents)))
+        return _pts
+
+    def _spread_grains(_provider, _location):
+        _snaps = _cached_get_snapshots(_provider, _location)
+        if not _snaps:
+            return set()
+        _out = set()
+        for _r in _snaps[-1].rows:
+            _g = _grain_disp((_r.spotGrain or _r.grain) if _r.isSpot else _r.grain)
+            if _g:
+                _out.add(_g)
+        return _out
+
+    _sp_pool = _cached_get_bids_filter_data()
+    _sp_label = {f'{_l["provider"]} · {_l["location"]}': (_l["provider"], _l["location"])
+                 for _l in _sp_pool}
+    _sp_names = sorted(_sp_label)
+    if len(_sp_names) < 2:
+        st.info("Need at least two locations with data to compare.")
+    else:
+        _sc1, _sc2, _sc3 = st.columns([4, 4, 3])
+        with _sc1:
+            _a_lbl = st.selectbox("Location A", _sp_names, key="spread_a")
+        with _sc2:
+            _b_choices = [_n for _n in _sp_names if _n != _a_lbl]
+            _b_lbl = st.selectbox("Location B", _b_choices, key="spread_b")
+        _a_pair, _b_pair = _sp_label[_a_lbl], _sp_label[_b_lbl]
+        _common = sorted(_spread_grains(*_a_pair) & _spread_grains(*_b_pair))
+        if not _common:
+            st.warning("These two locations share no common grain.")
+        else:
+            with _sc3:
+                _sg = st.selectbox("Grain", _common, key="spread_grain")
+            _pa = _spread_series(*_a_pair, _sg)
+            _pb = _spread_series(*_b_pair, _sg)
+            if len(_pa) < 2 or len(_pb) < 2:
+                st.warning("Not enough posting history for one of the locations.")
+            else:
+                _mrg = _pd.merge(
+                    _pd.DataFrame(_pa, columns=["Date", "A"]),
+                    _pd.DataFrame(_pb, columns=["Date", "B"]),
+                    on="Date", how="inner")
+                if len(_mrg) < 2:
+                    st.warning("The two locations have no overlapping posting dates.")
+                else:
+                    _mrg["Spread"] = (_mrg["A"] - _mrg["B"]).round(1)
+                    _dt = _pd.to_datetime(_mrg["Date"])
+                    _yy, _mm = _dt.dt.year, _dt.dt.month
+                    _mrg["MktYearNum"] = _yy.where(_mm >= 9, _yy - 1)
+                    _mrg["MktYear"] = _mrg["MktYearNum"].apply(lambda y: f"{y}/{str(y + 1)[-2:]}")
+                    _sep1 = _pd.to_datetime(_mrg["MktYearNum"].astype(str) + "-09-01")
+                    _mrg["MktWeek"] = ((_dt - _sep1).dt.days // 7 + 1).clip(1, 52)
+                    _seas = (_mrg.groupby(["MktYear", "MktYearNum", "MktWeek"], as_index=False)
+                             ["Spread"].mean())
+                    _seas["Spread"] = _seas["Spread"].round(1)
+
+                    _max_yr = int(_seas["MktYearNum"].max())
+                    _cur_my = (date.today().year if date.today().month >= 9
+                               else date.today().year - 1)
+                    _win_yrs = list(range(_cur_my - 5, _cur_my))
+                    _win = _seas[_seas["MktYearNum"].isin(_win_yrs)]
+                    _band = (_win.groupby("MktWeek")["Spread"]
+                             .agg(avg="mean", lo="min", hi="max").reset_index())
+                    _byrs = sorted(_win["MktYear"].unique())
+                    _cur = _seas[_seas["MktYearNum"] == _max_yr].copy()
+                    _cur_lbl = _cur["MktYear"].iloc[0] if not _cur.empty else ""
+
+                    _latest = _mrg.sort_values("Date").iloc[-1]
+                    _a_short = _a_lbl.split(" · ")[-1]
+                    _b_short = _b_lbl.split(" · ")[-1]
+                    st.markdown(
+                        f'<div style="font-size:13px;color:#1e293b;margin:2px 0 6px">Latest spread '
+                        f'(<b>{_latest["Date"]:%b %d, %Y}</b>): '
+                        f'<b style="font-size:16px">{_latest["Spread"]:+.0f}¢</b> '
+                        f'<span style="color:#64748b">({_a_short} {_latest["A"]:+.0f} − '
+                        f'{_b_short} {_latest["B"]:+.0f})</span></div>', unsafe_allow_html=True)
+
+                    _mlab = ("{1:'Sep',5:'Oct',10:'Nov',14:'Dec',18:'Jan',23:'Feb',"
+                             "27:'Mar',31:'Apr',36:'May',40:'Jun',45:'Jul',49:'Aug'}[datum.value]")
+                    _x_s = _alt.X("MktWeek:Q", title=None, scale=_alt.Scale(domain=[1, 52]),
+                                  axis=_alt.Axis(values=[1, 5, 10, 14, 18, 23, 27, 31, 36, 40, 45, 49],
+                                                 labelExpr=_mlab, labelFontSize=11, grid=True,
+                                                 gridColor="#eef2f6", domainColor="#cbd5e1",
+                                                 tickColor="#cbd5e1"))
+                    _yvals = list(_seas[_seas["MktYearNum"].isin(_win_yrs + [_max_yr])]["Spread"])
+                    _ydom = None
+                    if len(_yvals) >= 8:
+                        _q = _pd.Series(_yvals).quantile([0.025, 0.975])
+                        _qlo, _qhi = float(_q.iloc[0]), float(_q.iloc[1])
+                        if _qhi > _qlo:
+                            _pad = (_qhi - _qlo) * 0.10
+                            _ydom = [round(_qlo - _pad), round(_qhi + _pad)]
+                    _yscale = (_alt.Scale(zero=False, domain=_ydom, clamp=True) if _ydom
+                               else _alt.Scale(zero=False))
+                    _y_s = _alt.Y("Spread:Q", title="Spread (¢)", scale=_yscale,
+                                  axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
+
+                    _SEAS_H = 520
+                    _logo_path = _pl.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+                    _layers = []
+                    if _logo_path.exists():
+                        _uri = ("data:image/png;base64,"
+                                + _b64.b64encode(_logo_path.read_bytes()).decode())
+                        _wm_h = int(_SEAS_H * 0.50)
+                        _layers.append(
+                            _alt.Chart(_pd.DataFrame({"MktWeek": [26.5], "url": [_uri]}))
+                            .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.16,
+                                        align="center", baseline="middle")
+                            .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(_SEAS_H // 2), url="url:N"))
+                    _layers.append(
+                        _alt.Chart(_pd.DataFrame({"MktWeek": [1, 52], "Spread": [0.0, 0.0]}))
+                        .mark_line(color="#94a3b8", strokeDash=[4, 4], strokeWidth=1)
+                        .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Spread:Q")))
+                    if not _band.empty:
+                        _layers.append(
+                            _alt.Chart(_band).mark_area(color="#c4d7bd", opacity=0.55)
+                            .encode(x=_x_s, y=_alt.Y("lo:Q", title="Spread (¢)", scale=_yscale),
+                                    y2="hi:Q"))
+                        _layers.append(
+                            _alt.Chart(_band).mark_line(color="#4b6a4b", strokeDash=[8, 4],
+                                                        strokeWidth=2.5)
+                            .encode(x=_x_s, y=_alt.Y("avg:Q", scale=_yscale),
+                                    tooltip=[_alt.Tooltip("MktWeek:Q", title="Week"),
+                                             _alt.Tooltip("avg:Q", title="5-yr avg", format=".0f")]))
+                        _layers.append(
+                            _alt.Chart(_band.nlargest(1, "MktWeek").assign(_l="5-yr avg"))
+                            .mark_text(align="left", dx=6, fontSize=10, fontWeight="bold",
+                                       color="#4b6a4b")
+                            .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q", scale=_yscale),
+                                    text="_l:N"))
+                    if not _cur.empty:
+                        _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
+                                _alt.Tooltip("MktWeek:Q", title="Week"),
+                                _alt.Tooltip("Spread:Q", title="Spread (¢)")]
+                        _layers.append(
+                            _alt.Chart(_cur).mark_line(strokeWidth=4, color="#111827")
+                            .encode(x=_x_s, y=_y_s, tooltip=_tip))
+                        _layers.append(
+                            _alt.Chart(_cur.nlargest(1, "MktWeek"))
+                            .mark_text(align="left", dx=6, fontSize=10, fontWeight="bold",
+                                       color="#111827")
+                            .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Spread:Q"), text="MktYear:N"))
+
+                    _rng_txt = f"{_byrs[0]}–{_byrs[-1]}" if _byrs else "n/a"
+                    _sp_title = f"{_a_lbl} − {_b_lbl} · {_sg} Basis Spread"
+                    _sp_sub = "Seasonal Spread — Marketing Year (Sep–Aug)"
+                    st.markdown(
+                        '<div style="margin-top:10px;margin-bottom:2px;font-size:14px;color:#1e293b;'
+                        'font-weight:800;letter-spacing:.01em">' + _sp_title + '</div>'
+                        '<div style="margin-bottom:4px;font-size:10px;color:#64748b;font-weight:700;'
+                        'text-transform:uppercase;letter-spacing:.1em">' + _sp_sub
+                        + '&nbsp;&nbsp;<span style="font-weight:400;text-transform:none">'
+                        + (f'<b style="color:#000">{_cur_lbl} = black</b>' if _cur_lbl else '')
+                        + '  ·  <b style="color:#4b6a4b">5-yr avg = dashed</b>'
+                        + (f'  ·  <b style="color:#8bab7f">5-yr range = shaded ({_rng_txt})</b>'
+                           if not _band.empty else '')
+                        + '</span></div>', unsafe_allow_html=True)
+
+                    _sp_chart = _alt.layer(*_layers).properties(height=_SEAS_H, padding=_CHART_PAD)
+                    st.altair_chart(_sp_chart, use_container_width=True)
+                    _sp_export = _sp_chart.properties(title=_alt.TitleParams(
+                        _sp_title, subtitle=_sp_sub, fontSize=15, fontWeight="bold",
+                        color="#1e293b", subtitleFontSize=11, subtitleColor="#64748b",
+                        anchor="start", offset=12))
+                    _sp_fname = (f"spread_{_a_short}_vs_{_b_short}_{_sg}.png"
+                                 .replace(" ", "_").replace("/", "-").replace(",", ""))
+                    _chart_download_copy(_chart_png(_sp_export, width=1100, height=_SEAS_H),
+                                         _sp_fname, key=f"spread_{_a_lbl}_{_b_lbl}_{_sg}")
+                    st.caption(f"{len(_mrg)} overlapping posting dates · 5-yr window {_rng_txt} · "
+                               "spread in ¢/bu (front-month spot basis).")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # TAB: EXPORT  (download basis history to Excel — dates × locations)
 # ═══════════════════════════════════════════════════════════════════════════════
 if not _view_only():
@@ -5718,6 +5914,79 @@ if not _view_only():
                         st.download_button("⬇️  Download Excel", _buf.getvalue(), file_name=_fname,
                                            mime=("application/vnd.openxmlformats-officedocument"
                                                  ".spreadsheetml.sheet"))
+
+        # ── Rail corridor history ───────────────────────────────────────────
+        st.divider()
+        st.markdown('<div style="font-size:15px;font-weight:800;color:#1e293b;margin-bottom:2px">'
+                    '🚂 Rail corridor history</div>', unsafe_allow_html=True)
+        st.caption("Rail FOB basis by corridor & delivery period — **dates in rows**, a "
+                   "**Bid** column per corridor/period.")
+        from database import get_rail_fob_all as _grfa
+        _rail_all = _grfa("manual")
+        if not _rail_all:
+            st.info("No rail corridor history available.")
+        else:
+            _porder = {}
+            for _r in _rail_all:
+                _p, _o = _r["period"], _r.get("period_order")
+                if _o is not None and (_p not in _porder or _o < _porder[_p]):
+                    _porder[_p] = _o
+            _cor_opts = sorted({_r["market"] for _r in _rail_all})
+            _rc1, _rc2 = st.columns([5, 5])
+            with _rc1:
+                _sel_cor = st.multiselect("Corridor(s)", _cor_opts, key="exp_rail_cor")
+            _per_pool = sorted({_r["period"] for _r in _rail_all
+                                if not _sel_cor or _r["market"] in _sel_cor},
+                               key=lambda p: (_porder.get(p, 99), p))
+            with _rc2:
+                _sel_per = st.multiselect("Period(s)", _per_pool, key="exp_rail_per",
+                                          help="Leave empty to include every period.")
+            _rtoday = datetime.utcnow().date()
+            _rrng = st.date_input("Date range", value=(_rtoday - timedelta(days=180), _rtoday),
+                                  key="exp_rail_range")
+            _rstart, _rend = (_rrng if isinstance(_rrng, tuple) and len(_rrng) == 2
+                              else (_rtoday - timedelta(days=180), _rtoday))
+            if not _sel_cor:
+                st.info("Select one or more corridors to begin.")
+            else:
+                _rdata = {}
+                for _r in _rail_all:
+                    if _r["market"] not in _sel_cor:
+                        continue
+                    if _sel_per and _r["period"] not in _sel_per:
+                        continue
+                    if _r.get("bid") is None:
+                        continue
+                    try:
+                        _d = date.fromisoformat(_r["date"])
+                    except Exception:
+                        continue
+                    if not (_rstart <= _d <= _rend):
+                        continue
+                    _rdata.setdefault((_r["market"], _r["period"]), {})[_d] = _r["bid"]
+                if not _rdata:
+                    st.warning("No rail data for that corridor / period / date range.")
+                else:
+                    _rdf = pd.DataFrame(_rdata).sort_index()
+                    _rdf.index.name = "Date"
+                    _rcols = sorted(_rdf.columns,
+                                    key=lambda c: (c[0], _porder.get(c[1], 99), c[1]))
+                    _rdf = _rdf[_rcols]
+                    st.caption(f"{len(_rdf)} dates × {len(_rcols)} corridor/period column(s) · "
+                               "bids in ¢/bu (freight corridors in $/car).")
+                    st.dataframe(_rdf, use_container_width=True, height=340)
+                    if _view_only():
+                        st.caption("🔒 Downloads are disabled in this read-only view.")
+                    else:
+                        _rbuf = BytesIO()
+                        with pd.ExcelWriter(_rbuf, engine="openpyxl") as _w:
+                            _rdf.to_excel(_w, sheet_name="Rail")
+                        _rfname = f"rail_history_{_rstart:%Y%m%d}-{_rend:%Y%m%d}.xlsx"
+                        st.download_button(
+                            "⬇️  Download Excel (rail)", _rbuf.getvalue(), file_name=_rfname,
+                            key="dl_rail_exp",
+                            mime=("application/vnd.openxmlformats-officedocument"
+                                  ".spreadsheetml.sheet"))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 if not _view_only():
