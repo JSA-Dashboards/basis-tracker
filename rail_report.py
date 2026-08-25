@@ -289,6 +289,41 @@ def _seasonal_png(market, by_md, mkt_dates):
 
 
 # ── HTML ─────────────────────────────────────────────────────────────────────
+# Faint watermark tile for the email tables. Outlook renders <table background=…>
+# and the data cells are transparent, so the tile shows through behind the numbers.
+# Built once (Pillow), reused across emails.
+_TBL_WM_PATH: str | None = None
+_TBL_WM_CID = "railtblwm"
+
+
+def _table_watermark() -> str | None:
+    """Path to a faint JSA 50-Year watermark tile, or None if it can't be built."""
+    global _TBL_WM_PATH
+    if _TBL_WM_PATH and os.path.exists(_TBL_WM_PATH):
+        return _TBL_WM_PATH
+    import pathlib as _pl
+    src = _pl.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+    if not src.exists():
+        return None
+    try:
+        from PIL import Image
+        W, H = 460, 300
+        logo = Image.open(src).convert("RGBA")
+        lw, lh = logo.size
+        s = min(W * 0.66 / lw, H * 0.66 / lh)
+        logo = logo.resize((max(1, int(lw * s)), max(1, int(lh * s))), Image.LANCZOS)
+        logo.putalpha(logo.split()[3].point(lambda p: int(p * 0.18)))  # faint watermark
+        canvas = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+        canvas.paste(logo, ((W - logo.width) // 2, (H - logo.height) // 2), logo)
+        fh = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        canvas.save(fh, "PNG"); fh.close()
+        _TBL_WM_PATH = fh.name
+        return _TBL_WM_PATH
+    except Exception as exc:
+        log.warning("table watermark build failed: %s", exc)
+        return None
+
+
 def build_rail_html(markets: list | None = None, charts: bool = True,
                     title: str = "Rail Basis Update") -> tuple[str, dict]:
     """(html, inline_images) for the rail email; inline_images maps cid->filepath.
@@ -327,6 +362,12 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
         f'<div style="padding:4px 2px 0">')
 
     imgs = {}
+    _wm_path = _table_watermark()
+    if _wm_path:
+        imgs[_TBL_WM_CID] = _wm_path
+    _tbl_attr = f' background="cid:{_TBL_WM_CID}"' if _wm_path else ""
+    _tbl_css = (f"background-image:url('cid:{_TBL_WM_CID}');background-position:center;"
+                f"background-repeat:no-repeat;background-size:contain;") if _wm_path else ""
     for idx, m in enumerate(_ordered):
         elig = sorted(mkt_dates[m])
         eff = elig[-1]
@@ -344,7 +385,7 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
                  f'font-size:12px;font-weight:700;color:{JPSI_DARK}">'
                  f'{_RAIL_DISPLAY.get(m, m)} <span style="font-size:9px;color:#fff;background:{rcol};'
                  f'padding:1px 5px;border-radius:3px">{rail}</span>{aod}</div>')
-        body += ('<table style="border-collapse:collapse;width:100%">'
+        body += (f'<table{_tbl_attr} style="border-collapse:collapse;width:100%;{_tbl_css}">'
                  f'<tr><th style="{thl}">Period</th><th style="{thl}">Fut</th>'
                  f'<th style="{thr}">Bid</th><th style="{thr}">Offer</th>'
                  f'<th style="{thr}">Δ Last</th><th style="{thr}">Δ Wk</th>'
