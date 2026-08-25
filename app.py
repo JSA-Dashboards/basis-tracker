@@ -2821,7 +2821,12 @@ with tab_railfob:
         st.altair_chart(_rail_chart, use_container_width=True)
         _rail_fname = (f"rail_seasonal_{_mk}_{_pd_sel}.png"
                        .replace(" ", "_").replace("/", "-").replace(",", ""))
-        _chart_download_copy(_chart_png(_rail_chart, width=1100, height=_H), _rail_fname,
+        # Embed the title into the exported/copied PNG (on-screen keeps its HTML title).
+        _rail_export = _rail_chart.properties(title=_alt.TitleParams(
+            _rail_title, subtitle="Seasonal Bid — Marketing Year (Sep–Aug)",
+            fontSize=15, fontWeight="bold", color="#1e293b",
+            subtitleFontSize=11, subtitleColor="#64748b", anchor="start", offset=12))
+        _chart_download_copy(_chart_png(_rail_export, width=1100, height=_H), _rail_fname,
                              key=f"rail_seas_{_mk}_{_pd_sel}")
         st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
                    f"than once · partial windows fold into their month (FH/LH/Split Oct, "
@@ -4441,8 +4446,13 @@ with tab_bids:
                 st.altair_chart(_seas_chart, use_container_width=True)
                 _seas_fname = (f"seasonal_{loc_key}_{grain}.png"
                                .replace(" ", "_").replace("/", "-").replace(",", ""))
+                # Embed the title into the exported/copied PNG (on-screen keeps its HTML title).
+                _seas_export = _seas_chart.properties(title=_alt.TitleParams(
+                    _seas_title, subtitle="Seasonal Basis — Marketing Year (Sep–Aug)",
+                    fontSize=15, fontWeight="bold", color="#1e293b",
+                    subtitleFontSize=11, subtitleColor="#64748b", anchor="start", offset=12))
                 _chart_download_copy(
-                    _chart_png(_seas_chart, width=1100, height=_SEAS_H), _seas_fname,
+                    _chart_png(_seas_export, width=1100, height=_SEAS_H), _seas_fname,
                     key=f"seas_{provider}_{loc_key}_{grain}")
 
             except Exception as _seas_err:
