@@ -21,7 +21,8 @@ import tempfile
 from datetime import datetime, date, timedelta
 
 from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
-                            _GAIN, _LOSS, _SIG_LOGO, _SIG_LOGO_CID)
+                            _GAIN, _LOSS, _SIG_LOGO, _SIG_LOGO_CID,
+                            _table_watermark, _TBL_WM_CID)
 from database import get_rail_fob_all
 
 log = logging.getLogger(__name__)
@@ -289,41 +290,8 @@ def _seasonal_png(market, by_md, mkt_dates):
 
 
 # ── HTML ─────────────────────────────────────────────────────────────────────
-# Faint watermark tile for the email tables. Outlook renders <table background=…>
-# and the data cells are transparent, so the tile shows through behind the numbers.
-# Built once (Pillow), reused across emails.
-_TBL_WM_PATH: str | None = None
-_TBL_WM_CID = "railtblwm"
-
-
-def _table_watermark() -> str | None:
-    """Path to a faint JSA 50-Year watermark tile, or None if it can't be built."""
-    global _TBL_WM_PATH
-    if _TBL_WM_PATH and os.path.exists(_TBL_WM_PATH):
-        return _TBL_WM_PATH
-    import pathlib as _pl
-    src = _pl.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
-    if not src.exists():
-        return None
-    try:
-        from PIL import Image
-        W, H = 460, 300
-        logo = Image.open(src).convert("RGBA")
-        lw, lh = logo.size
-        s = min(W * 0.66 / lw, H * 0.66 / lh)
-        logo = logo.resize((max(1, int(lw * s)), max(1, int(lh * s))), Image.LANCZOS)
-        logo.putalpha(logo.split()[3].point(lambda p: int(p * 0.18)))  # faint watermark
-        canvas = Image.new("RGBA", (W, H), (255, 255, 255, 0))
-        canvas.paste(logo, ((W - logo.width) // 2, (H - logo.height) // 2), logo)
-        fh = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-        canvas.save(fh, "PNG"); fh.close()
-        _TBL_WM_PATH = fh.name
-        return _TBL_WM_PATH
-    except Exception as exc:
-        log.warning("table watermark build failed: %s", exc)
-        return None
-
-
+# _table_watermark / _TBL_WM_CID are imported from changes_report (shared with the
+# daily-changes email) so both email families use one faint watermark tile.
 def build_rail_html(markets: list | None = None, charts: bool = True,
                     title: str = "Rail Basis Update") -> tuple[str, dict]:
     """(html, inline_images) for the rail email; inline_images maps cid->filepath.

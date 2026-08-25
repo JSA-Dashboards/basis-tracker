@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from datetime import datetime
 
 import delivery_period as _dp
@@ -362,7 +363,7 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
 
 def _bcell(b) -> str:
     """Basis cell."""
-    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
     if b is None:
         return f'<td style="{td};color:#cbd5e1">—</td>'
     return f'<td style="{td};color:{JPSI_DARK};font-weight:700">{b:+d}</td>'
@@ -370,7 +371,7 @@ def _bcell(b) -> str:
 
 def _ccell(c) -> str:
     """Daily-change cell (colored; — when unchanged or no prior)."""
-    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
     if c is None or c == 0:
         return f'<td style="{td};color:#cbd5e1">—</td>'
     return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+d}</td>'
@@ -379,7 +380,7 @@ def _ccell(c) -> str:
 def _ccell_roll(c, rolled) -> str:
     """Rolled month: show the spread-adjusted change with a ↻ marker; if it couldn't
     be adjusted (missing futures price), show ↻ alone."""
-    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
     if not rolled:
         return _ccell(c)
     if c is None:
@@ -391,7 +392,7 @@ def _ccell_roll(c, rolled) -> str:
 
 def _bcellf(b) -> str:
     """Segment avg-basis cell (1 decimal)."""
-    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
     if b is None:
         return f'<td style="{td};color:#cbd5e1">—</td>'
     return f'<td style="{td};color:{JPSI_DARK};font-weight:600">{b:+.1f}</td>'
@@ -399,10 +400,43 @@ def _bcellf(b) -> str:
 
 def _ccellf(c) -> str:
     """Segment avg-change cell (1 decimal, colored)."""
-    td = "padding:3px 6px;text-align:right;white-space:nowrap"
+    td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
     if c is None or round(c, 1) == 0:
         return f'<td style="{td};color:#cbd5e1">—</td>'
     return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+.1f}</td>'
+
+
+# Faint watermark tile for email tables. Outlook honors <table background=…>; used
+# with transparent data cells so the mark shows through behind the numbers. Built once.
+_TBL_WM_PATH: str | None = None
+_TBL_WM_CID = "jsatblwm"
+
+
+def _table_watermark() -> str | None:
+    """Path to a faint JSA 50-Year watermark tile, or None if it can't be built."""
+    global _TBL_WM_PATH
+    if _TBL_WM_PATH and os.path.exists(_TBL_WM_PATH):
+        return _TBL_WM_PATH
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "50 Year logo JSA.png")
+    if not os.path.exists(src):
+        return None
+    try:
+        from PIL import Image
+        W, H = 460, 300
+        logo = Image.open(src).convert("RGBA")
+        lw, lh = logo.size
+        s = min(W * 0.66 / lw, H * 0.66 / lh)
+        logo = logo.resize((max(1, int(lw * s)), max(1, int(lh * s))), Image.LANCZOS)
+        logo.putalpha(logo.split()[3].point(lambda p: int(p * 0.18)))  # faint watermark
+        canvas = Image.new("RGBA", (W, H), (255, 255, 255, 0))
+        canvas.paste(logo, ((W - logo.width) // 2, (H - logo.height) // 2), logo)
+        fh = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        canvas.save(fh, "PNG"); fh.close()
+        _TBL_WM_PATH = fh.name
+        return _TBL_WM_PATH
+    except Exception as exc:
+        log.warning("table watermark build failed: %s", exc)
+        return None
 
 
 def build_changes_email_html(mode: str = "spot") -> str:
@@ -411,6 +445,10 @@ def build_changes_email_html(mode: str = "spot") -> str:
     _ff   = "font-family:Arial,Helvetica,sans-serif"
     _hdr  = ("font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
              "padding:3px 6px")
+    _wm = _table_watermark()
+    _tbl_attr = f' background="cid:{_TBL_WM_CID}"' if _wm else ""
+    _tbl_css = (f"background-image:url('cid:{_TBL_WM_CID}');background-position:center;"
+                f"background-repeat:no-repeat;background-size:contain;") if _wm else ""
 
     body = ""
     for ttl, ft, gr, gmode in TREND_CATEGORIES:
@@ -424,16 +462,15 @@ def build_changes_email_html(mode: str = "spot") -> str:
                 continue
             _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
                    "padding:2px 6px;text-align:right")
-            body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
+            body += (f'<table width="100%"{_tbl_attr} style="border-collapse:collapse;font-size:12px;{_tbl_css}">'
                      f'<tr><td style="{_hdr}" rowspan="2">Segment</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
                      f'<tr><td style="{_h2}">Avg Basis</td><td style="{_h2}">Δ</td>'
                      f'<td style="{_h2}">Avg Basis</td><td style="{_h2}">Δ</td></tr>')
             for i, r in enumerate(rows):
-                bg = "#f4f9fd" if i % 2 else "#ffffff"
-                body += (f'<tr style="background:{bg}">'
-                         f'<td style="padding:3px 6px;color:{JPSI_DARK}">{r["segment"]}</td>'
+                body += (f'<tr>'
+                         f'<td style="padding:3px 6px;color:{JPSI_DARK};border-bottom:1px solid #eef2f6">{r["segment"]}</td>'
                          + _bcellf(r["b1"]) + _ccellf(r["c1"]) + _bcellf(r["b2"]) + _ccellf(r["c2"]) + '</tr>')
             body += '</table>'
         else:
@@ -444,14 +481,13 @@ def build_changes_email_html(mode: str = "spot") -> str:
                 continue
             _h2 = ("font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
                    "padding:2px 6px;text-align:right")
-            body += ('<table width="100%" style="border-collapse:collapse;font-size:12px">'
+            body += (f'<table width="100%"{_tbl_attr} style="border-collapse:collapse;font-size:12px;{_tbl_css}">'
                      f'<tr><td style="{_hdr}" rowspan="2">Location</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m1_label"] or ""}</td>'
                      f'<td style="{_hdr};text-align:center" colspan="2">{result["m2_label"] or ""}</td></tr>'
                      f'<tr><td style="{_h2}">Basis</td><td style="{_h2}">Δ</td>'
                      f'<td style="{_h2}">Basis</td><td style="{_h2}">Δ</td></tr>')
             for i, r in enumerate(rows):
-                bg  = "#f4f9fd" if i % 2 else "#ffffff"
                 loc = adm_city_from_name(r["location"]) if r["provider"] == "ADM" else r["location"]
                 if r["roll1"] or r["roll2"]:
                     rf  = _short_fut(r["roll1_from"] or r["roll2_from"])
@@ -463,8 +499,8 @@ def build_changes_email_html(mode: str = "spot") -> str:
                            f'vs {_short_fut(r["m1_sym"])}</span>')
                 else:
                     tag = ""
-                body += (f'<tr style="background:{bg}">'
-                         f'<td style="padding:3px 6px;color:{JPSI_DARK}">'
+                body += (f'<tr>'
+                         f'<td style="padding:3px 6px;color:{JPSI_DARK};border-bottom:1px solid #eef2f6">'
                          f'<b style="color:{JPSI_DARK}">{r["provider"]}</b> {loc}{tag}</td>'
                          + _bcell(r["b1"]) + _ccell_roll(r["c1"], r["roll1"])
                          + _bcell(r["b2"]) + _ccell_roll(r["c2"], r["roll2"]) + '</tr>')
@@ -646,8 +682,11 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
         cc = os.getenv("CHANGES_EMAIL_CC") or None
     html = build_changes_email_html(mode) + signature_html()
     subject = f"JSA Daily Basis Changes - {datetime.now():%b %d, %Y}"
-    imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else None
-    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs)
+    imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else {}
+    _wm = _table_watermark()
+    if _wm:
+        imgs[_TBL_WM_CID] = _wm
+    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs or None)
     log.info("Daily Changes email sent via %s to %s (cc %s)", _via, to_addr, cc or "—")
     return True
 
