@@ -189,52 +189,98 @@ def _seasonal_png(market, by_md, mkt_dates):
         wk = min(52, max(1, ((dt - date(my, 9, 1)).days // 7) + 1))
         rows.append({"MktYear": f"{my}/{str(my + 1)[-2:]}", "MyNum": my, "MktWeek": wk, "Bid": bid})
     df = pd.DataFrame(rows).groupby(["MktYear", "MyNum", "MktWeek"], as_index=False)["Bid"].mean()
-    mx = int(df["MyNum"].max())
-    df = df[df["MyNum"] >= mx - 9]                      # last 10 marketing years (all if fewer)
+    mx = int(df["MyNum"].max())                          # current (bold) marketing year
     if df["MyNum"].nunique() < 2:
         return None
 
+    _yr = lambda y: f"{y}/{str(y + 1)[-2:]}"
     cur = df[df["MyNum"] == mx]
-    hist = df[df["MyNum"] < mx]
-    layers = []
-    if not hist.empty:
-        layers.append(alt.Chart(hist).mark_line(strokeWidth=1.6, opacity=0.55).encode(
-            x=alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52]),
-                    axis=alt.Axis(title=None, values=[1, 5, 10, 14, 18, 23, 27, 31, 36, 40, 45, 49],
-                                  labelExpr=("{'1':'Sep','5':'Oct','10':'Nov','14':'Dec','18':'Jan',"
-                                             "'23':'Feb','27':'Mar','31':'Apr','36':'May','40':'Jun',"
-                                             "'45':'Jul','49':'Aug'}[datum.value]"))),
-            y=alt.Y("Bid:Q", title="Spot basis (¢)", scale=alt.Scale(zero=False)),
-            color=alt.Color("MktYear:N", scale=alt.Scale(scheme="tableau10"),
-                            legend=alt.Legend(title="Mkt Year", orient="bottom", columns=6))))
-    if not cur.empty:
-        layers.append(alt.Chart(cur).mark_line(strokeWidth=4, color="#000000").encode(
-            x="MktWeek:Q", y="Bid:Q"))
-
-    # Forward curve — the corridor's latest rundown placed at each delivery week
-    # (dashed JPSI-blue line with points, over the seasonal history).
+    cur_lbl = _yr(mx)
+    _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-5:]   # 5 prior complete years (or fewer)
+    hist = df[df["MyNum"].isin(_hy)]
+    band = (hist.groupby("MktWeek")["Bid"].agg(lo="min", hi="max", avg="mean").reset_index()
+            if len(_hy) >= 2 else None)
+    _n = len(_hy)
+    rng_lbl = f"{_yr(_hy[0])}–{_yr(_hy[-1])}" if _hy else ""
     _fwd = _fwd_curve(market, by_md, mkt_dates)
-    if _fwd is not None and not _fwd.empty:
-        layers.append(alt.Chart(_fwd).mark_line(
-            strokeWidth=2.5, color="#0693e3", strokeDash=[7, 3],
-            point=alt.OverlayMarkDef(color="#0693e3", size=26)
-        ).encode(x="MktWeek:Q", y="Bid:Q"))
 
-    # JSA 50-Year logo watermark — centered, ~55% of chart height, faint, behind the lines.
+    # y-axis auto-fit to the band + current + forward (2.5–97.5 pct) so an outlier week
+    # doesn't squash the chart; outliers clamp to the edge.
+    _yv = list(cur["Bid"])
+    if band is not None:
+        _yv += list(band["lo"]) + list(band["hi"])
+    if _fwd is not None:
+        _yv += list(_fwd["Bid"])
+    _ysc = alt.Scale(zero=False)
+    if len(_yv) >= 8:
+        _q = pd.Series(_yv).quantile([0.025, 0.975]); _lo, _hi = float(_q.iloc[0]), float(_q.iloc[1])
+        if _hi > _lo:
+            _pad = (_hi - _lo) * 0.10
+            _ysc = alt.Scale(zero=False, domain=[round(_lo - _pad), round(_hi + _pad)], clamp=True)
+
+    def _X(ax):                                          # fresh X channel per layer
+        if ax:                                           # only the base layer sets the axis
+            return alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52]),
+                         axis=alt.Axis(title=None, values=[1, 5, 10, 14, 18, 23, 27, 31, 36, 40, 45, 49],
+                                       labelExpr=("{'1':'Sep','5':'Oct','10':'Nov','14':'Dec','18':'Jan',"
+                                                  "'23':'Feb','27':'Mar','31':'Apr','36':'May','40':'Jun',"
+                                                  "'45':'Jul','49':'Aug'}[datum.value]")))
+        return alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52]))   # inherit the shared axis
+
+    def _Y(field, ax):                                   # fresh Y channel per layer
+        if ax:
+            return alt.Y(f"{field}:Q", scale=_ysc, title="Basis (¢)", axis=alt.Axis(labelFontSize=10))
+        return alt.Y(f"{field}:Q", scale=_ysc)
+
+    # Muted green/gray theme: bold near-black current year, dashed sage avg, light-sage
+    # range band, brick-red forward curve. Legend up top with a swatch per series.
+    _CUR, _AVG, _BAND, _FWD = "#111827", "#4b6a4b", "#c4d7bd", "#c0392b"
+    _rng_name, _avg_name = f"{_n}-yr range ({rng_lbl})", f"{_n}-yr average"
+    _cscale = alt.Scale(domain=[cur_lbl, _avg_name, _rng_name, "Forward curve"],
+                        range=[_CUR, _AVG, _BAND, _FWD])
+    _leg = alt.Legend(orient="top", title=None, direction="horizontal",
+                      labelFontSize=9, columns=4, offset=2)
+    _col = lambda: alt.Color("Series:N", scale=_cscale, legend=_leg)
+
+    layers = [alt.Chart(pd.DataFrame({"MktWeek": [1, 52], "Bid": [0.0, 0.0]}))
+              .mark_line(color="#cbd5e1", strokeDash=[3, 3], strokeWidth=1)
+              .encode(x=_X(True), y=_Y("Bid", True))]     # base layer carries the axes
+    if band is not None:
+        layers.append(alt.Chart(band.assign(Series=_rng_name)).mark_area(opacity=0.6).encode(
+            x=_X(False), y=_Y("lo", False), y2="hi:Q", color=_col()))
+        layers.append(alt.Chart(band.assign(Series=_avg_name))
+                      .mark_line(strokeDash=[7, 4], strokeWidth=2)
+                      .encode(x=_X(False), y=_Y("avg", False), color=_col()))
+    if not cur.empty:
+        layers.append(alt.Chart(cur.assign(Series=cur_lbl))
+                      .mark_line(strokeWidth=3.5).encode(x=_X(False), y=_Y("Bid", False), color=_col()))
+    if _fwd is not None and not _fwd.empty:
+        _fw = _fwd.assign(Series="Forward curve")
+        layers.append(alt.Chart(_fw).mark_line(strokeDash=[6, 3], strokeWidth=2)
+                      .encode(x=_X(False), y=_Y("Bid", False), color=_col()))
+        layers.append(alt.Chart(_fw).mark_point(filled=True, size=34)
+                      .encode(x=_X(False), y=_Y("Bid", False), color=_col()))
+        layers.append(alt.Chart(_fw).mark_text(align="center", dy=-9, fontSize=8, fontWeight="bold",
+                                               color=_FWD)
+                      .encode(x=_X(False), y=_Y("Bid", False),
+                              text=alt.Text("Bid:Q", format="+.0f")))
+
+    # JSA 50-Year logo watermark — faint, centered, behind the data (over the zero rule).
     import base64 as _b64, pathlib as _pl
     _logo = _pl.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
     if _logo.exists():
-        _wm_h = int(225 * 0.55)
+        _wm_h = int(250 * 0.55)
         _uri = "data:image/png;base64," + _b64.b64encode(_logo.read_bytes()).decode()
         _wm = (alt.Chart(pd.DataFrame({"MktWeek": [26.5], "url": [_uri]}))
-               .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.18,
+               .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.15,
                            align="center", baseline="middle")
-               .encode(x=alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52]), axis=None),
-                       y=alt.value(int(225 / 2)), url="url:N"))
-        layers = [_wm] + layers                     # behind the seasonal lines
+               .encode(x=alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52])),
+                       y=alt.value(int(250 / 2)), url="url:N"))
+        layers = [layers[0], _wm] + layers[1:]
+
     chart = alt.layer(*layers).properties(
-        width=640, height=225, padding={"left": 6, "right": 20, "top": 8, "bottom": 6},
-        title=f"{_RAIL_DISPLAY.get(market, market)} · Spot basis seasonal")
+        width=680, height=250, padding={"left": 6, "right": 26, "top": 6, "bottom": 6},
+        title=f"{_RAIL_DISPLAY.get(market, market)} · Spot Corn Basis Seasonal")
     try:
         return vlc.vegalite_to_png(json.dumps(chart.to_dict(), default=str), scale=1.5)
     except Exception as exc:
