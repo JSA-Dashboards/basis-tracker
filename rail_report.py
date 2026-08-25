@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime, date, timedelta
 
@@ -116,6 +117,57 @@ def _spot_series(market, by_md, mkt_dates):
     return out
 
 
+# Delivery-month → marketing week (Sep-start year), matching the app's rail seasonal.
+_MON_WK = {"Sep": 1, "Oct": 5, "Nov": 10, "Dec": 14, "Jan": 18, "Feb": 23, "Mar": 27,
+           "Apr": 31, "May": 36, "Jun": 40, "Jul": 45, "Aug": 49}
+# Package periods → the months they span (spread into a per-month carry on the curve).
+_PKG_MON = {"OND": ["Oct", "Nov", "Dec"], "JFM": ["Jan", "Feb", "Mar"], "AM": ["Apr", "May"],
+            "JJ": ["Jun", "Jul"], "AMJJ": ["Apr", "May", "Jun", "Jul"],
+            "JFMAMJJ": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+            "JAN-JUL": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"], "AS": ["Aug", "Sep"]}
+_FWD_CARRY = 2.0
+_MON_RE = re.compile(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", re.I)
+
+
+def _fwd_bucket(period: str):
+    """A rail period label → a single month name, a package key, or None."""
+    p = " ".join(str(period).split())
+    key = p.replace(" ", "").upper()
+    if key in _PKG_MON:
+        return key
+    m = _MON_RE.search(p)                      # first month named (FH Oct → Oct)
+    return m.group(1).title() if m else None
+
+
+def _fwd_curve(market, by_md, mkt_dates):
+    """Forward curve of the corridor's LATEST rundown as a (MktWeek, Bid) DataFrame:
+    each delivery period placed at its month's week, packages spread into carry, kept
+    to the current marketing year from today forward. None if it can't be built."""
+    ds = sorted(mkt_dates.get(market, ()))
+    if not ds:
+        return None
+    pts = []
+    for period, r in by_md.get((market, ds[-1]), {}).items():
+        bid = r.get("bid")
+        if bid is None:
+            continue
+        bk = _fwd_bucket(period)
+        if bk in _MON_WK:
+            pts.append((_MON_WK[bk], float(bid)))
+        elif bk in _PKG_MON:
+            mons = _PKG_MON[bk]; ctr = (len(mons) - 1) / 2.0
+            for i, mo in enumerate(mons):
+                pts.append((_MON_WK[mo], round(float(bid) + _FWD_CARRY * (i - ctr), 1)))
+    if len(pts) < 2:
+        return None
+    import pandas as pd
+    df = pd.DataFrame(pts, columns=["MktWeek", "Bid"]).groupby("MktWeek", as_index=False)["Bid"].mean()
+    t = date.today(); tmy = t.year if t.month >= 9 else t.year - 1
+    twk = min(52, max(1, ((t - date(tmy, 9, 1)).days // 7) + 1))
+    cur = df[df["MktWeek"] >= twk].sort_values("MktWeek")
+    return cur if len(cur) >= 2 else df.sort_values("MktWeek")
+
+
 def _seasonal_png(market, by_md, mkt_dates):
     """Render the corridor's spot seasonal (recent marketing years + 5-yr band) to PNG
     bytes via vl-convert, or None if not enough history / render unavailable."""
@@ -158,6 +210,28 @@ def _seasonal_png(market, by_md, mkt_dates):
     if not cur.empty:
         layers.append(alt.Chart(cur).mark_line(strokeWidth=4, color="#000000").encode(
             x="MktWeek:Q", y="Bid:Q"))
+
+    # Forward curve — the corridor's latest rundown placed at each delivery week
+    # (dashed JPSI-blue line with points, over the seasonal history).
+    _fwd = _fwd_curve(market, by_md, mkt_dates)
+    if _fwd is not None and not _fwd.empty:
+        layers.append(alt.Chart(_fwd).mark_line(
+            strokeWidth=2.5, color="#0693e3", strokeDash=[7, 3],
+            point=alt.OverlayMarkDef(color="#0693e3", size=26)
+        ).encode(x="MktWeek:Q", y="Bid:Q"))
+
+    # JSA 50-Year logo watermark — centered, ~55% of chart height, faint, behind the lines.
+    import base64 as _b64, pathlib as _pl
+    _logo = _pl.Path(__file__).parent / "assets" / "50 Year logo JSA.png"
+    if _logo.exists():
+        _wm_h = int(225 * 0.55)
+        _uri = "data:image/png;base64," + _b64.b64encode(_logo.read_bytes()).decode()
+        _wm = (alt.Chart(pd.DataFrame({"MktWeek": [26.5], "url": [_uri]}))
+               .mark_image(width=int(_wm_h * 0.93), height=_wm_h, opacity=0.18,
+                           align="center", baseline="middle")
+               .encode(x=alt.X("MktWeek:Q", scale=alt.Scale(domain=[1, 52]), axis=None),
+                       y=alt.value(int(225 / 2)), url="url:N"))
+        layers = [_wm] + layers                     # behind the seasonal lines
     chart = alt.layer(*layers).properties(
         width=640, height=225, padding={"left": 6, "right": 20, "top": 8, "bottom": 6},
         title=f"{_RAIL_DISPLAY.get(market, market)} · Spot basis seasonal")
