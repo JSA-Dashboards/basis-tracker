@@ -5630,6 +5630,37 @@ with tab_spread:
                 _out.add(_g)
         return _out
 
+    def _spread_fwd_df(_provider, _location, _grain):
+        # Latest posted forward curve -> DataFrame(MktYearNum, MktWeek, Basis),
+        # mirroring the Bids-tab forward logic (delivery month -> marketing week).
+        _snaps = _cached_get_snapshots(_provider, _location)
+        if not _snaps:
+            return _pd.DataFrame(columns=["MktYearNum", "MktWeek", "Basis"])
+        _rws, _present, _fall = [], {}, []
+        for _fr in _snaps[-1].rows:
+            if (_fr.isSpot or _grain_disp(_fr.grain) != _grain
+                    or _fr.basisCents is None or not _fr.futuresSymbol):
+                continue
+            _fym = _dp.canonical(_fr.deliveryMonth or "", _fr.futuresSymbol)
+            if _fym:
+                _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
+                _wk = max(1, min(52, ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1))
+                _rws.append({"MktYearNum": _fmy, "MktWeek": _wk, "Basis": float(_fr.basisCents)})
+                _present.setdefault(_fmy, set()).add(_fym[1])
+            elif re.search(r"fall", _fr.deliveryMonth or "", re.I) and _fr.futuresSymbol[-2:].isdigit():
+                _fall.append((2000 + int(_fr.futuresSymbol[-2:]), float(_fr.basisCents)))
+        for _fy, _fbv in _fall:
+            for _mo in (9, 10, 11):
+                if _mo in _present.get(_fy, set()):
+                    continue
+                _wk = max(1, min(52, ((date(_fy, _mo, 1) - date(_fy, 9, 1)).days // 7) + 1))
+                _rws.append({"MktYearNum": _fy, "MktWeek": _wk, "Basis": _fbv})
+                _present.setdefault(_fy, set()).add(_mo)
+        _df = _pd.DataFrame(_rws)
+        if _df.empty:
+            return _df
+        return _df.groupby(["MktYearNum", "MktWeek"], as_index=False)["Basis"].mean()
+
     _sp_pool = _cached_get_bids_filter_data()
     _sp_label = {f'{_l["provider"]} · {_l["location"]}': (_l["provider"], _l["location"])
                  for _l in _sp_pool}
@@ -5684,6 +5715,17 @@ with tab_spread:
                     _cur = _seas[_seas["MktYearNum"] == _max_yr].copy()
                     _cur_lbl = _cur["MktYear"].iloc[0] if not _cur.empty else ""
 
+                    # Forward spread (A_fwd − B_fwd) where BOTH locations post a forward curve.
+                    _fwd_a = _spread_fwd_df(*_a_pair, _sg)
+                    _fwd_b = _spread_fwd_df(*_b_pair, _sg)
+                    _fwd = _pd.DataFrame(columns=["MktYearNum", "MktWeek", "Spread"])
+                    if not _fwd_a.empty and not _fwd_b.empty:
+                        _fwd = _pd.merge(_fwd_a.rename(columns={"Basis": "A"}),
+                                         _fwd_b.rename(columns={"Basis": "B"}),
+                                         on=["MktYearNum", "MktWeek"])
+                        _fwd["Spread"] = (_fwd["A"] - _fwd["B"]).round(1)
+                        _fwd = _fwd[_fwd["MktYearNum"].isin([_max_yr, _max_yr + 1])]
+
                     _latest = _mrg.sort_values("Date").iloc[-1]
                     _a_short = _a_lbl.split(" · ")[-1]
                     _b_short = _b_lbl.split(" · ")[-1]
@@ -5702,6 +5744,8 @@ with tab_spread:
                                                  gridColor="#eef2f6", domainColor="#cbd5e1",
                                                  tickColor="#cbd5e1"))
                     _yvals = list(_seas[_seas["MktYearNum"].isin(_win_yrs + [_max_yr])]["Spread"])
+                    if not _fwd.empty:
+                        _yvals += list(_fwd["Spread"])
                     _ydom = None
                     if len(_yvals) >= 8:
                         _q = _pd.Series(_yvals).quantile([0.025, 0.975])
@@ -5759,6 +5803,26 @@ with tab_spread:
                             .mark_text(align="left", dx=6, fontSize=10, fontWeight="bold",
                                        color="#111827")
                             .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Spread:Q"), text="MktYear:N"))
+                    # Forward spread curve — brick-red dashed, per crop year, with value labels.
+                    if not _fwd.empty:
+                        _FWDC = "#c0392b"
+                        for _fy in sorted(_fwd["MktYearNum"].unique()):
+                            _seg = _fwd[_fwd["MktYearNum"] == _fy].sort_values("MktWeek")
+                            if _seg.empty:
+                                continue
+                            _ftip = [_alt.Tooltip("MktWeek:Q", title="Week"),
+                                     _alt.Tooltip("Spread:Q", title="Fwd spread", format="+.0f")]
+                            if len(_seg) >= 2:
+                                _layers.append(_alt.Chart(_seg).mark_line(
+                                    color=_FWDC, strokeDash=[6, 3], strokeWidth=2.5)
+                                    .encode(x=_x_s, y=_alt.Y("Spread:Q", scale=_yscale), tooltip=_ftip))
+                            _layers.append(_alt.Chart(_seg).mark_point(
+                                color=_FWDC, filled=True, size=45)
+                                .encode(x=_x_s, y=_alt.Y("Spread:Q", scale=_yscale), tooltip=_ftip))
+                            _layers.append(_alt.Chart(_seg).mark_text(
+                                align="center", dy=-9, fontSize=8, fontWeight="bold", color=_FWDC)
+                                .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Spread:Q", scale=_yscale),
+                                        text=_alt.Text("Spread:Q", format="+.0f")))
 
                     _rng_txt = f"{_byrs[0]}–{_byrs[-1]}" if _byrs else "n/a"
                     _sp_title = f"{_a_lbl} − {_b_lbl} · {_sg} Basis Spread"
@@ -5773,6 +5837,8 @@ with tab_spread:
                         + '  ·  <b style="color:#4b6a4b">5-yr avg = dashed</b>'
                         + (f'  ·  <b style="color:#8bab7f">5-yr range = shaded ({_rng_txt})</b>'
                            if not _band.empty else '')
+                        + ('  ·  <b style="color:#c0392b">forward = red ●</b>'
+                           if not _fwd.empty else '')
                         + '</span></div>', unsafe_allow_html=True)
 
                     _sp_chart = _alt.layer(*_layers).properties(height=_SEAS_H, padding=_CHART_PAD)
