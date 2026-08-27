@@ -25,6 +25,15 @@ from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
                             _table_watermark, _TBL_WM_CID)
 from database import get_rail_fob_all
 
+# Load DATABASE_URL when rail_report is invoked standalone (a script or the scheduled
+# task) so we connect to Postgres — otherwise database.py silently falls back to the
+# empty local SQLite, which blanks the tables AND the per-corridor seasonal charts.
+# No-op under the Streamlit app / Cloud, where the env / st.secrets are already set
+# (load_dotenv never overrides an existing DATABASE_URL).
+import pathlib as _pl_env
+from dotenv import load_dotenv as _load_env
+_load_env(_pl_env.Path(__file__).with_name(".env"))
+
 log = logging.getLogger(__name__)
 
 DEFAULT_TO = "kpostin@jpsi.com"
