@@ -2973,11 +2973,16 @@ with tab_railfob:
                    f"history builds) · ? = pending side.")
         copy_button(_mh, "📋 Copy table")
 
-    # ── Palmetto (live CSX/NS scrape) — persisted daily so its change columns build ──
+    # ── Palmetto (live CSX/NS scrape) — archived at most WEEKLY, and only when the
+    #    bids actually changed vs the last archive (Kolten 2026-08-27). ──
     _rf = _cached_rail_fob()
     if _rf and _rf.get("rows") and not _view_only():
         _ptoday = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if _ptoday not in get_rail_fob_dates("palmetto"):
+        _pdates = sorted(get_rail_fob_dates("palmetto"))
+        _plast = _pdates[-1] if _pdates else None
+        _pdelta = ((datetime.strptime(_ptoday, "%Y-%m-%d")
+                    - datetime.strptime(_plast, "%Y-%m-%d")).days) if _plast else 999
+        if _pdelta >= 7:
             _prows = []
             for _r in _rf["rows"]:
                 for _i, _c in enumerate(_r["cells"]):
@@ -2988,7 +2993,11 @@ with tab_railfob:
                                    "period_order": _i, "futures": _c.get("futures"),
                                    "bid": _c["bid"], "offer": _c.get("offer"),
                                    "bid_raw": None, "offer_raw": None})
-            if _prows:
+            # Only archive when the board actually changed since the last snapshot.
+            _pcurr = {(x["market"], x["period"]): (x["bid"], x["offer"]) for x in _prows}
+            _pprev = ({(x["market"], x["period"]): (x["bid"], x["offer"])
+                       for x in get_rail_fob("palmetto", _plast)} if _plast else {})
+            if _prows and _pcurr != _pprev:
                 save_rail_fob(_ptoday, "palmetto", _prows)
 
     st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX / NS</div>',
