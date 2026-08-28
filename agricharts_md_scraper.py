@@ -129,7 +129,17 @@ def parse_site(cfg: dict) -> NewSnapshotRequest | None:
         if not m:
             continue
         month, year = _MON[m.group(1)], 2000 + int(m.group(2))
-        cme = _fut_for(root, month, year)
+        # The page quotes each bid against a specific futures contract (e.g. an arg
+        # like quotes['ZCZ26']). TRUST that actual contract over the delivery-month
+        # cycle — otherwise a nearby bid a plant has already rolled to Dec gets
+        # mislabeled against the expiring Sep board (KAAPA 2026-08: Aug/Sep vs CZ).
+        qsym = None
+        for _x in a[13:]:
+            mq = re.search(r"([A-Z]{2}[FGHJKMNQUVXZ]\d{2})", _x or "")
+            if mq and mq.group(1)[:2] == root:
+                qsym = mq.group(1)
+                break
+        cme = qsym or _fut_for(root, month, year)
         if not cme:
             continue
         delivery = f"{_MON_NAME[month]} {year}"
