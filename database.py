@@ -604,6 +604,37 @@ def upsert_snapshot(snap: dict) -> int:
         conn.close()
 
 
+def _drop_stale_forward_rows(snaps: list[dict]) -> None:
+    """Drop non-spot rows whose delivery month is already before the snapshot's own
+    (year, month) — e.g. a lingering 'Sep 2025' milo bid on a 2026 feed. Such stale
+    bids create phantom nearest-month slots and bogus contract-rolls downstream.
+    Universal guard so every scraper is covered, not just one parser. Best-effort:
+    unparseable delivery labels and spot rows are always kept. Mutates `snaps`."""
+    try:
+        import delivery_period as _dp
+    except Exception:
+        return
+    from datetime import datetime as _dt
+    for s in snaps:
+        try:
+            _d = _dt.fromisoformat((s.get("timestamp") or "").replace("Z", "+00:00"))
+            ym = (_d.year, _d.month)
+        except Exception:
+            continue
+        kept = []
+        for r in s.get("rows", []):
+            if r.get("isSpot"):
+                kept.append(r); continue
+            try:
+                k = _dp.canonical(r.get("deliveryMonth"), r.get("futuresSymbol"))
+            except Exception:
+                k = None
+            if k and k < ym:
+                continue                     # stale past-delivery bid — skip
+            kept.append(r)
+        s["rows"] = kept
+
+
 def upsert_snapshots(snaps: list[dict]) -> int:
     """Bulk upsert: insert many snapshots + their rows in ONE connection using
     batched multi-row INSERTs. Same INSERT … ON CONFLICT DO NOTHING semantics as
@@ -616,6 +647,7 @@ def upsert_snapshots(snaps: list[dict]) -> int:
     to a single snapshot whose rows are the union. Returns rows written/seen."""
     if not snaps:
         return 0
+    _drop_stale_forward_rows(snaps)
     conn = get_conn()
     c    = conn.cursor()
     try:

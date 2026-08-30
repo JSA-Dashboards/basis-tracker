@@ -38,6 +38,16 @@ def parse_ksethanol_location(loc: dict) -> Optional[NewSnapshotRequest]:
     timestamp     = loc.get("timestamp", "")
     cashbids      = loc.get("cashbids") or []
 
+    # (year, month) of this scrape, so we can drop stale bids whose delivery window
+    # is already in the past (e.g. a lingering 'Sep 2025' milo bid on a 2026 feed —
+    # it otherwise creates a phantom nearest-month slot and a bogus roll downstream).
+    snap_ym = None
+    try:
+        _st = datetime.fromisoformat((timestamp or "").replace("Z", "+00:00"))
+        snap_ym = (_st.year, _st.month)
+    except (ValueError, TypeError):
+        snap_ym = None
+
     rows: list[SnapshotRow] = []
     for bid in cashbids:
         grain     = (bid.get("grain") or "").strip().title()
@@ -48,6 +58,15 @@ def parse_ksethanol_location(loc: dict) -> Optional[NewSnapshotRequest]:
 
         if basis is None or not symbol:
             continue
+
+        # Skip a bid whose delivery month is entirely before this scrape's month.
+        if snap_ym:
+            try:
+                _dd = datetime.strptime(del_start, "%m/%d/%Y")
+                if (_dd.year, _dd.month) < snap_ym:
+                    continue
+            except (ValueError, TypeError):
+                pass
 
         pfx    = _GRAIN_PFX.get(grain, grain[:2].upper() if grain else "XX")
         row_id = f"{pfx}_{bid_id}" if bid_id else f"{pfx}_{del_start}"
