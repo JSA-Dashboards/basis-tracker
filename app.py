@@ -1567,15 +1567,27 @@ def _fut_ord(sym) -> int:
     return yr * 12 + mon
 
 
+def _snap_ym(snap):
+    """(year, month) of a snapshot's timestamp, for dropping stale past-delivery bids."""
+    try:
+        d = datetime.fromisoformat(snap.timestamp.replace("Z", "+00:00"))
+        return (d.year, d.month)
+    except Exception:
+        return None
+
+
 def _curve_map(snap, grain):
     """{canonical (year, month) -> basis_cents} for a grain's forward rows (nearest
     slot; on a slot tie the later/rolled-to contract wins)."""
     m, best = {}, {}
+    ym = _snap_ym(snap)
     for r in snap.rows:
         if (r.isSpot or _grain_disp(r.grain) != grain
                 or r.basisCents is None or not r.futuresSymbol):
             continue
         k   = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+        if ym and k and k < ym:      # stale past-delivery bid (e.g. a lingering 'Sep 2025')
+            continue
         sk  = _dp.slot_key(r.deliveryMonth)
         fo  = _fut_ord(r.futuresSymbol)
         cur = best.get(k)
@@ -1589,11 +1601,14 @@ def _curve_syms(snap, grain):
     later/rolled-to contract wins, so a roll (ZSN26 → ZSQ26) is detected even while a
     location still lists the delivery month against both the old and new contract."""
     m, best = {}, {}
+    ym = _snap_ym(snap)
     for r in snap.rows:
         if (r.isSpot or _grain_disp(r.grain) != grain
                 or r.basisCents is None or not r.futuresSymbol):
             continue
         k   = _dp.canonical(r.deliveryMonth, r.futuresSymbol)
+        if ym and k and k < ym:      # stale past-delivery bid (e.g. a lingering 'Sep 2025')
+            continue
         sk  = _dp.slot_key(r.deliveryMonth)
         fo  = _fut_ord(r.futuresSymbol)
         cur = best.get(k)
