@@ -1,124 +1,175 @@
-"""Massive (api.massive.com) futures curve for the basis tracker.
+"""
+massive_futures.py — Futures curve harvested from Massive's flat-file S3
+archive (official CME/CBOT session settlement data).
 
-Returns {basis-tracker symbol -> price in cents}, e.g. {"ZCU26": 512.25, ...} — the
-same shape as adm_futures.fetch_futures_curve(). Used as the PRIMARY source for the
-roll-spread / forward-basis math (official CBOT settlements); callers fall back to the
-free ADM Gradable curve when the key is missing or the API fails.
+Massive publishes one gzipped CSV per CBOT trading session under
 
-Ticker mapping: Massive outrights are 1-digit-year (ZCU6 = Sep 2026); we rebuild the
-2-digit-year symbol the tracker uses (ZCU26) from the ticker's month letter + the
-contract's settlement year. See [[reference_massive_futures_api]].
+    us_futures_cbot/session_aggs_v1/YYYY/MM/YYYY-MM-DD.csv.gz
+
+with one row per instrument traded that day (outrights, calendar spreads,
+butterflies) and columns:
+
+    ticker,session_end_date,window_start,open,high,low,close,volume,
+    dollar_volume,transactions,settlement_price
+
+We keep only outright contracts (tickers containing '-', ':' or a space are
+calendar spreads / butterflies) for the commodities Basis Tracker tracks —
+corn, soybeans, wheat, soybean meal, soybean oil, oats and KC HRW wheat, all
+of which clear on CBOT — and use `settlement_price` (the exchange's official
+close) rather than the last raw trade `close`. Verified against a live ADM
+quote for the same contract months: Massive's settlement_price is already in
+the same units Basis Tracker stores (no dollars->cents scaling needed, unlike
+ADM's feed).
+
+Ticker year codes are single-digit (e.g. "ZCZ6" = Dec 2026 corn); converted
+here to Basis Tracker's own 2-digit-year convention ("ZCZ26") to match
+adm_futures.py and the rest of the app.
+
+Files land once per session (after the close), not intraday — this walks
+back up to a week to find the most recently published file, so weekends and
+holidays are transparent to the caller.
+
+Minneapolis spring wheat (MW) trades on MGEX, which Massive doesn't carry —
+that symbol has to keep coming from adm_futures.py or another source.
 """
 from __future__ import annotations
 
+import gzip
 import logging
-import os
-import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-import requests
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
 
 log = logging.getLogger(__name__)
 
-BASE_URL = "https://api.massive.com/futures/v1"
-# CBOT grains the tracker prices basis against (corn/soy/wheat/meal/oil/KC wheat).
-_PRODUCTS = ["ZC", "ZS", "ZW", "ZM", "ZL", "KE"]
-_TICKER_RE = re.compile(r"^([A-Z]{1,3})([FGHJKMNQUVXZ])(\d)$")
+_ENDPOINT = "https://files.massive.com"
+_BUCKET   = "flatfiles"
+_PREFIX   = "us_futures_cbot/session_aggs_v1"
+
+# Root symbols we want (matches app.py's _FUT_SHORT, minus MW — see docstring).
+_ROOTS  = {"ZC", "ZS", "ZW", "ZM", "ZL", "ZO", "KE"}
+_MONTHS = "FGHJKMNQUVXZ"
 
 
-def _key() -> str | None:
-    k = os.getenv("MASSIVE_API_KEY")
-    if k:
-        return k
-    try:                                   # Streamlit Cloud secret
-        import streamlit as st
-        return st.secrets.get("MASSIVE_API_KEY")
-    except Exception:
-        return None
-
-
-def _get(path: str, key: str, params: dict | None = None, _attempt: int = 0) -> dict:
+def _client():
+    """boto3 S3 client for Massive's endpoint. Credentials from st.secrets,
+    falling back to env vars for non-Streamlit callers (e.g. cron scripts)."""
+    key = secret = ""
     try:
-        r = requests.get(f"{BASE_URL}{path}", headers={"Authorization": f"Bearer {key}"},
-                         params=params or {}, timeout=30)
-        r.raise_for_status()
-        return r.json()
-    except requests.exceptions.RequestException:
-        if _attempt < 2:                    # transient timeouts happen — retry twice
-            return _get(path, key, params, _attempt + 1)
+        import streamlit as st
+        key    = st.secrets.get("MASSIVE_S3_ACCESS_KEY", "")
+        secret = st.secrets.get("MASSIVE_S3_SECRET_KEY", "")
+    except Exception:
+        pass
+    if not key or not secret:
+        import os
+        key    = key    or os.environ.get("MASSIVE_S3_ACCESS_KEY", "")
+        secret = secret or os.environ.get("MASSIVE_S3_SECRET_KEY", "")
+    if not key or not secret:
+        raise RuntimeError("MASSIVE_S3_ACCESS_KEY / MASSIVE_S3_SECRET_KEY not configured")
+    return boto3.client(
+        "s3",
+        aws_access_key_id=key,
+        aws_secret_access_key=secret,
+        endpoint_url=_ENDPOINT,
+        config=Config(signature_version="s3v4"),
+    )
+
+
+def _to_2digit_year(root: str, month: str, digit: str) -> str:
+    """'ZC' + 'Z' + '6' -> 'ZCZ26', anchored on today via the standard
+    nearby-decade rule (never resolves more than ~1 year into the past)."""
+    d      = int(digit)
+    today  = datetime.now(timezone.utc)
+    decade = (today.year // 10) * 10
+    year   = decade + d
+    if year < today.year - 1:
+        year += 10
+    return f"{root}{month}{year % 100:02d}"
+
+
+def _fetch_session_file(s3, date: datetime) -> bytes | None:
+    key = f"{_PREFIX}/{date:%Y}/{date:%m}/{date:%Y-%m-%d}.csv.gz"
+    try:
+        return s3.get_object(Bucket=_BUCKET, Key=key)["Body"].read()
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+            return None
         raise
 
 
-def _outright(ticker: str, pc: str) -> bool:
-    """Plain single-month contract (exclude spreads/butterflies/combos)."""
-    return ticker.startswith(pc) and bool(_TICKER_RE.match(ticker))
-
-
-def _price(snap: dict) -> float | None:
-    """Settlement first (stable), then close, last trade, bid."""
-    for path in (("session", "settlement_price"), ("session", "close"),
-                 ("last_trade", "price"), ("last_quote", "bid")):
-        node = snap
-        for k in path:
-            node = node.get(k) if isinstance(node, dict) else None
-            if node is None:
-                break
-        if isinstance(node, (int, float)) and node:
-            return float(node)
-    return None
-
-
-def fetch_futures_curve() -> dict[str, float]:
-    """{'ZCU26': price_cents, ...} from Massive settlements, or {} on any failure."""
-    key = _key()
-    if not key:
+def fetch_futures_curve(max_lookback_days: int = 7) -> dict[str, float]:
+    """Return {2-digit-year symbol -> settlement price} for the most recently
+    published CBOT session. Walks back up to `max_lookback_days` to skip
+    weekends/holidays. Empty dict on any failure (never raises) — mirrors
+    adm_futures.fetch_futures_curve()'s contract so callers can treat the two
+    sources interchangeably."""
+    try:
+        s3 = _client()
+    except Exception as exc:
+        log.error("Massive S3 client init failed: %s", exc)
         return {}
-    as_of = datetime.now(timezone.utc).date().isoformat()
-    curve: dict[str, float] = {}
-    for pc in _PRODUCTS:
+
+    today = datetime.now(timezone.utc)
+    raw, found_date = None, None
+    for back in range(max_lookback_days):
+        day = today - timedelta(days=back)
         try:
-            data = _get("/contracts", key, {"product_code": pc, "active": "true",
-                                            "date": as_of, "limit": 400})
+            raw = _fetch_session_file(s3, day)
         except Exception as exc:
-            log.warning("Massive /contracts %s failed: %s", pc, exc)
+            log.warning("Massive fetch failed for %s: %s", day.date(), exc)
             continue
-        exp_of = {}
-        for r in data.get("results", []):
-            t = r.get("ticker", "")
-            if not _outright(t, pc):
-                continue
-            exp = r.get("settlement_date") or r.get("last_trade_date")
-            if exp:
-                exp_of[t] = exp
-        tickers = list(exp_of)
-        for i in range(0, len(tickers), 25):
-            chunk = tickers[i:i + 25]
-            try:
-                snap = _get("/snapshot", key,
-                            {"ticker.any_of": ",".join(chunk), "limit": len(chunk)})
-            except Exception as exc:
-                log.warning("Massive /snapshot %s failed: %s", pc, exc)
-                continue
-            for r in snap.get("results", []):
-                t = (r.get("details") or {}).get("ticker")
-                mon = _TICKER_RE.match(t or "")
-                p = _price(r)
-                exp = exp_of.get(t) or (r.get("details") or {}).get("settlement_date")
-                if not (t and mon and p is not None and exp):
-                    continue
-                try:
-                    yr = datetime.fromisoformat(str(exp)[:10]).year
-                except Exception:
-                    continue
-                curve[f"{pc}{mon.group(2)}{yr % 100:02d}"] = p   # ZC + U + 26 -> ZCU26
+        if raw is not None:
+            found_date = day.date()
+            break
+
+    if raw is None:
+        log.warning("Massive: no session file found in the last %d days", max_lookback_days)
+        return {}
+
+    text  = gzip.decompress(raw).decode("utf-8")
+    lines = text.splitlines()
+    if not lines:
+        return {}
+
+    header = lines[0].split(",")
+    try:
+        i_ticker = header.index("ticker")
+        i_settle = header.index("settlement_price")
+    except ValueError:
+        log.error("Massive: unexpected CSV header %r", header)
+        return {}
+
+    curve: dict[str, float] = {}
+    for line in lines[1:]:
+        fields = line.split(",")
+        if len(fields) <= max(i_ticker, i_settle):
+            continue
+        tkr = fields[i_ticker]
+        if "-" in tkr or ":" in tkr or " " in tkr:
+            continue  # calendar spread / butterfly — outrights only
+        root, rest = tkr[:2], tkr[2:]
+        if root not in _ROOTS or len(rest) != 2:
+            continue
+        month, digit = rest[0], rest[1]
+        if month not in _MONTHS or not digit.isdigit():
+            continue
+        sym = _to_2digit_year(root, month, digit)
+        try:
+            curve[sym] = float(fields[i_settle])
+        except ValueError:
+            pass
+
+    log.info("Massive futures curve: %d contracts (session %s)", len(curve), found_date)
     return curve
 
 
 if __name__ == "__main__":
-    import pathlib
-    from dotenv import load_dotenv
-    load_dotenv(pathlib.Path(__file__).with_name(".env"))
-    c = fetch_futures_curve()
-    print(f"{len(c)} contracts")
-    for s in sorted(c)[:20]:
-        print(f"  {s}: {c[s]}")
+    import sys
+    logging.basicConfig(level=logging.INFO, format="%(message)s",
+                        handlers=[logging.StreamHandler(sys.stdout)])
+    cur = fetch_futures_curve()
+    for s in sorted(cur):
+        print(f"  {s:7} {cur[s]:9.2f}")
