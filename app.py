@@ -5064,15 +5064,44 @@ with tab_summary:
             def _mavg(xs):
                 return (sum(xs) / len(xs)) if xs else None
 
+            # Anchor each location's CURRENT basis to the map's reference contract so a
+            # location that already rolled (e.g. to CZ) is expressed vs the same board
+            # as everyone else — otherwise the "vs ZCU26" level mixes contracts mid-roll.
+            def _map_level(r):
+                bc = r.get("b_current")
+                if bc is None:
+                    return None
+                sc = r.get("s_current")
+                if sc and _ref_sym and sc != _ref_sym and "R" not in (sc, _ref_sym):
+                    a = get_adj(sc, _ref_sym)          # adj = px(sc) - px(ref); B_ref = B_sc + adj
+                    if a.get("adj") is not None:
+                        return bc + a["adj"]
+                    if a.get("unknown"):
+                        return None
+                return bc
+
+            # Current-vs-window move, spread-adjusted when that location's reference
+            # contract rolled between the two dates (so a state index isn't swung by the
+            # contract gap during a roll).
+            def _map_move(r, win):
+                bc, bw = r.get("b_current"), r.get(f"b_{win}")
+                if bc is None or bw is None:
+                    return None
+                d = bc - bw
+                fc, fw = r.get("s_current"), r.get(f"s_{win}")
+                if fc and fw and fc != fw and "R" not in (fc, fw):
+                    a = get_adj(fw, fc)
+                    if a.get("adj") is not None:
+                        return d - a["adj"]
+                    if a.get("unknown"):
+                        return None
+                return d
+
             _MAP_METRICS = {
-                "Current Value": lambda rs: _mavg([r["b_current"] for r in rs
-                                                   if r.get("b_current") is not None]),
-                "Change vs LW":  lambda rs: _mavg([r["b_current"] - r["b_wk_ago"] for r in rs
-                                                   if r.get("b_current") is not None and r.get("b_wk_ago") is not None]),
-                "Change vs LM":  lambda rs: _mavg([r["b_current"] - r["b_mo_ago"] for r in rs
-                                                   if r.get("b_current") is not None and r.get("b_mo_ago") is not None]),
-                "Change vs LY":  lambda rs: _mavg([r["b_current"] - r["b_yr_ago"] for r in rs
-                                                   if r.get("b_current") is not None and r.get("b_yr_ago") is not None]),
+                "Current Value": lambda rs: _mavg([v for r in rs if (v := _map_level(r)) is not None]),
+                "Change vs LW":  lambda rs: _mavg([m for r in rs if (m := _map_move(r, "wk_ago")) is not None]),
+                "Change vs LM":  lambda rs: _mavg([m for r in rs if (m := _map_move(r, "mo_ago")) is not None]),
+                "Change vs LY":  lambda rs: _mavg([m for r in rs if (m := _map_move(r, "yr_ago")) is not None]),
             }
 
             # Bucket rows by US state (skip non-US / unknown).
