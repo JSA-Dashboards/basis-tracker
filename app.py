@@ -1292,27 +1292,31 @@ def _trend_ts(ts: str) -> datetime:
 
 
 def _trend_extract(snap, grain, mode="spot"):
-    """Basis for grain at delivery `mode` ('spot' = nearest), with isSpot fallback."""
+    """(basis, futures symbol) for grain at delivery `mode` ('spot' = nearest), with
+    isSpot fallback. The symbol lets the trend/index moves spread-adjust across a
+    contract roll (e.g. spot CU->CZ); None for a bare spot row (no contract to anchor)."""
     if snap is None:
-        return None
+        return (None, None)
     if mode == "spot":
         cands = [r for r in snap.rows
                  if not r.isSpot and _grain_disp(r.grain) == grain
                  and r.basisCents is not None and r.futuresSymbol]
         if cands:
-            return min(cands, key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol)).basisCents
+            r = min(cands, key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
+            return (r.basisCents, r.futuresSymbol)
         row = next((r for r in snap.rows
                     if r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None), None)
-        return row.basisCents if row else None
+        return (row.basisCents, row.futuresSymbol or None) if row else (None, None)
     matches = [r for r in snap.rows
                if not r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None
                and _dp.label(_dp.canonical(r.deliveryMonth, r.futuresSymbol)) == mode]
     if matches:
-        return min(matches, key=lambda r: _dp.slot_key(r.deliveryMonth)).basisCents
+        r = min(matches, key=lambda r: _dp.slot_key(r.deliveryMonth))
+        return (r.basisCents, r.futuresSymbol)
     row = next((r for r in snap.rows
                 if r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None
                 and _dp.label(_dp.canonical(r.deliveryMonth, r.futuresSymbol)) == mode), None)
-    return row.basisCents if row else None
+    return (row.basisCents, row.futuresSymbol or None) if row else (None, None)
 
 
 def _trend_curve(snap, grain):
@@ -1413,11 +1417,29 @@ def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list
               "segment": river_segment(key[1])}
         for lbl, (tg, md) in targets.items():
             snap = _trend_closest(snaps, tg, md)
-            rd[f"b_{lbl}"] = _trend_extract(snap, grain, mode)
+            rd[f"b_{lbl}"], rd[f"f_{lbl}"] = _trend_extract(snap, grain, mode)
             if lbl == "current":
                 rd["spot_gt_next"] = _trend_spot_gt_next(snap, grain)
         rows.append(rd)
     return [r for r in rows if r.get("b_current") is not None]
+
+
+def _trend_move(r, win):
+    """Current-vs-`win` basis move for a trend row, spread-adjusted if the location's
+    reference contract rolled between the two (e.g. CU->CZ). None to exclude the row —
+    missing endpoint, or a roll with no spread available (so it can't distort the index)."""
+    bc, bw = r.get("b_current"), r.get(f"b_{win}")
+    if bc is None or bw is None:
+        return None
+    d = bc - bw
+    fc, fw = r.get("f_current"), r.get(f"f_{win}")
+    if fc and fw and fc != fw:
+        a = get_adj(fw, fc)
+        if a.get("adj") is not None:
+            return d - a["adj"]
+        if a.get("unknown"):
+            return None
+    return d
 
 
 def _cards_copy_layout(parts: list[str]) -> str:
@@ -1442,8 +1464,7 @@ def render_trend_cards(rows, group_field, groups, layout: str = "grid") -> str:
     def _avg(xs):    return (sum(xs) / len(xs)) if xs else None
     def _grows(gv):  return [r for r in rows if (r.get(group_field) or "") == gv]
     def _moves(rs, win):
-        return [r["b_current"] - r[f"b_{win}"] for r in rs
-                if r.get("b_current") is not None and r.get(f"b_{win}") is not None]
+        return [m for r in rs if (m := _trend_move(r, win)) is not None]
     def _fc(v):  return "—" if v is None else f"{'+' if v >= 0 else '−'}{abs(v):.1f}"
     def _fp(v):  return "—" if v is None else f"{round(v)}%"
 
@@ -5125,12 +5146,8 @@ with tab_summary:
             _WINS = [("wk_ago", "vs LW"), ("mo_ago", "vs LM"), ("yr_ago", "vs LY")]
 
             def _win_moves(rows, win):
-                out = []
-                for r in rows:
-                    bc, bw = r.get("b_current"), r.get(f"b_{win}")
-                    if bc is not None and bw is not None:
-                        out.append(bc - bw)
-                return out
+                # Roll-adjusted (spread-corrected across a contract roll like CU->CZ).
+                return [m for r in rows if (m := _trend_move(r, win)) is not None]
 
             def _avg(xs):
                 return (sum(xs) / len(xs)) if xs else None
