@@ -1649,9 +1649,9 @@ def run_futures_capture() -> int:
     date, so historical forward-basis curves can later anchor on each day's actual
     futures (instead of always today's). Best-effort — never blocks the scrape."""
     try:
-        import adm_futures
+        import futures_curve
         from database import save_futures_curve
-        curve = adm_futures.fetch_futures_curve()
+        curve = futures_curve.fetch_futures_curve()
         if not curve:
             log.warning("Futures capture: empty curve — skipped")
             return 0

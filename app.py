@@ -125,9 +125,10 @@ def _cached_get_map_data() -> list[dict]:
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _cached_futures_curve() -> dict:
-    """Today's live futures curve {symbol -> cents} harvested from ADM's feed."""
-    import adm_futures
-    return adm_futures.fetch_futures_curve()
+    """Today's live futures curve {symbol -> cents} — Massive settlements primary,
+    ADM Gradable fallback (see futures_curve.py)."""
+    import futures_curve
+    return futures_curve.fetch_futures_curve()
 
 @st.cache_data(ttl=600, show_spinner=False)
 def _cached_futures_curve_for(date_str: str) -> dict:

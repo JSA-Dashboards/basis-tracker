@@ -38,12 +38,13 @@ def set_curve(curve: Optional[dict[str, float]]) -> None:
 
 
 def ensure_curve() -> dict[str, float]:
-    """Lazily harvest the ADM futures curve if one hasn't been set (standalone use)."""
+    """Lazily harvest the futures curve if one hasn't been set (standalone use) —
+    Massive settlements primary, ADM Gradable fallback (see futures_curve.py)."""
     global _CURVE
     if not _CURVE:
         try:
-            import adm_futures
-            _CURVE = adm_futures.fetch_futures_curve()
+            import futures_curve
+            _CURVE = futures_curve.fetch_futures_curve()
         except Exception:
             pass
     return _CURVE
