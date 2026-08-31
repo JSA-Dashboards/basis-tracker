@@ -2598,11 +2598,12 @@ with tab_railfob:
                     continue
                 _b = _seasonal_bucket(_r["period"])
                 if _b:                      # None = not a tracked seasonal period
-                    _rows.append((_r["market"], _b, _r["date"], _r["bid"]))
+                    _rows.append((_r["market"], _b, _r["date"], _r["bid"],
+                                  _r.get("commodity") or "Corn"))
         if not _rows:
             st.caption("No rail history archived yet — the seasonal chart fills in as postings are saved.")
             return
-        _df = _pd.DataFrame(_rows, columns=["Market", "Period", "Date", "Bid"])
+        _df = _pd.DataFrame(_rows, columns=["Market", "Period", "Date", "Bid", "Commodity"])
 
         try:
             from rail_corridors import CORRIDOR_ORDER as _CO
@@ -2821,7 +2822,8 @@ with tab_railfob:
                                               align="center", baseline="top")
                    .encode(x=_alt.X("MktWeek:Q"), y=_alt.value(6), text="code:N")] + _layers
 
-        _rail_title = f"{_RAIL_DISPLAY.get(_mk, _mk)} · {_pd_sel} · Corn"
+        _comm = _pv["Commodity"].iloc[0] if not _pv.empty else "Corn"
+        _rail_title = f"{_RAIL_DISPLAY.get(_mk, _mk)} · {_pd_sel} · {_comm}"
         st.markdown(
             '<div style="margin-top:8px;margin-bottom:2px;font-size:14px;color:#1e293b;'
             'font-weight:800;letter-spacing:.01em">' + _rail_title + '</div>'

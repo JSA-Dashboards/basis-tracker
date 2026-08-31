@@ -22,7 +22,8 @@ from datetime import datetime, date, timedelta
 
 from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
                             _GAIN, _LOSS, _SIG_LOGO, _SIG_LOGO_CID,
-                            _table_watermark, _TBL_WM_CID)
+                            _table_watermark, _TBL_WM_CID,
+                            _roll_adjust, _futures_curve)
 from database import get_rail_fob_all
 
 # Load DATABASE_URL when rail_report is invoked standalone (a script or the scheduled
@@ -102,16 +103,27 @@ def _bo_cell(cell, blue, tdr):
     return f'<td style="{tdr};{col}">{s}</td>'
 
 
-def _chg_cell(cur_bid, prior_map, period, tdr):
+def _chg_cell(cur_bid, prior_map, period, tdr, cur_fut=None, curve=None):
     if cur_bid is None or not prior_map or prior_map.get(period) is None:
         return f'<td style="{tdr};color:#cbd5e1">—</td>'
-    pb = prior_map[period].get("bid")
+    prow = prior_map[period]
+    pb = prow.get("bid")
     if pb is None:
         return f'<td style="{tdr};color:#cbd5e1">—</td>'
     d = cur_bid - pb
+    rolled = False
+    pf = prow.get("futures")
+    # If this period's reference contract rolled (e.g. spot CU->CZ), spread-adjust the
+    # change so it's the true basis move, not the contract gap. "R" packages can't be
+    # anchored to a single contract, so leave those raw.
+    if cur_fut and pf and cur_fut != pf and "R" not in (cur_fut, pf):
+        adj = _roll_adjust(d, pf, cur_fut, curve or {})
+        if adj is not None:
+            d, rolled = adj, True
+    mark = ' <span style="color:#d97706">&#8635;</span>' if rolled else ''
     if d == 0:
-        return f'<td style="{tdr};color:#94a3b8">0</td>'
-    return f'<td style="{tdr};color:{_GAIN if d > 0 else _LOSS};font-weight:700">{d:+d}</td>'
+        return f'<td style="{tdr};color:#94a3b8">0{mark}</td>'
+    return f'<td style="{tdr};color:{_GAIN if d > 0 else _LOSS};font-weight:700">{d:+d}{mark}</td>'
 
 
 # ── spot seasonal chart (front-period bid by marketing week) ──────────────────
@@ -184,6 +196,9 @@ def _seasonal_png(market, by_md, mkt_dates):
     series = _spot_series(market, by_md, mkt_dates)
     if len(series) < 8:
         return None
+    _ds = sorted(mkt_dates.get(market, ()))
+    _cells = list(by_md.get((market, _ds[-1]), {}).values()) if _ds else []
+    _comm = (_cells[0].get("commodity") if _cells else None) or "Corn"
     try:
         import pandas as pd
         import altair as alt
@@ -290,7 +305,7 @@ def _seasonal_png(market, by_md, mkt_dates):
 
     chart = alt.layer(*layers).properties(
         width=680, height=250, padding={"left": 6, "right": 26, "top": 6, "bottom": 6},
-        title=f"{_RAIL_DISPLAY.get(market, market)} · Spot Corn Basis Seasonal")
+        title=f"{_RAIL_DISPLAY.get(market, market)} · Spot {_comm} Basis Seasonal")
     try:
         return vlc.vegalite_to_png(json.dumps(chart.to_dict(), default=str), scale=1.5)
     except Exception as exc:
@@ -330,6 +345,10 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
     tdr = tdl.replace("text-align:left", "text-align:right") + ";font-variant-numeric:tabular-nums"
 
     latest_overall = max((max(ds) for ds in mkt_dates.values()), default=None)
+    try:
+        _curve = _futures_curve()       # for spread-adjusting a period's contract roll
+    except Exception:
+        _curve = {}
     body = (
         f'<div style="font-family:Arial,Helvetica,sans-serif;color:{JPSI_DARK};max-width:820px">'
         f'<div style="background:{JPSI_DARK};padding:16px 20px;border-radius:8px 8px 0 0">'
@@ -369,11 +388,14 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
                  f'<th style="{thr}">Δ Mo</th><th style="{thr}">Δ Yr</th></tr>')
         for c in cells:
             b = c.get("bid")
+            cf = c.get("futures")
             body += (f'<tr><td style="{tdl};color:{JPSI_DARK};font-weight:600">{c["period"]}</td>'
-                     f'<td style="{tdl};color:#94a3b8;font-size:10px">{c.get("futures") or ""}</td>'
+                     f'<td style="{tdl};color:#94a3b8;font-size:10px">{cf or ""}</td>'
                      + _bo_cell(c, False, tdr) + _bo_cell(c, True, tdr)
-                     + _chg_cell(b, pd_, c["period"], tdr) + _chg_cell(b, pw, c["period"], tdr)
-                     + _chg_cell(b, pmo, c["period"], tdr) + _chg_cell(b, pyr, c["period"], tdr)
+                     + _chg_cell(b, pd_, c["period"], tdr, cf, _curve)
+                     + _chg_cell(b, pw, c["period"], tdr, cf, _curve)
+                     + _chg_cell(b, pmo, c["period"], tdr, cf, _curve)
+                     + _chg_cell(b, pyr, c["period"], tdr, cf, _curve)
                      + '</tr>')
         body += '</table>'
 
