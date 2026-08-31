@@ -2906,16 +2906,26 @@ with tab_railfob:
             col = "color:#0693e3;font-weight:600" if blue else "color:#32373c;font-weight:700"
             return f'<td style="{_TDR};{col}">{s}</td>'
 
-        def _chg_html(cur_bid, prior_map, period):
+        def _chg_html(cur_bid, prior_map, period, cur_fut=None):
             if cur_bid is None or not prior_map or prior_map.get(period) is None:
                 return f'<td style="{_TDR};color:#cbd5e1">—</td>'
-            pb = prior_map[period].get("bid")
+            _prow = prior_map[period]
+            pb = _prow.get("bid")
             if pb is None:
                 return f'<td style="{_TDR};color:#cbd5e1">—</td>'
             d = cur_bid - pb
+            rolled = False
+            _pf = _prow.get("futures")
+            # If this period's reference contract rolled (e.g. spot CU->CZ), spread-adjust
+            # the change to the true basis move; "R" packages can't be anchored, so raw.
+            if cur_fut and _pf and cur_fut != _pf and "R" not in (cur_fut, _pf):
+                _a = get_adj(_pf, cur_fut)
+                if _a.get("adj") is not None:
+                    d, rolled = d - _a["adj"], True
+            _mk = ' <span style="color:#d97706">&#8635;</span>' if rolled else ''
             if d == 0:
-                return f'<td style="{_TDR};color:#94a3b8">0</td>'
-            return f'<td style="{_TDR};color:{"#16a34a" if d > 0 else "#dc2626"};font-weight:700">{d:+d}</td>'
+                return f'<td style="{_TDR};color:#94a3b8">0{_mk}</td>'
+            return f'<td style="{_TDR};color:{"#16a34a" if d > 0 else "#dc2626"};font-weight:700">{d:+d}{_mk}</td>'
 
         def _prior_maps(market, cur):
             """(last update, ~1wk, ~1mo, ~1yr) prior postings for a corridor.
@@ -2966,13 +2976,14 @@ with tab_railfob:
                   f'<td style="{_THR}">Δ Mo</td><td style="{_THR}">Δ Yr</td></tr>')
             for c in _cells:
                 _b = c.get("bid")
+                _cf = c.get("futures")
                 h += (f'<tr><td style="{_TDL};color:#32373c">{c["period"]}</td>'
-                      f'<td style="{_TDL};color:#94a3b8;font-size:10px">{c.get("futures") or ""}</td>'
+                      f'<td style="{_TDL};color:#94a3b8;font-size:10px">{_cf or ""}</td>'
                       + _bidoff_html(c, False) + _bidoff_html(c, True)
-                      + _chg_html(_b, _pd, c["period"])
-                      + _chg_html(_b, _pw, c["period"])
-                      + _chg_html(_b, _pmo, c["period"])
-                      + _chg_html(_b, _pyr, c["period"])
+                      + _chg_html(_b, _pd, c["period"], _cf)
+                      + _chg_html(_b, _pw, c["period"], _cf)
+                      + _chg_html(_b, _pmo, c["period"], _cf)
+                      + _chg_html(_b, _pyr, c["period"], _cf)
                       + '</tr>')
             h += '</table></div>'
             return h
