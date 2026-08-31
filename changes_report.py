@@ -28,6 +28,8 @@ from database import get_grain_map, get_bids_filter_data, get_snapshots_bulk
 log = logging.getLogger(__name__)
 
 DEFAULT_TO = os.getenv("CHANGES_EMAIL_TO", "kpostin@jpsi.com")
+# Standing BCC on the daily bids/changes email (overridable via DAILY_BIDS_BCC env).
+DAILY_BIDS_BCC = '"Daily Bids" <dailybids@jpsi.com>'
 
 _CME_MONTH_TO_INT = {
     "F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
@@ -594,7 +596,7 @@ def signature_html() -> str:
 
 
 def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = None,
-                     inline_images: dict | None = None) -> None:
+                     inline_images: dict | None = None, bcc: str | None = None) -> None:
     """Send an HTML email via the local, logged-in Outlook desktop app.
 
     `inline_images` is an optional {content_id: filepath} map for images referenced
@@ -606,6 +608,8 @@ def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = Non
     mail.To = to_addr
     if cc:
         mail.CC = cc
+    if bcc:
+        mail.BCC = bcc
     mail.Subject = subject
     mail.HTMLBody = html
     for cid, path in (inline_images or {}).items():
@@ -631,7 +635,7 @@ def _email_cfg(key: str, default=None):
 
 
 def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
-                  inline_images: dict | None = None) -> None:
+                  inline_images: dict | None = None, bcc: str | None = None) -> None:
     """Send the HTML email over SMTP (for environments without Outlook, e.g. Streamlit
     Cloud). Config from env or st.secrets: SMTP_HOST, SMTP_PORT (default 587),
     SMTP_USER, SMTP_PASS, SMTP_FROM (defaults to SMTP_USER). Inline images embed by
@@ -663,7 +667,11 @@ def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
             img.add_header("Content-ID", f"<{cid}>")
             img.add_header("Content-Disposition", "inline", filename=os.path.basename(path))
             root.attach(img)
+    # BCC is an envelope-only recipient — added to the send list but NOT to any header.
     rcpts = [to_addr] + ([cc] if cc else [])
+    if bcc:
+        from email.utils import getaddresses
+        rcpts += [a for _, a in getaddresses([bcc]) if a]
     with smtplib.SMTP(host, port, timeout=30) as s:
         s.starttls()
         s.login(user, pw)
@@ -671,16 +679,16 @@ def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
 
 
 def send_email(subject: str, html: str, to_addr: str, cc: str | None = None,
-               inline_images: dict | None = None) -> str:
+               inline_images: dict | None = None, bcc: str | None = None) -> str:
     """Dispatch: send via local Outlook if available, else fall back to SMTP (Cloud).
     Returns which path was used ('outlook' | 'smtp'); raises if both fail."""
     try:
         import win32com.client  # noqa: F401  (present only on the local machine)
-        send_via_outlook(subject, html, to_addr, cc=cc, inline_images=inline_images)
+        send_via_outlook(subject, html, to_addr, cc=cc, inline_images=inline_images, bcc=bcc)
         return "outlook"
     except Exception as e_out:
         try:
-            send_via_smtp(subject, html, to_addr, cc=cc, inline_images=inline_images)
+            send_via_smtp(subject, html, to_addr, cc=cc, inline_images=inline_images, bcc=bcc)
             return "smtp"
         except Exception as e_smtp:
             raise RuntimeError(f"Email send failed — Outlook: {e_out}; SMTP: {e_smtp}")
@@ -701,8 +709,10 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
     _wm = _table_watermark()
     if _wm:
         imgs[_TBL_WM_CID] = _wm
-    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs or None)
-    log.info("Daily Changes email sent via %s to %s (cc %s)", _via, to_addr, cc or "—")
+    bcc = os.getenv("DAILY_BIDS_BCC") or DAILY_BIDS_BCC
+    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs or None, bcc=bcc)
+    log.info("Daily Changes email sent via %s to %s (cc %s | bcc %s)",
+             _via, to_addr, cc or "—", bcc or "—")
     return True
 
 
