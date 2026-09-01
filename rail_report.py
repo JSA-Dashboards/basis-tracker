@@ -221,6 +221,8 @@ def _seasonal_png(market, by_md, mkt_dates):
     _yr = lambda y: f"{y}/{str(y + 1)[-2:]}"
     cur = df[df["MyNum"] == mx]
     cur_lbl = _yr(mx)
+    prev = df[df["MyNum"] == mx - 1]        # most recent COMPLETE marketing year
+    prev_lbl = _yr(mx - 1)
     _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-5:]   # 5 prior complete years (or fewer)
     hist = df[df["MyNum"].isin(_hy)]
     band = (hist.groupby("MktWeek")["Bid"].agg(lo="min", hi="max", avg="mean").reset_index()
@@ -259,12 +261,16 @@ def _seasonal_png(market, by_md, mkt_dates):
 
     # Muted green/gray theme: bold near-black current year, dashed sage avg, light-sage
     # range band, brick-red forward curve. Legend up top with a swatch per series.
-    _CUR, _AVG, _BAND, _FWD = "#111827", "#4b6a4b", "#c4d7bd", "#c0392b"
+    _CUR, _PREV, _AVG, _BAND, _FWD = "#111827", "#2563eb", "#4b6a4b", "#c4d7bd", "#c0392b"
     _rng_name, _avg_name = f"{_n}-yr range ({rng_lbl})", f"{_n}-yr average"
-    _cscale = alt.Scale(domain=[cur_lbl, _avg_name, _rng_name, "Forward curve"],
-                        range=[_CUR, _AVG, _BAND, _FWD])
+    _dom, _rng = [cur_lbl], [_CUR]
+    if not prev.empty:
+        _dom.append(prev_lbl); _rng.append(_PREV)      # most recent complete year, hero blue
+    _dom += [_avg_name, _rng_name, "Forward curve"]
+    _rng += [_AVG, _BAND, _FWD]
+    _cscale = alt.Scale(domain=_dom, range=_rng)
     _leg = alt.Legend(orient="top", title=None, direction="horizontal",
-                      labelFontSize=9, columns=4, offset=2)
+                      labelFontSize=9, columns=5, offset=2)
     _col = lambda: alt.Color("Series:N", scale=_cscale, legend=_leg)
 
     layers = [alt.Chart(pd.DataFrame({"MktWeek": [1, 52], "Bid": [0.0, 0.0]}))
@@ -276,6 +282,9 @@ def _seasonal_png(market, by_md, mkt_dates):
         layers.append(alt.Chart(band.assign(Series=_avg_name))
                       .mark_line(strokeDash=[7, 4], strokeWidth=2)
                       .encode(x=_X(False), y=_Y("avg", False), color=_col()))
+    if not prev.empty:
+        layers.append(alt.Chart(prev.assign(Series=prev_lbl))
+                      .mark_line(strokeWidth=2.5).encode(x=_X(False), y=_Y("Bid", False), color=_col()))
     if not cur.empty:
         layers.append(alt.Chart(cur.assign(Series=cur_lbl))
                       .mark_line(strokeWidth=3.5).encode(x=_X(False), y=_Y("Bid", False), color=_col()))
