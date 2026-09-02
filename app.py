@@ -1988,6 +1988,40 @@ def copy_button(html: str, label: str = "📋 Copy", height: int = 44) -> None:
 # terminal label, and marks overflow into the pad rather than being sliced.
 _CHART_PAD = {"left": 6, "right": 22, "top": 8, "bottom": 6}
 
+# --- "Best fit" y-axis zoom ------------------------------------------------
+# A fixed auto-fit gets squashed by a handful of outlier weeks (a June spike, a
+# harvest low). The Best-fit control clamps the y-axis to the central N% of the
+# plotted values so the season's normal range fills the frame; outliers still
+# draw but clamp to the edge. "Full" restores the raw min/max.
+_YFIT = {"75%": (0.125, 0.875), "90%": (0.05, 0.95), "95%": (0.025, 0.975), "Full": None}
+_YFIT_DEFAULT = "90%"
+
+
+def _yfit_scale(values, fit=_YFIT_DEFAULT, pad_frac=0.08):
+    """alt.Scale zoomed to the central `fit` % of `values`. Needs >=8 points to clamp."""
+    import altair as _alt
+    import pandas as _pd
+    vals = [v for v in values if v is not None]
+    pct = _YFIT.get(fit)
+    if pct is None or len(vals) < 8:
+        return _alt.Scale(zero=False)
+    q = _pd.Series(vals).quantile(list(pct))
+    lo, hi = float(q.iloc[0]), float(q.iloc[1])
+    if hi <= lo:
+        return _alt.Scale(zero=False)
+    pad = (hi - lo) * pad_frac
+    return _alt.Scale(zero=False, domain=[round(lo - pad), round(hi + pad)], clamp=True)
+
+
+def _yfit_radio(key, default=_YFIT_DEFAULT):
+    """Compact horizontal picker for the Best-fit level; returns the chosen label."""
+    return st.radio(
+        "Best fit", list(_YFIT), index=list(_YFIT).index(default),
+        horizontal=True, key=key, label_visibility="collapsed",
+        help="Zoom the y-axis to the central % of values so outlier weeks don't "
+             "squash the chart. 'Full' shows the raw min/max.",
+    )
+
 
 def _chart_png(chart, width: int = 1100, height: int = 560, scale: float = 2.0):
     """Render an Altair chart to PNG bytes via vl-convert (Cloud-safe, Rust-based).
@@ -2653,6 +2687,9 @@ with tab_railfob:
         with _c2:
             _pd_sel = st.selectbox("Shipping period", _p_opts, key="rail_seas_per",
                                    format_func=lambda p: f"{p}  ({_p_n[p]})")
+        with _c3:
+            st.caption("Best fit")
+            _rfit = _yfit_radio("rail_seas_fit")
 
         _sel = _pv[_pv["Period"] == _pd_sel][["Date", "Bid"]].copy()
         _dts = _pd.to_datetime(_sel["Date"])
@@ -2746,20 +2783,12 @@ with tab_railfob:
             _rfwd_cur = _df_rfwd[_df_rfwd["MktWeek"] >= _twk].sort_values("MktWeek")
             _rfwd_nxt = _df_rfwd[_df_rfwd["MktWeek"] < _twk].sort_values("MktWeek")
 
-        # Auto-fit the y-axis to the central ~95% of bids so outlier days don't squash
-        # the chart; outliers clamp to the edge.
+        # Best-fit y-axis: clamp to the central N% of bids (picker above) so outlier
+        # days don't squash the chart; outliers clamp to the edge.
         _ryvals = list(_drawn["Bid"]) + list(_rband["lo"]) + list(_rband["hi"])
         if not _df_rfwd.empty:
             _ryvals += list(_df_rfwd["Bid"])
-        _rydom = None
-        if len(_ryvals) >= 8:
-            _rq = _pd.Series(_ryvals).quantile([0.025, 0.975])
-            _rqlo, _rqhi = float(_rq.iloc[0]), float(_rq.iloc[1])
-            if _rqhi > _rqlo:
-                _rpad = (_rqhi - _rqlo) * 0.08
-                _rydom = [round(_rqlo - _rpad), round(_rqhi + _rpad)]
-        _ry_scale = (_alt.Scale(zero=False, domain=_rydom, clamp=True) if _rydom
-                     else _alt.Scale(zero=False))
+        _ry_scale = _yfit_scale(_ryvals, _rfit)
         _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
                     axis=_alt.Axis(labelFontSize=10))
         _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_ry_scale,
@@ -4243,6 +4272,7 @@ with tab_bids:
                     _sel_yrs = sorted(_pick) if _pick else _default_yrs
                 else:
                     _sel_yrs = _all_yrs
+                _bfit = _yfit_radio(f"seas_fit_{provider}_{loc_key}_{grain}")
                 _drawn     = _df_seas[_df_seas["MktYearNum"].isin(_sel_yrs)]
                 _hist      = _drawn[_drawn["MktYearNum"] < _max_yr]
                 _hist_prev = _hist[_hist["MktYearNum"] == _max_yr - 1]     # most recent complete year
@@ -4313,20 +4343,12 @@ with tab_bids:
                                              labelExpr=_mlab, labelFontSize=11,
                                              grid=True, gridColor="#eef2f6",
                                              domainColor="#cbd5e1", tickColor="#cbd5e1"))
-                # Auto-fit the y-axis to the central ~95% of values so a few outlier
-                # days don't squash the chart; outliers clamp to the edge (clamp=True).
+                # Best-fit y-axis: clamp to the central N% of values (picker above) so a
+                # few outlier days don't squash the chart; outliers clamp to the edge.
                 _yvals = list(_drawn["Basis"]) + list(_band["lo"]) + list(_band["hi"])
                 if not _df_fwdc.empty:
                     _yvals += list(_df_fwdc["Basis"])
-                _ydom = None
-                if len(_yvals) >= 8:
-                    _q = _pd.Series(_yvals).quantile([0.025, 0.975])
-                    _qlo, _qhi = float(_q.iloc[0]), float(_q.iloc[1])
-                    if _qhi > _qlo:
-                        _pad = (_qhi - _qlo) * 0.08
-                        _ydom = [round(_qlo - _pad), round(_qhi + _pad)]
-                _y_scale = (_alt.Scale(zero=False, domain=_ydom, clamp=True) if _ydom
-                            else _alt.Scale(zero=False))
+                _y_scale = _yfit_scale(_yvals, _bfit)
                 _y_s = _alt.Y("Basis:Q", title="Basis (¢)", scale=_y_scale,
                               axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
                 _tip_s = [
@@ -5765,6 +5787,7 @@ with tab_spread:
         else:
             with _sc3:
                 _sg = st.selectbox("Grain", _common, key="spread_grain")
+            _spfit = _yfit_radio("spread_seas_fit")
             _pa = _spread_series(*_a_pair, _sg)
             _pb = _spread_series(*_b_pair, _sg)
             if len(_pa) < 2 or len(_pb) < 2:
@@ -5830,15 +5853,7 @@ with tab_spread:
                     _yvals = list(_seas[_seas["MktYearNum"].isin(_win_yrs + [_max_yr])]["Spread"])
                     if not _fwd.empty:
                         _yvals += list(_fwd["Spread"])
-                    _ydom = None
-                    if len(_yvals) >= 8:
-                        _q = _pd.Series(_yvals).quantile([0.025, 0.975])
-                        _qlo, _qhi = float(_q.iloc[0]), float(_q.iloc[1])
-                        if _qhi > _qlo:
-                            _pad = (_qhi - _qlo) * 0.10
-                            _ydom = [round(_qlo - _pad), round(_qhi + _pad)]
-                    _yscale = (_alt.Scale(zero=False, domain=_ydom, clamp=True) if _ydom
-                               else _alt.Scale(zero=False))
+                    _yscale = _yfit_scale(_yvals, _spfit, pad_frac=0.10)
                     _y_s = _alt.Y("Spread:Q", title="Spread (¢)", scale=_yscale,
                                   axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
 

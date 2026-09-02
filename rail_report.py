@@ -238,9 +238,11 @@ def _seasonal_png(market, by_md, mkt_dates):
         _yv += list(band["lo"]) + list(band["hi"])
     if _fwd is not None:
         _yv += list(_fwd["Bid"])
+    # Best fit: clamp to the central 90% (matches the app's default) so outlier weeks
+    # don't squash the emailed chart; outliers clamp to the edge.
     _ysc = alt.Scale(zero=False)
     if len(_yv) >= 8:
-        _q = pd.Series(_yv).quantile([0.025, 0.975]); _lo, _hi = float(_q.iloc[0]), float(_q.iloc[1])
+        _q = pd.Series(_yv).quantile([0.05, 0.95]); _lo, _hi = float(_q.iloc[0]), float(_q.iloc[1])
         if _hi > _lo:
             _pad = (_hi - _lo) * 0.10
             _ysc = alt.Scale(zero=False, domain=[round(_lo - _pad), round(_hi + _pad)], clamp=True)
