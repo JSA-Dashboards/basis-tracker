@@ -2789,8 +2789,14 @@ with tab_railfob:
         if not _df_rfwd.empty:
             _ryvals += list(_df_rfwd["Bid"])
         _ry_scale = _yfit_scale(_ryvals, _rfit)
-        _x = _alt.X("MktWeek:Q", title="Market Week", scale=_alt.Scale(domain=[1, 52]),
-                    axis=_alt.Axis(labelFontSize=10))
+        # Month references on the X axis (marketing year starts Sep = week 1) instead
+        # of the dense 1-52 week ticks — one label per month at its first week.
+        _mlab = ("{1:'Sep',5:'Oct',10:'Nov',14:'Dec',18:'Jan',23:'Feb',"
+                 "27:'Mar',31:'Apr',36:'May',40:'Jun',45:'Jul',49:'Aug'}"
+                 "[datum.value]")
+        _x = _alt.X("MktWeek:Q", title=None, scale=_alt.Scale(domain=[1, 52]),
+                    axis=_alt.Axis(values=[1, 5, 10, 14, 18, 23, 27, 31, 36, 40, 45, 49],
+                                   labelExpr=_mlab, labelFontSize=11))
         _y = _alt.Y("Bid:Q", title="Bid (¢)", scale=_ry_scale,
                     axis=_alt.Axis(labelFontSize=10))
         _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
