@@ -51,6 +51,38 @@ st.set_page_config(
 )
 
 
+# ── Retired Cloud/hub deployment redirect ────────────────────────────────────
+# After the Snowflake cutover this dashboard lives in Streamlit-in-Snowflake and
+# writes flow to Snowflake. The old Streamlit Cloud / hub deployments still read
+# Postgres, which no longer updates — so redirect anyone who lands on them. Only
+# fires on the Postgres backend (SiS and local both run on Snowflake now); set
+# ALLOW_POSTGRES_UI=1 to restore the Postgres UI for a rollback.
+try:
+    from database import _use_pg as _db_use_pg
+    _stale_pg = _db_use_pg() and not os.getenv("ALLOW_POSTGRES_UI")
+except Exception:
+    _stale_pg = False
+if _stale_pg:
+    _SIS_URL = ("https://app.snowflake.com/eofnxsc/qtc58073/#/streamlit-apps/"
+                "JSA.BASIS_TRACKER.BASIS_TRACKER_APP")
+    st.markdown(
+        "<div style='max-width:640px;margin:64px auto;text-align:center;"
+        "font-family:Georgia,serif'>"
+        "<div style='font-size:26px;font-weight:700;color:#32373c'>"
+        "Basis Tracker has moved to Snowflake</div>"
+        "<div style='font-family:sans-serif;color:#64748b;font-size:14px;margin:12px 0 20px'>"
+        "This dashboard now runs inside Snowflake and reads live data there. "
+        "This Streamlit Cloud version is retired and no longer updates.</div>"
+        f"<a href='{_SIS_URL}' target='_blank' style='font-family:sans-serif;"
+        "display:inline-block;background:#0693e3;color:#fff;padding:10px 18px;"
+        "border-radius:6px;text-decoration:none;font-weight:600'>"
+        "Open the Snowflake app &rarr;</a>"
+        "<div style='font-family:sans-serif;color:#94a3b8;font-size:12px;margin-top:14px'>"
+        "(Sign in with your Snowflake account.)</div></div>",
+        unsafe_allow_html=True)
+    st.stop()
+
+
 def _require_password():
     """Gate the app behind APP_PASSWORD (secret / env). No password set → open."""
     _pw = os.getenv("APP_PASSWORD", "")
