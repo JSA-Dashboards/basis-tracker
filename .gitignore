@@ -43,3 +43,6 @@ _watch_*.py
 
 # ── Single-instance lock for auto_import.py ────────────────────────────────
 .auto_import.lock
+
+# ── Snowflake migration: exported table data (staging, not for git) ────────
+snowflake/export/
