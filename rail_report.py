@@ -380,6 +380,10 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
         eff = elig[-1]
         cells = sorted(by_md.get((m, eff), {}).values(),
                        key=lambda r: (r.get("period_order") if r.get("period_order") is not None else 99))
+        # "Spot" is backfilled from "Return Trip" to keep the freight seasonal
+        # continuous; don't double-show it in the emailed table when Return Trip exists.
+        if any(r.get("period") == "Return Trip" for r in cells):
+            cells = [r for r in cells if r.get("period") != "Spot"]
         if not cells:
             continue
         rail = cells[0].get("rail") or ""

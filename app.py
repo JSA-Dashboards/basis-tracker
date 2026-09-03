@@ -2990,6 +2990,10 @@ with tab_railfob:
             _eff = max(_elig)
             _cells = sorted(_by_md.get((_m, _eff), {}).values(),
                             key=lambda r: (r["period_order"] if r.get("period_order") is not None else 99))
+            # "Spot" is backfilled from "Return Trip" to keep the freight seasonal
+            # continuous; don't double-show it on the board when Return Trip is present.
+            if any(r.get("period") == "Return Trip" for r in _cells):
+                _cells = [r for r in _cells if r.get("period") != "Spot"]
             if not _cells:
                 return ''
             _rail = _cells[0].get("rail") or ""
