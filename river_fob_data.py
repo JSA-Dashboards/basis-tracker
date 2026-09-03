@@ -26,7 +26,12 @@ def _river_conn():
 
 
 def _ph() -> str:
-    return "%s" if (_river_url() or _use_pg()) else "?"
+    # Dedicated river Postgres → %s. Otherwise follow the main backend's placeholder
+    # (Snowflake & Postgres = %s, SQLite = ?) so queries bind correctly under SiS.
+    if _river_url():
+        return "%s"
+    from database import _ph as _db_ph
+    return _db_ph()
 
 
 def using_fallback() -> bool:

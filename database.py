@@ -30,17 +30,238 @@ def _pg_url() -> str:
     return os.getenv("DATABASE_URL", "")
 
 
+def _backend() -> str:
+    """Active backend: 'snowflake' | 'postgres' | 'sqlite'.
+
+    Snowflake wins when USE_SNOWFLAKE is truthy (even if DATABASE_URL is still
+    set), so the cutover is a single env flag. Otherwise Postgres if a
+    DATABASE_URL exists, else local SQLite."""
+    if os.getenv("USE_SNOWFLAKE", "").strip().lower() in ("1", "true", "yes", "on"):
+        return "snowflake"
+    if _sf_active_session_conn() is not None:   # running inside Streamlit-in-Snowflake
+        return "snowflake"
+    return "postgres" if os.getenv("DATABASE_URL") else "sqlite"
+
+
 def _use_pg() -> bool:
-    return bool(_pg_url())
+    return _backend() == "postgres"
+
+
+def _use_sf() -> bool:
+    return _backend() == "snowflake"
+
+
+def _ph() -> str:
+    """Parameter placeholder for the active backend (Snowflake & Postgres use %s)."""
+    return "?" if _backend() == "sqlite" else "%s"
+
+
+# ── Snowflake adapter ──────────────────────────────────────────────────────────
+# Snowflake's DictCursor returns UPPERCASE column names; the whole app reads rows
+# by lowercase keys (r['basis_cents']). These thin wrappers lowercase result keys
+# and give the connection the psycopg2-ish surface (cursor/commit/close) the code
+# already expects, so the 40 public functions work unchanged on Snowflake.
+
+class _LowerDictCursor:
+    def __init__(self, cur):
+        self._c = cur
+
+    def execute(self, sql, params=None):
+        self._c.execute(sql, params)
+        return self
+
+    def executemany(self, sql, seq):
+        self._c.executemany(sql, seq)
+        return self
+
+    @staticmethod
+    def _lc(row):
+        return {k.lower(): v for k, v in row.items()} if row else row
+
+    def fetchone(self):
+        return self._lc(self._c.fetchone())
+
+    def fetchall(self):
+        return [self._lc(r) for r in self._c.fetchall()]
+
+    def fetchmany(self, size=None):
+        rows = self._c.fetchmany(size) if size is not None else self._c.fetchmany()
+        return [self._lc(r) for r in rows]
+
+    @property
+    def rowcount(self):
+        return self._c.rowcount
+
+    def close(self):
+        return self._c.close()
+
+
+class _SFConn:
+    def __init__(self, conn, owned=True):
+        self._conn = conn
+        self._owned = owned          # False = shared SiS session conn; never close it
+
+    def cursor(self):
+        import snowflake.connector
+        return _LowerDictCursor(self._conn.cursor(snowflake.connector.DictCursor))
+
+    def commit(self):
+        return self._conn.commit()
+
+    def rollback(self):
+        return self._conn.rollback()
+
+    def close(self):
+        if self._owned:
+            return self._conn.close()
+
+    def execute_string(self, sql):
+        return self._conn.execute_string(sql)
+
+
+_SF_SESSION_CONN = "unchecked"   # cached SiS active-session conn ("unchecked" until probed)
+
+
+def _sf_active_session_conn():
+    """Inside Streamlit-in-Snowflake (or any Snowpark context) reuse the active
+    session's connection — no credentials needed. Returns None if not in-session.
+    The probe (and its result, including None) is cached so it runs at most once."""
+    global _SF_SESSION_CONN
+    if _SF_SESSION_CONN != "unchecked":
+        return _SF_SESSION_CONN
+    try:
+        from snowflake.snowpark.context import get_active_session
+        _SF_SESSION_CONN = get_active_session().connection
+    except Exception:
+        _SF_SESSION_CONN = None
+    return _SF_SESSION_CONN
+
+
+def _sf_get():
+    """Return (raw_conn, owned). In SiS → shared active-session conn (owned=False);
+    otherwise a fresh connection from SNOWFLAKE_* env (owned=True, for local/jobs)."""
+    sess = _sf_active_session_conn()
+    if sess is not None:
+        _force_pyformat(sess)     # SiS/Snowpark defaults to qmark; our SQL uses %s
+        return sess, False
+    import snowflake.connector as sc
+    kw = dict(
+        account=os.environ["SNOWFLAKE_ACCOUNT"],
+        user=os.environ["SNOWFLAKE_USER"],
+        password=os.environ.get("SNOWFLAKE_PASSWORD") or None,
+        role=os.environ.get("SNOWFLAKE_ROLE") or None,
+        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
+        database=os.environ.get("SNOWFLAKE_DATABASE") or None,
+        schema=os.environ.get("SNOWFLAKE_SCHEMA") or None,
+        login_timeout=30,
+    )
+    conn = sc.connect(**{k: v for k, v in kw.items() if v is not None})
+    _force_pyformat(conn)
+    return conn, True
+
+
+def _force_pyformat(conn) -> None:
+    """Ensure %s-style parameter binding. Inside Streamlit-in-Snowflake the active
+    session's connection uses paramstyle 'qmark', which would pass our %s through
+    literally and break every parameterized query; force it to pyformat."""
+    try:
+        conn._paramstyle = "pyformat"
+    except Exception:
+        pass
+
+
+def _merge(c, table, cols, values, key_cols, update_cols=None, coalesce=False):
+    """Snowflake single-row upsert emulating INSERT ... ON CONFLICT(key_cols).
+    update_cols=None → DO NOTHING; else DO UPDATE SET those cols. coalesce=True
+    keeps the existing value when the new one is NULL (COALESCE(new, old)).
+    `values` is a tuple aligned with `cols`."""
+    using = ", ".join(f"%s AS {col}" for col in cols)
+    on = " AND ".join(f"t.{k} = s.{k}" for k in key_cols)
+    ins_cols = ", ".join(cols)
+    ins_vals = ", ".join(f"s.{col}" for col in cols)
+    sql = f"MERGE INTO {table} t USING (SELECT {using}) s ON {on} "
+    if update_cols:
+        if coalesce:
+            setc = ", ".join(f"t.{col} = COALESCE(s.{col}, t.{col})" for col in update_cols)
+        else:
+            setc = ", ".join(f"t.{col} = s.{col}" for col in update_cols)
+        sql += f"WHEN MATCHED THEN UPDATE SET {setc} "
+    sql += f"WHEN NOT MATCHED THEN INSERT ({ins_cols}) VALUES ({ins_vals})"
+    c.execute(sql, values)
+
+
+def _merge_bulk(c, table, cols_types, rows, key_cols, update_cols=None,
+                coalesce=False, chunk=250, gen_id_col=None):
+    """Chunked multi-row Snowflake upsert. cols_types is [(name, snowflaketype), ...]
+    (types cast the VALUES literals so NULL-only columns still resolve). `rows` is a
+    list of tuples aligned with cols_types. Returns rows processed.
+
+    gen_id_col: name of an auto-id column to generate for newly-inserted rows as
+    MAX(existing)+ROW_NUMBER() — assigned in SQL so it always sits above the current
+    max (no IDENTITY reliance, no reseed, collision-free across chunks since each
+    chunk's MAX sees the prior chunk's inserts)."""
+    if not rows:
+        return 0
+    names = [n for n, _ in cols_types]
+    sel = ", ".join(f"column{i + 1}::{t} AS {n}" for i, (n, t) in enumerate(cols_types))
+    ins_names = names[:]
+    ins_vals = ["s." + n for n in names]
+    if gen_id_col:
+        sel = (f"(SELECT COALESCE(MAX({gen_id_col}), 0) FROM {table}) "
+               f"+ ROW_NUMBER() OVER (ORDER BY column1) AS {gen_id_col}, " + sel)
+        ins_names = [gen_id_col] + ins_names
+        ins_vals = ["s." + gen_id_col] + ins_vals
+    on = " AND ".join(f"t.{k} = s.{k}" for k in key_cols)
+    ins = f"WHEN NOT MATCHED THEN INSERT ({', '.join(ins_names)}) " \
+          f"VALUES ({', '.join(ins_vals)})"
+    upd = ""
+    if update_cols:
+        setc = (", ".join(f"t.{n} = COALESCE(s.{n}, t.{n})" for n in update_cols)
+                if coalesce else ", ".join(f"t.{n} = s.{n}" for n in update_cols))
+        upd = f"WHEN MATCHED THEN UPDATE SET {setc} "
+    ncol = len(names)
+    total = 0
+    for i in range(0, len(rows), chunk):
+        part = rows[i:i + chunk]
+        vgroups = ", ".join("(" + ", ".join(["%s"] * ncol) + ")" for _ in part)
+        sql = (f"MERGE INTO {table} t USING "
+               f"(SELECT {sel} FROM VALUES {vgroups}) s ON {on} {upd}{ins}")
+        c.execute(sql, [v for row in part for v in row])
+        total += len(part)
+    return total
+
+
+def _sf_lookup_ids(c, table, key_cols, keys, id_col="id", chunk=500):
+    """Snowflake: map each (key tuple) → id via a VALUES join (no psycopg2 IN %s)."""
+    out = {}
+    if not keys:
+        return out
+    sel = ", ".join(f"column{i + 1}::string AS {k}" for i, k in enumerate(key_cols))
+    on = " AND ".join(f"t.{k} = k.{k}" for k in key_cols)
+    cols = ", ".join(f"t.{k}" for k in key_cols)
+    keys = list(keys)
+    for i in range(0, len(keys), chunk):
+        part = keys[i:i + chunk]
+        vgroups = ", ".join("(" + ", ".join(["%s"] * len(key_cols)) + ")" for _ in part)
+        c.execute(
+            f"SELECT t.{id_col} AS _id, {cols} FROM {table} t "
+            f"JOIN (SELECT {sel} FROM VALUES {vgroups}) k ON {on}",
+            [v for key in part for v in key])
+        for r in c.fetchall():
+            out[tuple(r[k] for k in key_cols)] = r["_id"]
+    return out
 
 
 def get_conn():
     """Open and return a database connection for the active backend."""
-    url = _pg_url()
-    if url:
+    b = _backend()
+    if b == "snowflake":
+        raw, owned = _sf_get()
+        return _SFConn(raw, owned=owned)
+    if b == "postgres":
         import psycopg2
         import psycopg2.extras
-        return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+        return psycopg2.connect(_pg_url(), cursor_factory=psycopg2.extras.RealDictCursor)
     import sqlite3
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -244,6 +465,10 @@ def init_db():
     # (Normally auto-released when the holder's connection dies, but through the
     # Supabase pooler that reaping can lag minutes — see the bounded acquire
     # below.) No-op on SQLite.
+    if _use_sf():
+        # Snowflake schema + seed data are provisioned by snowflake/01_schema.sql
+        # and the one-time migration load — nothing for init_db to create/seed.
+        return
     _INIT_LOCK_KEY = 727274
     lock_conn = None
     have_lock = False
@@ -322,7 +547,7 @@ def seed_geocoding(seed_path: str | None = None) -> int:
 
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     written = 0
     try:
         for row in seed:
@@ -370,7 +595,7 @@ def seed_facility_types(seed_path: str | None = None) -> int:
 
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     written = 0
     try:
         for row in seed:
@@ -426,7 +651,7 @@ def seed_grain_map(seed_path: str | None = None) -> int:
 
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     written = 0
     try:
         for row in seed:
@@ -493,7 +718,7 @@ def is_email_imported(email_id: str) -> bool:
         return False
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"SELECT 1 FROM imported_emails WHERE email_id={ph} LIMIT 1", (email_id,))
         return c.fetchone() is not None
@@ -508,7 +733,10 @@ def mark_email_imported(email_id: str, subject: str = ""):
     conn = get_conn()
     c    = conn.cursor()
     try:
-        if _use_pg():
+        if _use_sf():
+            _merge(c, "imported_emails", ["email_id", "subject"],
+                   (email_id, subject), ["email_id"])
+        elif _use_pg():
             c.execute(
                 "INSERT INTO imported_emails (email_id, subject) VALUES (%s, %s)"
                 " ON CONFLICT DO NOTHING",
@@ -534,7 +762,32 @@ def upsert_snapshot(snap: dict) -> int:
     conn = get_conn()
     c    = conn.cursor()
     try:
-        if _use_pg():
+        if _use_sf():
+            # ── Snowflake path (MERGE + explicit ids, no RETURNING/IDENTITY) ──
+            c.execute("SELECT COALESCE(MAX(id), 0) + 1 AS nid FROM snapshots")
+            _nid = c.fetchone()["nid"]
+            _merge(c, "snapshots",
+                   ["id", "timestamp", "provider", "location", "source",
+                    "email_subject", "email_date"],
+                   (_nid, snap["timestamp"], snap["provider"], snap["location"],
+                    snap.get("source", "manual"), snap.get("emailSubject"),
+                    snap.get("emailDate")),
+                   ["timestamp", "provider", "location"])
+            c.execute(
+                "SELECT id FROM snapshots WHERE timestamp=%s AND provider=%s AND location=%s",
+                (snap["timestamp"], snap["provider"], snap["location"]))
+            snap_id = c.fetchone()["id"]
+            c.execute("SELECT COALESCE(MAX(id), 0) AS b FROM snapshot_rows")
+            _rbase = c.fetchone()["b"]
+            for _i, r in enumerate(snap.get("rows", [])):
+                _merge(c, "snapshot_rows",
+                       ["id", "snapshot_id", "row_id", "grain", "delivery_month",
+                        "futures_symbol", "basis_cents", "is_spot", "spot_grain"],
+                       (_rbase + _i + 1, snap_id, r["id"], r["grain"], r["deliveryMonth"],
+                        r["futuresSymbol"], r.get("basisCents"),
+                        1 if r.get("isSpot") else 0, r.get("spotGrain")),
+                       ["snapshot_id", "row_id"])
+        elif _use_pg():
             # ── PostgreSQL path ──────────────────────────────────────────────
             c.execute(
                 """INSERT INTO snapshots
@@ -660,6 +913,34 @@ def upsert_snapshots(snaps: list[dict]) -> int:
                              s.get("source", "manual"), s.get("emailSubject"),
                              s.get("emailDate"))
 
+        if _use_sf():
+            _merge_bulk(c, "snapshots",
+                        [("timestamp", "string"), ("provider", "string"),
+                         ("location", "string"), ("source", "string"),
+                         ("email_subject", "string"), ("email_date", "string")],
+                        list(seen.values()), ["timestamp", "provider", "location"],
+                        gen_id_col="id")
+            id_map = _sf_lookup_ids(c, "snapshots",
+                                    ["timestamp", "provider", "location"], list(seen.keys()))
+            row_tuples = []
+            for s in snaps:
+                sid = id_map.get((s["timestamp"], s["provider"], s["location"]))
+                if sid is None:
+                    continue
+                for r in s.get("rows", []):
+                    row_tuples.append((
+                        sid, r["id"], r["grain"], r["deliveryMonth"],
+                        r["futuresSymbol"], r.get("basisCents"),
+                        1 if r.get("isSpot") else 0, r.get("spotGrain")))
+            _merge_bulk(c, "snapshot_rows",
+                        [("snapshot_id", "number"), ("row_id", "string"),
+                         ("grain", "string"), ("delivery_month", "string"),
+                         ("futures_symbol", "string"), ("basis_cents", "number"),
+                         ("is_spot", "number"), ("spot_grain", "string")],
+                        row_tuples, ["snapshot_id", "row_id"], gen_id_col="id")
+            conn.commit()
+            return len(row_tuples)
+
         if _use_pg():
             from psycopg2.extras import execute_values
             execute_values(
@@ -743,7 +1024,7 @@ def upsert_snapshots(snaps: list[dict]) -> int:
 def get_snapshots(provider: str, location: str) -> list[Snapshot]:
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""
             SELECT s.id AS snap_id, s.timestamp, s.provider, s.location,
@@ -791,7 +1072,7 @@ def get_snapshots(provider: str, location: str) -> list[Snapshot]:
 def delete_snapshot(snapshot_id: int) -> bool:
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"DELETE FROM snapshot_rows WHERE snapshot_id={ph}", (snapshot_id,))
         c.execute(f"DELETE FROM snapshots WHERE id={ph}", (snapshot_id,))
@@ -814,7 +1095,14 @@ def upsert_location_meta(provider: str, location: str,
     conn = get_conn()
     c    = conn.cursor()
     try:
-        if _use_pg():
+        if _use_sf():
+            _merge(c, "location_meta",
+                   ["provider", "location", "state", "facility_type", "region", "lat", "lon"],
+                   (provider, location, state, facility_type, region, lat, lon),
+                   ["provider", "location"],
+                   update_cols=["state", "facility_type", "region", "lat", "lon"],
+                   coalesce=True)
+        elif _use_pg():
             c.execute("""
                 INSERT INTO location_meta (provider, location, state, facility_type, region, lat, lon)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
@@ -853,6 +1141,16 @@ def upsert_location_metas(provider: str, items: list[dict]) -> int:
     try:
         rows = [(provider, it["location"], it.get("state"), it.get("facility_type"),
                  it.get("region"), it.get("lat"), it.get("lon")) for it in items]
+        if _use_sf():
+            _merge_bulk(c, "location_meta",
+                        [("provider", "string"), ("location", "string"),
+                         ("state", "string"), ("facility_type", "string"),
+                         ("region", "string"), ("lat", "float"), ("lon", "float")],
+                        rows, ["provider", "location"],
+                        update_cols=["state", "facility_type", "region", "lat", "lon"],
+                        coalesce=True)
+            conn.commit()
+            return len(rows)
         if _use_pg():
             c.executemany(
                 """INSERT INTO location_meta
@@ -887,7 +1185,7 @@ def get_location_meta(provider: str) -> dict[str, dict]:
     """Return {location_name: {state, facility_type, region, lat, lon}} for a provider."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(
             f"SELECT location, state, facility_type, region, lat, lon FROM location_meta WHERE provider={ph}",
@@ -1075,7 +1373,7 @@ def grain_counts_by_facility(days: int = 21) -> list[tuple]:
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00")
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""
             SELECT lm.facility_type AS ft, r.grain AS grain, COUNT(*) AS n
@@ -1101,13 +1399,21 @@ def save_futures_curve(curve: dict, date: str) -> int:
     from datetime import datetime, timezone
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     now  = datetime.now(timezone.utc).isoformat()
     sql  = (f"INSERT INTO futures_prices (date, symbol, price_cents, captured_at) "
             f"VALUES ({ph},{ph},{ph},{ph}) "
             f"ON CONFLICT (date, symbol) DO UPDATE "
             f"SET price_cents = EXCLUDED.price_cents, captured_at = EXCLUDED.captured_at")
     try:
+        if _use_sf():
+            _merge_bulk(c, "futures_prices",
+                        [("date", "string"), ("symbol", "string"),
+                         ("price_cents", "float"), ("captured_at", "string")],
+                        [(date, sym, float(px), now) for sym, px in curve.items()],
+                        ["date", "symbol"], update_cols=["price_cents", "captured_at"])
+            conn.commit()
+            return len(curve)
         for sym, px in curve.items():
             c.execute(sql, (date, sym, float(px), now))
         conn.commit()
@@ -1120,7 +1426,7 @@ def get_futures_curve(date: str) -> dict:
     """Return the stored futures curve {symbol -> cents} for `date`, or {} if none."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"SELECT symbol, price_cents FROM futures_prices WHERE date={ph}", (date,))
         return {r["symbol"]: r["price_cents"] for r in c.fetchall()}
@@ -1137,7 +1443,7 @@ def get_roll_spread(from_sym: str, to_sym: str):
         return None
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""SELECT a.price_cents - b.price_cents AS spread
                       FROM futures_prices a
@@ -1160,7 +1466,7 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
     from datetime import datetime, timezone
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     now  = datetime.now(timezone.utc).isoformat()
     sql  = (f"INSERT INTO rail_fob (date, source, market, rail, commodity, period, "
             f"period_order, futures, bid, offer, bid_raw, offer_raw, captured_at) "
@@ -1172,6 +1478,22 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
             f"bid_raw=EXCLUDED.bid_raw, offer_raw=EXCLUDED.offer_raw, "
             f"captured_at=EXCLUDED.captured_at")
     try:
+        if _use_sf():
+            _merge_bulk(c, "rail_fob",
+                        [("date", "string"), ("source", "string"), ("market", "string"),
+                         ("rail", "string"), ("commodity", "string"), ("period", "string"),
+                         ("period_order", "number"), ("futures", "string"),
+                         ("bid", "number"), ("offer", "number"), ("bid_raw", "string"),
+                         ("offer_raw", "string"), ("captured_at", "string")],
+                        [(date, source, r["market"], r.get("rail"), r.get("commodity"),
+                          r["period"], r.get("period_order"), r.get("futures"),
+                          r.get("bid"), r.get("offer"), r.get("bid_raw"),
+                          r.get("offer_raw"), now) for r in rows],
+                        ["date", "source", "market", "period"],
+                        update_cols=["rail", "commodity", "period_order", "futures",
+                                     "bid", "offer", "bid_raw", "offer_raw", "captured_at"])
+            conn.commit()
+            return len(rows)
         for r in rows:
             c.execute(sql, (date, source, r["market"], r.get("rail"), r.get("commodity"),
                             r["period"], r.get("period_order"), r.get("futures"),
@@ -1187,7 +1509,7 @@ def get_rail_fob(source: str, date: str) -> list:
     """Return all rail FOB cells for a source + date, ordered by market then period_order."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""SELECT market, rail, commodity, period, period_order, futures,
                              bid, offer, bid_raw, offer_raw
@@ -1202,7 +1524,7 @@ def get_rail_fob_dates(source: str) -> list:
     """Distinct posting dates for a source, most recent first."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"SELECT DISTINCT date FROM rail_fob WHERE source={ph} ORDER BY date DESC",
                   (source,))
@@ -1215,7 +1537,7 @@ def get_rail_fob_all(source: str) -> list:
     """All rail FOB cells for a source across every date (for trend/change columns)."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""SELECT date, market, rail, commodity, period, period_order, futures,
                              bid, offer, bid_raw, offer_raw
@@ -1240,7 +1562,7 @@ def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> d
     cutoff     = (datetime.utcnow() - timedelta(days=since_days)).strftime("%Y-%m-%dT00:00:00")
     conn       = get_conn()
     c          = conn.cursor()
-    ph         = "%s" if _use_pg() else "?"
+    ph         = _ph()
     try:
         pair_conds = " OR ".join(f"(s.provider={ph} AND s.location={ph})" for _ in pairs)
         params     = [v for p in pairs for v in p] + [cutoff]
@@ -1297,7 +1619,14 @@ def save_spot_forward_manual(date: str, corn_cif: int | None = None, bean_cif: i
     conn = get_conn()
     c    = conn.cursor()
     try:
-        if _use_pg():
+        if _use_sf():
+            _merge(c, "spot_forward_manual",
+                   ["date", "corn_cif_cents", "bean_cif_cents", "ilr_freight_cents",
+                    "chi_eth_cents", "ny_eth_cents"],
+                   (date, corn_cif, bean_cif, ilr_freight, chi_eth, ny_eth), ["date"],
+                   update_cols=["corn_cif_cents", "bean_cif_cents", "ilr_freight_cents",
+                                "chi_eth_cents", "ny_eth_cents"], coalesce=True)
+        elif _use_pg():
             c.execute("""
                 INSERT INTO spot_forward_manual
                 (date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents)
@@ -1331,7 +1660,7 @@ def get_spot_forward_manual(date: str) -> dict:
     """Get manual spot/forward entries for a date. Returns {date, corn_cif_cents, ...}."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""
             SELECT date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents
@@ -1352,7 +1681,7 @@ def get_spot_forward_manual_history(days: int = 30) -> list[dict]:
     cutoff = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         c.execute(f"""
             SELECT date, corn_cif_cents, bean_cif_cents, ilr_freight_cents, chi_eth_cents, ny_eth_cents
@@ -1391,7 +1720,7 @@ def set_nightly_overrides(date: str, rows: list[dict]) -> bool:
     None are skipped (nothing to override)."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         _ensure_nightly_override(conn, c)
         c.execute(f"DELETE FROM nightly_override WHERE date={ph}", (date,))
@@ -1416,7 +1745,7 @@ def get_nightly_overrides(date: str) -> dict:
     (each field None means no override for that field)."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         _ensure_nightly_override(conn, c)
         c.execute(
@@ -1456,7 +1785,7 @@ def set_index_excludes(pairs) -> bool:
     """Replace the whole outlier set with `pairs` (iterable of (provider, location))."""
     conn = get_conn()
     c    = conn.cursor()
-    ph   = "%s" if _use_pg() else "?"
+    ph   = _ph()
     try:
         _ensure_index_excludes(conn, c)
         c.execute("DELETE FROM index_excludes")
@@ -1530,7 +1859,7 @@ def upsert_client_report(rec: dict) -> bool:
     frequency, day_of_week, locations(list of dicts), active, created_at}."""
     import json as _json
     conn = get_conn(); c = conn.cursor()
-    ph = "%s" if _use_pg() else "?"
+    ph = _ph()
     try:
         _ensure_client_reports(conn, c)
         locs = _json.dumps(rec.get("locations") or [])
@@ -1539,7 +1868,14 @@ def upsert_client_report(rec: dict) -> bool:
         vals = (rec["id"], rec["client_name"], rec["email"], rec.get("cc"),
                 rec["frequency"], rec.get("day_of_week"), locs, depth, coms,
                 1 if rec.get("active", True) else 0, rec.get("created_at"))
-        if _use_pg():
+        if _use_sf():
+            _merge(c, "client_reports",
+                   ["id", "client_name", "email", "cc", "frequency", "day_of_week",
+                    "locations", "depth", "commodities", "active", "created_at"],
+                   vals, ["id"],
+                   update_cols=["client_name", "email", "cc", "frequency", "day_of_week",
+                                "locations", "depth", "commodities", "active"])
+        elif _use_pg():
             c.execute(f"""INSERT INTO client_reports
                 (id, client_name, email, cc, frequency, day_of_week, locations, depth,
                  commodities, active, created_at)
@@ -1567,7 +1903,7 @@ def upsert_client_report(rec: dict) -> bool:
 
 def delete_client_report(report_id: str) -> bool:
     conn = get_conn(); c = conn.cursor()
-    ph = "%s" if _use_pg() else "?"
+    ph = _ph()
     try:
         _ensure_client_reports(conn, c)
         c.execute(f"DELETE FROM client_reports WHERE id={ph}", (report_id,))
