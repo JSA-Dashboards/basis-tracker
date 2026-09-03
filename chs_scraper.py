@@ -110,38 +110,35 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.list_ids:
-        # Reload the page, capture fresh IDs
-        from playwright.sync_api import sync_playwright
-        import time
-
-        captured = {}
-        with sync_playwright() as p:
-            browser = p.chromium.launch(channel="chrome", headless=True)
-            ctx = browser.new_context()
-            page = ctx.new_page()
-
-            def _on_resp(resp):
-                if "GetBidsList" in resp.url:
-                    try:
-                        captured["data"] = resp.json()
-                    except Exception:
-                        pass
-
-            page.on("response", _on_resp)
-            page.goto("https://www.chs-illinois.com/grain/cash-bids/",
-                      timeout=30000, wait_until="networkidle")
-            time.sleep(2)
-            browser.close()
-
-        if "data" in captured:
-            locs = captured["data"].get("locations", [])
-            print(f"# {len(locs)} Illinois locations captured from page")
-            print("CHS_ILLINOIS_IDS: set[str] = {")
-            for l in locs:
-                print(f'    "{l["id"]}",  # {l["name"]}')
-            print("}")
-        else:
-            print("No data captured.")
+        # Browser-free refresh (HTTP only): dump every CHS location from the Bushel
+        # API and cross-check the hardcoded Illinois set. The chs-illinois.com page
+        # scopes to Illinois via a comma-separated `locations` list baked into its
+        # widget, which isn't exposed over HTTP — so the IL set is curated by hand
+        # here. This surfaces (a) any hardcoded IL id that fell off the API and
+        # (b) the full location list so new IL elevators are easy to spot and add.
+        data = fetch_chs_bids()
+        locs = data.get("locations", [])
+        by_id = {l["id"]: l.get("name", "") for l in locs}
+        if not locs:
+            print("No data fetched from the API.")
+            sys.exit(1)
+        print(f"# {len(locs)} total CHS locations from the Bushel API")
+        missing = [i for i in CHS_ILLINOIS_IDS if i not in by_id]
+        if missing:
+            print(f"# WARNING: {len(missing)} hardcoded IL id(s) no longer in the API "
+                  "(renamed/removed) — review:")
+            for i in missing:
+                print(f"#   {i}")
+        print("\n# --- current Illinois set (still present in the API) ---")
+        print("CHS_ILLINOIS_IDS: set[str] = {")
+        for i in sorted(CHS_ILLINOIS_IDS):
+            if i in by_id:
+                print(f'    "{i}",  # {by_id[i]}')
+        print("}")
+        print("\n# --- all CHS locations (add any new Illinois elevators above) ---")
+        for l in sorted(locs, key=lambda x: x.get("name", "")):
+            flag = "  <- IL" if l["id"] in CHS_ILLINOIS_IDS else ""
+            print(f'#   {l["id"]}  {l.get("name", "")}{flag}')
         sys.exit(0)
 
     # Normal test: fetch and display
