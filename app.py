@@ -6263,7 +6263,10 @@ if not _view_only():
             _cor_opts = sorted({_r["market"] for _r in _rail_all})
             _rc1, _rc2 = st.columns([5, 5])
             with _rc1:
-                _sel_cor = st.multiselect("Corridor(s)", _cor_opts, key="exp_rail_cor")
+                _sel_cor = st.multiselect("Corridor(s)", _cor_opts, default=_cor_opts,
+                                          key="exp_rail_cor",
+                                          help="All corridors are selected by default — "
+                                               "remove any you don't want.")
             _per_pool = sorted({_r["period"] for _r in _rail_all
                                 if not _sel_cor or _r["market"] in _sel_cor},
                                key=lambda p: (_porder.get(p, 99), p))
