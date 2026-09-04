@@ -74,6 +74,14 @@ SITES: list[dict] = [
     {"provider": "Golden Grain", "location": "Mason City, IA", "state": "IA",
      "facility_type": "Corn Processing", "company_id": 98951, "commodity_ids": "",
      "origin": "https://www.ggecorn.com"},
+    # Granite Falls Energy + its Heron Lake BioEnergy plant moved off DTN/aghost to
+    # CIHedging (both embedded on granitefallsenergy.com/corn-cash-bids/).
+    {"provider": "Granite Falls Energy", "location": "Granite Falls, MN", "state": "MN",
+     "facility_type": "Corn Processing", "company_id": 15460, "commodity_ids": "",
+     "origin": "https://granitefallsenergy.com"},
+    {"provider": "Heron Lake BioEnergy", "location": "Heron Lake, MN", "state": "MN",
+     "facility_type": "Corn Processing", "company_id": 15562, "commodity_ids": "",
+     "origin": "https://granitefallsenergy.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
