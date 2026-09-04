@@ -34,12 +34,37 @@ def _ph() -> str:
     return _db_ph()
 
 
+def _tbl(name: str) -> str:
+    """Qualify a River FOB table. The portal moved its archive to its own
+    standalone Snowflake database (RIVER_FOB.PUBLIC), so on the Snowflake main
+    connection we read/write there cross-database. On the dedicated-Postgres path
+    (RIVER_DATABASE_URL) the tables are unqualified in that DB."""
+    if not _river_url():
+        try:
+            from database import _use_sf
+            if _use_sf():
+                return f"RIVER_FOB.PUBLIC.{name}"
+        except Exception:
+            pass
+    return name
+
+
 def using_fallback() -> bool:
-    """True when RIVER_DATABASE_URL is NOT configured, so reads fall back to the
-    basis tracker's main DB. That fallback froze once the portal switched to the
-    dedicated river DB, so a True here means the River FOB data is likely stale.
-    The app surfaces this as a visible banner rather than serving silent staleness."""
-    return not _river_url()
+    """True only when reads fall back to the basis tracker's own (stale) DB.
+
+    With RIVER_DATABASE_URL set we read that dedicated river DB. On Snowflake we
+    read the portal's standalone RIVER_FOB database (current), which is NOT a
+    stale fallback. Only the non-Snowflake, no-RIVER_DATABASE_URL path hits the
+    old shared DB — that's the one worth a staleness banner."""
+    if _river_url():
+        return False
+    try:
+        from database import _use_sf
+        if _use_sf():
+            return False
+    except Exception:
+        pass
+    return True
 
 
 def list_dates() -> list:
@@ -47,8 +72,8 @@ def list_dates() -> list:
     conn = _river_conn()
     c = conn.cursor()
     try:
-        c.execute("""SELECT as_of FROM cif_history
-                     UNION SELECT as_of FROM freight_history
+        c.execute(f"""SELECT as_of FROM {_tbl('cif_history')}
+                     UNION SELECT as_of FROM {_tbl('freight_history')}
                      ORDER BY as_of DESC""")
         return [r["as_of"] for r in c.fetchall()]
     finally:
@@ -62,15 +87,15 @@ def load_snapshot(as_of: str):
     conn = _river_conn()
     c = conn.cursor()
     try:
-        c.execute(f"SELECT commodity, month, value FROM cif_history WHERE as_of={ph}", (as_of,))
+        c.execute(f"SELECT commodity, month, value FROM {_tbl('cif_history')} WHERE as_of={ph}", (as_of,))
         cif = {}
         for r in c.fetchall():
             cif.setdefault(r["commodity"], {})[r["month"]] = r["value"]
-        c.execute(f"SELECT region, month, value FROM freight_history WHERE as_of={ph}", (as_of,))
+        c.execute(f"SELECT region, month, value FROM {_tbl('freight_history')} WHERE as_of={ph}", (as_of,))
         frt = {}
         for r in c.fetchall():
             frt.setdefault(r["region"], {})[r["month"]] = r["value"]
-        c.execute(f"SELECT commodity, seq, month, contract FROM calendar_history "
+        c.execute(f"SELECT commodity, seq, month, contract FROM {_tbl('calendar_history')} "
                   f"WHERE as_of={ph} ORDER BY commodity, seq", (as_of,))
         cal = {}
         for r in c.fetchall():
@@ -109,7 +134,7 @@ def save_snapshot(as_of, cif_by_commodity, freight_by_region, calendar=None):
     now = datetime.now(timezone.utc).isoformat()
     try:
         for t in ("cif_history", "freight_history", "calendar_history"):
-            c.execute(f"DELETE FROM {t} WHERE as_of={ph}", (as_of,))
+            c.execute(f"DELETE FROM {_tbl(t)} WHERE as_of={ph}", (as_of,))
         cif_rows = [(as_of, com, m, _f(v))
                     for com, mv in cif_by_commodity.items()
                     for m, v in mv.items() if _f(v) is not None]
@@ -120,12 +145,12 @@ def save_snapshot(as_of, cif_by_commodity, freight_by_region, calendar=None):
                     for com, cols in (calendar or {}).items()
                     for i, (m, ct) in enumerate(cols)]
         if cif_rows:
-            c.executemany(f"INSERT INTO cif_history VALUES ({ph},{ph},{ph},{ph})", cif_rows)
+            c.executemany(f"INSERT INTO {_tbl('cif_history')} VALUES ({ph},{ph},{ph},{ph})", cif_rows)
         if frt_rows:
-            c.executemany(f"INSERT INTO freight_history VALUES ({ph},{ph},{ph},{ph})", frt_rows)
+            c.executemany(f"INSERT INTO {_tbl('freight_history')} VALUES ({ph},{ph},{ph},{ph})", frt_rows)
         if cal_rows:
             c.executemany(
-                f"INSERT INTO calendar_history VALUES ({ph},{ph},{ph},{ph},{ph})", cal_rows)
+                f"INSERT INTO {_tbl('calendar_history')} VALUES ({ph},{ph},{ph},{ph},{ph})", cal_rows)
         conn.commit()
         return len(cif_rows), len(frt_rows)
     finally:
