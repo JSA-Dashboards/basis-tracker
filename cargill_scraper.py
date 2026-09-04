@@ -15,6 +15,7 @@ Returns a list of location dicts ready for parsers/cargill_parser.py.
 """
 import json
 import logging
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -48,8 +49,16 @@ _MAX_WORKERS = 8
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _load_locations() -> dict:
-    """Load the cargill_locations.json static map."""
-    with open(_LOCATIONS_JSON, encoding="utf-8") as fh:
+    """Load the cargill_locations.json static map. In a Snowpark stored proc the
+    file is staged into the import directory (a zip's data files aren't readable via
+    __file__), so check there first; otherwise use the local path."""
+    path = _LOCATIONS_JSON
+    imp = getattr(sys, "_xoptions", {}).get("snowflake_import_directory")
+    if imp:
+        cand = Path(imp) / "cargill_locations.json"
+        if cand.exists():
+            path = cand
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
