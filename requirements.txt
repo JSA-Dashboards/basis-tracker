@@ -3,7 +3,8 @@
 # pdfplumber, msal) live in requirements-dev.txt for local use / auto_import.
 streamlit>=1.40.0
 python-dotenv==1.0.1
-psycopg2-binary>=2.9.9
+psycopg2-binary>=2.9.9          # legacy Postgres path / rollback
+snowflake-connector-python>=3.12  # DB backend when USE_SNOWFLAKE=1 (Cloud→Snowflake)
 pydantic>=2.0.0
 holidays>=0.50
 requests>=2.31.0
