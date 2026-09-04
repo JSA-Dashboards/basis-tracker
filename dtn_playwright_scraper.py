@@ -31,18 +31,12 @@ SITES: list[dict] = [
     {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
      "grain": "Corn", "layout": "columnar",
      "url": "https://corn.glaciallakesenergy.com/"},
-    {"provider": "E Energy", "location": "Adams, NE", "state": "NE",
-     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
-     "url": "https://corn.eenergyadams.com/index.cfm?show=11&mid=6"},
-    {"provider": "Dakota Ethanol", "location": "Wentworth, SD", "state": "SD",
-     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
-     "url": "https://www.dakotaethanol.com/index.cfm?show=11&mid=3"},
     {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
      "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
      "url": "https://greenamericabiofuels.com/corn-bids"},
-    {"provider": "Pennsylvania Grain Processing", "location": "Clymer, PA", "state": "PA",
-     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
-     "url": "http://dtn.pagrain.com/index.cfm?show=11&mid=3"},
+    # E Energy, Dakota Ethanol, PA Grain moved to dtn_http_scraper.py (browser-free
+    # displayNumber decode). Only the columnar (Glacial) + non-aghost (GreenAmerica)
+    # + dead (Heron Lake) sites remain here.
 ]
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>

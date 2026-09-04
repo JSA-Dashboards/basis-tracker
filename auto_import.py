@@ -127,6 +127,7 @@ from alto_scraper import fetch_alto_bids, parse_alto
 from cihedging_scraper import fetch_cihedging
 from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
+from dtn_http_scraper import fetch_dtn_http               # browser-free aghost decode
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -701,6 +702,45 @@ def run_dtn_playwright() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("DTN(pw) done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_dtn_http() -> int:
+    """Scrape the DTN/aghost SINGLE-layout plants (E Energy, Dakota, PA Grain) over
+    plain HTTP — their client-side displayNumber() basis obfuscation is decoded in
+    Python, no browser. These were removed from run_dtn_playwright's set. The
+    remaining DTN sites (Glacial Lakes columnar, GreenAmerica widget, Heron Lake)
+    still go through run_dtn_playwright."""
+    log.info("=" * 60)
+    log.info("DTN (HTTP decode) plants scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_dtn_http()
+    except Exception as exc:
+        log.error("DTN(http) scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("DTN(http) scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("DTN(http) bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("DTN(http) meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("DTN(http) done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1902,6 +1942,7 @@ def run(
     if run_vistacomm_scrape:
         total += _run_guarded(run_vistacomm, "VistaComm")
     if run_dtn_scrape:
+        total += _run_guarded(run_dtn_http, "DTN-HTTP", 120)
         total += _run_guarded(run_dtn_playwright, "DTN", 480)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
@@ -2320,6 +2361,7 @@ if __name__ == "__main__":
         run_vistacomm()
     elif args.dtn_only:
         init_db()
+        run_dtn_http()
         run_dtn_playwright()
     elif args.agmd_only:
         init_db()
