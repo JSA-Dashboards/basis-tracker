@@ -3129,6 +3129,139 @@ with tab_railfob:
     ]
     _rail_board("manual", _MANUAL_SECTIONS, "man")
 
+    # ── Enter / update a manual rundown (paste → parse → review → save) ──────────
+    #    Admin only; the read-only build never shows the editor.
+    if not _view_only():
+        import pandas as _pd
+        from rail_corridors import RAIL_BY_CORRIDOR as _RBC
+        # Corridor options = exactly the names shown on the board above.
+        _corr_opts = []
+        for _t, _rows in _MANUAL_SECTIONS:
+            for _row in _rows:
+                for _spec in _row:
+                    for _m in (_spec if isinstance(_spec, (list, tuple)) else [_spec]):
+                        if _m not in _corr_opts:
+                            _corr_opts.append(_m)
+
+        with st.expander("✏️ Enter / update a rail rundown (paste)"):
+            _pc1, _pc2 = st.columns([3, 2])
+            with _pc1:
+                _pcorr = st.selectbox("Corridor", _corr_opts, key="rail_paste_corr")
+            with _pc2:
+                _pdate = st.date_input("Posting date", value=datetime.utcnow().date(),
+                                       key="rail_paste_date")
+            _pdiso = _pdate.isoformat()
+            st.caption(
+                "Paste the corridor's rundown, e.g. "
+                "`Sep -5/+3  Oct 0/6  Nov 4/10  Dec 8/14  JFM 12/18  AMJJ 17/25`. "
+                "Values are stored **exactly as posted** — the tag (z/u/h/k/n) only picks the "
+                "contract, never rolls the number. Dec defaults to CH unless tagged z; spanning "
+                "packages (AMJJ, Jan-Jul) price vs R. Use `?` for a pending side, `Flat` for 0.")
+            _ptext = st.text_area(
+                "Rundown", height=110, key="rail_paste_text",
+                placeholder="Sep -5/+3  Oct 0/6  Nov 4/10  Dec 8/14  JFM 12/18  AMJJ 17/25")
+            if st.button("⤵ Parse & preview", key="rail_paste_parse", type="primary"):
+                import rail_paste as _rp
+                _rws, _wrn = _rp.parse_rundown(_ptext, _pcorr, _pdate)
+                st.session_state["rail_paste_rows"] = _rws
+                st.session_state["rail_paste_warn"] = _wrn
+                st.session_state["rail_paste_meta"] = (_pcorr, _pdiso)
+
+            _staged = st.session_state.get("rail_paste_rows")
+            _smeta = st.session_state.get("rail_paste_meta")
+            if _staged is not None and _smeta == (_pcorr, _pdiso):
+                for _w in st.session_state.get("rail_paste_warn", []):
+                    st.warning(_w)
+                if not _staged:
+                    st.info("Nothing parsed — check the format above.")
+                else:
+                    _seed = _pd.DataFrame([{
+                        "Period": r["period"], "Futures": r["futures"] or "",
+                        "Bid": r["bid"], "Offer": r["offer"],
+                        "Bid ?": r.get("bid_raw") == "?", "Offer ?": r.get("offer_raw") == "?",
+                    } for r in _staged])
+                    st.caption(f"Review {len(_seed)} period(s) for **{_pcorr}** · {_pdiso}. "
+                               "Edit any cell, add/remove rows, then save. "
+                               "“Bid ? / Offer ?” marks a pending side (board shows “?”).")
+                    _edited = st.data_editor(
+                        _seed, num_rows="dynamic", width="stretch",
+                        key=f"rail_paste_grid_{_pcorr}_{_pdiso}",
+                        column_config={
+                            "Period": st.column_config.TextColumn("Period", required=True),
+                            "Futures": st.column_config.TextColumn(
+                                "Futures", help="Full CME symbol (ZCZ26, ZCH27), R for a "
+                                                "spanning package, or blank."),
+                            "Bid": st.column_config.NumberColumn("Bid", step=1,
+                                help="¢/bu (freight $/car). As posted — no rolling."),
+                            "Offer": st.column_config.NumberColumn("Offer", step=1),
+                            "Bid ?": st.column_config.CheckboxColumn("Bid ?", width="small"),
+                            "Offer ?": st.column_config.CheckboxColumn("Offer ?", width="small"),
+                        })
+                    _is_freight = ("Freight" in _pcorr) or ("Shuttle" in _pcorr)
+                    _sc1, _sc2 = st.columns([2, 5])
+                    with _sc1:
+                        _do_save = st.button("💾 Save rundown", key="rail_paste_save",
+                                             type="primary")
+                    with _sc2:
+                        _email_after = st.checkbox(
+                            "Email this corridor's update after saving", value=not _is_freight,
+                            key="rail_paste_email",
+                            help="Sends the rail update email for this corridor (Outlook locally, "
+                                 "SMTP on the Cloud app). Off by default for freight corridors.")
+                    if _do_save:
+                        _rail = _RBC.get(_pcorr) or {
+                            "CSX": "CSX", "NS": "NS", "CN": "CN", "UP": "UP", "BN": "BNSF"
+                        }.get(_pcorr.split()[0].upper())
+
+                        def _pn(v):
+                            if v is None or (isinstance(v, float) and _pd.isna(v)):
+                                return None
+                            try:
+                                return int(round(float(v)))
+                            except (TypeError, ValueError):
+                                return None
+
+                        _out = []
+                        for _i, _rr in enumerate(_edited.to_dict("records")):
+                            _per = str(_rr.get("Period") or "").strip()
+                            if not _per:
+                                continue
+                            _fut = str(_rr.get("Futures") or "").strip() or None
+                            _out.append({
+                                "market": _pcorr, "rail": _rail, "commodity": "Corn",
+                                "period": _per, "period_order": _i, "futures": _fut,
+                                "bid": _pn(_rr.get("Bid")), "offer": _pn(_rr.get("Offer")),
+                                "bid_raw": "?" if _rr.get("Bid ?") else None,
+                                "offer_raw": "?" if _rr.get("Offer ?") else None,
+                            })
+                        if not _out:
+                            st.warning("Nothing to save — add at least one period.")
+                        else:
+                            # Freight boards: seed a "Spot" row from "Return Trip" so the
+                            # spot seasonal stays continuous (hidden on the board when
+                            # Return Trip is present).
+                            if _is_freight:
+                                _rt = next((r for r in _out
+                                            if r["period"].strip().lower() == "return trip"), None)
+                                if _rt and not any(r["period"].strip().lower() == "spot"
+                                                   for r in _out):
+                                    _out.append({**_rt, "period": "Spot",
+                                                 "period_order": 0, "futures": None})
+                            save_rail_fob(_pdiso, "manual", _out)
+                            st.success(f"Saved {_pcorr} — {len(_out)} row(s) for {_pdiso}.")
+                            for _k in ("rail_paste_rows", "rail_paste_warn", "rail_paste_meta"):
+                                st.session_state.pop(_k, None)
+                            if _email_after:
+                                try:
+                                    import rail_report as _rr2
+                                    _rr2.send_rail_update_email(markets=[_pcorr])
+                                    st.success(f"Update emailed for {_pcorr}.")
+                                except Exception as _e:
+                                    st.warning(f"Saved, but the email didn't send ({_e}). "
+                                               "Needs Outlook running (local) or SMTP_* secrets "
+                                               "(Cloud).")
+                            st.rerun()
+
     # ── Email the rail board on demand (full build only; sends via local Outlook) ──
     if not _view_only():
         st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
