@@ -2091,16 +2091,28 @@ def _paste_clean(html: str) -> str:
             .replace("border-bottom:1px solid #f1f5f9", "border:1px solid #e6e9ee"))
 
 
-_tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB", "🌊 River FOB",
-               "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
-if not _view_only():
+_admin = not _view_only()
+_tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB"]
+if _admin:
+    _tab_labels.append("✏️ Rail Entry")      # admin: paste-in rail rundowns
+_tab_labels += ["🌊 River FOB", "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
+if _admin:
     _tab_labels.append("📥 Export")          # no download tab in the read-only build
     _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
 _tabs = st.tabs(_tab_labels)
-(tab_changes, tab_spotfwd, tab_bids, tab_railfob, tab_riverfob, tab_map,
- tab_summary, tab_trends, tab_spread) = _tabs[:9]
-tab_export = _tabs[9] if not _view_only() else None
-tab_clients = _tabs[10] if not _view_only() else None
+_ti = {lbl: t for lbl, t in zip(_tab_labels, _tabs)}
+tab_changes  = _ti["🔔 Changes"]
+tab_spotfwd  = _ti["🌙 Nightly Recap"]
+tab_bids     = _ti["📋 Bids"]
+tab_railfob  = _ti["🚂 Rail FOB"]
+tab_riverfob = _ti["🌊 River FOB"]
+tab_map      = _ti["🗺️ Map"]
+tab_summary  = _ti["📊 Summary"]
+tab_trends   = _ti["📈 Trends"]
+tab_spread   = _ti["🔀 Spread"]
+tab_export    = _ti.get("📥 Export")
+tab_clients   = _ti.get("📧 Client Reports")
+tab_railentry = _ti.get("✏️ Rail Entry")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: CHANGES  (locations whose basis moved vs the prior posting)
@@ -3129,139 +3141,6 @@ with tab_railfob:
     ]
     _rail_board("manual", _MANUAL_SECTIONS, "man")
 
-    # ── Enter / update a manual rundown (paste → parse → review → save) ──────────
-    #    Admin only; the read-only build never shows the editor.
-    if not _view_only():
-        import pandas as _pd
-        from rail_corridors import RAIL_BY_CORRIDOR as _RBC
-        # Corridor options = exactly the names shown on the board above.
-        _corr_opts = []
-        for _t, _rows in _MANUAL_SECTIONS:
-            for _row in _rows:
-                for _spec in _row:
-                    for _m in (_spec if isinstance(_spec, (list, tuple)) else [_spec]):
-                        if _m not in _corr_opts:
-                            _corr_opts.append(_m)
-
-        with st.expander("✏️ Enter / update a rail rundown (paste)"):
-            _pc1, _pc2 = st.columns([3, 2])
-            with _pc1:
-                _pcorr = st.selectbox("Corridor", _corr_opts, key="rail_paste_corr")
-            with _pc2:
-                _pdate = st.date_input("Posting date", value=datetime.utcnow().date(),
-                                       key="rail_paste_date")
-            _pdiso = _pdate.isoformat()
-            st.caption(
-                "Paste the corridor's rundown, e.g. "
-                "`Sep -5/+3  Oct 0/6  Nov 4/10  Dec 8/14  JFM 12/18  AMJJ 17/25`. "
-                "Values are stored **exactly as posted** — the tag (z/u/h/k/n) only picks the "
-                "contract, never rolls the number. Dec defaults to CH unless tagged z; spanning "
-                "packages (AMJJ, Jan-Jul) price vs R. Use `?` for a pending side, `Flat` for 0.")
-            _ptext = st.text_area(
-                "Rundown", height=110, key="rail_paste_text",
-                placeholder="Sep -5/+3  Oct 0/6  Nov 4/10  Dec 8/14  JFM 12/18  AMJJ 17/25")
-            if st.button("⤵ Parse & preview", key="rail_paste_parse", type="primary"):
-                import rail_paste as _rp
-                _rws, _wrn = _rp.parse_rundown(_ptext, _pcorr, _pdate)
-                st.session_state["rail_paste_rows"] = _rws
-                st.session_state["rail_paste_warn"] = _wrn
-                st.session_state["rail_paste_meta"] = (_pcorr, _pdiso)
-
-            _staged = st.session_state.get("rail_paste_rows")
-            _smeta = st.session_state.get("rail_paste_meta")
-            if _staged is not None and _smeta == (_pcorr, _pdiso):
-                for _w in st.session_state.get("rail_paste_warn", []):
-                    st.warning(_w)
-                if not _staged:
-                    st.info("Nothing parsed — check the format above.")
-                else:
-                    _seed = _pd.DataFrame([{
-                        "Period": r["period"], "Futures": r["futures"] or "",
-                        "Bid": r["bid"], "Offer": r["offer"],
-                        "Bid ?": r.get("bid_raw") == "?", "Offer ?": r.get("offer_raw") == "?",
-                    } for r in _staged])
-                    st.caption(f"Review {len(_seed)} period(s) for **{_pcorr}** · {_pdiso}. "
-                               "Edit any cell, add/remove rows, then save. "
-                               "“Bid ? / Offer ?” marks a pending side (board shows “?”).")
-                    _edited = st.data_editor(
-                        _seed, num_rows="dynamic", width="stretch",
-                        key=f"rail_paste_grid_{_pcorr}_{_pdiso}",
-                        column_config={
-                            "Period": st.column_config.TextColumn("Period", required=True),
-                            "Futures": st.column_config.TextColumn(
-                                "Futures", help="Full CME symbol (ZCZ26, ZCH27), R for a "
-                                                "spanning package, or blank."),
-                            "Bid": st.column_config.NumberColumn("Bid", step=1,
-                                help="¢/bu (freight $/car). As posted — no rolling."),
-                            "Offer": st.column_config.NumberColumn("Offer", step=1),
-                            "Bid ?": st.column_config.CheckboxColumn("Bid ?", width="small"),
-                            "Offer ?": st.column_config.CheckboxColumn("Offer ?", width="small"),
-                        })
-                    _is_freight = ("Freight" in _pcorr) or ("Shuttle" in _pcorr)
-                    _sc1, _sc2 = st.columns([2, 5])
-                    with _sc1:
-                        _do_save = st.button("💾 Save rundown", key="rail_paste_save",
-                                             type="primary")
-                    with _sc2:
-                        _email_after = st.checkbox(
-                            "Email this corridor's update after saving", value=not _is_freight,
-                            key="rail_paste_email",
-                            help="Sends the rail update email for this corridor (Outlook locally, "
-                                 "SMTP on the Cloud app). Off by default for freight corridors.")
-                    if _do_save:
-                        _rail = _RBC.get(_pcorr) or {
-                            "CSX": "CSX", "NS": "NS", "CN": "CN", "UP": "UP", "BN": "BNSF"
-                        }.get(_pcorr.split()[0].upper())
-
-                        def _pn(v):
-                            if v is None or (isinstance(v, float) and _pd.isna(v)):
-                                return None
-                            try:
-                                return int(round(float(v)))
-                            except (TypeError, ValueError):
-                                return None
-
-                        _out = []
-                        for _i, _rr in enumerate(_edited.to_dict("records")):
-                            _per = str(_rr.get("Period") or "").strip()
-                            if not _per:
-                                continue
-                            _fut = str(_rr.get("Futures") or "").strip() or None
-                            _out.append({
-                                "market": _pcorr, "rail": _rail, "commodity": "Corn",
-                                "period": _per, "period_order": _i, "futures": _fut,
-                                "bid": _pn(_rr.get("Bid")), "offer": _pn(_rr.get("Offer")),
-                                "bid_raw": "?" if _rr.get("Bid ?") else None,
-                                "offer_raw": "?" if _rr.get("Offer ?") else None,
-                            })
-                        if not _out:
-                            st.warning("Nothing to save — add at least one period.")
-                        else:
-                            # Freight boards: seed a "Spot" row from "Return Trip" so the
-                            # spot seasonal stays continuous (hidden on the board when
-                            # Return Trip is present).
-                            if _is_freight:
-                                _rt = next((r for r in _out
-                                            if r["period"].strip().lower() == "return trip"), None)
-                                if _rt and not any(r["period"].strip().lower() == "spot"
-                                                   for r in _out):
-                                    _out.append({**_rt, "period": "Spot",
-                                                 "period_order": 0, "futures": None})
-                            save_rail_fob(_pdiso, "manual", _out)
-                            st.success(f"Saved {_pcorr} — {len(_out)} row(s) for {_pdiso}.")
-                            for _k in ("rail_paste_rows", "rail_paste_warn", "rail_paste_meta"):
-                                st.session_state.pop(_k, None)
-                            if _email_after:
-                                try:
-                                    import rail_report as _rr2
-                                    _rr2.send_rail_update_email(markets=[_pcorr])
-                                    st.success(f"Update emailed for {_pcorr}.")
-                                except Exception as _e:
-                                    st.warning(f"Saved, but the email didn't send ({_e}). "
-                                               "Needs Outlook running (local) or SMTP_* secrets "
-                                               "(Cloud).")
-                            st.rerun()
-
     # ── Email the rail board on demand (full build only; sends via local Outlook) ──
     if not _view_only():
         st.markdown("<div style='margin-top:12px'></div>", unsafe_allow_html=True)
@@ -3289,6 +3168,142 @@ with tab_railfob:
                         st.info("No corridors on that date to email.")
                 except Exception as _e:
                     st.error(f"Send failed (Outlook must be running locally): {_e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: RAIL ENTRY  (admin: paste one or more rail rundowns → parse → review → save)
+# ═══════════════════════════════════════════════════════════════════════════════
+if tab_railentry is not None:
+    with tab_railentry:
+        import pandas as _pd
+        import rail_paste as _rp
+        from database import save_rail_fob as _srf
+        from rail_corridors import RAIL_BY_CORRIDOR as _RBC
+
+        st.caption("Paste one or more corridor rundowns — the parser detects each corridor by "
+                   "its name, so you can drop several in at once. Values are stored **exactly as "
+                   "posted**; the tag (z/u/h/k/n) only picks the contract, never rolls the number. "
+                   "Dec defaults to CH unless tagged z; spanning packages (AMJJ, Jan-Jul) → R. "
+                   "Use `?` for a pending side, `Flat` for 0.")
+
+        _rc1, _rc2 = st.columns([2, 5])
+        with _rc1:
+            _redate = st.date_input("Posting date", value=datetime.utcnow().date(),
+                                    key="rail_entry_date")
+        _rediso = _redate.isoformat()
+
+        st.markdown("**Paste rundowns** — start each block with the corridor name "
+                    "(e.g. `NS Ft Wayne`, `Col`, `Eville`, `BN PNW`, `BN Freight`).")
+        _retext = st.text_area(
+            "Rundowns", height=200, key="rail_entry_text", label_visibility="collapsed",
+            placeholder=("NS Ft Wayne  Sep -5/+3  Oct 0/6  Nov 4/10  Dec 8/14  JFM 12/18  AMJJ 17/25\n"
+                         "Col  Sep 2/9z  Oct 5/12  Dec 10/16  JFM 14/20  AMJJ 21/?\n"
+                         "Eville  FH Sep -6/0z  Oct 3/9  Dec 9/15  AMJJ 21/?"))
+        if st.button("⤵ Parse & preview", key="rail_entry_parse", type="primary"):
+            _rws, _wrn = _rp.parse_multi(_retext, _redate)
+            st.session_state["rail_entry_rows"] = _rws
+            st.session_state["rail_entry_warn"] = _wrn
+            st.session_state["rail_entry_meta"] = _rediso
+
+        _staged = st.session_state.get("rail_entry_rows")
+        if _staged is not None and st.session_state.get("rail_entry_meta") == _rediso:
+            for _w in st.session_state.get("rail_entry_warn", []):
+                st.warning(_w)
+            if not _staged:
+                st.info("Nothing parsed yet — check that each block starts with a corridor name.")
+            else:
+                _corrs = list(dict.fromkeys(r["market"] for r in _staged))
+                st.success(f"Detected {len(_corrs)} corridor(s): {', '.join(_corrs)} · "
+                           f"{len(_staged)} period(s) total for {_rediso}.")
+                _corr_choices = sorted(set(_RBC) | set(_rp._CORR_ALIASES.values())
+                                       | {r["market"] for r in _staged})
+                _seed = _pd.DataFrame([{
+                    "Corridor": r["market"], "Period": r["period"],
+                    "Futures": r["futures"] or "", "Bid": r["bid"], "Offer": r["offer"],
+                    "Bid ?": r.get("bid_raw") == "?", "Offer ?": r.get("offer_raw") == "?",
+                } for r in _staged])
+                st.caption("Review every row — edit any cell, add/remove rows, then save. The "
+                           "**Corridor** column decides where each row is filed; “Bid ? / Offer ?” "
+                           "marks a pending side (board shows “?”).")
+                _edited = st.data_editor(
+                    _seed, num_rows="dynamic", width="stretch", key=f"rail_entry_grid_{_rediso}",
+                    column_config={
+                        "Corridor": st.column_config.SelectboxColumn(
+                            "Corridor", options=_corr_choices, required=True, width="medium"),
+                        "Period": st.column_config.TextColumn("Period", required=True),
+                        "Futures": st.column_config.TextColumn(
+                            "Futures", help="Full CME symbol (ZCZ26, ZCH27), R for a spanning "
+                                            "package, or blank."),
+                        "Bid": st.column_config.NumberColumn(
+                            "Bid", step=1, help="¢/bu (freight $/car). As posted — no rolling."),
+                        "Offer": st.column_config.NumberColumn("Offer", step=1),
+                        "Bid ?": st.column_config.CheckboxColumn("Bid ?", width="small"),
+                        "Offer ?": st.column_config.CheckboxColumn("Offer ?", width="small"),
+                    })
+                _sc1, _sc2 = st.columns([2, 4])
+                with _sc1:
+                    _do_save = st.button("💾 Save all", key="rail_entry_save", type="primary")
+                with _sc2:
+                    _email_after = st.checkbox(
+                        "Email the basis corridors' updates after saving", value=True,
+                        key="rail_entry_email",
+                        help="Sends one rail update email covering every non-freight corridor "
+                             "saved (Outlook locally, SMTP on the Cloud app).")
+                if _do_save:
+                    def _pn(v):
+                        if v is None or (isinstance(v, float) and _pd.isna(v)):
+                            return None
+                        try:
+                            return int(round(float(v)))
+                        except (TypeError, ValueError):
+                            return None
+
+                    _by_corr = {}
+                    for _rr in _edited.to_dict("records"):
+                        _corr = str(_rr.get("Corridor") or "").strip()
+                        _per = str(_rr.get("Period") or "").strip()
+                        if not _corr or not _per:
+                            continue
+                        _by_corr.setdefault(_corr, []).append(_rr)
+
+                    _saved = []
+                    for _corr, _rrows in _by_corr.items():
+                        _rail = _RBC.get(_corr) or {
+                            "CSX": "CSX", "NS": "NS", "CN": "CN", "UP": "UP", "BN": "BNSF"
+                        }.get(_corr.split()[0].upper())
+                        _out = []
+                        for _i, _rr in enumerate(_rrows):
+                            _out.append({
+                                "market": _corr, "rail": _rail, "commodity": "Corn",
+                                "period": str(_rr["Period"]).strip(), "period_order": _i,
+                                "futures": (str(_rr.get("Futures") or "").strip() or None),
+                                "bid": _pn(_rr.get("Bid")), "offer": _pn(_rr.get("Offer")),
+                                "bid_raw": "?" if _rr.get("Bid ?") else None,
+                                "offer_raw": "?" if _rr.get("Offer ?") else None,
+                            })
+                        _is_freight = ("Freight" in _corr) or ("Shuttle" in _corr)
+                        if _is_freight:
+                            _rt = next((r for r in _out
+                                        if r["period"].strip().lower() == "return trip"), None)
+                            if _rt and not any(r["period"].strip().lower() == "spot" for r in _out):
+                                _out.append({**_rt, "period": "Spot", "period_order": 0,
+                                             "futures": None})
+                        _srf(_rediso, "manual", _out)
+                        _saved.append(_corr)
+
+                    st.success(f"Saved {len(_saved)} corridor(s): {', '.join(_saved)}.")
+                    _basis_saved = [c for c in _saved
+                                    if not (("Freight" in c) or ("Shuttle" in c))]
+                    if _email_after and _basis_saved:
+                        try:
+                            import rail_report as _rr2
+                            _rr2.send_rail_update_email(markets=_basis_saved)
+                            st.success(f"Emailed update for: {', '.join(_basis_saved)}.")
+                        except Exception as _e:
+                            st.warning(f"Saved, but the email didn't send ({_e}). Needs Outlook "
+                                       "running (local) or SMTP_* secrets (Cloud).")
+                    for _k in ("rail_entry_rows", "rail_entry_warn", "rail_entry_meta"):
+                        st.session_state.pop(_k, None)
+                    st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RIVER FOB  (read-only view of the JSA FOB Sheet, shared Supabase archive)

@@ -146,3 +146,91 @@ def parse_rundown(text: str, corridor: str, as_of=None):
         })
         order += 1
     return rows, warnings
+
+
+# ── Multi-corridor detection ────────────────────────────────────────────────────
+# Shorthand the desk pastes as a corridor header → canonical market name (matching
+# the names on the Rail FOB board). Keys are matched case-insensitively and
+# tolerate flexible spacing / apostrophes / parentheses (see _alias_tokens).
+_CORR_ALIASES = {
+    # Eastern
+    "ns ft wayne": "NS Ft Wayne", "ft wayne": "NS Ft Wayne", "fort wayne": "NS Ft Wayne",
+    "ns": "NS Ft Wayne",
+    "csx columbus": "CSX Columbus", "columbus": "CSX Columbus", "col": "CSX Columbus",
+    "csx evansville": "CSX Evansville", "evansville": "CSX Evansville", "eville": "CSX Evansville",
+    "csx freight": "CSX Freight",
+    # Gulf export
+    "cn 105s": "CN 105s", "cn 105": "CN 105s",
+    "cn 25s": "CN 25's", "cn 25": "CN 25's",
+    # UP western
+    "up group 3": "UP Group 3", "group 3": "UP Group 3", "up grp 3": "UP Group 3",
+    "up interior ia": "UP Interior IA", "interior ia": "UP Interior IA", "up interior": "UP Interior IA",
+    "up illinois dom": "UP Illinois (Dom)", "up il dom": "UP Illinois (Dom)",
+    "allen station dom": "UP Illinois (Dom)",
+    "up illinois mex": "UP Illinois (Mex)", "up il mex": "UP Illinois (Mex)",
+    "allen station mex": "UP Illinois (Mex)",
+    "up freight": "UP Freight", "up 110 shuttle": "UP Freight", "up shuttle": "UP Freight",
+    # BN western
+    "bn hereford": "BN Hereford", "hereford": "BN Hereford", "bncn sellers": "BN Hereford",
+    "bn pnw be": "BN PNW BE", "pnw be": "BN PNW BE",
+    "bn pnw cp": "BN PNW CP", "cp pnw": "BN PNW CP",
+    "bn pnw": "BN PNW", "pnw": "BN PNW",
+    "bn cobo": "BN COBO", "cobo": "BN COBO",
+    "bn freight": "BN Freight", "bn 110 shuttle": "BN Freight", "bn shuttle": "BN Freight",
+}
+
+
+def _alias_tokens(a: str) -> tuple:
+    """Alphanumeric word tokens of an alias/header, lower-cased."""
+    return tuple(re.findall(r"[a-z0-9]+", a.lower()))
+
+
+# canonical corridor keyed by its token tuple (unambiguous; duplicate tuples that
+# map to the same corridor are harmless).
+_ALIAS_BY_TOKENS = {_alias_tokens(a): c for a, c in _CORR_ALIASES.items()}
+
+# One alternation, alternatives longest-first so "BN PNW BE" wins over "BN PNW"
+# over "PNW". Tokens may be separated by spaces / apostrophes / parentheses, and
+# the whole thing is bounded so it can't match inside a longer word.
+_CORR_RE = re.compile(
+    r"(?<![A-Za-z0-9])(" + "|".join(
+        r"[\s'’()]*".join(re.escape(t) for t in _alias_tokens(a))
+        for a in sorted(_CORR_ALIASES, key=len, reverse=True)
+    ) + r")(?![A-Za-z0-9])", re.I)
+
+
+def detect_segments(text: str):
+    """Split a multi-corridor paste into [(corridor, cell_text), …] by finding
+    corridor headers. Text before the first header is ignored."""
+    text = text or ""
+    ms = list(_CORR_RE.finditer(text))
+    segs = []
+    for i, m in enumerate(ms):
+        corr = _ALIAS_BY_TOKENS.get(_alias_tokens(m.group(1)))
+        if not corr:
+            continue
+        start = m.end()
+        end = ms[i + 1].start() if i + 1 < len(ms) else len(text)
+        segs.append((corr, text[start:end]))
+    return segs
+
+
+def parse_multi(text: str, as_of=None, fallback_corridor: str | None = None):
+    """Parse a paste that may contain several corridors. Detects each corridor by
+    its header name and parses that block. Returns (rows, warnings) where rows
+    carry their own `market`. If no header is found, falls back to
+    `fallback_corridor` (whole text as one corridor) when given."""
+    segs = detect_segments(text)
+    if not segs:
+        if fallback_corridor:
+            return parse_rundown(text, fallback_corridor, as_of)
+        return [], ["No corridor name detected — start each block with the corridor "
+                    "name (e.g. “NS Ft Wayne”, “Col”, “Eville”)."]
+    rows, warnings = [], []
+    for corr, seg in segs:
+        r, w = parse_rundown(seg, corr, as_of)
+        if not r:
+            warnings.append(f"“{corr}” — no values parsed from its block.")
+        rows.extend(r)
+        warnings.extend(w)
+    return rows, warnings
