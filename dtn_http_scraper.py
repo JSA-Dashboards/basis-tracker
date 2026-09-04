@@ -27,13 +27,12 @@ log = logging.getLogger(__name__)
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 
-# aghost SINGLE-layout sites (same platform / displayNumber obfuscation) — fully
-# browser-free here. Not handled by this module (see fetch_dtn_playwright fallback):
-#   * Glacial Lakes (corn.glaciallakesenergy.com) — same obfuscation but COLUMNAR
-#     (3 plants side-by-side); needs a per-column parser (TODO).
+# aghost sites (same platform / displayNumber obfuscation) — fully browser-free
+# here. "columnar" sites carry several plants side-by-side (parsed per column).
+# NOT handled here (see fetch_dtn_playwright fallback):
 #   * GreenAmerica (greenamericabiofuels.com) — a NEWER DTN "content-services"
 #     JS widget, not aghost; different crack entirely.
-#   * Heron Lake (heronlakebioenergy.com/index.cfm) — URL now 404s (site moved).
+# (Heron Lake + Granite Falls moved to CIHedging — see cihedging_scraper.py.)
 SITES: list[dict] = [
     {"provider": "E Energy", "location": "Adams, NE", "state": "NE",
      "facility_type": "Corn Processing", "grain": "Corn",
@@ -44,6 +43,9 @@ SITES: list[dict] = [
     {"provider": "Pennsylvania Grain Processing", "location": "Clymer, PA", "state": "PA",
      "facility_type": "Corn Processing", "grain": "Corn",
      "url": "http://dtn.pagrain.com/index.cfm?show=11&mid=3"},
+    {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
+     "grain": "Corn", "columnar": True,
+     "url": "https://corn.glaciallakesenergy.com/"},
 ]
 
 _SYM_RE = re.compile(r"@[A-Z]{1,2}\d[FGHJKMNQUVXZ]")
@@ -177,6 +179,91 @@ def _parse_site(html: str, cfg: dict) -> NewSnapshotRequest | None:
                               location=cfg["location"], source="web", rows=rows)
 
 
+_COL_DELIV_RE = re.compile(
+    r"^(?:By |Balance\b|Split\b|New Crop\b|FH |LH |"
+    r"[A-Z][a-z]{2}-[A-Z][a-z]{2}\b|"                              # Oct-Nov, Nov-Dec
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\b)", re.I)
+
+
+def _parse_columnar(html: str, cfg: dict):
+    """Columnar aghost grid (several plants side-by-side, e.g. Glacial Lakes:
+    Watertown/Mina/Aberdeen). Same displayNumber decode; the grid is one flat cell
+    stream laid out as delivery, then per plant [futures, @sym, basisDN, cashDN,
+    spacer]. For each symbol cell: basis = the DN just after it; plant column =
+    (sym_idx - delivery_idx - 2)//5 (handles rows where a plant has no bid).
+    Returns (list[NewSnapshotRequest] one per plant, list[metas])."""
+    from bs4 import BeautifulSoup
+    decode = _build_decoder(html)
+    if decode is None:
+        log.warning("DTN(http) %s: no displayNumber decoder found", cfg["provider"])
+        return [], []
+    plants: list[str] = []
+    for p in re.findall(r"GLE\s*-\s*([A-Za-z .]+,\s*[A-Z]{2})", html):
+        p = re.sub(r"\s+", " ", p).strip()
+        if p not in plants:
+            plants.append(p)
+    if not plants:
+        return [], []
+    soup = BeautifulSoup(html, "html.parser")
+    tables = soup.find_all("table")
+    if not tables:
+        return [], []
+    grid = max(tables, key=lambda t: len(_SYM_RE.findall(t.get_text(" "))))
+    cells = grid.find_all(["th", "td"])
+    pfx = _PFX.get({"Corn": "ZC", "Soybeans": "ZS"}.get(cfg["grain"], ""), "XX")
+
+    per_plant: dict[str, list] = {p: [] for p in plants}
+    for i, c in enumerate(cells):
+        if not _SYM_RE.fullmatch(c.get_text(" ", strip=True)):
+            continue
+        dj = next((k for k in range(i - 1, max(-1, i - 20), -1)
+                   if _COL_DELIV_RE.match(cells[k].get_text(" ", strip=True))), None)
+        if dj is None:
+            continue
+        pidx = (i - dj - 2) // 5
+        if not (0 <= pidx < len(plants)):
+            continue
+        pair = []
+        for off in (1, 2):
+            if i + off < len(cells):
+                a = re.findall(r"displayNumber\(([-0-9.]+)\s*,\s*\d\)", str(cells[i + off]))
+                if a:
+                    v = decode(a[0])
+                    if v is not None:
+                        pair.append(v)
+        cands = [v for v in pair if abs(v) < 2]
+        if not cands:
+            continue
+        per_plant[plants[pidx]].append(
+            (re.sub(r"\s+", " ", cells[dj].get_text(" ", strip=True)).strip(),
+             _SYM_RE.search(c.get_text(" ")).group(0), min(cands, key=abs)))
+
+    reqs, metas = [], []
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    for plant, raw in per_plant.items():
+        rows, seen = [], set()
+        for delivery, sym, bv in raw:
+            cme = _fut_symbol(sym)
+            basis = _basis_cents(f"{bv:.2f}")
+            if not cme or basis is None or len(delivery) > 22:
+                continue
+            del_key = "".join(ch for ch in delivery.upper() if ch.isalnum()) or cme
+            row_id = f"{pfx}_{cme}_{del_key}"
+            if row_id in seen:
+                continue
+            seen.add(row_id)
+            rows.append(SnapshotRow(id=row_id, grain=cfg["grain"], deliveryMonth=delivery,
+                                    futuresSymbol=cme, basisCents=basis, isSpot=False))
+        if not rows:
+            continue
+        reqs.append(NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
+                                       location=plant, source="web", rows=rows))
+        st = plant.split(",")[-1].strip() if "," in plant else cfg.get("state")
+        metas.append({"provider": cfg["provider"], "location": plant,
+                      "state": st, "facility_type": cfg.get("facility_type")})
+    return reqs, metas
+
+
 def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[dict]]:
     """Fetch the aghost cash-bid sites over HTTP (no browser). Returns
     (snapshot requests, location metas), matching fetch_dtn_playwright."""
@@ -184,14 +271,22 @@ def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[di
     with httpx.Client(headers={"user-agent": _UA}, timeout=timeout,
                       follow_redirects=True) as client:
         for cfg in SITES:
+            label = cfg.get("location") or cfg.get("provider")
             try:
                 html = client.get(cfg["url"]).text
             except Exception as exc:
-                log.warning("DTN(http) %s fetch failed: %s", cfg["location"], exc)
+                log.warning("DTN(http) %s fetch failed: %s", label, exc)
+                continue
+            if cfg.get("columnar"):
+                creqs, cmetas = _parse_columnar(html, cfg)
+                if not creqs:
+                    log.warning("DTN(http): no bids parsed for %s (columnar)", label)
+                reqs.extend(creqs)
+                metas.extend(cmetas)
                 continue
             req = _parse_site(html, cfg)
             if req is None:
-                log.warning("DTN(http): no bids parsed for %s", cfg["location"])
+                log.warning("DTN(http): no bids parsed for %s", label)
                 continue
             reqs.append(req)
             metas.append({"provider": cfg["provider"], "location": cfg["location"],

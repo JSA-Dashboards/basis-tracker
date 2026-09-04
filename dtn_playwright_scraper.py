@@ -25,9 +25,6 @@ log = logging.getLogger(__name__)
 # `layout`: "single" (one plant per page) or "columnar" (one grid, several plants
 # side by side — locations read from the header). `grain` = the page's default table.
 SITES: list[dict] = [
-    {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
-     "grain": "Corn", "layout": "columnar",
-     "url": "https://corn.glaciallakesenergy.com/"},
     {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
      "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
      "url": "https://greenamericabiofuels.com/corn-bids"},
