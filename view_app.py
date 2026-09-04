@@ -8,7 +8,9 @@ running off master and auto-updating on every push.
 
 It forces VIEW_ONLY on before app.py runs (no VIEW_ONLY secret needed) and then
 executes app.py fresh on each Streamlit rerun via runpy. The view app's secrets
-only need DATABASE_URL; leaving APP_PASSWORD unset keeps it an open link.
+need the same backend connection as the main app (the SNOWFLAKE_* block, or
+DATABASE_URL on the Postgres rollback path); leaving APP_PASSWORD unset keeps it
+an open link.
 """
 import os
 import runpy
