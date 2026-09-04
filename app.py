@@ -27,7 +27,13 @@ load_dotenv()
 # Inject any secrets that weren't already set by load_dotenv() into os.environ
 # so that database.py and other modules can read them via os.getenv().
 try:
-    for _secret_key in ("DATABASE_URL", "RIVER_DATABASE_URL", "APP_PASSWORD", "VIEW_ONLY"):
+    _secret_keys = (
+        "DATABASE_URL", "RIVER_DATABASE_URL", "APP_PASSWORD", "VIEW_ONLY",
+        # Snowflake backend (set USE_SNOWFLAKE=1 in Cloud secrets to read Snowflake)
+        "USE_SNOWFLAKE", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
+        "SNOWFLAKE_ROLE", "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
+    )
+    for _secret_key in _secret_keys:
         if _secret_key in st.secrets and not os.environ.get(_secret_key):
             os.environ[_secret_key] = str(st.secrets[_secret_key])
 except Exception:
