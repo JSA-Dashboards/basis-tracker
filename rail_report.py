@@ -23,7 +23,7 @@ from datetime import datetime, date, timedelta
 from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
                             _GAIN, _LOSS, _SIG_LOGO, _SIG_LOGO_CID,
                             _table_watermark, _TBL_WM_CID,
-                            _roll_adjust, _futures_curve)
+                            _roll_adjust, _futures_curve, JSA_GROUP_BCC)
 from database import get_rail_fob_all
 
 # Load DATABASE_URL when rail_report is invoked standalone (a script or the scheduled
@@ -445,7 +445,8 @@ def send_rail_update_email(markets: list | None = None, to_addr: str | None = No
     title = (f"Rail Basis Update · {n} corridor{'s' if n != 1 else ''}") if markets else "Rail Basis Update"
     subj  = (f"JSA Rail Update — {', '.join(markets)}"[:150]) if markets else SUBJECT
     html, imgs = build_rail_html(markets=markets, charts=True, title=title)
-    _via = send_email(subj, html, to_addr or DEFAULT_TO, inline_images=imgs or None)
+    _bcc = os.getenv("JSA_GROUP_BCC") or JSA_GROUP_BCC
+    _via = send_email(subj, html, to_addr or DEFAULT_TO, bcc=_bcc, inline_images=imgs or None)
     log.info("Rail update email (%s) sent via %s to %s",
              ", ".join(markets) if markets else "full", _via, to_addr or DEFAULT_TO)
     return True
@@ -455,7 +456,7 @@ def send_rail_recap_email(to_addr: str | None = None) -> bool:
     """Full weekly RECAP: every active corridor + a spot seasonal chart each."""
     html, imgs = build_rail_html(markets=None, charts=True, title="Rail Basis Weekly Recap")
     _via = send_email("JSA Rail Basis — Weekly Recap", html, to_addr or DEFAULT_TO,
-                      inline_images=imgs or None)
+                      bcc=os.getenv("JSA_GROUP_BCC") or JSA_GROUP_BCC, inline_images=imgs or None)
     log.info("Rail weekly recap emailed via %s to %s", _via, to_addr or DEFAULT_TO)
     return True
 

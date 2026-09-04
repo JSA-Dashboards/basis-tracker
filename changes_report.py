@@ -29,7 +29,10 @@ log = logging.getLogger(__name__)
 
 DEFAULT_TO = os.getenv("CHANGES_EMAIL_TO", "kpostin@jpsi.com")
 # Standing BCC on the daily bids/changes email (overridable via DAILY_BIDS_BCC env).
-DAILY_BIDS_BCC = '"Daily Bids" <dailybids@jpsi.com>'
+# Comma-separated; the Outlook path re-joins with ';' so both transports work.
+DAILY_BIDS_BCC = '"Daily Bids" <dailybids@jpsi.com>, jsagroup@jpsi.com'
+# Standing BCC added to the rail updates (overridable via JSA_GROUP_BCC env).
+JSA_GROUP_BCC = "jsagroup@jpsi.com"
 
 _CME_MONTH_TO_INT = {
     "F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
@@ -603,13 +606,18 @@ def send_via_outlook(subject: str, html: str, to_addr: str, cc: str | None = Non
     in the HTML as <img src="cid:content_id">.
     """
     import win32com.client as win32  # pywin32 (local/dev only)
+    from email.utils import getaddresses
+    # Outlook wants ';'-separated recipients; our cc/bcc may be comma-separated
+    # (multiple addresses). Re-join to bare addresses on ';' so both work.
+    def _semi(v):
+        return "; ".join(a for _, a in getaddresses([v]) if a) if v else v
     outlook = win32.Dispatch("Outlook.Application")
     mail = outlook.CreateItem(0)  # 0 = olMailItem
-    mail.To = to_addr
+    mail.To = _semi(to_addr)
     if cc:
-        mail.CC = cc
+        mail.CC = _semi(cc)
     if bcc:
-        mail.BCC = bcc
+        mail.BCC = _semi(bcc)
     mail.Subject = subject
     mail.HTMLBody = html
     for cid, path in (inline_images or {}).items():
