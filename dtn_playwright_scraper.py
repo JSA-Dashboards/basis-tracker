@@ -24,14 +24,12 @@ log = logging.getLogger(__name__)
 
 # `layout`: "single" (one plant per page) or "columnar" (one grid, several plants
 # side by side — locations read from the header). `grain` = the page's default table.
-SITES: list[dict] = [
-    {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
-     "facility_type": "Corn Processing", "grain": "Corn", "layout": "single",
-     "url": "https://greenamericabiofuels.com/corn-bids"},
-    # E Energy, Dakota Ethanol, PA Grain moved to dtn_http_scraper.py (browser-free
-    # displayNumber decode). Only the columnar (Glacial) + non-aghost (GreenAmerica)
-    # + dead (Heron Lake) sites remain here.
-]
+# EMPTY — every DTN plant is now browser-free (see dtn_http_scraper.py: aghost
+# single + columnar decode, and the DTN content-services JSON API for GreenAmerica;
+# Heron Lake + Granite Falls went to cihedging_scraper.py). Nothing here needs a
+# headless browser anymore. Kept as a hook in case a site reverts to a JS-only
+# render — add it back here and fetch_dtn_playwright will pick it up.
+SITES: list[dict] = []
 
 # In the rendered DOM each cash-bid row is: <th>delivery</th> <td>futures price</td>
 # <td>@C6U</td> <td>basis</td> <td>cash</td>. Pull delivery + the @-symbol + the
@@ -145,8 +143,10 @@ def fetch_dtn_playwright(timeout_ms: int = 40000, attempts: int = 2
     gets a generous per-render wait and one retry on a fresh page, and the Chromium
     launch itself is retried once. So a single slow site — or a cold-launch hiccup in
     the non-interactive Task Scheduler context — no longer blanks the whole batch."""
-    from playwright.sync_api import sync_playwright
     reqs, metas = [], []
+    if not SITES:                      # all DTN plants are browser-free now — skip
+        return reqs, metas             # (don't even import/launch playwright)
+    from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser = None
         for launch_try in range(1, 3):

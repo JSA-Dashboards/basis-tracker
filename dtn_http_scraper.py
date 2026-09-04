@@ -264,9 +264,64 @@ def _parse_columnar(html: str, cfg: dict):
     return reqs, metas
 
 
+# ── DTN content-services JSON API (newer widget) ─────────────────────────────
+# The modern DTN cash-bids-table-widget (e.g. GreenAmerica) fetches a clean JSON
+# feed from api.dtn.com with the widget's public apikey — no obfuscation, no
+# browser. Each site is one siteId (from the widget's network call:
+# api.dtn.com/markets/sites/<siteId>/cash-bids).
+_DTN_API = "https://api.dtn.com/markets/sites/{site}/cash-bids?apikey={key}&units=us"
+_DTN_API_KEY = "aXMTOjnb89xRC2A9bzuMZ1Gt5D5pRAiJ"   # public cash-bids widget key
+API_SITES: list[dict] = [
+    {"provider": "GreenAmerica", "location": "Ord, NE", "state": "NE",
+     "facility_type": "Corn Processing", "site_id": "e0413701",
+     "origin": "https://greenamericabiofuels.com"},
+]
+_API_ROOT = {"Corn": "ZC", "Soybeans": "ZS", "Wheat": "ZW", "Milo": "ZC", "Sorghum": "ZC"}
+
+
+def _parse_api_site(cfg: dict, client: httpx.Client) -> NewSnapshotRequest | None:
+    url = _DTN_API.format(site=cfg["site_id"], key=_DTN_API_KEY)
+    hdrs = {}
+    if cfg.get("origin"):
+        hdrs["origin"] = cfg["origin"]
+        hdrs["referer"] = cfg["origin"].rstrip("/") + "/"
+    try:
+        data = client.get(url, headers=hdrs).json()
+    except Exception as exc:
+        log.warning("DTN(api) %s fetch failed: %s", cfg["location"], exc)
+        return None
+    rows: list[SnapshotRow] = []
+    seen: set[str] = set()
+    for rec in data or []:
+        sym = rec.get("symbol")
+        bp = rec.get("basisPrice")
+        if not sym or bp is None:
+            continue
+        cme = _fut_symbol(sym)
+        if not cme:
+            continue
+        grain = rec.get("commodityDisplayName") or cfg.get("grain", "Corn")
+        root = _API_ROOT.get(grain, "ZC")
+        pfx = _PFX.get(root, "XX")
+        basis = int(round(float(bp) * 100))
+        delivery = (rec.get("contractDeliveryLabel") or "").strip()
+        del_key = "".join(c for c in delivery.upper() if c.isalnum()) or cme
+        row_id = f"{pfx}_{cme}_{del_key}"
+        if row_id in seen:
+            continue
+        seen.add(row_id)
+        rows.append(SnapshotRow(id=row_id, grain=grain, deliveryMonth=delivery,
+                                futuresSymbol=cme, basisCents=basis, isSpot=False))
+    if not rows:
+        return None
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    return NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
+                              location=cfg["location"], source="web", rows=rows)
+
+
 def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[dict]]:
-    """Fetch the aghost cash-bid sites over HTTP (no browser). Returns
-    (snapshot requests, location metas), matching fetch_dtn_playwright."""
+    """Fetch the aghost cash-bid sites + DTN content-services API sites over HTTP
+    (no browser). Returns (snapshot requests, location metas)."""
     reqs, metas = [], []
     with httpx.Client(headers={"user-agent": _UA}, timeout=timeout,
                       follow_redirects=True) as client:
@@ -287,6 +342,15 @@ def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[di
             req = _parse_site(html, cfg)
             if req is None:
                 log.warning("DTN(http): no bids parsed for %s", label)
+                continue
+            reqs.append(req)
+            metas.append({"provider": cfg["provider"], "location": cfg["location"],
+                          "state": cfg.get("state"), "facility_type": cfg.get("facility_type")})
+        # DTN content-services JSON API sites (GreenAmerica, …)
+        for cfg in API_SITES:
+            req = _parse_api_site(cfg, client)
+            if req is None:
+                log.warning("DTN(api): no bids parsed for %s", cfg["location"])
                 continue
             reqs.append(req)
             metas.append({"provider": cfg["provider"], "location": cfg["location"],
