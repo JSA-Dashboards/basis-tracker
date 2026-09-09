@@ -1553,11 +1553,15 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
     c    = conn.cursor()
     ph   = _ph()
     now  = datetime.now(timezone.utc).isoformat()
+    # commodity is part of the key so a corridor can carry corn AND beans on the
+    # same date/period without one overwriting the other (Postgres ON CONFLICT
+    # target would need a matching unique index if that stale backend is revived;
+    # Snowflake's MERGE ON below just needs the columns).
     sql  = (f"INSERT INTO rail_fob (date, source, market, rail, commodity, period, "
             f"period_order, futures, bid, offer, bid_raw, offer_raw, captured_at) "
             f"VALUES ({','.join([ph]*13)}) "
-            f"ON CONFLICT (date, source, market, period) DO UPDATE SET "
-            f"rail=EXCLUDED.rail, commodity=EXCLUDED.commodity, "
+            f"ON CONFLICT (date, source, market, commodity, period) DO UPDATE SET "
+            f"rail=EXCLUDED.rail, "
             f"period_order=EXCLUDED.period_order, futures=EXCLUDED.futures, "
             f"bid=EXCLUDED.bid, offer=EXCLUDED.offer, "
             f"bid_raw=EXCLUDED.bid_raw, offer_raw=EXCLUDED.offer_raw, "
@@ -1574,8 +1578,8 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
                           r["period"], r.get("period_order"), r.get("futures"),
                           r.get("bid"), r.get("offer"), r.get("bid_raw"),
                           r.get("offer_raw"), now) for r in rows],
-                        ["date", "source", "market", "period"],
-                        update_cols=["rail", "commodity", "period_order", "futures",
+                        ["date", "source", "market", "commodity", "period"],
+                        update_cols=["rail", "period_order", "futures",
                                      "bid", "offer", "bid_raw", "offer_raw", "captured_at"])
             conn.commit()
             return len(rows)

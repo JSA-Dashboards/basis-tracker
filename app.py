@@ -3185,10 +3185,16 @@ if tab_railentry is not None:
                    "Dec defaults to CH unless tagged z; spanning packages (AMJJ, Jan-Jul) → R. "
                    "Use `?` for a pending side, `Flat` for 0.")
 
-        _rc1, _rc2 = st.columns([2, 5])
+        _rc1, _rcC, _rc2 = st.columns([2, 2, 4])
         with _rc1:
             _redate = st.date_input("Posting date", value=datetime.utcnow().date(),
                                     key="rail_entry_date")
+        with _rcC:
+            _recom = st.selectbox("Commodity", ["Corn", "Soybeans", "Wheat", "Sorghum"],
+                                  key="rail_entry_com",
+                                  help="One commodity per paste. It labels every row and is part "
+                                       "of the save key, so corn and beans on the same corridor/"
+                                       "period no longer overwrite each other.")
         _rediso = _redate.isoformat()
 
         st.markdown("**Paste rundowns** — start each block with the corridor name "
@@ -3199,13 +3205,13 @@ if tab_railentry is not None:
                          "Col  Sep 2/9z  Oct 5/12  Dec 10/16  JFM 14/20  AMJJ 21/?\n"
                          "Eville  FH Sep -6/0z  Oct 3/9  Dec 9/15  AMJJ 21/?"))
         if st.button("⤵ Parse & preview", key="rail_entry_parse", type="primary"):
-            _rws, _wrn = _rp.parse_multi(_retext, _redate)
+            _rws, _wrn = _rp.parse_multi(_retext, _redate, commodity=_recom)
             st.session_state["rail_entry_rows"] = _rws
             st.session_state["rail_entry_warn"] = _wrn
-            st.session_state["rail_entry_meta"] = _rediso
+            st.session_state["rail_entry_meta"] = (_rediso, _recom)
 
         _staged = st.session_state.get("rail_entry_rows")
-        if _staged is not None and st.session_state.get("rail_entry_meta") == _rediso:
+        if _staged is not None and st.session_state.get("rail_entry_meta") == (_rediso, _recom):
             for _w in st.session_state.get("rail_entry_warn", []):
                 st.warning(_w)
             if not _staged:
@@ -3217,18 +3223,23 @@ if tab_railentry is not None:
                 _corr_choices = sorted(set(_RBC) | set(_rp._CORR_ALIASES.values())
                                        | {r["market"] for r in _staged})
                 _seed = _pd.DataFrame([{
-                    "Corridor": r["market"], "Period": r["period"],
-                    "Futures": r["futures"] or "", "Bid": r["bid"], "Offer": r["offer"],
+                    "Corridor": r["market"], "Commodity": r.get("commodity") or _recom,
+                    "Period": r["period"], "Futures": r["futures"] or "",
+                    "Bid": r["bid"], "Offer": r["offer"],
                     "Bid ?": r.get("bid_raw") == "?", "Offer ?": r.get("offer_raw") == "?",
                 } for r in _staged])
                 st.caption("Review every row — edit any cell, add/remove rows, then save. The "
                            "**Corridor** column decides where each row is filed; “Bid ? / Offer ?” "
                            "marks a pending side (board shows “?”).")
                 _edited = st.data_editor(
-                    _seed, num_rows="dynamic", width="stretch", key=f"rail_entry_grid_{_rediso}",
+                    _seed, num_rows="dynamic", width="stretch",
+                    key=f"rail_entry_grid_{_rediso}_{_recom}",
                     column_config={
                         "Corridor": st.column_config.SelectboxColumn(
                             "Corridor", options=_corr_choices, required=True, width="medium"),
+                        "Commodity": st.column_config.SelectboxColumn(
+                            "Commodity", options=["Corn", "Soybeans", "Wheat", "Sorghum"],
+                            required=True, width="small"),
                         "Period": st.column_config.TextColumn("Period", required=True),
                         "Futures": st.column_config.TextColumn(
                             "Futures", help="Full CME symbol (ZCZ26, ZCH27), R for a spanning "
@@ -3273,22 +3284,24 @@ if tab_railentry is not None:
                         _out = []
                         for _i, _rr in enumerate(_rrows):
                             _out.append({
-                                "market": _corr, "rail": _rail, "commodity": "Corn",
+                                "market": _corr, "rail": _rail,
+                                "commodity": (str(_rr.get("Commodity") or "Corn").strip() or "Corn"),
                                 "period": str(_rr["Period"]).strip(), "period_order": _i,
                                 "futures": (str(_rr.get("Futures") or "").strip() or None),
                                 "bid": _pn(_rr.get("Bid")), "offer": _pn(_rr.get("Offer")),
                                 "bid_raw": "?" if _rr.get("Bid ?") else None,
                                 "offer_raw": "?" if _rr.get("Offer ?") else None,
                             })
-                        # A repeated corridor+period would crash the Snowflake MERGE;
-                        # database.py collapses it (last wins) — flag it so a real
+                        # A repeated corridor+commodity+period would crash the Snowflake
+                        # MERGE; database.py collapses it (last wins) — flag it so a real
                         # double-entry isn't lost silently.
                         _pc = {}
                         for _r in _out:
-                            _pc[_r["period"]] = _pc.get(_r["period"], 0) + 1
-                        for _pk, _pn2 in _pc.items():
+                            _k = (_r["commodity"], _r["period"])
+                            _pc[_k] = _pc.get(_k, 0) + 1
+                        for (_cm, _pk), _pn2 in _pc.items():
                             if _pn2 > 1:
-                                _dups.append(f"{_corr} · {_pk} (×{_pn2}, kept last)")
+                                _dups.append(f"{_corr} · {_cm} · {_pk} (×{_pn2}, kept last)")
                         _is_freight = ("Freight" in _corr) or ("Shuttle" in _corr)
                         if _is_freight:
                             _rt = next((r for r in _out

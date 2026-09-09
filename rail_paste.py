@@ -85,8 +85,15 @@ def _to_full(short: str, as_of: date) -> str:
     return f"ZC{short[1]}{y % 100:02d}"
 
 
-def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date):
-    """Resolve a cell's futures: full symbol (ZCZ26), 'R' (spanning), or None."""
+def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
+                 commodity: str = "Corn"):
+    """Resolve a cell's futures: full symbol (ZCZ26), 'R' (spanning), or None.
+
+    The corn-contract cycle only applies to corn. For any other commodity we don't
+    stamp a corn symbol on it — return None (the reviewer can fill it) so bean/wheat
+    bids aren't mislabeled with ZC contracts."""
+    if (commodity or "Corn").strip().lower() not in ("corn", "yellow corn", ""):
+        return None
     short = corn_futures(period, rail, as_of)          # 'CH' / 'CZ' / 'R' / None
     if tag:
         short = _TAG2SHORT[tag.lower()]                # explicit tag wins
@@ -95,6 +102,25 @@ def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date):
     if not short or short == "R":
         return short                                   # None or 'R' (no year/roll math)
     return _to_full(short, as_of)
+
+
+# Unicode that pasted rail boards carry and that breaks parsing if left raw:
+#  • the real minus sign U+2212 (a "−15" bid would miss the [+-] value regex),
+#  • en/em/figure dashes → ASCII '-' (so "Jan – July" unifies with "Jan-July"),
+#  • bullets/·/nbsp → space (so "• Interior Iowa" headers are detectable),
+#  • curly quotes → straight. Anything else non-ASCII → space (kills mojibake "�").
+_PUNCT = {"−": "-", "–": "-", "—": "-", "‒": "-", "―": "-",
+          "‘": "'", "’": "'", "“": '"', "”": '"',
+          "•": " ", "·": " ", "▪": " ", "◦": " ", "‣": " ",
+          " ": " "}
+
+
+def _normalize_punct(text: str) -> str:
+    if not text:
+        return text
+    for k, v in _PUNCT.items():
+        text = text.replace(k, v)
+    return "".join(ch if ord(ch) < 128 else " " for ch in text)
 
 
 def _clean_period(raw: str, corridor: str) -> str:
@@ -107,13 +133,16 @@ def _clean_period(raw: str, corridor: str) -> str:
         for tok in str(name).split():
             if len(tok) > 1:                           # skip 1-char tokens (e.g. rail initials collide with months)
                 s = re.sub(rf"(?i)\b{re.escape(tok)}\b", " ", s)
+    s = re.sub(r"\s*-\s*", "-", s)                     # "Jan - July" -> "Jan-July" (period labels only)
     s = s.strip(" \t\r\n/,;:-")
     return re.sub(r"\s+", " ", s).strip()
 
 
-def parse_rundown(text: str, corridor: str, as_of=None):
+def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn"):
     """Parse one corridor's pasted rundown into (rows, warnings).
 
+    `commodity` labels every row (one commodity per paste) and gates the corn
+    futures math — bean/wheat rows get futures=None rather than a corn symbol.
     rows: dicts ready for database.save_rail_fob(date, 'manual', rows).
     warnings: human-readable notes about cells that couldn't be placed.
     """
@@ -121,6 +150,7 @@ def parse_rundown(text: str, corridor: str, as_of=None):
         as_of = date.today()
     if isinstance(as_of, datetime):
         as_of = as_of.date()
+    text = _normalize_punct(text)
     corridor = canonical_corridor(corridor)
     rail = RAIL_BY_CORRIDOR.get(corridor)
 
@@ -138,9 +168,9 @@ def parse_rundown(text: str, corridor: str, as_of=None):
             warnings.append(f"Skipped a value with no period: “{m.group(0).strip()}”.")
             continue
         rows.append({
-            "market": corridor, "rail": rail, "commodity": "Corn",
+            "market": corridor, "rail": rail, "commodity": commodity,
             "period": period, "period_order": order,
-            "futures": _futures_for(period, rail, tag, as_of),
+            "futures": _futures_for(period, rail, tag, as_of, commodity),
             "bid": bid, "offer": offer,
             "bid_raw": bid_raw, "offer_raw": offer_raw,
         })
@@ -165,6 +195,7 @@ _CORR_ALIASES = {
     # UP western
     "up group 3": "UP Group 3", "group 3": "UP Group 3", "up grp 3": "UP Group 3",
     "up interior ia": "UP Interior IA", "interior ia": "UP Interior IA", "up interior": "UP Interior IA",
+    "up interior iowa": "UP Interior IA", "interior iowa": "UP Interior IA",
     "up illinois dom": "UP Illinois (Dom)", "up il dom": "UP Illinois (Dom)",
     "allen station dom": "UP Illinois (Dom)",
     "up illinois mex": "UP Illinois (Mex)", "up il mex": "UP Illinois (Mex)",
@@ -202,7 +233,7 @@ _CORR_RE = re.compile(
 def detect_segments(text: str):
     """Split a multi-corridor paste into [(corridor, cell_text), …] by finding
     corridor headers. Text before the first header is ignored."""
-    text = text or ""
+    text = _normalize_punct(text or "")               # so "• Interior Iowa" headers match
     ms = list(_CORR_RE.finditer(text))
     segs = []
     for i, m in enumerate(ms):
@@ -215,20 +246,21 @@ def detect_segments(text: str):
     return segs
 
 
-def parse_multi(text: str, as_of=None, fallback_corridor: str | None = None):
-    """Parse a paste that may contain several corridors. Detects each corridor by
-    its header name and parses that block. Returns (rows, warnings) where rows
-    carry their own `market`. If no header is found, falls back to
-    `fallback_corridor` (whole text as one corridor) when given."""
+def parse_multi(text: str, as_of=None, fallback_corridor: str | None = None,
+                commodity: str = "Corn"):
+    """Parse a paste that may contain several corridors, all of one `commodity`.
+    Detects each corridor by its header name and parses that block. Returns
+    (rows, warnings) where rows carry their own `market` and the given commodity.
+    If no header is found, falls back to `fallback_corridor` when given."""
     segs = detect_segments(text)
     if not segs:
         if fallback_corridor:
-            return parse_rundown(text, fallback_corridor, as_of)
+            return parse_rundown(text, fallback_corridor, as_of, commodity)
         return [], ["No corridor name detected — start each block with the corridor "
                     "name (e.g. “NS Ft Wayne”, “Col”, “Eville”)."]
     rows, warnings = [], []
     for corr, seg in segs:
-        r, w = parse_rundown(seg, corr, as_of)
+        r, w = parse_rundown(seg, corr, as_of, commodity)
         if not r:
             warnings.append(f"“{corr}” — no values parsed from its block.")
         rows.extend(r)
