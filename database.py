@@ -16,6 +16,7 @@ which database is active.
 """
 import os
 import sys
+import threading
 import time
 from pathlib import Path
 from models import Snapshot, SnapshotRow
@@ -67,11 +68,21 @@ class _LowerDictCursor:
         self._c = cur
 
     def execute(self, sql, params=None):
-        self._c.execute(sql, params)
+        try:
+            self._c.execute(sql, params)
+        except Exception as e:                       # a dead pooled conn self-heals:
+            if _is_conn_dead(e):                     # drop it so the next get_conn()
+                _sf_pool_reset()                     # opens a fresh one
+            raise
         return self
 
     def executemany(self, sql, seq):
-        self._c.executemany(sql, seq)
+        try:
+            self._c.executemany(sql, seq)
+        except Exception as e:
+            if _is_conn_dead(e):
+                _sf_pool_reset()
+            raise
         return self
 
     @staticmethod
@@ -137,13 +148,38 @@ def _sf_active_session_conn():
     return _SF_SESSION_CONN
 
 
-def _sf_get():
-    """Return (raw_conn, owned). In SiS → shared active-session conn (owned=False);
-    otherwise a fresh connection from SNOWFLAKE_* env (owned=True, for local/jobs)."""
-    sess = _sf_active_session_conn()
-    if sess is not None:
-        _force_pyformat(sess)     # SiS/Snowpark defaults to qmark; our SQL uses %s
-        return sess, False
+# Non-SiS connection pool: one reused connection per process. Auth on this account
+# is slow (~15s), so opening a fresh connection per query was both the dominant
+# load cost AND the cause of the 30s login-timeout crashes on Streamlit Cloud
+# (each tab fired several connects; one would tip past the limit). We now open once
+# and reuse, with a generous login_timeout and a keep-alive so the session survives.
+_SF_POOL_LOCK = threading.Lock()
+_SF_POOLED = None
+
+
+def _is_conn_dead(e) -> bool:
+    """True if an error means the connection/session is gone (so the pool should be
+    dropped and reopened). SQL-level errors (ProgrammingError, etc.) must NOT match
+    — they'd trigger a needless reconnect but, more importantly, aren't the pool's
+    fault."""
+    if type(e).__name__ in ("OperationalError", "InterfaceError"):
+        return True
+    s = str(e).lower()
+    return ("session no longer exists" in s or "authentication token has expired" in s
+            or "connection is closed" in s)
+
+
+def _sf_alive(conn) -> bool:
+    try:
+        return not conn.is_closed()
+    except Exception:
+        return False
+
+
+def _sf_connect_raw():
+    """Open a fresh Snowflake connection from SNOWFLAKE_* env (local / Cloud / jobs).
+    login_timeout is generous (this account's auth runs ~15s and Cloud adds latency);
+    keep-alive stops the pooled session idling out between reruns."""
     import snowflake.connector as sc
     kw = dict(
         account=os.environ["SNOWFLAKE_ACCOUNT"],
@@ -153,11 +189,49 @@ def _sf_get():
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
         database=os.environ.get("SNOWFLAKE_DATABASE") or None,
         schema=os.environ.get("SNOWFLAKE_SCHEMA") or None,
-        login_timeout=30,
+        login_timeout=60,
+        client_session_keep_alive=True,
     )
     conn = sc.connect(**{k: v for k, v in kw.items() if v is not None})
     _force_pyformat(conn)
-    return conn, True
+    return conn
+
+
+def _sf_pool_reset():
+    """Drop the pooled connection so the next _sf_get() reconnects (self-heal)."""
+    global _SF_POOLED
+    with _SF_POOL_LOCK:
+        c, _SF_POOLED = _SF_POOLED, None
+    if c is not None:
+        try:
+            c.close()
+        except Exception:
+            pass
+
+
+def _sf_get():
+    """Return (raw_conn, owned=False). In SiS → the shared active-session conn.
+    Otherwise the process-pooled connection (reconnecting if it died). owned=False
+    so the per-query conn.close() calls across the 40 functions are no-ops and the
+    connection persists across queries and reruns."""
+    sess = _sf_active_session_conn()
+    if sess is not None:
+        _force_pyformat(sess)     # SiS/Snowpark defaults to qmark; our SQL uses %s
+        return sess, False
+    global _SF_POOLED
+    conn = _SF_POOLED
+    if conn is not None and _sf_alive(conn):
+        return conn, False
+    with _SF_POOL_LOCK:
+        conn = _SF_POOLED
+        if conn is None or not _sf_alive(conn):
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+            _SF_POOLED = _sf_connect_raw()
+    return _SF_POOLED, False
 
 
 def _force_pyformat(conn) -> None:
