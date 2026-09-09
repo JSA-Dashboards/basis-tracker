@@ -3265,7 +3265,7 @@ if tab_railentry is not None:
                             continue
                         _by_corr.setdefault(_corr, []).append(_rr)
 
-                    _saved = []
+                    _saved, _dups = [], []
                     for _corr, _rrows in _by_corr.items():
                         _rail = _RBC.get(_corr) or {
                             "CSX": "CSX", "NS": "NS", "CN": "CN", "UP": "UP", "BN": "BNSF"
@@ -3280,6 +3280,15 @@ if tab_railentry is not None:
                                 "bid_raw": "?" if _rr.get("Bid ?") else None,
                                 "offer_raw": "?" if _rr.get("Offer ?") else None,
                             })
+                        # A repeated corridor+period would crash the Snowflake MERGE;
+                        # database.py collapses it (last wins) — flag it so a real
+                        # double-entry isn't lost silently.
+                        _pc = {}
+                        for _r in _out:
+                            _pc[_r["period"]] = _pc.get(_r["period"], 0) + 1
+                        for _pk, _pn2 in _pc.items():
+                            if _pn2 > 1:
+                                _dups.append(f"{_corr} · {_pk} (×{_pn2}, kept last)")
                         _is_freight = ("Freight" in _corr) or ("Shuttle" in _corr)
                         if _is_freight:
                             _rt = next((r for r in _out
@@ -3291,6 +3300,10 @@ if tab_railentry is not None:
                         _saved.append(_corr)
 
                     st.success(f"Saved {len(_saved)} corridor(s): {', '.join(_saved)}.")
+                    if _dups:
+                        st.warning("Duplicate corridor+period rows were collapsed "
+                                   "(kept the last of each) — check these weren't a "
+                                   "mistake: " + "; ".join(_dups))
                     _basis_saved = [c for c in _saved
                                     if not (("Freight" in c) or ("Shuttle" in c))]
                     if _email_after and _basis_saved:

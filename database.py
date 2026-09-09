@@ -277,6 +277,17 @@ def _merge_bulk(c, table, cols_types, rows, key_cols, update_cols=None,
     if not rows:
         return 0
     names = [n for n, _ in cols_types]
+    # Snowflake MERGE (and Postgres ON CONFLICT) reject a source that holds two rows
+    # with the same key — "Duplicate row detected during DML action" (42P18). Collapse
+    # duplicates by key_cols, keeping the LAST occurrence, which matches the row-by-row
+    # upsert's last-write-wins and can't change a correct (already-unique) batch.
+    if len(rows) > 1:
+        _ki = [names.index(k) for k in key_cols]
+        _seen = {}
+        for _r in rows:
+            _seen[tuple(_r[i] for i in _ki)] = _r
+        if len(_seen) != len(rows):
+            rows = list(_seen.values())
     sel = ", ".join(f"column{i + 1}::{t} AS {n}" for i, (n, t) in enumerate(cols_types))
     ins_names = names[:]
     ins_vals = ["s." + n for n in names]
