@@ -40,6 +40,13 @@ _CM = {"CH": 3, "CK": 5, "CN": 7, "CU": 9, "CZ": 12}     # contract → month
 # market, but the corridor is picked separately here, so in a cell they're noise.)
 _DROP_NOTES = re.compile(r"(?i)\b(pk|wtx|dctx|mex|dom|ks/mo|ks|mo|center|ctr)\b")
 
+# Header noise that isn't a corridor, period, or value: commodity-grade tags
+# (YC=yellow corn, YSB/YSBS=yellow soybeans, YB), the "FOB <city>" descriptor, and
+# a leading "Update" line. Stripped before both corridor detection and period
+# cleaning so "CN YSB 105's (FOB Champ)" still matches the CN 105s alias and the
+# descriptor doesn't leak into the first period.
+_NOISE = re.compile(r"(?i)\b(ysbs|ysb|yc|yb|fob|champaign|champ|update)\b")
+
 # A single value token: a signed number (optionally trailing '?'), 'Flat', '*',
 # or a bare '?'. Guarded by (?<![\w'.]) so it can't start mid-number and a forward
 # crop-year like '26 isn't read as a value — while still allowing a leading +/-
@@ -51,8 +58,12 @@ _DROP_NOTES = re.compile(r"(?i)\b(pk|wtx|dctx|mex|dom|ks/mo|ks|mo|center|ctr)\b"
 # NB: the whitespace lives INSIDE the optional offer group, so a cell with no
 # offer doesn't consume the trailing space and let the tag grab the next period's
 # leading letter (e.g. the "N" of "Nov").
+# The trailing tag is any single letter that abuts the value (no space): corn uses
+# u/z/h/k/n, soybeans use f/h/k/n/q/u/x, etc. We consume whatever letter is there
+# so it can't spill into the next period; _futures_for only *maps* the corn letters
+# and ignores the rest (bean/wheat futures are left blank for review).
 _VAL = r"[+-]?\d+(?:\.\d+)?\??|flat|\*|\?"
-_CELL = re.compile(rf"(?<![\w'.])({_VAL})(?:\s*/\s*({_VAL}))?([uzhkn])?", re.I)
+_CELL = re.compile(rf"(?<![\w'.])({_VAL})(?:\s*/\s*({_VAL}))?([a-z])?", re.I)
 
 
 def _val(tok):
@@ -95,8 +106,8 @@ def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
     if (commodity or "Corn").strip().lower() not in ("corn", "yellow corn", ""):
         return None
     short = corn_futures(period, rail, as_of)          # 'CH' / 'CZ' / 'R' / None
-    if tag:
-        short = _TAG2SHORT[tag.lower()]                # explicit tag wins
+    if tag and tag.lower() in _TAG2SHORT:
+        short = _TAG2SHORT[tag.lower()]                # explicit corn tag wins
     elif period_start_month(period) == 12:
         short = "CH"                                   # Dec defaults to CH unless tagged z
     if not short or short == "R":
@@ -150,7 +161,7 @@ def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn")
         as_of = date.today()
     if isinstance(as_of, datetime):
         as_of = as_of.date()
-    text = _normalize_punct(text)
+    text = _NOISE.sub(" ", _normalize_punct(text))
     corridor = canonical_corridor(corridor)
     rail = RAIL_BY_CORRIDOR.get(corridor)
 
@@ -212,8 +223,10 @@ _CORR_ALIASES = {
 
 
 def _alias_tokens(a: str) -> tuple:
-    """Alphanumeric word tokens of an alias/header, lower-cased."""
-    return tuple(re.findall(r"[a-z0-9]+", a.lower()))
+    """Word tokens of an alias/header, lower-cased, splitting letter runs from digit
+    runs so "105s" → ("105","s"). That lets the join's [\\s'()]* absorb a possessive,
+    so the alias "cn 105s" still matches a pasted "CN 105's"."""
+    return tuple(re.findall(r"[a-z]+|[0-9]+", a.lower()))
 
 
 # canonical corridor keyed by its token tuple (unambiguous; duplicate tuples that
@@ -233,7 +246,7 @@ _CORR_RE = re.compile(
 def detect_segments(text: str):
     """Split a multi-corridor paste into [(corridor, cell_text), …] by finding
     corridor headers. Text before the first header is ignored."""
-    text = _normalize_punct(text or "")               # so "• Interior Iowa" headers match
+    text = _NOISE.sub(" ", _normalize_punct(text or ""))   # so "CN YSB 105's (FOB Champ)" matches
     ms = list(_CORR_RE.finditer(text))
     segs = []
     for i, m in enumerate(ms):
