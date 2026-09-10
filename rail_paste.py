@@ -38,7 +38,7 @@ _CM = {"CH": 3, "CK": 5, "CN": 7, "CU": 9, "CZ": 12}     # contract → month
 # Desk notations that ride along with a value but are NOT part of the period and
 # NOT futures tags — dropped per the memory. (dom/mex also split the UP Illinois
 # market, but the corridor is picked separately here, so in a cell they're noise.)
-_DROP_NOTES = re.compile(r"(?i)\b(pk|wtx|dctx|mex|dom|ks/mo|ks|mo|center|ctr)\b")
+_DROP_NOTES = re.compile(r"(?i)\b(pkg|pk|wtx|dctx|mex|dom|ks/mo|ks|mo|center|ctr)\b")
 
 # Header noise that isn't a corridor, period, or value: commodity-grade tags
 # (YC=yellow corn, YSB/YSBS=yellow soybeans, YB), the "FOB <city>" descriptor, and
@@ -62,7 +62,7 @@ _NOISE = re.compile(r"(?i)\b(ysbs|ysb|yc|yb|fob|champaign|champ|update)\b")
 # u/z/h/k/n, soybeans use f/h/k/n/q/u/x, etc. We consume whatever letter is there
 # so it can't spill into the next period; _futures_for only *maps* the corn letters
 # and ignores the rest (bean/wheat futures are left blank for review).
-_VAL = r"[+-]?\d+(?:\.\d+)?\??|flat|\*|\?"
+_VAL = r"[+-]?\d+(?:\.\d+)?\??|flat|\*+|\?"
 _CELL = re.compile(rf"(?<![\w'.])({_VAL})(?:\s*/\s*({_VAL}))?([a-z])?", re.I)
 
 
@@ -74,7 +74,7 @@ def _val(tok):
     t = tok.strip().lower()
     if t == "?":
         return None, "?"
-    if t in ("", "*"):
+    if t == "" or set(t) == {"*"}:                     # '', '*', '***' → blank
         return None, None
     if t == "flat":
         return 0, None
@@ -165,10 +165,16 @@ def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn")
     corridor = canonical_corridor(corridor)
     rail = RAIL_BY_CORRIDOR.get(corridor)
 
+    # UP Illinois is posted as ONE bare rundown whose cells carry (dom)/(mex)
+    # tags; each row routes to its own sub-market. Untagged near-month cells keep
+    # the corridor's base (Dom). Other corridors have no per-cell split.
+    up_il_split = corridor in ("UP Illinois (Dom)", "UP Illinois (Mex)")
+
     rows, warnings = [], []
     last_end, order = 0, 0
     for m in _CELL.finditer(text or ""):
-        period = _clean_period(text[last_end:m.start()], corridor)
+        raw_seg = text[last_end:m.start()]
+        period = _clean_period(raw_seg, corridor)
         last_end = m.end()
         bid, bid_raw = _val(m.group(1))
         offer, offer_raw = _val(m.group(2))
@@ -178,8 +184,16 @@ def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn")
         if not period:
             warnings.append(f"Skipped a value with no period: “{m.group(0).strip()}”.")
             continue
+        mkt = corridor
+        if up_il_split:
+            seg_l = raw_seg.lower()
+            if re.search(r"\bmex\b", seg_l):
+                mkt = "UP Illinois (Mex)"
+            elif re.search(r"\bdom\b", seg_l):
+                mkt = "UP Illinois (Dom)"
         rows.append({
-            "market": corridor, "rail": rail, "commodity": commodity,
+            "market": mkt, "rail": RAIL_BY_CORRIDOR.get(mkt, rail),
+            "commodity": commodity,
             "period": period, "period_order": order,
             "futures": _futures_for(period, rail, tag, as_of, commodity),
             "bid": bid, "offer": offer,
@@ -211,6 +225,12 @@ _CORR_ALIASES = {
     "allen station dom": "UP Illinois (Dom)",
     "up illinois mex": "UP Illinois (Mex)", "up il mex": "UP Illinois (Mex)",
     "allen station mex": "UP Illinois (Mex)",
+    # Bare header (no dom/mex): a single "UP Illinois" rundown carries per-cell
+    # (dom)/(mex) tags that route each row to the right sub-market (see
+    # parse_rundown). The base/default for untagged near-month cells is Dom.
+    "up illinois": "UP Illinois (Dom)", "up il": "UP Illinois (Dom)",
+    "allen station": "UP Illinois (Dom)", "allen": "UP Illinois (Dom)",
+    "illinois": "UP Illinois (Dom)",
     "up freight": "UP Freight", "up 110 shuttle": "UP Freight", "up shuttle": "UP Freight",
     # BN western
     "bn hereford": "BN Hereford", "hereford": "BN Hereford", "bncn sellers": "BN Hereford",
@@ -238,7 +258,7 @@ _ALIAS_BY_TOKENS = {_alias_tokens(a): c for a, c in _CORR_ALIASES.items()}
 # the whole thing is bounded so it can't match inside a longer word.
 _CORR_RE = re.compile(
     r"(?<![A-Za-z0-9])(" + "|".join(
-        r"[\s'’()]*".join(re.escape(t) for t in _alias_tokens(a))
+        r"[\s'’()\-]*".join(re.escape(t) for t in _alias_tokens(a))
         for a in sorted(_CORR_ALIASES, key=len, reverse=True)
     ) + r")(?![A-Za-z0-9])", re.I)
 
