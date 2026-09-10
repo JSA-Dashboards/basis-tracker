@@ -686,20 +686,112 @@ def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
         s.sendmail(frm, rcpts, root.as_string())
 
 
+def _graph_configured() -> bool:
+    """True when the Microsoft Graph app-only credentials are present."""
+    return bool(_email_cfg("GRAPH_TENANT_ID") and _email_cfg("GRAPH_CLIENT_ID")
+                and _email_cfg("GRAPH_CLIENT_SECRET"))
+
+
+def send_via_graph(subject: str, html: str, to_addr: str, cc: str | None = None,
+                   inline_images: dict | None = None, bcc: str | None = None) -> None:
+    """Send the HTML email through Microsoft Graph using the OAuth 2.0
+    client-credentials (app-only) flow — the Cloud-friendly path IT approved.
+
+    No user or service-account password: the app authenticates as itself with a
+    client secret and calls Graph's sendMail as the shared mailbox. Config from
+    env or st.secrets:
+        GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET  (the registration)
+        GRAPH_SENDER (the mailbox to send as, e.g. basis-tracker@jpsi.com)
+    Inline images embed by Content-ID exactly like the Outlook/SMTP paths."""
+    import base64
+    import msal
+    import requests
+
+    tenant = _email_cfg("GRAPH_TENANT_ID")
+    client = _email_cfg("GRAPH_CLIENT_ID")
+    secret = _email_cfg("GRAPH_CLIENT_SECRET")
+    sender = _email_cfg("GRAPH_SENDER") or _email_cfg("SMTP_FROM")
+    if not (tenant and client and secret and sender):
+        raise RuntimeError("Graph not configured (need GRAPH_TENANT_ID, "
+                           "GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET, GRAPH_SENDER).")
+
+    app = msal.ConfidentialClientApplication(
+        client_id=client,
+        authority=f"https://login.microsoftonline.com/{tenant}",
+        client_credential=secret,
+    )
+    tok = app.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
+    access = tok.get("access_token")
+    if not access:
+        raise RuntimeError(f"Graph auth failed: {tok.get('error_description') or tok}")
+
+    def _recips(addrs: str | None):
+        if not addrs:
+            return []
+        from email.utils import getaddresses
+        return [{"emailAddress": {"address": a}} for _, a in getaddresses([addrs]) if a]
+
+    message: dict = {
+        "subject": subject,
+        "body": {"contentType": "HTML", "content": html},
+        "toRecipients": _recips(to_addr),
+    }
+    if cc:
+        message["ccRecipients"] = _recips(cc)
+    if bcc:
+        message["bccRecipients"] = _recips(bcc)
+
+    # Inline images ride as attachments with a Content-ID and isInline=true, so the
+    # HTML's cid: references resolve — the Graph analogue of the MIME-related part.
+    atts = []
+    for cid, path in (inline_images or {}).items():
+        if os.path.exists(path):
+            with open(path, "rb") as fh:
+                data = base64.b64encode(fh.read()).decode("ascii")
+            atts.append({
+                "@odata.type": "#microsoft.graph.fileAttachment",
+                "name": os.path.basename(path),
+                "contentId": cid,
+                "isInline": True,
+                "contentBytes": data,
+            })
+    if atts:
+        message["attachments"] = atts
+
+    resp = requests.post(
+        f"https://graph.microsoft.com/v1.0/users/{sender}/sendMail",
+        headers={"Authorization": f"Bearer {access}",
+                 "Content-Type": "application/json"},
+        json={"message": message, "saveToSentItems": True},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 202):
+        raise RuntimeError(f"Graph sendMail failed [{resp.status_code}]: {resp.text[:300]}")
+
+
 def send_email(subject: str, html: str, to_addr: str, cc: str | None = None,
                inline_images: dict | None = None, bcc: str | None = None) -> str:
-    """Dispatch: send via local Outlook if available, else fall back to SMTP (Cloud).
-    Returns which path was used ('outlook' | 'smtp'); raises if both fail."""
+    """Dispatch: local Outlook if available, else Microsoft Graph (Cloud), else SMTP.
+    Returns which path was used ('outlook' | 'graph' | 'smtp'); raises if all fail."""
     try:
         import win32com.client  # noqa: F401  (present only on the local machine)
         send_via_outlook(subject, html, to_addr, cc=cc, inline_images=inline_images, bcc=bcc)
         return "outlook"
     except Exception as e_out:
+        errors = [f"Outlook: {e_out}"]
+        if _graph_configured():
+            try:
+                send_via_graph(subject, html, to_addr, cc=cc,
+                               inline_images=inline_images, bcc=bcc)
+                return "graph"
+            except Exception as e_graph:
+                errors.append(f"Graph: {e_graph}")
         try:
             send_via_smtp(subject, html, to_addr, cc=cc, inline_images=inline_images, bcc=bcc)
             return "smtp"
         except Exception as e_smtp:
-            raise RuntimeError(f"Email send failed — Outlook: {e_out}; SMTP: {e_smtp}")
+            errors.append(f"SMTP: {e_smtp}")
+            raise RuntimeError("Email send failed — " + "; ".join(errors))
 
 
 def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
