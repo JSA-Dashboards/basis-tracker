@@ -12,12 +12,17 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
+from urllib.parse import urlencode
 
 import requests
+from bs4 import BeautifulSoup
 
 log = logging.getLogger(__name__)
 
-_API_URL    = "https://www.cihedging.com/cih/api/index.cfm/origination/cashbids/145642"
+# CIHedging retired the old /origination/cashbids/<id> path (now HTTP 500). The
+# live widget is the v2 endpoint (same one cihedging_scraper.py uses), returning
+# the bid grid as a JSON-encoded HTML string.
+_API        = "https://www.cihedging.com/cih/api/index.cfm/v2/origination/cashbids/{cid}/widget?{qs}"
 _COMPANY_ID = 145642
 
 _HEADERS = {
@@ -39,110 +44,79 @@ _MONTH_CODES: dict[str, str] = {
     "Sep": "U", "Oct": "V", "Nov": "X", "Dec": "Z",
 }
 
-# Regex to extract rows: delivery, futures label, futures price, change, basis.
-# "Jul'26" uses a plain ASCII apostrophe.
-_ROW_RE = re.compile(
-    r'<span>([A-Z][a-z]+ \d{4})</span>'    # group 1: delivery  "Jun 2026"
-    r'.*?'
-    r"<span>([A-Z][a-z]+'\d{2})</span>"     # group 2: futures   "Jul'26"
-    r'.*?'
-    r'cashbid_price">([\d.]+)</td>'          # group 3: futures price
-    r'.*?'
-    r'cashbid_price">([-+]?[\d.]+)</td>'    # group 4: change
-    r'.*?'
-    r'cashbid_price">([-+]?[\d.]+)</td>',   # group 5: basis (dollars)
-    re.DOTALL,
-)
-
-
-def _futures_label_to_cme(label: str, grain_root: str) -> str | None:
-    """
-    Convert widget label like "Jul'26" to CME symbol like "ZSN26".
-    grain_root: "ZS" for Soybeans.
-    """
-    m = re.match(r"([A-Z][a-z]+)'(\d{2})$", label)
+def _fut_to_cme(text: str, grain_root: str = "ZS") -> str | None:
+    """v2 futures cell 'Nov 26 …' → CME symbol 'ZSX26'."""
+    m = re.match(r"([A-Za-z]{3})\s+(\d{2})", text.strip())
     if not m:
         return None
-    month_abbr, yr = m.group(1), m.group(2)
-    code = _MONTH_CODES.get(month_abbr)
-    if not code:
-        return None
-    return f"{grain_root}{code}{yr}"
+    code = _MONTH_CODES.get(m.group(1).title())
+    return f"{grain_root}{code}{m.group(2)}" if code else None
 
 
-def _parse_grain_section(section_html: str, grain_root: str) -> list[dict]:
-    """Parse one grain section's HTML into a list of bid dicts."""
-    rows: list[dict] = []
-    seen: set[str] = set()
-
-    for m in _ROW_RE.finditer(section_html):
-        delivery    = m.group(1).strip()   # "Jun 2026"
-        fut_label   = m.group(2).strip()   # "Jul'26"
-        # The change cell uses class "cashbid_price numberNegative/Positive" so
-        # cashbid_price"> only matches futures price (g3) and basis (g4).
-        basis_usd   = float(m.group(4))    # e.g. -0.10
-
-        cme_sym = _futures_label_to_cme(fut_label, grain_root)
-        if not cme_sym:
-            log.debug("MNSP: unrecognised futures label %r", fut_label)
-            continue
-
-        key = f"{delivery}|{cme_sym}"
-        if key in seen:
-            continue
-        seen.add(key)
-
-        rows.append({
-            "delivery":    delivery,
-            "cme_symbol":  cme_sym,
-            "basis_cents": int(round(basis_usd * 100)),
-        })
-
-    return rows
+def _widget_qs() -> str:
+    return urlencode({
+        "commodity_ids": "", "custom_commodity_ids": "", "exclude_non_custom": "false",
+        "exclude_custom": "false", "address_ids": "", "show_cash_bid_title": "true",
+        "show_cash_bid_filters": "true", "show_cash_bid_note": "true",
+        "show_location_names": "true", "with_new_chart": "true",
+    })
 
 
 def fetch_mnsoy_bids() -> list[dict]:
     """
-    Fetch MNSP soybean bids.
+    Fetch MNSP soybean bids from the CIHedging v2 widget (company 145642).
 
-    Returns a list with one entry (single location):
-        {
-            "location":  "Brewster",
-            "timestamp": str,   # ISO-8601 UTC date-normalised
-            "bids":      [{"delivery", "cme_symbol", "basis_cents"}],
-        }
-    Returns an empty list on fetch/parse failure.
+    Parses ONLY the "Soybeans" commodity section — the widget also exposes
+    "Soybean Meal" ($/ton) and "Soybean Pellets", which must NOT be mixed into the
+    ¢/bu soybean basis. Returns a single-location list:
+        {"location": "Brewster", "timestamp": str,
+         "bids": [{"delivery", "cme_symbol", "basis_cents"}]}
+    Empty list on fetch/parse failure.
     """
     today_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
-
+    url = _API.format(cid=_COMPANY_ID, qs=_widget_qs())
     try:
-        resp = requests.post(_API_URL, headers=_HEADERS, timeout=20)
+        resp = requests.post(url, headers=_HEADERS, timeout=25)
         resp.raise_for_status()
-        html: str = resp.json()   # API returns a JSON-encoded HTML string
+        html: str = resp.json()   # endpoint returns the HTML grid as a JSON string
     except Exception as exc:
         log.error("MNSP: fetch failed: %s", exc)
         return []
 
-    # Split by grain-section headers; the h2 text may have surrounding whitespace.
-    # Each part after split starts with stripped grain name content.
-    parts = re.split(r'<h2[^>]*>', html)
-    soy_html = ""
-    for part in parts:
-        if re.match(r'\s*Soybeans\s*</h2>', part):
-            soy_html = part
-            break
-        # Also catch if "Soybeans" appears in first 40 chars (whitespace-padded)
-        if "Soybeans" in part[:40] and "Meal" not in part[:40] and "Pellet" not in part[:40]:
-            soy_html = part
-            break
+    soup = BeautifulSoup(html, "html.parser")
+    bids: list[dict] = []
+    seen: set[str] = set()
+    for com in soup.select("div.cih-com-row[data-commodity-name]"):
+        if (com.get("data-commodity-name") or "").strip().lower() != "soybeans":
+            continue                                   # skip Soybean Meal / Pellets
+        tbl = com.find("table", class_="cih-table")
+        if not tbl:
+            continue
+        for tr in tbl.find_all("tr", attrs={"data-delivery-period-label": True}):
+            tds = tr.find_all("td")
+            if len(tds) < 5:
+                continue
+            label = (tr.get("data-delivery-period-label") or "").strip()
+            year  = tr.get("data-delivery-year") or ""
+            cme   = _fut_to_cme(tds[1].get_text(" ", strip=True), "ZS")
+            if not cme:
+                continue
+            basis_txt = tds[3].get_text(strip=True).replace("+", "")
+            try:
+                basis_cents = int(round(float(basis_txt) * 100))
+            except ValueError:
+                continue
+            delivery = label if re.search(r"\d{4}", label) else (
+                f"{label} {year}".strip() if year else label)
+            key = f"{delivery}|{cme}"
+            if key in seen:
+                continue
+            seen.add(key)
+            bids.append({"delivery": delivery, "cme_symbol": cme,
+                         "basis_cents": basis_cents})
 
-    if not soy_html:
-        log.warning("MNSP: Soybeans section not found in response")
-        return []
-
-    bids = _parse_grain_section(soy_html, grain_root="ZS")
     if not bids:
-        log.warning("MNSP: no soybean bids parsed")
+        log.warning("MNSP: no soybean bids parsed (widget layout may have changed)")
         return []
 
     log.info("MNSP Brewster  %d soybean bid(s)", len(bids))
