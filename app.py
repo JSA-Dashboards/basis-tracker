@@ -324,9 +324,13 @@ _CME_MONTH_TO_INT = {
 
 def _front_month_row(rows, grain):
     """
-    Return the row with the nearest (smallest expiration) futures symbol for `grain`.
-    This is the "spot" bid — the front-month contract currently being traded.
-    Skips explicit isSpot rows and any rows with unparseable symbols.
+    Return the "spot" bid for `grain` — the nearest DELIVERY window, not merely the
+    nearest futures contract. After a contract roll several delivery windows share
+    one contract (e.g. Sep/Oct/FH-Nov/LH-Nov/Dec all vs ZCZ26 once CU is off the
+    board); ranking by the futures symbol alone ties them and the winner fell to
+    the scraper's arbitrary row order (so "LH Nov" could show as spot). Ranking by
+    delivery_period.deliv_key picks the truly nearest window (September) and is
+    deterministic. Skips explicit isSpot rows and rows with unparseable symbols.
     """
     candidates = []
     for r in rows:
@@ -339,15 +343,12 @@ def _front_month_row(rows, grain):
         yr2 = sym[-2:]
         if not yr2.isdigit():
             continue
-        mon = _CME_MONTH_TO_INT.get(month_code)
-        if not mon:
+        if _CME_MONTH_TO_INT.get(month_code) is None:
             continue
-        year = 2000 + int(yr2)
-        candidates.append(((year, mon), r))
+        candidates.append(r)
     if not candidates:
         return None
-    candidates.sort(key=lambda x: x[0])
-    return candidates[0][1]
+    return min(candidates, key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
 
 
 def compute_changes(snapshots):
@@ -4171,7 +4172,9 @@ with tab_bids:
         snaps_up_to = snapshots[: snapshots.index(viewing) + 1]
         changes     = compute_changes(snaps_up_to)
 
-        body_rows      = [r for r in viewing.rows if not r.isSpot and _grain_disp(r.grain) == grain]
+        body_rows      = sorted(
+            [r for r in viewing.rows if not r.isSpot and _grain_disp(r.grain) == grain],
+            key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
         explicit_spot  = next((r for r in viewing.rows
                                if r.isSpot and _grain_disp(r.spotGrain or r.grain) == grain), None)
         derived_spot   = _front_month_row(viewing.rows, grain)
