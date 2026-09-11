@@ -174,6 +174,12 @@ def _cached_rail_fob() -> dict:
     return palmetto_rail_scraper.fetch_rail_fob() or {}
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _cached_rail_fob_all(source: str) -> list:
+    """Every rail_fob cell for a source across all dates (Net Carry / trends)."""
+    from database import get_rail_fob_all
+    return get_rail_fob_all(source)
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _cached_river_dates() -> list:
     import river_fob_data
     return river_fob_data.list_dates()
@@ -2096,7 +2102,7 @@ _admin = not _view_only()
 _tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB"]
 if _admin:
     _tab_labels.append("✏️ Rail Entry")      # admin: paste-in rail rundowns
-_tab_labels += ["🌊 River FOB", "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
+_tab_labels += ["💵 Net Carry", "🌊 River FOB", "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
 if _admin:
     _tab_labels.append("📥 Export")          # no download tab in the read-only build
     _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
@@ -2106,6 +2112,7 @@ tab_changes  = _ti["🔔 Changes"]
 tab_spotfwd  = _ti["🌙 Nightly Recap"]
 tab_bids     = _ti["📋 Bids"]
 tab_railfob  = _ti["🚂 Rail FOB"]
+tab_netcarry = _ti["💵 Net Carry"]
 tab_riverfob = _ti["🌊 River FOB"]
 tab_map      = _ti["🗺️ Map"]
 tab_summary  = _ti["📊 Summary"]
@@ -3331,6 +3338,213 @@ if tab_railentry is not None:
                     for _k in ("rail_entry_rows", "rail_entry_warn", "rail_entry_meta"):
                         st.session_state.pop(_k, None)
                     st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: NET CARRY  (forward basis vs one contract, net of the cost to carry)
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_netcarry:
+    import net_carry as _ncmod
+    import pandas as _nc_pd
+    import altair as _nc_alt
+    from datetime import date as _nc_date
+
+    st.markdown(
+        '<div style="font-size:15px;font-weight:700;color:#32373c;margin-bottom:2px">'
+        '💵 Net Carry</div>'
+        '<div style="font-size:12px;color:#64748b;margin-bottom:12px">'
+        'Each delivery\'s basis re-expressed against one futures contract, then netted '
+        'against the cost to carry grain forward. <b>Inverse (+)</b> = market pays to move '
+        'now; <b>Carry (−)</b> = market pays to store.</div>',
+        unsafe_allow_html=True,
+    )
+
+    _nc_a, _nc_b = st.columns([3, 7])
+    with _nc_a:
+        _nc_kind = st.radio("Location type", ["Basis location", "Rail corridor"],
+                            horizontal=True, key="nc_kind")
+
+    # ── Assemble the chosen location's forward quotes (items) + available dates ──
+    _nc_items = None          # list[{delivery, futures, basis}] once a date is picked
+    _nc_title = ""
+    _nc_asof = None           # date object for the picked posting date
+    _nc_grain = None
+
+    if _nc_kind == "Basis location":
+        _nc_locs = _cached_list_locations()
+        if not _nc_locs:
+            st.info("No basis locations with data yet.")
+        else:
+            _nc_provs = sorted({r["provider"] for r in _nc_locs})
+            _c1, _c2, _c3 = st.columns(3)
+            with _c1:
+                _nc_prov = st.selectbox("Provider", _nc_provs, key="nc_prov")
+            _nc_plocs = sorted({r["location"] for r in _nc_locs if r["provider"] == _nc_prov})
+            with _c2:
+                _nc_loc = st.selectbox("Location", _nc_plocs, key=f"nc_loc_{_nc_prov}")
+            _nc_snaps = _cached_get_snapshots(_nc_prov, _nc_loc)
+            if not _nc_snaps:
+                st.info("No snapshots for this location yet.")
+            else:
+                # newest snapshot per calendar date
+                _by_date = {}
+                for _s in _nc_snaps:
+                    _by_date[_s.timestamp[:10]] = _s          # later wins (ordered asc)
+                _nc_dates = sorted(_by_date, reverse=True)
+                _latest_rows = _by_date[_nc_dates[0]].rows
+                _nc_grains = _build_grains(_latest_rows) or ["—"]
+                with _c3:
+                    _nc_grain = st.selectbox("Commodity", _nc_grains, key="nc_grain_b")
+                _dsel = st.selectbox(
+                    "As-of date", _nc_dates, index=0, key=f"nc_date_b_{_nc_prov}_{_nc_loc}",
+                    format_func=lambda d: _nc_date.fromisoformat(d).strftime("%b %d, %Y")
+                    + (" · latest" if d == _nc_dates[0] else ""))
+                _snap = _by_date[_dsel]
+                _nc_items = [
+                    {"delivery": r.deliveryMonth, "futures": r.futuresSymbol,
+                     "basis": r.basisCents}
+                    for r in _snap.rows
+                    if not r.isSpot and _grain_disp(r.grain) == _nc_grain
+                    and r.basisCents is not None
+                ]
+                _nc_asof = _nc_date.fromisoformat(_dsel)
+                _nc_title = f"{_nc_prov} · {_nc_loc}"
+
+    else:  # Rail corridor
+        _rail_all = _cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto")
+        if not _rail_all:
+            st.info("No rail corridor data yet.")
+        else:
+            _mkts = sorted({r["market"] for r in _rail_all})
+            _c1, _c2, _c3 = st.columns(3)
+            with _c1:
+                _nc_mkt = st.selectbox("Corridor", _mkts, key="nc_mkt")
+            _mkt_rows = [r for r in _rail_all if r["market"] == _nc_mkt]
+            _mkt_grains = sorted({(r.get("commodity") or "Corn") for r in _mkt_rows}) or ["Corn"]
+            with _c2:
+                _nc_grain = st.selectbox("Commodity", _mkt_grains, key=f"nc_grain_r_{_nc_mkt}")
+            _g_rows = [r for r in _mkt_rows if (r.get("commodity") or "Corn") == _nc_grain]
+            _rdates = sorted({str(r["date"]) for r in _g_rows}, reverse=True)
+            if not _rdates:
+                st.info("No postings for this corridor/commodity.")
+            else:
+                with _c3:
+                    _dsel = st.selectbox(
+                        "As-of date", _rdates, index=0, key=f"nc_date_r_{_nc_mkt}_{_nc_grain}",
+                        format_func=lambda d: _nc_date.fromisoformat(d[:10]).strftime("%b %d, %Y")
+                        + (" · latest" if d == _rdates[0] else ""))
+                _nc_items = [
+                    {"delivery": r["period"], "futures": r.get("futures"), "basis": r["bid"]}
+                    for r in _g_rows if str(r["date"]) == _dsel and r.get("bid") is not None
+                ]
+                _nc_asof = _nc_date.fromisoformat(_dsel[:10])
+                _nc_title = _nc_mkt
+
+    # ── Controls: reference contract, carry anchor, interest rate ──────────────
+    if _nc_items is not None and len(_nc_items) >= 1:
+        _o1, _o2, _o3 = st.columns(3)
+        with _o1:
+            _ref_mode_lbl = st.radio(
+                "Express basis vs", ["Nearest new-crop", "Front / nearest active"],
+                horizontal=True, key="nc_refmode")
+        _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        with _o2:
+            _anchor_lbl = st.selectbox("Carry starts (interest = 0)", _MONTHS,
+                                       index=9, key="nc_anchor")   # default October
+        with _o3:
+            _rate_pct = st.number_input("Interest rate (annual %)", min_value=0.0,
+                                        max_value=25.0, value=9.0, step=0.25, key="nc_rate")
+        _anchor_month = _MONTHS.index(_anchor_lbl) + 1
+
+        _curve = _cached_futures_curve_for(_nc_asof.isoformat())
+        _ref_mode = "newcrop" if _ref_mode_lbl.startswith("Nearest new") else "front"
+        _ref_sym = _ncmod.reference_symbol(_nc_grain, _ref_mode, _curve, _nc_asof)
+        _nc_rows, _nc_meta = _ncmod.compute_net_carry(
+            _nc_items, _ref_sym, _curve, _anchor_month, _rate_pct / 100.0)
+
+        # ── Summary line ──────────────────────────────────────────────────────
+        _refp = _nc_meta["ref_price"]
+        _pm = _nc_meta["per_month"]
+        _bits = [f"Reference <b>{_ref_sym or '—'}</b>"]
+        if _refp is not None:
+            _bits.append(f"board {_refp/100:.2f}")
+        if _pm is not None:
+            _bits.append(f"interest <b>{_pm:.2f}¢/mo</b> @ {_rate_pct:.2f}%")
+        _bits.append(f"carry from <b>{_anchor_lbl}</b>")
+        st.markdown(
+            f'<div style="font-size:11px;color:#64748b;margin:6px 0 10px">'
+            f'{" · ".join(_bits)}</div>', unsafe_allow_html=True)
+        if not _nc_meta["all_converted"]:
+            st.caption("⚠️ Some deliveries lack a futures spread to the reference contract — "
+                       "those rows show raw basis (flagged ·) and their carry may be off.")
+        if _nc_meta.get("skipped"):
+            st.caption("Not on the carry ladder (no single delivery month): "
+                       + ", ".join(_nc_meta["skipped"]))
+
+        # ── Table (matches the Net Carry sheet) ───────────────────────────────
+        def _f(v, dec=1, sign=True):
+            if v is None:
+                return "—"
+            return (f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}")
+
+        _hdr = ("Delivery", f"Basis {_ref_sym or ''}", "Interest",
+                f"Net of Interest {_ref_sym or ''}", "Inverse(+)/Carry(−)")
+        _cells = []
+        for _r in _nc_rows:
+            _icell = "" if _r.months == 0 else _f(_r.interest, 1, sign=False)
+            if _r.carry is None:
+                _ccell = ""
+            else:
+                _col = ("#0a7f3f" if _r.carry > 0.0049 else
+                        "#c0392b" if _r.carry < -0.0049 else "#64748b")
+                _ccell = f'<span style="color:{_col};font-weight:600">{_f(_r.carry)}</span>'
+            _flag = "" if _r.converted else ' <span style="color:#c0392b">·</span>'
+            _cells.append((f"{_r.delivery}{_flag}", _f(_r.basis_ref), _icell,
+                           _f(_r.net), _ccell))
+
+        _th = "".join(
+            f'<th style="text-align:{"left" if i==0 else "right"};padding:6px 12px;'
+            f'border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;'
+            f'text-transform:uppercase;letter-spacing:.03em;white-space:nowrap">{h}</th>'
+            for i, h in enumerate(_hdr))
+        _tr = ""
+        for _row in _cells:
+            _tds = "".join(
+                f'<td style="text-align:{"left" if i==0 else "right"};padding:5px 12px;'
+                f'border-bottom:1px solid #eef2f6;font-size:13px;'
+                f'font-variant-numeric:tabular-nums">{c}</td>'
+                for i, c in enumerate(_row))
+            _tr += f"<tr>{_tds}</tr>"
+        st.markdown(
+            f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:4px 0 6px">'
+            f'{_nc_title}</div>'
+            f'<table style="border-collapse:collapse;min-width:560px">'
+            f'<thead><tr>{_th}</tr></thead><tbody>{_tr}</tbody></table>',
+            unsafe_allow_html=True)
+
+        # ── Carry-by-month bar (green inverse / red carry) ────────────────────
+        _bar_pts = [{"Delivery": _r.delivery, "Carry": _r.carry}
+                    for _r in _nc_rows if _r.carry is not None]
+        if _bar_pts:
+            _bar_order = [p["Delivery"] for p in _bar_pts]
+            _bar_df = _nc_pd.DataFrame(_bar_pts)
+            st.markdown(
+                '<div style="margin-top:16px;margin-bottom:4px;font-size:10px;color:#64748b;'
+                'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
+                'Inverse (+) / Carry (−) by delivery</div>', unsafe_allow_html=True)
+            _bar = (
+                _nc_alt.Chart(_bar_df).mark_bar().encode(
+                    x=_nc_alt.X("Delivery:N", sort=_bar_order, title=None,
+                               axis=_nc_alt.Axis(labelAngle=-30, labelFontSize=10)),
+                    y=_nc_alt.Y("Carry:Q", title="¢/bu", axis=_nc_alt.Axis(labelFontSize=10)),
+                    color=_nc_alt.condition(_nc_alt.datum.Carry > 0,
+                                            _nc_alt.value("#0a7f3f"), _nc_alt.value("#c0392b")),
+                    tooltip=[_nc_alt.Tooltip("Delivery:N"),
+                             _nc_alt.Tooltip("Carry:Q", title="Inverse(+)/Carry(−)", format="+.1f")],
+                ).properties(height=180))
+            st.altair_chart(_bar, use_container_width=True)
+    elif _nc_items is not None:
+        st.info("Not enough forward quotes to build a carry curve for this selection.")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RIVER FOB  (read-only view of the JSA FOB Sheet, shared Supabase archive)
