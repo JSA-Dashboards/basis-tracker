@@ -82,6 +82,15 @@ SITES: list[dict] = [
     {"provider": "Heron Lake BioEnergy", "location": "Heron Lake, MN", "state": "MN",
      "facility_type": "Corn Processing", "company_id": 15562, "commodity_ids": "",
      "origin": "https://granitefallsenergy.com"},
+    {"provider": "Bushmills Ethanol", "location": "Atwater, MN", "state": "MN",
+     "facility_type": "Corn Processing", "company_id": 110773, "commodity_ids": "",
+     "origin": "https://bushmillsethanol.com"},
+    {"provider": "Red River Energy", "location": "Rosholt, SD", "state": "SD",
+     "facility_type": "Corn Processing", "company_id": 22569, "commodity_ids": "",
+     "origin": "https://www.redriverenergy.com"},
+    {"provider": "Chippewa Valley (CVEC)", "location": "Benson, MN", "state": "MN",
+     "facility_type": "Corn Processing", "company_id": 23921, "commodity_ids": "",
+     "origin": "https://cvec.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",

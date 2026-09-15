@@ -246,6 +246,12 @@ _PROVIDER_COLOR: dict[str, str] = {
     "Mennel":    "#a3243b",
     "Agtegra":   "#5a8a2c",
     "Bartlett":  "#b45309",
+    "West-Con":  "#2563eb",
+    "Wheaton Dumont Co-Op": "#0d9488",
+    "Elbow Lake Co-op Grain": "#7c3aed",
+    "Bushmills Ethanol": "#ea580c",
+    "Red River Energy": "#b91c1c",
+    "Chippewa Valley (CVEC)": "#0891b2",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -3725,7 +3731,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.selectbox(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)"],
             label_visibility="collapsed",
         )
 
@@ -4234,7 +4240,7 @@ with tab_bids:
                        "Mid Missouri", "JBS", "Heartland Coop", "Alto",
                        "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag",
                        "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio",
-                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO"):
+                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so. The five Bushel
@@ -4265,7 +4271,13 @@ with tab_bids:
                       "E Energy": "--dtn-only",
                       "Dakota Ethanol": "--dtn-only",
                       "GreenAmerica": "--dtn-only",
-                      "WGM": "--agmd-only"}.get(provider)
+                      "WGM": "--agmd-only",
+                      "West-Con": "--agmd-only",
+                      "Wheaton Dumont Co-Op": "--agmd-only",
+                      "Elbow Lake Co-op Grain": "--dtn-only",
+                      "Bushmills Ethanol": "--cihedging-only",
+                      "Red River Energy": "--cihedging-only",
+                      "Chippewa Valley (CVEC)": "--cihedging-only"}.get(provider)
                      or ("--bushelsites-only" if provider in _bushel else None))
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
                      "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",

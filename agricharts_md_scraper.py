@@ -44,6 +44,18 @@ SITES: list[dict] = [
      "url": "https://cvacoop365.agricharts.com/markets/cash.php?location_filter=83175"},
     {"provider": "WGM", "location": "Adair, IL", "state": "IL", "facility_type": "Rail Terminal",
      "url": "https://www.westerngrainmarketing.com/markets/cash.php?location_filter=86697"},
+    {"provider": "West-Con", "location": "Holloway, MN", "state": "MN",
+     "facility_type": "Country Elevator",
+     "url": "https://www.west-con.com/markets/cash.php?location_filter=1631"},
+    {"provider": "West-Con", "location": "Appleton, MN", "state": "MN",
+     "facility_type": "Country Elevator",
+     "url": "https://www.west-con.com/markets/cash.php?location_filter=1635"},
+    {"provider": "West-Con", "location": "Milbank, SD", "state": "SD",
+     "facility_type": "Country Elevator",
+     "url": "https://www.west-con.com/markets/cash.php?location_filter=1632"},
+    {"provider": "Wheaton Dumont Co-Op", "location": "Wheaton, MN", "state": "MN",
+     "facility_type": "Country Elevator",
+     "url": "https://www.wdcoop.com/markets/cash.php"},
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it

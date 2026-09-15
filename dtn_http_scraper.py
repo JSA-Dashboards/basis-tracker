@@ -46,6 +46,9 @@ SITES: list[dict] = [
     {"provider": "Glacial Lakes", "state": "SD", "facility_type": "Corn Processing",
      "grain": "Corn", "columnar": True,
      "url": "https://corn.glaciallakesenergy.com/"},
+    {"provider": "Elbow Lake Co-op Grain", "location": "Elbow Lake, MN", "state": "MN",
+     "facility_type": "Country Elevator", "grain": "Corn",
+     "url": "https://www.elbowlakecoopgrain.com/index.cfm?show=11&mid=5"},
 ]
 
 _SYM_RE = re.compile(r"@[A-Z]{1,2}\d[FGHJKMNQUVXZ]")
