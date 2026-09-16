@@ -135,6 +135,31 @@ SITES: list[dict] = [
           ("Prairie Central-Sunbury", 81942, "IL"), ("Prairie Creek-Elwood", 81943, "IL"),
           ("Ransom", 30152, "IL"), ("Route 30", 60470, "IL"), ("Serena", 30155, "IL"),
           ("St Anne", 26258, "IL"), ("Sycamore", 27472, "IL"), ("Yuton", 88043, "IL")]],
+    # Heritage Cooperative (OH) via heritagecoop.agricharts.com — own elevators
+    *[{"provider": "Heritage Cooperative", "location": f"{_town}, OH", "state": "OH",
+       "facility_type": "Country Elevator",
+       "url": f"https://heritagecoop.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Ada", 21608), ("Arlington", 21609), ("Cairo", 21610), ("Canfield", 47232),
+          ("Columbiana", 82922), ("DeGraff", 41137), ("East Liverpool", 47233),
+          ("Fletcher", 41143), ("Garfield", 82923), ("Kenton", 21601), ("Lisbon", 47236),
+          ("Marysville", 83797), ("McCutchenville", 62465), ("Mechanicsburg", 21605),
+          ("Nashport", 75576), ("New Philadelphia", 47234), ("Richwood", 62464),
+          ("Thackery", 21607), ("Upper Sandusky", 21602), ("Urbana", 21604),
+          ("Vanlue", 62466), ("West Liberty", 21606)]],
+    # Total Grain Marketing / TGM (IL, a Growmark FS co) via totalgrain.agricharts.com
+    *[{"provider": "Total Grain Marketing", "location": f"{_town}", "state": _st,
+       "facility_type": "Country Elevator",
+       "url": f"https://totalgrain.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id, _st in [
+          ("Arcola, IL", 83055, "IL"), ("Ashmore, IL", 83056, "IL"), ("Cadwell, IL", 83057, "IL"),
+          ("Casey, IL", 83058, "IL"), ("Champaign, IL", 83059, "IL"), ("Fairgrange, IL", 83063, "IL"),
+          ("Greenup, IL", 84057, "IL"), ("Greenville, IL", 83065, "IL"), ("Hillsboro, IN", 83066, "IN"),
+          ("Ingraham, IL", 83069, "IL"), ("Kansas, IL", 83070, "IL"), ("Lis, IL", 83072, "IL"),
+          ("Louisville, IL", 83073, "IL"), ("Lovington, IL", 83074, "IL"), ("Middlesworth, IL", 83075, "IL"),
+          ("Mulberry Grove, IL", 83076, "IL"), ("Neoga, IL", 83077, "IL"), ("Rose Hill, IL", 83079, "IL"),
+          ("Sandoval, IL", 83080, "IL"), ("Shelbyville, IL", 83081, "IL"), ("Stewardson, IL", 83082, "IL"),
+          ("Watson, IL", 83084, "IL"), ("Willow Hill, IL", 83085, "IL"), ("Windsor, IL", 83086, "IL")]],
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
