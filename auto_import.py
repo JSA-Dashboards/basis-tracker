@@ -132,6 +132,7 @@ from dtn_content_scraper import fetch_dtn_content         # DTN content-services
 from fse_scraper import fetch_fse                         # Farm Service Elevator (ASP.NET)
 from cpi_scraper import fetch_cpi                          # CPI (static HTML tables)
 from bushel_powered_scraper import fetch_bushel_powered    # newer Bushel (bushelpowered API)
+from landus_scraper import fetch_landus                    # Landus (Next.js API routes)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -770,6 +771,36 @@ def run_bushel_powered() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("Bushel-powered done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_landus() -> int:
+    """Scrape Landus Cooperative (IA) via its Next.js /api/cash-bids routes."""
+    log.info("=" * 60)
+    log.info("Landus scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_landus()
+    except Exception as exc:
+        log.error("Landus scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("Landus scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("Landus bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("Landus", [{"location": m["location"], "state": m.get("state"),
+                                          "facility_type": m.get("facility_type")} for m in metas])
+    except Exception as exc:
+        log.error("Landus meta upsert failed: %s", exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("Landus done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -2002,6 +2033,7 @@ def run(
     run_fse_scrape: bool = True,
     run_cpi_scrape: bool = True,
     run_bushel_powered_scrape: bool = True,
+    run_landus_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -2097,6 +2129,8 @@ def run(
         total += _run_guarded(run_cpi, "CPI", 120)
     if run_bushel_powered_scrape:
         total += _run_guarded(run_bushel_powered, "Bushel-powered", 120)
+    if run_landus_scrape:
+        total += _run_guarded(run_landus, "Landus", 180)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2374,6 +2408,9 @@ if __name__ == "__main__":
     bpow_group = parser.add_mutually_exclusive_group()
     bpow_group.add_argument("--no-bushel-powered", dest="no_bushel_powered", action="store_true", help="Skip newer-Bushel (bushelpowered API) plants (MichAg) scrape")
     bpow_group.add_argument("--bushel-powered-only", dest="bushel_powered_only", action="store_true", help="Run newer-Bushel (bushelpowered API) plants (MichAg) scrape only")
+    landus_group = parser.add_mutually_exclusive_group()
+    landus_group.add_argument("--no-landus", dest="no_landus", action="store_true", help="Skip Landus Cooperative (IA) scrape")
+    landus_group.add_argument("--landus-only", dest="landus_only", action="store_true", help="Run Landus Cooperative (IA) scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2540,6 +2577,9 @@ if __name__ == "__main__":
     elif args.bushel_powered_only:
         init_db()
         run_bushel_powered()
+    elif args.landus_only:
+        init_db()
+        run_landus()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2598,6 +2638,7 @@ if __name__ == "__main__":
             run_fse_scrape=not args.no_fse,
             run_cpi_scrape=not args.no_cpi,
             run_bushel_powered_scrape=not args.no_bushel_powered,
+            run_landus_scrape=not args.no_landus,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
