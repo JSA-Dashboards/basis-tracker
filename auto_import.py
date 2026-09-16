@@ -130,6 +130,7 @@ from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright insi
 from dtn_http_scraper import fetch_dtn_http               # browser-free aghost decode
 from dtn_content_scraper import fetch_dtn_content         # DTN content-services JSON API
 from fse_scraper import fetch_fse                         # Farm Service Elevator (ASP.NET)
+from cpi_scraper import fetch_cpi                          # CPI (static HTML tables)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -702,6 +703,36 @@ def run_fse() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("FSE done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_cpi() -> int:
+    """Scrape CPI (Cooperative Producers, Inc., NE) — static HTML location tables."""
+    log.info("=" * 60)
+    log.info("CPI scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_cpi()
+    except Exception as exc:
+        log.error("CPI scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("CPI scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("CPI bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("CPI", [{"location": m["location"], "state": m.get("state"),
+                                       "facility_type": m.get("facility_type")} for m in metas])
+    except Exception as exc:
+        log.error("CPI meta upsert failed: %s", exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("CPI done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1932,6 +1963,7 @@ def run(
     run_dtn_scrape: bool = True,
     run_dtn_content_scrape: bool = True,
     run_fse_scrape: bool = True,
+    run_cpi_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -2023,6 +2055,8 @@ def run(
         total += _run_guarded(run_dtn_content, "DTN-Content", 120)
     if run_fse_scrape:
         total += _run_guarded(run_fse, "FSE", 120)
+    if run_cpi_scrape:
+        total += _run_guarded(run_cpi, "CPI", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2294,6 +2328,9 @@ if __name__ == "__main__":
     fse_group = parser.add_mutually_exclusive_group()
     fse_group.add_argument("--no-fse", dest="no_fse", action="store_true", help="Skip Farm Service Elevator (Willmar/Swanville MN) scrape")
     fse_group.add_argument("--fse-only", dest="fse_only", action="store_true", help="Run Farm Service Elevator scrape only")
+    cpi_group = parser.add_mutually_exclusive_group()
+    cpi_group.add_argument("--no-cpi", dest="no_cpi", action="store_true", help="Skip CPI (Cooperative Producers, NE) scrape")
+    cpi_group.add_argument("--cpi-only", dest="cpi_only", action="store_true", help="Run CPI (Cooperative Producers, NE) scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2454,6 +2491,9 @@ if __name__ == "__main__":
     elif args.fse_only:
         init_db()
         run_fse()
+    elif args.cpi_only:
+        init_db()
+        run_cpi()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2510,6 +2550,7 @@ if __name__ == "__main__":
             run_dtn_scrape=not args.no_dtn,
             run_dtn_content_scrape=not args.no_dtn_content,
             run_fse_scrape=not args.no_fse,
+            run_cpi_scrape=not args.no_cpi,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
