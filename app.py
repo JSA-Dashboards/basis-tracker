@@ -3154,6 +3154,9 @@ with tab_railfob:
             ["BN PNW BE"],
             ["BN PNW CP"],   # → "CP PNW", very bottom
         ]),
+        ("CPKC Rail", [
+            ["CPKC Freight"],
+        ]),
     ]
     _rail_board("manual", _MANUAL_SECTIONS, "man")
 

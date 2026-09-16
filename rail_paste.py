@@ -239,6 +239,8 @@ _CORR_ALIASES = {
     "bn pnw": "BN PNW", "pnw": "BN PNW",
     "bn cobo": "BN COBO", "cobo": "BN COBO",
     "bn freight": "BN Freight", "bn 110 shuttle": "BN Freight", "bn shuttle": "BN Freight",
+    "cpkc freight": "CPKC Freight", "cpkc 110 shuttle": "CPKC Freight",
+    "cpkc shuttle": "CPKC Freight", "cpkc": "CPKC Freight", "cp kc": "CPKC Freight",
 }
 
 
