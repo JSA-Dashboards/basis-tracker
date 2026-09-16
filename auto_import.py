@@ -128,6 +128,7 @@ from cihedging_scraper import fetch_cihedging
 from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
 from dtn_http_scraper import fetch_dtn_http               # browser-free aghost decode
+from dtn_content_scraper import fetch_dtn_content         # DTN content-services JSON API
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -629,6 +630,42 @@ def run_cihedging() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("CIHedging done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_dtn_content() -> int:
+    """Scrape the DTN content-services cash-bid sites (NFP, Central United Co-op).
+    Multiple providers + auto-discovered locations, so metas are grouped per provider."""
+    log.info("=" * 60)
+    log.info("DTN content-services scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_dtn_content()
+    except Exception as exc:
+        log.error("DTN-content scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("DTN-content scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("DTN-content bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("DTN-content meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("DTN-content done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1857,6 +1894,7 @@ def run(
     run_cihedging_scrape: bool = True,
     run_vistacomm_scrape: bool = True,
     run_dtn_scrape: bool = True,
+    run_dtn_content_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -1944,6 +1982,8 @@ def run(
     if run_dtn_scrape:
         total += _run_guarded(run_dtn_http, "DTN-HTTP", 120)
         total += _run_guarded(run_dtn_playwright, "DTN", 480)
+    if run_dtn_content_scrape:
+        total += _run_guarded(run_dtn_content, "DTN-Content", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2209,6 +2249,9 @@ if __name__ == "__main__":
     dtn_group = parser.add_mutually_exclusive_group()
     dtn_group.add_argument("--no-dtn", dest="no_dtn", action="store_true", help="Skip DTN headless-render plants (Heron Lake) scrape")
     dtn_group.add_argument("--dtn-only", dest="dtn_only", action="store_true", help="Run DTN headless-render plants (Heron Lake) scrape only")
+    dtnc_group = parser.add_mutually_exclusive_group()
+    dtnc_group.add_argument("--no-dtn-content", dest="no_dtn_content", action="store_true", help="Skip DTN content-services plants (NFP, Central United) scrape")
+    dtnc_group.add_argument("--dtn-content-only", dest="dtn_content_only", action="store_true", help="Run DTN content-services plants (NFP, Central United) scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2363,6 +2406,9 @@ if __name__ == "__main__":
         init_db()
         run_dtn_http()
         run_dtn_playwright()
+    elif args.dtn_content_only:
+        init_db()
+        run_dtn_content()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2417,6 +2463,7 @@ if __name__ == "__main__":
             run_cihedging_scrape=not args.no_cihedging,
             run_vistacomm_scrape=not args.no_vistacomm,
             run_dtn_scrape=not args.no_dtn,
+            run_dtn_content_scrape=not args.no_dtn_content,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,

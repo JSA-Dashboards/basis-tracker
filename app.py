@@ -257,6 +257,8 @@ _PROVIDER_COLOR: dict[str, str] = {
     "New Vision Co-op": "#15803d",
     "Glacial Plains Cooperative": "#1d4ed8",
     "Farmward Cooperative": "#9333ea",
+    "NFP": "#be123c",
+    "Central United Co-op": "#0f766e",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -3739,7 +3741,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.selectbox(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op"],
             label_visibility="collapsed",
         )
 
@@ -4248,7 +4250,7 @@ with tab_bids:
                        "Mid Missouri", "JBS", "Heartland Coop", "Alto",
                        "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag",
                        "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio",
-                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative"):
+                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so. The five Bushel
@@ -4290,7 +4292,9 @@ with tab_bids:
                       "Highwater Ethanol": "--dtn-only",
                       "New Vision Co-op": "--agmd-only",
                       "Glacial Plains Cooperative": "--agmd-only",
-                      "Farmward Cooperative": "--agmd-only"}.get(provider)
+                      "Farmward Cooperative": "--agmd-only",
+                      "NFP": "--dtn-content-only",
+                      "Central United Co-op": "--dtn-content-only"}.get(provider)
                      or ("--bushelsites-only" if provider in _bushel else None))
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
                      "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",
