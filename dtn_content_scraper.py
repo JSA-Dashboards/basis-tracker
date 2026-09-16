@@ -50,10 +50,16 @@ _GRAIN = {
 SITES: list[dict] = [
     {"provider": "NFP", "site_id": "e0220801",
      "api_key": "bvXb0KenjViuRw8HotpxChPvaAx1R78d",
-     "facility_type": "Feed Mill"},
+     "facility_type": "Feed Mill", "origin": "https://www.nfpinc.com"},
     {"provider": "Central United Co-op", "site_id": "E0200701",
      "api_key": "0T9QFViMwN7qKJBG2VsVcv9yR7HAObJz",
-     "facility_type": "Country Elevator"},
+     "facility_type": "Country Elevator", "origin": "https://centralunitedcoop.com"},
+    {"provider": "Premier Cooperative", "site_id": "E0266901",
+     "api_key": "Ymv7TuCB46yoIZwTzFaXgijkFTIBGpHc",
+     "facility_type": "Country Elevator", "origin": "https://www.premiercooperative.com"},
+    {"provider": "Keystone Cooperative", "site_id": "E0135301",
+     "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl",
+     "facility_type": "Country Elevator", "origin": "https://www.keystonecoop.com"},
 ]
 
 
@@ -80,8 +86,12 @@ def fetch_dtn_content() -> tuple[list[NewSnapshotRequest], list[dict]]:
 
     for cfg in SITES:
         url = _API.format(site=cfg["site_id"], key=cfg["api_key"])
+        headers = dict(_HEADERS)
+        if cfg.get("origin"):        # some sites' apiKeys are referrer-gated (403 without)
+            headers["Origin"] = cfg["origin"]
+            headers["Referer"] = cfg["origin"].rstrip("/") + "/"
         try:
-            resp = requests.get(url, headers=_HEADERS, timeout=25)
+            resp = requests.get(url, headers=headers, timeout=25)
             resp.raise_for_status()
             data = resp.json()
         except Exception as exc:

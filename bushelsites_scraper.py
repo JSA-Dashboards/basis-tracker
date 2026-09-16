@@ -90,6 +90,11 @@ SITES: dict[str, dict] = {
         "style": "h2", "facility": "Country Elevator",
         "locmap": {"Boyd": ("Boyd, MN", "MN", "Country Elevator")},
     },
+    "Madison Farmers Elevator": {
+        "url": "https://madisonfarmerselevator.com/cash-bids",
+        "style": "h2", "facility": "Country Elevator",
+        "locmap": {"Madison": ("Madison, MN", "MN", "Country Elevator")},
+    },
 }
 
 

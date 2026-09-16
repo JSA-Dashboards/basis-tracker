@@ -91,6 +91,9 @@ SITES: list[dict] = [
     {"provider": "Chippewa Valley (CVEC)", "location": "Benson, MN", "state": "MN",
      "facility_type": "Corn Processing", "company_id": 23921, "commodity_ids": "",
      "origin": "https://cvec.com"},
+    {"provider": "Ringneck Energy", "location": "Onida, SD", "state": "SD",
+     "facility_type": "Corn Processing", "company_id": 24788, "commodity_ids": "",
+     "origin": "https://ringneckenergysd.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",

@@ -95,6 +95,21 @@ SITES: list[dict] = [
           ("Larchwood", 87558, "IA"), ("Lester", 87560, "IA"), ("Ocheyedan", 87561, "IA"),
           ("Rock Rapids", 87562, "IA"), ("Rock Valley", 87563, "IA"),
           ("Rushmore", 87564, "MN"), ("Sibley", 87565, "IA")]],
+    # AgKota (SD) via agkotagrain.com
+    *[{"provider": "AgKota", "location": f"{_town}", "state": _st,
+       "facility_type": "Country Elevator",
+       "url": f"https://www.agkotagrain.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id, _st in [
+          ("Plankinton, SD", 86551, "SD"), ("Colton, SD", 86552, "SD"),
+          ("Hartford, SD", 86553, "SD")]],
+    # Kokomo Grain (IN) via kokomograin.com — own elevators (ADM Fkt / T-L Laf are
+    # delivered points, excluded)
+    *[{"provider": "Kokomo Grain", "location": f"{_town}, IN", "state": "IN",
+       "facility_type": "Country Elevator",
+       "url": f"https://www.kokomograin.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Amboy", 20018), ("Edinburgh", 20020), ("Kokomo", 20021),
+          ("Winamac", 20023), ("Emporia", 31805), ("Anderson", 36292)]],
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
