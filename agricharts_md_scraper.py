@@ -110,6 +110,31 @@ SITES: list[dict] = [
       for _town, _id in [
           ("Amboy", 20018), ("Edinburgh", 20020), ("Kokomo", 20021),
           ("Winamac", 20023), ("Emporia", 31805), ("Anderson", 36292)]],
+    # Prairie Ag Partners (eastern SD) via prairieagpartners.com
+    *[{"provider": "Prairie Ag Partners", "location": f"{_town}, SD", "state": "SD",
+       "facility_type": "Country Elevator",
+       "url": f"https://prairieagpartners.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Arlington", 64574), ("Badger", 64576), ("Bancroft", 64578),
+          ("Carthage", 64581), ("DeSmet", 64583), ("Lake Preston", 64570),
+          ("Oldham", 64585)]],
+    # FS Grain (IL/IN) via fsgrain.com — own elevators only (ADM/CGB/CHS/Viterra/
+    # Viserion/Marquis delivered points, Direct Ships, DISABLED, and Storage-only
+    # duplicates excluded)
+    *[{"provider": "FS Grain", "location": f"{_town}, {_st}", "state": _st,
+       "facility_type": "Country Elevator",
+       "url": f"https://www.fsgrain.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id, _st in [
+          ("Ashton", 60464, "IL"), ("Bourbonnais", 26257, "IL"), ("Buda", 30141, "IL"),
+          ("Creston", 60466, "IL"), ("Exline", 79679, "IL"), ("Fitchmoor", 60468, "IL"),
+          ("Grand Ridge", 30142, "IL"), ("Harmon", 42343, "IL"), ("Holder", 88041, "IL"),
+          ("Kentland", 30145, "IN"), ("Lehigh", 76018, "IL"), ("Lisbon Center", 79681, "IL"),
+          ("Mazon", 30147, "IL"), ("McLean", 88042, "IL"),
+          ("Mendota Terminal", 86082, "IL"), ("Odell", 30149, "IL"), ("Ohio", 30150, "IL"),
+          ("Polo", 76031, "IL"), ("Prairie Central-Pontiac", 81941, "IL"),
+          ("Prairie Central-Sunbury", 81942, "IL"), ("Prairie Creek-Elwood", 81943, "IL"),
+          ("Ransom", 30152, "IL"), ("Route 30", 60470, "IL"), ("Serena", 30155, "IL"),
+          ("St Anne", 26258, "IL"), ("Sycamore", 27472, "IL"), ("Yuton", 88043, "IL")]],
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
