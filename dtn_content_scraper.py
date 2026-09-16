@@ -60,6 +60,9 @@ SITES: list[dict] = [
     {"provider": "Keystone Cooperative", "site_id": "E0135301",
      "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl",
      "facility_type": "Country Elevator", "origin": "https://www.keystonecoop.com"},
+    {"provider": "Centerra Co-op", "site_id": "E0178501",
+     "api_key": "fr4fNACpxBZUzXdgg0l8Snbd5XS5SBpK",
+     "facility_type": "Country Elevator", "origin": "https://www.centerracoop.com"},
 ]
 
 

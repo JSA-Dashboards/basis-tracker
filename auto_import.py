@@ -129,6 +129,7 @@ from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
 from dtn_http_scraper import fetch_dtn_http               # browser-free aghost decode
 from dtn_content_scraper import fetch_dtn_content         # DTN content-services JSON API
+from fse_scraper import fetch_fse                         # Farm Service Elevator (ASP.NET)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -666,6 +667,41 @@ def run_dtn_content() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("DTN-content done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_fse() -> int:
+    """Scrape Farm Service Elevator (Willmar via GET, Swanville via ASP.NET postback)."""
+    log.info("=" * 60)
+    log.info("FSE (fsemn.com) scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_fse()
+    except Exception as exc:
+        log.error("FSE scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("FSE scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("FSE bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("FSE meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("FSE done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1895,6 +1931,7 @@ def run(
     run_vistacomm_scrape: bool = True,
     run_dtn_scrape: bool = True,
     run_dtn_content_scrape: bool = True,
+    run_fse_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -1984,6 +2021,8 @@ def run(
         total += _run_guarded(run_dtn_playwright, "DTN", 480)
     if run_dtn_content_scrape:
         total += _run_guarded(run_dtn_content, "DTN-Content", 120)
+    if run_fse_scrape:
+        total += _run_guarded(run_fse, "FSE", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2252,6 +2291,9 @@ if __name__ == "__main__":
     dtnc_group = parser.add_mutually_exclusive_group()
     dtnc_group.add_argument("--no-dtn-content", dest="no_dtn_content", action="store_true", help="Skip DTN content-services plants (NFP, Central United) scrape")
     dtnc_group.add_argument("--dtn-content-only", dest="dtn_content_only", action="store_true", help="Run DTN content-services plants (NFP, Central United) scrape only")
+    fse_group = parser.add_mutually_exclusive_group()
+    fse_group.add_argument("--no-fse", dest="no_fse", action="store_true", help="Skip Farm Service Elevator (Willmar/Swanville MN) scrape")
+    fse_group.add_argument("--fse-only", dest="fse_only", action="store_true", help="Run Farm Service Elevator scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2409,6 +2451,9 @@ if __name__ == "__main__":
     elif args.dtn_content_only:
         init_db()
         run_dtn_content()
+    elif args.fse_only:
+        init_db()
+        run_fse()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2464,6 +2509,7 @@ if __name__ == "__main__":
             run_vistacomm_scrape=not args.no_vistacomm,
             run_dtn_scrape=not args.no_dtn,
             run_dtn_content_scrape=not args.no_dtn_content,
+            run_fse_scrape=not args.no_fse,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
