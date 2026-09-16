@@ -85,6 +85,11 @@ SITES: dict[str, dict] = {
             "Aledo/Edgington": ("Aledo/Edgington, IL", "IL", "Country Elevator"),
         },
     },
+    "Prairie Grain Partners": {
+        "url": "https://www.prairiegrainpartners.com/cashbidssingle-",
+        "style": "h2", "facility": "Country Elevator",
+        "locmap": {"Boyd": ("Boyd, MN", "MN", "Country Elevator")},
+    },
 }
 
 
