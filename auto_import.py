@@ -131,6 +131,7 @@ from dtn_http_scraper import fetch_dtn_http               # browser-free aghost 
 from dtn_content_scraper import fetch_dtn_content         # DTN content-services JSON API
 from fse_scraper import fetch_fse                         # Farm Service Elevator (ASP.NET)
 from cpi_scraper import fetch_cpi                          # CPI (static HTML tables)
+from bushel_powered_scraper import fetch_bushel_powered    # newer Bushel (bushelpowered API)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -733,6 +734,42 @@ def run_cpi() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("CPI done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_bushel_powered() -> int:
+    """Scrape the newer-Bushel (bushelpowered aggregator API) sites (MichAg …).
+    Multiple providers possible + auto-discovered locations, metas grouped per provider."""
+    log.info("=" * 60)
+    log.info("Bushel-powered scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_bushel_powered()
+    except Exception as exc:
+        log.error("Bushel-powered scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("Bushel-powered scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("Bushel-powered bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"),
+             "facility_type": m.get("facility_type")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("Bushel-powered meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("Bushel-powered done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -1964,6 +2001,7 @@ def run(
     run_dtn_content_scrape: bool = True,
     run_fse_scrape: bool = True,
     run_cpi_scrape: bool = True,
+    run_bushel_powered_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -2057,6 +2095,8 @@ def run(
         total += _run_guarded(run_fse, "FSE", 120)
     if run_cpi_scrape:
         total += _run_guarded(run_cpi, "CPI", 120)
+    if run_bushel_powered_scrape:
+        total += _run_guarded(run_bushel_powered, "Bushel-powered", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2331,6 +2371,9 @@ if __name__ == "__main__":
     cpi_group = parser.add_mutually_exclusive_group()
     cpi_group.add_argument("--no-cpi", dest="no_cpi", action="store_true", help="Skip CPI (Cooperative Producers, NE) scrape")
     cpi_group.add_argument("--cpi-only", dest="cpi_only", action="store_true", help="Run CPI (Cooperative Producers, NE) scrape only")
+    bpow_group = parser.add_mutually_exclusive_group()
+    bpow_group.add_argument("--no-bushel-powered", dest="no_bushel_powered", action="store_true", help="Skip newer-Bushel (bushelpowered API) plants (MichAg) scrape")
+    bpow_group.add_argument("--bushel-powered-only", dest="bushel_powered_only", action="store_true", help="Run newer-Bushel (bushelpowered API) plants (MichAg) scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2494,6 +2537,9 @@ if __name__ == "__main__":
     elif args.cpi_only:
         init_db()
         run_cpi()
+    elif args.bushel_powered_only:
+        init_db()
+        run_bushel_powered()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2551,6 +2597,7 @@ if __name__ == "__main__":
             run_dtn_content_scrape=not args.no_dtn_content,
             run_fse_scrape=not args.no_fse,
             run_cpi_scrape=not args.no_cpi,
+            run_bushel_powered_scrape=not args.no_bushel_powered,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
