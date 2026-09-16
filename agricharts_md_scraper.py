@@ -81,6 +81,20 @@ SITES: list[dict] = [
           ("Morgan", 87428), ("Morton", 87429), ("Olivia", 87426),
           ("Renville", 87423), ("Sacred Heart", 87425), ("Springfield", 87430),
           ("Wood Lake", 87427)]],
+    # Cooperative Farmers Elevator (CFE) — NW IA / SW MN via coopfe.agricharts.com
+    # (coopfe.com itself is WAF-blocked; the agricharts data host is not).
+    *[{"provider": "Cooperative Farmers Elevator", "location": f"{_town}, {_st}",
+       "state": _st, "facility_type": "Country Elevator",
+       "url": f"https://coopfe.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id, _st in [
+          ("Allendorf", 87548, "IA"), ("Alvord", 87549, "IA"), ("Ashton", 87550, "IA"),
+          ("Bigelow", 87551, "MN"), ("George", 87552, "IA"),
+          ("George Downtown", 88029, "IA"), ("Germantown", 87566, "MN"),
+          ("Harris", 87553, "IA"), ("Hartley", 87554, "IA"), ("Hawarden", 87555, "IA"),
+          ("Hudson", 87556, "SD"), ("Inwood", 87557, "IA"), ("Lake Park", 87559, "IA"),
+          ("Larchwood", 87558, "IA"), ("Lester", 87560, "IA"), ("Ocheyedan", 87561, "IA"),
+          ("Rock Rapids", 87562, "IA"), ("Rock Valley", 87563, "IA"),
+          ("Rushmore", 87564, "MN"), ("Sibley", 87565, "IA")]],
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
