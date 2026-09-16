@@ -56,6 +56,31 @@ SITES: list[dict] = [
     {"provider": "Wheaton Dumont Co-Op", "location": "Wheaton, MN", "state": "MN",
      "facility_type": "Country Elevator",
      "url": "https://www.wdcoop.com/markets/cash.php"},
+    # New Vision Co-op (SW MN) — own elevators via newvision.agricharts.com
+    *[{"provider": "New Vision Co-op", "location": f"{_town}, MN", "state": "MN",
+       "facility_type": "Country Elevator",
+       "url": f"https://newvision.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Adrian", 46899), ("Beaver Creek", 18652), ("Brewster", 46894),
+          ("Dundee", 46900), ("Ellsworth", 46901), ("Heron Lake", 46895),
+          ("Hills Terminal", 18650), ("Jeffers", 46902), ("Magnolia", 20359),
+          ("Miloma", 41203), ("Mountain Lake", 46896), ("Reading", 46904),
+          ("Wilmont", 46905), ("Windom", 46898), ("Worthington", 46897)]],
+    # Glacial Plains Cooperative (MN) via glacialplains.agricharts.com
+    *[{"provider": "Glacial Plains Cooperative", "location": f"{_town}, MN", "state": "MN",
+       "facility_type": "Country Elevator",
+       "url": f"https://glacialplains.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Benson", 20326), ("DeGraff", 20330), ("Milan", 20325), ("Murdock", 31737)]],
+    # Farmward Cooperative (MN) via farmward.agricharts.com
+    *[{"provider": "Farmward Cooperative", "location": f"{_town}, MN", "state": "MN",
+       "facility_type": "Country Elevator",
+       "url": f"https://farmward.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Clements", 87431), ("Comfrey", 87432), ("Danube East", 87424),
+          ("Morgan", 87428), ("Morton", 87429), ("Olivia", 87426),
+          ("Renville", 87423), ("Sacred Heart", 87425), ("Springfield", 87430),
+          ("Wood Lake", 87427)]],
 ]
 
 # A FOURTH AgriCharts variant: the "/bidlist" template. Instead of writeBidRow it
