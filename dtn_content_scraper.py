@@ -52,16 +52,18 @@ SITES: list[dict] = [
      "api_key": "bvXb0KenjViuRw8HotpxChPvaAx1R78d",
      "facility_type": "Feed Mill", "origin": "https://www.nfpinc.com"},
     {"provider": "Central United Co-op", "site_id": "E0200701",
-     "api_key": "0T9QFViMwN7qKJBG2VsVcv9yR7HAObJz",
+     "api_key": "0T9QFViMwN7qKJBG2VsVcv9yR7HAObJz", "state": "MN",
      "facility_type": "Country Elevator", "origin": "https://centralunitedcoop.com"},
     {"provider": "Premier Cooperative", "site_id": "E0266901",
-     "api_key": "Ymv7TuCB46yoIZwTzFaXgijkFTIBGpHc",
+     "api_key": "Ymv7TuCB46yoIZwTzFaXgijkFTIBGpHc", "state": "WI",
      "facility_type": "Country Elevator", "origin": "https://www.premiercooperative.com"},
     {"provider": "Keystone Cooperative", "site_id": "E0135301",
-     "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl",
+     "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl", "state": "IN",
      "facility_type": "Country Elevator", "origin": "https://www.keystonecoop.com"},
+    # Centerra is mostly OH; Volant is its PA location.
     {"provider": "Centerra Co-op", "site_id": "E0178501",
-     "api_key": "fr4fNACpxBZUzXdgg0l8Snbd5XS5SBpK",
+     "api_key": "fr4fNACpxBZUzXdgg0l8Snbd5XS5SBpK", "state": "OH",
+     "states": {"Volant": "PA"},
      "facility_type": "Country Elevator", "origin": "https://www.centerracoop.com"},
 ]
 
@@ -127,7 +129,8 @@ def fetch_dtn_content() -> tuple[list[NewSnapshotRequest], list[dict]]:
             by_loc.setdefault(loc, []).append(SnapshotRow(
                 id=rid, grain=grain, deliveryMonth=deliv,
                 futuresSymbol=cme, basisCents=cents, isSpot=False))
-            states.setdefault(loc, _state_from(loc, (cfg.get("states") or {}).get(loc)))
+            states.setdefault(loc, _state_from(loc, (cfg.get("states") or {}).get(loc))
+                              or cfg.get("state"))
 
         for loc, rows in by_loc.items():
             reqs.append(NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
