@@ -2547,7 +2547,6 @@ with tab_railfob:
         ("BN Western Rail", [
             ["BN Hereford", "BN PNW", "BN COBO"],
             ["BN Freight"],
-            ["BN PNW BE"],
             ["BN PNW CP"],   # → "CP PNW", very bottom
         ]),
         ("CPKC Rail", [
