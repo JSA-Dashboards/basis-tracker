@@ -94,6 +94,15 @@ SITES: list[dict] = [
     {"provider": "Ringneck Energy", "location": "Onida, SD", "state": "SD",
      "facility_type": "Corn Processing", "company_id": 24788, "commodity_ids": "",
      "origin": "https://ringneckenergysd.com"},
+    {"provider": "Guardian Energy", "location": "Hankinson, ND", "state": "ND",
+     "facility_type": "Corn Processing", "company_id": 23214, "commodity_ids": "",
+     "origin": "https://www.guardiannrg.com"},
+    {"provider": "Guardian Energy", "location": "Janesville, MN", "state": "MN",
+     "facility_type": "Corn Processing", "company_id": 85740, "commodity_ids": "",
+     "origin": "https://www.guardiannrg.com"},
+    {"provider": "Guardian Energy", "location": "Lima, OH", "state": "OH",
+     "facility_type": "Corn Processing", "company_id": 85741, "commodity_ids": "",
+     "origin": "https://www.guardiannrg.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
