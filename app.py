@@ -276,6 +276,7 @@ _PROVIDER_COLOR: dict[str, str] = {
     "Michigan Agricultural Commodities": "#0e7490",
     "Landus": "#15803d",
     "Guardian Energy": "#b45309",
+    "NuGen Energy": "#ca8a04",
 }
 
 MONTH_CODES = {"F":"Jan","G":"Feb","H":"Mar","J":"Apr","K":"May","M":"Jun",
@@ -3758,7 +3759,7 @@ with tab_bids:
     prov_col, _ = st.columns([3, 7])
     with prov_col:
         provider = st.selectbox(
-            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op", "Cooperative Farmers Elevator", "Ringneck Energy", "Premier Cooperative", "Keystone Cooperative", "AgKota", "Kokomo Grain", "Madison Farmers Elevator", "Prairie Ag Partners", "FS Grain", "Heritage Cooperative", "Total Grain Marketing", "Centerra Co-op", "Farm Service Elevator", "CPI", "Michigan Agricultural Commodities", "Landus", "Guardian Energy"],
+            "Provider", ["ADM", "POET", "CHS", "CGB", "Cargill", "GPRE", "Andersons", "Bunge", "Scoular", "AGP", "LDC", "Bartlett", "Star of West", "Mennel", "Agtegra", "See-Mor", "Ace", "One Earth", "Harvestone", "Big River", "BioUrja", "Mid Missouri", "JBS", "Heartland Coop", "Alto", "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag", "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio", "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op", "Cooperative Farmers Elevator", "Ringneck Energy", "Premier Cooperative", "Keystone Cooperative", "AgKota", "Kokomo Grain", "Madison Farmers Elevator", "Prairie Ag Partners", "FS Grain", "Heritage Cooperative", "Total Grain Marketing", "Centerra Co-op", "Farm Service Elevator", "CPI", "Michigan Agricultural Commodities", "Landus", "Guardian Energy", "NuGen Energy"],
             label_visibility="collapsed",
         )
 
@@ -4267,7 +4268,7 @@ with tab_bids:
                        "Mid Missouri", "JBS", "Heartland Coop", "Alto",
                        "Cardinal Ethanol", "Sandhills Renewables", "Husker Ag",
                        "Garden City Coop", "Gold Eagle Coop", "UWGP", "Aztalan Bio",
-                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op", "Cooperative Farmers Elevator", "Ringneck Energy", "Premier Cooperative", "Keystone Cooperative", "AgKota", "Kokomo Grain", "Madison Farmers Elevator", "Prairie Ag Partners", "FS Grain", "Heritage Cooperative", "Total Grain Marketing", "Centerra Co-op", "Farm Service Elevator", "CPI", "Michigan Agricultural Commodities", "Landus", "Guardian Energy"):
+                       "Absolute Energy", "Fox River Valley Energy", "Heron Lake BioEnergy", "Glacial Lakes", "Homeland Energy", "KAAPA", "Little Sioux", "Siouxland Energy", "Siouxland Ethanol", "Elite Octane", "Plymouth Energy", "Golden Grain", "E Energy", "Dakota Ethanol", "GreenAmerica", "WGM", "INCO", "West-Con", "Wheaton Dumont Co-Op", "Elbow Lake Co-op Grain", "Bushmills Ethanol", "Red River Energy", "Chippewa Valley (CVEC)", "Prairie Grain Partners", "Highwater Ethanol", "New Vision Co-op", "Glacial Plains Cooperative", "Farmward Cooperative", "NFP", "Central United Co-op", "Cooperative Farmers Elevator", "Ringneck Energy", "Premier Cooperative", "Keystone Cooperative", "AgKota", "Kokomo Grain", "Madison Farmers Elevator", "Prairie Ag Partners", "FS Grain", "Heritage Cooperative", "Total Grain Marketing", "Centerra Co-op", "Farm Service Elevator", "CPI", "Michigan Agricultural Commodities", "Landus", "Guardian Energy", "NuGen Energy"):
         # INCO (Incobrasa, Gilman IL) has NO scraper — it's hand-fed at irregular
         # intervals, so .get() rather than [] here: there is no CLI flag or sidebar
         # button to point at, and the empty-state message says so. The five Bushel
@@ -4328,7 +4329,8 @@ with tab_bids:
                       "CPI": "--cpi-only",
                       "Michigan Agricultural Commodities": "--bushel-powered-only",
                       "Landus": "--landus-only",
-                      "Guardian Energy": "--cihedging-only"}.get(provider)
+                      "Guardian Energy": "--cihedging-only",
+                      "NuGen Energy": "--agmd-only"}.get(provider)
                      or ("--bushelsites-only" if provider in _bushel else None))
         _ag_btn   = {"Star of West": "Scrape SOW now", "Mennel": "Scrape Mennel now",
                      "Agtegra": "Scrape Agtegra now", "Bartlett": "Scrape Bartlett now",
@@ -6638,6 +6640,8 @@ if not _view_only():
                    "and (optionally) which commodities; they get basis by delivery period, "
                    "Day/Week/Month change, and a trend arrow, emailed on their cadence "
                    "after the daily scrape.")
+        if st.session_state.get("cr_saved_msg"):     # survives the post-save rerun
+            st.success(f"Saved {st.session_state.pop('cr_saved_msg')}.")
 
         @st.cache_data(ttl=300, show_spinner=False)
         def _loc_grain_opts():
@@ -6722,7 +6726,14 @@ if not _view_only():
                 st.warning("Name, email, and at least one location are required.")
             else:
                 upsert_client_report(_client_rec())
-                st.success(f"Saved {_name}.")
+                # Clear the form back to a blank "New client…" after saving. A new
+                # client has no id yet, so leaving the form filled means a second
+                # Save mints a DUPLICATE — clearing it makes the second click a no-op.
+                for _key in ("cr_name", "cr_email", "cr_cc", "cr_freq", "cr_dow",
+                             "cr_active", "cr_locs", "cr_coms", "cr_depth"):
+                    st.session_state.pop(_key + _k, None)
+                st.session_state["cr_pick"] = "➕ New client…"
+                st.session_state["cr_saved_msg"] = _name
                 st.rerun()
         if _do_prev:
             if _sel_locs:

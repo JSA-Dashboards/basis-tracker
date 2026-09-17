@@ -56,6 +56,9 @@ SITES: list[dict] = [
     {"provider": "Wheaton Dumont Co-Op", "location": "Wheaton, MN", "state": "MN",
      "facility_type": "Country Elevator",
      "url": "https://www.wdcoop.com/markets/cash.php"},
+    {"provider": "NuGen Energy", "location": "Marion, SD", "state": "SD",
+     "facility_type": "Corn Processing",
+     "url": "https://www.nugenmarion.com/markets/cash.php?location_filter=52414"},
     # New Vision Co-op (SW MN) — own elevators via newvision.agricharts.com
     *[{"provider": "New Vision Co-op", "location": f"{_town}, MN", "state": "MN",
        "facility_type": "Country Elevator",
