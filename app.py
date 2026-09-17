@@ -1483,6 +1483,25 @@ tab_railentry = _ti.get("✏️ Rail Entry")
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_changes:
     st.caption("Branded daily report — click Copy, then paste into your email (formatting is preserved).")
+    # One-button manual scrape of every source (replaces the old per-company
+    # sidebar). Scrapes normally run automatically at 3:45 PM daily.
+    if not _view_only():
+        _rc, _ = st.columns([3, 7])
+        with _rc:
+            if st.button("🔄 Refresh all bids now", key="refresh_all_btn",
+                         help="Scrape every source now — takes a few minutes. "
+                              "Normally runs automatically at 3:45 PM daily."):
+                import auto_import as _ai
+                with st.spinner("Scraping every source… a few minutes; don't navigate away."):
+                    try:
+                        _n = _ai.run(run_pruning=False)
+                        st.cache_data.clear()   # drop cached snapshots so the fresh bids show
+                        st.session_state["_refresh_msg"] = _n
+                        st.rerun()
+                    except Exception as _e:
+                        st.error(f"Refresh failed: {_e}")
+        if st.session_state.get("_refresh_msg") is not None:
+            st.success(f"Refreshed all sources — {st.session_state.pop('_refresh_msg')} bid row(s) upserted.")
     _email_html = build_changes_email_html()
     copy_button(_email_html, "📋 Copy report for email")
     _wm = _jsa_watermark_uri()
@@ -2520,7 +2539,10 @@ with tab_railfob:
                     _rr.send_rail_recap_email()
                     st.success("Rail recap emailed.")
                 except Exception as _e:
-                    st.error(f"Send failed (Outlook must be running locally): {_e}")
+                    st.error("Email didn't send. On Cloud this needs the Microsoft Graph secrets "
+                             "(GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
+                             "GRAPH_SENDER — pending from IT); run locally with Outlook open "
+                             f"until then. ({_e})")
         with _re2:
             if st.button("📧 Email latest update", key="rail_email_update",
                          help="Email just the corridors posted on the selected board date"):
@@ -2534,7 +2556,10 @@ with tab_railfob:
                     else:
                         st.info("No corridors on that date to email.")
                 except Exception as _e:
-                    st.error(f"Send failed (Outlook must be running locally): {_e}")
+                    st.error("Email didn't send. On Cloud this needs the Microsoft Graph secrets "
+                             "(GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
+                             "GRAPH_SENDER — pending from IT); run locally with Outlook open "
+                             f"until then. ({_e})")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RAIL ENTRY  (admin: paste one or more rail rundowns → parse → review → save)
@@ -5985,6 +6010,16 @@ if not _view_only():
                 f'{c["client_name"]} ({c["frequency"]}, {len(c["locations"])} locs'
                 + ("" if c["active"] else ", off") + ")" for c in _clients))
 
+        # Consume a post-save reset here — BEFORE any cr_* widget is created, so
+        # clearing/setting their session_state is allowed (doing it after a widget is
+        # instantiated raises StreamlitWidgetAlreadyInstantiated).
+        if st.session_state.pop("_cr_reset", False):
+            _pfx = ("cr_name", "cr_email", "cr_cc", "cr_freq", "cr_dow",
+                    "cr_active", "cr_locs", "cr_coms", "cr_depth")
+            for _sk in [k for k in st.session_state if k.startswith(_pfx)]:
+                del st.session_state[_sk]
+            st.session_state["cr_pick"] = "➕ New client…"
+
         _pick = st.selectbox("Client", ["➕ New client…"] + sorted(_by_name), key="cr_pick")
         _ed = _by_name.get(_pick) or {}
         _k = f"_{_pick}"          # suffix keys with the pick so switching clients resets fields
@@ -6052,13 +6087,12 @@ if not _view_only():
                 st.warning("Name, email, and at least one location are required.")
             else:
                 upsert_client_report(_client_rec())
-                # Clear the form back to a blank "New client…" after saving. A new
-                # client has no id yet, so leaving the form filled means a second
-                # Save mints a DUPLICATE — clearing it makes the second click a no-op.
-                for _key in ("cr_name", "cr_email", "cr_cc", "cr_freq", "cr_dow",
-                             "cr_active", "cr_locs", "cr_coms", "cr_depth"):
-                    st.session_state.pop(_key + _k, None)
-                st.session_state["cr_pick"] = "➕ New client…"
+                # Ask the top-of-tab handler to blank the form on the next run — the
+                # widgets are already instantiated here, so clearing their keys now
+                # raises StreamlitWidgetAlreadyInstantiated. (Clearing matters because
+                # a new client has no id until saved, so a filled form + second Save
+                # would mint a DUPLICATE.)
+                st.session_state["_cr_reset"] = True
                 st.session_state["cr_saved_msg"] = _name
                 st.rerun()
         if _do_prev:
@@ -6082,7 +6116,10 @@ if not _view_only():
                     _cr.send_client_report(_ed)
                     st.success(f"Sent to {_ed['email']}.")
                 except Exception as _e:
-                    st.error(f"Send failed (Outlook must be running locally): {_e}")
+                    st.error("Email didn't send. On Cloud this needs the Microsoft Graph secrets "
+                             "(GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
+                             "GRAPH_SENDER — pending from IT); run locally with Outlook open "
+                             f"until then. ({_e})")
 
 
 # ── Branded footer (JPSI) ─────────────────────────────────────────────────────
