@@ -1148,7 +1148,8 @@ def run_cargill() -> int:
                 continue
 
             _snaps.append(snap_req)
-            _metas.append({"location": snap_req.location, "state": loc.get("state") or None})
+            _metas.append({"location": snap_req.location, "state": loc.get("state") or None,
+                           "facility_type": loc.get("facility_type")})
             locations_done += 1
             total_rows     += len(snap_req.rows)
             log.info(

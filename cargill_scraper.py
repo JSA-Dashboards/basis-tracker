@@ -116,6 +116,9 @@ def _fetch_location(session, slug, meta, today_utc) -> dict | None:
         "city":          city,
         "timestamp":     today_utc,
         "cashbids":      cashbids,
+        # optional per-location classification from cargill_locations.json (most
+        # locations omit it → None → COALESCE keeps whatever location_meta has).
+        "facility_type": meta.get("facility_type"),
     }
 
 

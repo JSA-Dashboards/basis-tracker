@@ -43,6 +43,7 @@
   "hutchinson-east-cah":                {"barchart_id": "63508", "display_name": "Hutchinson East",                       "comm_roots": ["ZC","ZS","KE"]},
   "hutchinson-west-cah":                {"barchart_id": "48427", "display_name": "Hutchinson West",                       "comm_roots": ["ZC","ZS","KE"]},
   "indianapolis-ssna":                  {"barchart_id": "49647", "display_name": "Indianapolis Mill",                     "comm_roots": ["ZC"]},
+  "fort-dodge-ssna":                    {"barchart_id": "37722", "display_name": "Fort Dodge",                            "comm_roots": ["ZC"], "facility_type": "Corn Processing"},
   "iowa-falls-gos":                     {"barchart_id": "63320", "display_name": "Iowa Falls",                            "comm_roots": ["ZS"]},
   "kansas-city-gos":                    {"barchart_id": "63226", "display_name": "Kansas City",                           "comm_roots": ["ZS"]},
   "keithsburg-cah":                     {"barchart_id": "64724", "display_name": "Keithsburg",                            "comm_roots": ["ZC","ZS"]},
