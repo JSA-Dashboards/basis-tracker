@@ -67,6 +67,14 @@ SITES: list[dict] = [
     {"provider": "Dawson Grain", "location": "AGP Dawson, MN", "state": "MN",
      "facility_type": "Oilseed Processing",
      "url": "https://www.dawsongrain.com/markets/cash.php?location_filter=1939"},
+    # Central Farmers Cooperative (SD) — 11 elevators via centralfarmersresp.agricharts.com
+    *[{"provider": "Central Farmers Co-op", "location": f"{_town}, SD", "state": "SD",
+       "facility_type": "Country Elevator",
+       "url": f"https://centralfarmersresp.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("Canova", 26062), ("Dimock", 26060), ("Freeman", 26059), ("Lyons", 26058),
+          ("Marion", 26057), ("Montrose", 26064), ("Mt Vernon", 86860), ("Salem", 26061),
+          ("Springfield", 31110), ("Tyndall", 31109), ("Viborg", 26063)]],
     # New Vision Co-op (SW MN) — own elevators via newvision.agricharts.com
     *[{"provider": "New Vision Co-op", "location": f"{_town}, MN", "state": "MN",
        "facility_type": "Country Elevator",
