@@ -1502,6 +1502,35 @@ with tab_changes:
                         st.error(f"Refresh failed: {_e}")
         if st.session_state.get("_refresh_msg") is not None:
             st.success(f"Refreshed all sources — {st.session_state.pop('_refresh_msg')} bid row(s) upserted.")
+
+        # ── Email setup / test (admin) — verify the outbound path (Graph or an
+        #    interim SMTP relay) while IT's Graph secrets are pending. Sends a tiny
+        #    test and reports which path worked, or the raw error. Shows only WHICH
+        #    secrets are set, never their values.
+        with st.expander("✉️ Email setup / test"):
+            import changes_report as _cr
+            _cfg = _cr._email_cfg
+            _graph_on = _cr._graph_configured()
+            _smtp_on = bool(_cfg("SMTP_HOST") and (_cfg("SMTP_FROM") or _cfg("SMTP_USER")))
+            st.caption(
+                f"Graph: {'✅ configured' if _graph_on else '— not set'}  ·  "
+                f"SMTP: {'✅ configured' if _smtp_on else '— not set'}"
+                + (f"  (host set, from `{_cfg('SMTP_FROM') or _cfg('SMTP_USER')}`, "
+                   f"port {_cfg('SMTP_PORT','587')})" if _cfg('SMTP_HOST') else ""))
+            _tc1, _tc2 = st.columns([3, 2])
+            with _tc1:
+                _test_to = st.text_input("Send a test to", value="kpostin@jpsi.com",
+                                         key="smtp_test_to", label_visibility="collapsed")
+            with _tc2:
+                if st.button("Send test email", key="smtp_test_btn"):
+                    try:
+                        _path = _cr.send_email(
+                            "JSA basis tracker — email test",
+                            f"<p>Outbound email is working. Sent {datetime.now():%b %d, %Y %I:%M %p}.</p>",
+                            (_test_to or "").strip())
+                        st.success(f"Sent via **{_path}** → {(_test_to or '').strip()}")
+                    except Exception as _e:
+                        st.error(f"Test failed — {_e}")
     _email_html = build_changes_email_html()
     copy_button(_email_html, "📋 Copy report for email")
     _wm = _jsa_watermark_uri()

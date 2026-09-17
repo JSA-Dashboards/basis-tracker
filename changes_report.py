@@ -658,8 +658,8 @@ def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
     pw   = _email_cfg("SMTP_PASS")
     port = int(_email_cfg("SMTP_PORT", "587"))
     frm  = _email_cfg("SMTP_FROM") or user
-    if not (host and user and pw):
-        raise RuntimeError("SMTP not configured (need SMTP_HOST, SMTP_USER, SMTP_PASS).")
+    if not host or not frm:
+        raise RuntimeError("SMTP not configured (need SMTP_HOST and SMTP_FROM/SMTP_USER).")
 
     root = MIMEMultipart("related")
     root["Subject"], root["From"], root["To"] = subject, frm, to_addr
@@ -680,9 +680,19 @@ def send_via_smtp(subject: str, html: str, to_addr: str, cc: str | None = None,
     if bcc:
         from email.utils import getaddresses
         rcpts += [a for _, a in getaddresses([bcc]) if a]
-    with smtplib.SMTP(host, port, timeout=30) as s:
-        s.starttls()
-        s.login(user, pw)
+    # Port 465 = implicit TLS (SMTPS); 587/other = STARTTLS. Login only when creds
+    # are given, so a no-auth relay still works. Broadens support to any relay the
+    # desk stands up (Brevo/SendGrid/etc.) while IT's Graph path is pending.
+    conn = smtplib.SMTP_SSL(host, port, timeout=30) if port == 465 \
+        else smtplib.SMTP(host, port, timeout=30)
+    with conn as s:
+        if port != 465:
+            try:
+                s.starttls()
+            except smtplib.SMTPNotSupportedError:
+                pass
+        if user and pw:
+            s.login(user, pw)
         s.sendmail(frm, rcpts, root.as_string())
 
 
