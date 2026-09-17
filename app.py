@@ -6682,21 +6682,28 @@ if not _view_only():
             _lbl = f'{x["provider"]} · {x["location"]}'
             if _lbl in _opt_label and _lbl not in _cur:
                 _cur.append(_lbl)
-        _sel = st.multiselect("Locations (Provider · Location)", sorted(_opt_label),
-                              default=_cur, key="cr_locs" + _k)
-        _sel_locs = [_opt_label[s] for s in _sel]
+        # The location/commodity pickers live in a FORM so adding many locations
+        # doesn't rerun the whole (now large) dashboard on every pick — you add
+        # them all with zero reruns, then Save/Preview submits once.
+        with st.form("cr_form" + _k):
+            _sel = st.multiselect("Locations (Provider · Location)", sorted(_opt_label),
+                                  default=_cur, key="cr_locs" + _k)
+            _cc1, _cc2 = st.columns([3, 2])
+            with _cc1:
+                _sel_coms = st.multiselect(
+                    "Commodities (leave empty = all posted at each location)", _grain_opts,
+                    default=[g for g in (_ed.get("commodities") or []) if g in _grain_opts],
+                    key="cr_coms" + _k)
+            with _cc2:
+                _depth_lbl = {"curve": "Full forward curve", "spot": "Spot only"}
+                _depth = st.radio("Delivery periods", ["curve", "spot"],
+                                  index=["curve", "spot"].index(_ed.get("depth", "curve")),
+                                  format_func=lambda d: _depth_lbl[d], key="cr_depth" + _k)
+            _fs1, _fs2, _ = st.columns([2, 2, 5])
+            _do_save = _fs1.form_submit_button("💾 Save")
+            _do_prev = _fs2.form_submit_button("👁️ Preview")
 
-        _cc1, _cc2 = st.columns([3, 2])
-        with _cc1:
-            _sel_coms = st.multiselect(
-                "Commodities (leave empty = all posted at each location)", _grain_opts,
-                default=[g for g in (_ed.get("commodities") or []) if g in _grain_opts],
-                key="cr_coms" + _k)
-        with _cc2:
-            _depth_lbl = {"curve": "Full forward curve", "spot": "Spot only"}
-            _depth = st.radio("Delivery periods", ["curve", "spot"],
-                              index=["curve", "spot"].index(_ed.get("depth", "curve")),
-                              format_func=lambda d: _depth_lbl[d], key="cr_depth" + _k)
+        _sel_locs = [_opt_label[s] for s in _sel]
 
         def _client_rec():
             return {"id": _ed.get("id") or _uuid.uuid4().hex, "client_name": _name,
@@ -6705,19 +6712,14 @@ if not _view_only():
                     "commodities": _sel_coms, "active": _active,
                     "created_at": _ed.get("created_at") or datetime.utcnow().isoformat()}
 
-        _b1, _b2, _b3, _b4, _ = st.columns([2, 2, 2, 2, 3])
-        if _b1.button("💾 Save", key="cr_save" + _k):
+        if _do_save:
             if not _name or not _email or not _sel_locs:
                 st.warning("Name, email, and at least one location are required.")
             else:
                 upsert_client_report(_client_rec())
                 st.success(f"Saved {_name}.")
                 st.rerun()
-        if _ed and _b2.button("🗑️ Delete", key="cr_del" + _k):
-            delete_client_report(_ed["id"])
-            st.success("Deleted.")
-            st.rerun()
-        if _b3.button("👁️ Preview", key="cr_prev" + _k):
+        if _do_prev:
             if _sel_locs:
                 import streamlit.components.v1 as _comp
                 _comp.html(_cr.build_client_html(
@@ -6725,12 +6727,20 @@ if not _view_only():
                     height=520, scrolling=True)
             else:
                 st.info("Pick at least one location to preview.")
-        if _ed and _b4.button("✉️ Send now", key="cr_send" + _k):
-            try:
-                _cr.send_client_report(_ed)
-                st.success(f"Sent to {_ed['email']}.")
-            except Exception as _e:
-                st.error(f"Send failed (Outlook must be running locally): {_e}")
+
+        # Delete / Send act on the saved record, so they stay outside the form.
+        if _ed:
+            _d1, _d2, _ = st.columns([2, 2, 5])
+            if _d1.button("🗑️ Delete", key="cr_del" + _k):
+                delete_client_report(_ed["id"])
+                st.success("Deleted.")
+                st.rerun()
+            if _d2.button("✉️ Send now", key="cr_send" + _k):
+                try:
+                    _cr.send_client_report(_ed)
+                    st.success(f"Sent to {_ed['email']}.")
+                except Exception as _e:
+                    st.error(f"Send failed (Outlook must be running locally): {_e}")
 
 
 # ── Branded footer (JPSI) ─────────────────────────────────────────────────────
