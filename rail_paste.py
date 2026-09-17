@@ -258,9 +258,13 @@ _ALIAS_BY_TOKENS = {_alias_tokens(a): c for a, c in _CORR_ALIASES.items()}
 # One alternation, alternatives longest-first so "BN PNW BE" wins over "BN PNW"
 # over "PNW". Tokens may be separated by spaces / apostrophes / parentheses, and
 # the whole thing is bounded so it can't match inside a longer word.
+# Tokens of an alias may be separated by spaces / apostrophes / parens / hyphens
+# AND periods — the desk abbreviates "Ft. Wayne" with a period, so without '.' in
+# this class the "ft"→"wayne" join failed and the whole Ft. Wayne block fell into
+# the previous corridor (e.g. CSX Freight). (2026-09-17)
 _CORR_RE = re.compile(
     r"(?<![A-Za-z0-9])(" + "|".join(
-        r"[\s'’()\-]*".join(re.escape(t) for t in _alias_tokens(a))
+        r"[\s'’().\-]*".join(re.escape(t) for t in _alias_tokens(a))
         for a in sorted(_CORR_ALIASES, key=len, reverse=True)
     ) + r")(?![A-Za-z0-9])", re.I)
 
