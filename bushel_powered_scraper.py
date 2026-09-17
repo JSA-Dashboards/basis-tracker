@@ -42,6 +42,13 @@ _PFX = {"ZC": "CN", "ZS": "SB", "ZW": "WH", "KE": "KW", "ZM": "ML"}
 SITES: list[dict] = [
     {"provider": "Michigan Agricultural Commodities", "slug": "mac", "state": "MI",
      "facility_type": "Country Elevator", "origin": "https://www.michag.com"},
+    # CF Grain (Canby, MN) — 5 locations; Astoria is across the SD line.
+    {"provider": "CF Grain", "slug": "canby", "state": "MN",
+     "states": {"Astoria": "SD"},
+     "facility_type": "Country Elevator", "origin": "https://www.cfgrain.com"},
+    # PRC Co-op (Prinsburg, MN) — 2 MN locations.
+    {"provider": "PRC Co-op", "slug": "prinsburg", "state": "MN",
+     "facility_type": "Country Elevator", "origin": "https://www.prccoop.com"},
 ]
 
 

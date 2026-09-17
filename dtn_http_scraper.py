@@ -52,6 +52,18 @@ SITES: list[dict] = [
     {"provider": "Highwater Ethanol", "location": "Lamberton, MN", "state": "MN",
      "facility_type": "Corn Processing", "grain": "Corn",
      "url": "https://www.highwaterethanol.com/index.cfm?show=11&mid=36"},
+    # Bellingham Farmers Co-op (MN) — single aghost page posting corn/soy/wheat;
+    # grain is now derived per-row from the futures symbol (see _ROOT_GRAIN).
+    {"provider": "Bellingham Farmers Co-op", "location": "Bellingham, MN", "state": "MN",
+     "facility_type": "Country Elevator", "grain": "Corn",
+     "url": "http://www.bellinghamfarmerscoop.com/index.cfm?show=11&mid=3"},
+    # Jennie-O turkey feed mills — one aghost page per plant via ?theLocation=N.
+    *[{"provider": "Jennie-O", "location": f"{_town}, {_st}", "state": _st,
+       "facility_type": "Feed Mill", "grain": "Corn", "portal": True,
+       "url": f"https://jennieo.aghostportal.com/index.cfm?show=11&mid=3&theLocation={_id}&layout=1046"}
+      for _town, _st, _id in [
+          ("Atwater", "MN", 1), ("Barron", "WI", 2), ("Dawson", "MN", 3),
+          ("Faribault", "MN", 4), ("Perham", "MN", 7)]],
 ]
 
 _SYM_RE = re.compile(r"@[A-Z]{1,2}\d[FGHJKMNQUVXZ]")
@@ -127,6 +139,12 @@ def _build_decoder(html: str):
     return decode
 
 
+# CME symbol root → (grain label). Lets a multi-commodity aghost page (e.g.
+# Bellingham posts corn/soy/wheat on one grid) label each row by its own futures
+# symbol instead of a single configured grain. Corn-only sites are unaffected.
+_ROOT_GRAIN = {"ZC": "Corn", "ZS": "Soybeans", "ZW": "Wheat", "KE": "Wheat",
+               "MW": "Wheat", "ZM": "Soybean Meal", "ZL": "Soybean Oil", "ZO": "Oats"}
+
 _DN_RE = re.compile(r"displayNumber\(([-0-9.]+)\s*,\s*\d\)")
 # delivery label anywhere: opt FH/LH, then a month (abbrev or full, any case) or
 # "New Crop", then a 4-digit year. Handles Sept/SEPT/September 2026, New Crop 2027.
@@ -140,7 +158,7 @@ def _parse_site(html: str, cfg: dict) -> NewSnapshotRequest | None:
     if decode is None:
         log.warning("DTN(http) %s: no displayNumber decoder found", cfg["location"])
         return None
-    pfx = _PFX.get({"Corn": "ZC", "Soybeans": "ZS"}.get(cfg["grain"], ""), "XX")
+    cfg_root = {"Corn": "ZC", "Soybeans": "ZS", "Wheat": "ZW"}.get(cfg["grain"], "")
 
     # Position-based, DOM-structure-agnostic: displayNumber args run [basis, cash] per
     # row in document order, so even-indexed calls are the basis. For each, the row's
@@ -171,12 +189,75 @@ def _parse_site(html: str, cfg: dict) -> NewSnapshotRequest | None:
         basis = _basis_cents(f"{bv:.2f}")
         if not cme or basis is None:
             continue
+        root = cme[:2]                       # grain/prefix from the row's own symbol
+        grain = _ROOT_GRAIN.get(root, cfg["grain"])
+        pfx = _PFX.get(root if root in _ROOT_GRAIN else cfg_root, "XX")
         del_key = "".join(ch for ch in delivery.upper() if ch.isalnum()) or cme
         row_id = f"{pfx}_{cme}_{del_key}"
         if row_id in seen:
             continue
         seen.add(row_id)
-        rows.append(SnapshotRow(id=row_id, grain=cfg["grain"], deliveryMonth=delivery,
+        rows.append(SnapshotRow(id=row_id, grain=grain, deliveryMonth=delivery,
+                                futuresSymbol=cme, basisCents=basis, isSpot=False))
+    if not rows:
+        return None
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    return NewSnapshotRequest(timestamp=ts, provider=cfg["provider"],
+                              location=cfg["location"], source="web", rows=rows)
+
+
+_MON = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+        7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+_PORTAL_DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{2,4})")
+
+
+def _parse_portal(html: str, cfg: dict) -> NewSnapshotRequest | None:
+    """aghostportal.com hosted layout (e.g. Jennie-O feed mills). Unlike the classic
+    aghost page, each bid is a clean <tr>: <th><span>M/D/YY</span></th> (the delivery
+    date, END of the window) then displayNumber(basis)/displayNumber(...) cells and an
+    @-symbol. Delivery is read ONLY from the row's <th> so the per-row 'as of'
+    timestamp in the <td title=…> can't be mistaken for it. Grain per-row from symbol."""
+    from bs4 import BeautifulSoup
+    decode = _build_decoder(html)
+    if decode is None:
+        log.warning("DTN(portal) %s: no displayNumber decoder found", cfg["location"])
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    rows: list[SnapshotRow] = []
+    seen: set[str] = set()
+    for tr in soup.find_all("tr"):
+        th = tr.find("th")
+        if not th:
+            continue
+        md = _PORTAL_DATE_RE.search(th.get_text(" ", strip=True))
+        symm = _SYM_RE.search(tr.get_text(" "))
+        if not md or not symm:
+            continue
+        # This layout ships MALFORMED (unclosed <tr>), so BeautifulSoup nests every
+        # following row inside this one — its cells bleed in. Each column is a
+        # [cash, basis] pair; the row's OWN bid is the FIRST pair, so read only args[:2]
+        # (basis = the small member) and the first @-symbol, ignoring the bleed.
+        args = re.findall(r"displayNumber\(([-0-9.]+)\s*,\s*\d\)", str(tr))[:2]
+        cands = [v for v in (decode(a) for a in args) if v is not None and abs(v) < 2]
+        if not cands:
+            continue
+        bv = min(cands, key=abs)
+        cme = _fut_symbol(symm.group(0))
+        basis = _basis_cents(f"{bv:.2f}")
+        if not cme or basis is None:
+            continue
+        mo, _dy, yr = md.groups()
+        yr = int(yr) + (2000 if int(yr) < 100 else 0)
+        delivery = f"{_MON.get(int(mo), int(mo))} {yr}"
+        root = cme[:2]
+        grain = _ROOT_GRAIN.get(root, cfg["grain"])
+        pfx = _PFX.get(root if root in _ROOT_GRAIN else "ZC", "XX")
+        del_key = "".join(c for c in delivery.upper() if c.isalnum()) or cme
+        row_id = f"{pfx}_{cme}_{del_key}"
+        if row_id in seen:
+            continue
+        seen.add(row_id)
+        rows.append(SnapshotRow(id=row_id, grain=grain, deliveryMonth=delivery,
                                 futuresSymbol=cme, basisCents=basis, isSpot=False))
     if not rows:
         return None
@@ -345,7 +426,7 @@ def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[di
                 reqs.extend(creqs)
                 metas.extend(cmetas)
                 continue
-            req = _parse_site(html, cfg)
+            req = _parse_portal(html, cfg) if cfg.get("portal") else _parse_site(html, cfg)
             if req is None:
                 log.warning("DTN(http): no bids parsed for %s", label)
                 continue

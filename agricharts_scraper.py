@@ -48,6 +48,10 @@ TENANTS: list[dict] = [
     {"provider": "Gold Eagle Coop", "host": "https://goldeagle.agricharts.com",
      "shape": "multi", "state": "IA",
      "want": {"GOLDFIELD": ("Goldfield, IA", "Corn Processing")}},
+    # Meadowland Farmers Co-op (MN) — feed aggregates to one bid sheet (HQ Lamberton).
+    {"provider": "Meadowland Co-op", "host": "https://meadsprout2.agricharts.com",
+     "shape": "single", "location": "Lamberton, MN", "state": "MN",
+     "facility": "Country Elevator"},
 ]
 
 

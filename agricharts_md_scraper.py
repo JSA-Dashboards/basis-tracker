@@ -59,6 +59,14 @@ SITES: list[dict] = [
     {"provider": "NuGen Energy", "location": "Marion, SD", "state": "SD",
      "facility_type": "Corn Processing",
      "url": "https://www.nugenmarion.com/markets/cash.php?location_filter=52414"},
+    # Dawson Grain (MN) — own-domain AgriCharts; the co-op elevator plus the AGP
+    # soybean crush plant it posts delivered bids for.
+    {"provider": "Dawson Grain", "location": "Dawson, MN", "state": "MN",
+     "facility_type": "Country Elevator",
+     "url": "https://www.dawsongrain.com/markets/cash.php?location_filter=1639"},
+    {"provider": "Dawson Grain", "location": "AGP Dawson, MN", "state": "MN",
+     "facility_type": "Oilseed Processing",
+     "url": "https://www.dawsongrain.com/markets/cash.php?location_filter=1939"},
     # New Vision Co-op (SW MN) — own elevators via newvision.agricharts.com
     *[{"provider": "New Vision Co-op", "location": f"{_town}, MN", "state": "MN",
        "facility_type": "Country Elevator",
