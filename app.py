@@ -180,6 +180,18 @@ def _cached_rail_fob_all(source: str) -> list:
     return get_rail_fob_all(source)
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _cached_rail_fob_dates(source: str) -> list:
+    """Distinct posting dates for a rail source (cached — was a per-rerun query)."""
+    from database import get_rail_fob_dates
+    return get_rail_fob_dates(source)
+
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_index_excludes():
+    """Locations excluded from index/trends (cached — was a per-rerun query)."""
+    from database import get_index_excludes
+    return get_index_excludes()
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _cached_river_dates() -> list:
     import river_fob_data
     return river_fob_data.list_dates()
@@ -1439,8 +1451,12 @@ def trend_periods(facility_type: str, grain: str) -> set:
     return periods
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
-    """Per-location current/LW/LM/LY basis + spot>next, for a type + grain + delivery."""
+    """Per-location current/LW/LM/LY basis + spot>next, for a type + grain + delivery.
+
+    Cached (ttl 300): the Trends/Changes tabs call this for all 11 categories on
+    every rerun; the underlying data only changes on the daily scrape."""
     pairs, meta, data, now = _trend_load(facility_type)
     if not pairs:
         return []
@@ -1900,8 +1916,12 @@ def _ccellf(c) -> str:
     return f'<td style="{td};color:{_GAIN if c > 0 else _LOSS};font-weight:700">{c:+.1f}</td>'
 
 
+@st.cache_data(ttl=300, show_spinner=False)
 def build_changes_email_html(mode: str = "spot") -> str:
-    """A branded, email-ready HTML report of daily basis changes (JPSI styling)."""
+    """A branded, email-ready HTML report of daily basis changes (JPSI styling).
+
+    Cached (ttl 300): the Changes tab rebuilds this all-category report on every
+    rerun; data only changes on the daily scrape."""
     today = datetime.utcnow()
     _ff   = "font-family:Arial,Helvetica,sans-serif"
     _hdr  = ("font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
@@ -2347,7 +2367,7 @@ with tab_spotfwd:
     # most recent date still shows its last-known values instead of "—".
     _asof_iso = sf_asof.isoformat()
     _rail_by_md, _rail_mkt_dates = {}, {}
-    for _r in get_rail_fob_all("manual"):
+    for _r in _cached_rail_fob_all("manual"):
         _rail_by_md.setdefault((_r["market"], _r["date"]), []).append(_r)
         _rail_mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
 
@@ -2705,7 +2725,7 @@ with tab_railfob:
 
         _rows = []
         for _src in ("manual", "palmetto"):
-            for _r in get_rail_fob_all(_src):
+            for _r in _cached_rail_fob_all(_src):
                 if _r.get("bid") is None:
                     continue
                 _b = _seasonal_bucket(_r["period"])
@@ -2973,7 +2993,7 @@ with tab_railfob:
         """Grid board for a stored rail-FOB source (palmetto / manual): labeled
         section headings + per-corridor tables with Day/Wk/Mo bid changes and
         carry-forward of corridors not posted on the selected date."""
-        _dates = get_rail_fob_dates(source)
+        _dates = _cached_rail_fob_dates(source)
         if not _dates:
             st.caption("No postings stored yet — this board fills in as data is saved.")
             return
@@ -2981,7 +3001,7 @@ with tab_railfob:
         with _mc:
             _msel = st.selectbox("Posting date", _dates, key=f"rail_date_{key}")
         _by_md, _mkt_dates = {}, {}
-        for _r in get_rail_fob_all(source):
+        for _r in _cached_rail_fob_all(source):
             _by_md.setdefault((_r["market"], _r["date"]), {})[_r["period"]] = _r
             _mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
 
@@ -3124,7 +3144,7 @@ with tab_railfob:
     _rf = _cached_rail_fob()
     if _rf and _rf.get("rows") and not _view_only():
         _ptoday = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        _pdates = sorted(get_rail_fob_dates("palmetto"))
+        _pdates = sorted(_cached_rail_fob_dates("palmetto"))
         _plast = _pdates[-1] if _pdates else None
         _pdelta = ((datetime.strptime(_ptoday, "%Y-%m-%d")
                     - datetime.strptime(_plast, "%Y-%m-%d")).days) if _plast else 999
@@ -6129,7 +6149,7 @@ with tab_trends:
                  for t, f, g, m in _TREND_CATS}
     _all_pairs = sorted({(r["provider"], r["location"])
                          for rows in _cat_rows.values() for r in rows})
-    _excl = get_index_excludes()
+    _excl = _cached_index_excludes()
 
     # ── Outlier picker — drop a location from the index averages ───────────────
     if not _view_only():
@@ -6144,6 +6164,7 @@ with tab_trends:
             _new = {_lbl[s] for s in _sel}
             if _new != _excl:
                 set_index_excludes(_new)
+                _cached_index_excludes.clear()   # invalidate so the read reflects the write
                 st.rerun()
 
     for (_ttl, _ft, _gr, _mode), _rows_all in _cat_rows.items():
