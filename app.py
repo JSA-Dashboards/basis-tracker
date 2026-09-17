@@ -50,10 +50,8 @@ st.set_page_config(
     page_title="Basis Tracker · JPSI",
     page_icon="https://www.jpsi.com/wp-content/uploads/2019/04/cropped-Favicon-1-192x192.png",
     layout="wide",
-    # Force the sidebar open in the full app (the JPSI theme hides Streamlit's
-    # header, so the collapse arrow isn't available); collapse it in view-only,
-    # where the sidebar holds no controls.
-    initial_sidebar_state="collapsed" if _view_only() else "expanded",
+    # The sidebar (admin scrape buttons) was removed, so keep it collapsed/hidden.
+    initial_sidebar_state="collapsed",
 )
 
 
@@ -84,12 +82,12 @@ def _require_password():
 
 _require_password()
 
-if _view_only():
-    # No sidebar at all in the read-only build (and hide its expand control).
-    st.markdown(
-        "<style>[data-testid='stSidebar'],[data-testid='stSidebarCollapsedControl'],"
-        "[data-testid='collapsedControl']{display:none !important}</style>",
-        unsafe_allow_html=True)
+# The sidebar held only admin scrape buttons, now removed — hide the empty
+# sidebar and its expand control in every build.
+st.markdown(
+    "<style>[data-testid='stSidebar'],[data-testid='stSidebarCollapsedControl'],"
+    "[data-testid='collapsedControl']{display:none !important}</style>",
+    unsafe_allow_html=True)
 
 # ── On-startup init (once per Streamlit process, not per rerun) ───────────────
 @st.cache_resource
@@ -613,699 +611,6 @@ st.markdown(_jsa_watermark_css("jsawm"), unsafe_allow_html=True)
 # Trends cards span the full width, so use a smaller (zoomed-out) watermark there.
 st.markdown(_jsa_watermark_css("jsawmt", size="22% auto"), unsafe_allow_html=True)
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    if not _view_only():
-        st.markdown("### 🌽 ADM / POET / CHS")
-        if st.button("Scrape ADM now", key="adm_scrape_btn"):
-            from adm_scraper import fetch_adm_bids
-            from parsers.adm_parser import parse_instruments as _parse_adm
-            with st.spinner("Fetching ADM Gradable (all 151 locations)…"):
-                try:
-                    raw = fetch_adm_bids()
-                    adm_rows = 0
-                    adm_locs = 0
-                    for item in raw:
-                        snap = _parse_adm(
-                            item["market_id"], item["display_name"],
-                            item["instruments_data"], item["timestamp"],
-                        )
-                        if snap:
-                            upsert_snapshot(snap.model_dump())
-                            adm_rows += len(snap.rows)
-                            adm_locs += 1
-                    st.success(f"✓ {adm_locs} location(s) — {adm_rows} bid row(s) upserted.")
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"ADM scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --adm-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        if st.button("Scrape POET now", key="poet_scrape_btn"):
-            from poet_scraper import fetch_poet_bids
-            from parsers.poet_parser import parse_instruments as _parse_poet
-            with st.spinner("Scraping POET Gradable (all 36 locations)…"):
-                try:
-                    raw = fetch_poet_bids(headless=True)
-                    poet_imported = 0
-                    for item in raw:
-                        snap = _parse_poet(
-                            item["market_id"],
-                            item["display_name"],
-                            item["instruments_data"],
-                            item["timestamp"],
-                        )
-                        if snap:
-                            upsert_snapshot(snap.dict())
-                            poet_imported += len(snap.rows)
-                    st.success(
-                        f"✓ {len(raw)} location(s) scraped — "
-                        f"{poet_imported} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"POET scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --poet-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape CHS now", key="chs_scrape_btn"):
-            from chs_scraper import fetch_chs_bids, CHS_ILLINOIS_IDS
-            from parsers.chs_parser import parse_bids_response as _parse_chs
-            from datetime import datetime, timezone as _tz
-            _ts = datetime.now(_tz.utc).strftime("%Y-%m-%dT00:00:00Z")
-            with st.spinner("Fetching CHS Illinois bids…"):
-                try:
-                    raw = fetch_chs_bids()
-                    snaps = _parse_chs(raw, set(), _ts)  # empty = all locations
-                    chs_rows = 0
-                    for s in snaps:
-                        upsert_snapshot(s.model_dump())
-                        chs_rows += len(s.rows)
-                    st.success(
-                        f"✓ {len(snaps)} snapshot(s) — {chs_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"CHS scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'Both run automatically at 3:45 PM daily.<br>'
-            'CLI: <code style="color:#0693e3">python auto_import.py --chs-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape CGB now", key="cgb_scrape_btn"):
-            from cgb_scraper import fetch_cgb_bids as _fetch_cgb
-            from parsers.cgb_parser import parse_cgb_location as _parse_cgb
-            from database import upsert_location_meta as _ulm
-            with st.spinner("Fetching CGB Grain bids (86 locations)…"):
-                try:
-                    _locs = _fetch_cgb()
-                    cgb_rows = 0
-                    cgb_locs = 0
-                    for _loc in _locs:
-                        _snap = _parse_cgb(_loc)
-                        if _snap:
-                            upsert_snapshot(_snap.model_dump())
-                            _ulm(
-                                "CGB", _snap.location,
-                                state         = _loc.get("state") or None,
-                                facility_type = _loc.get("facility_type") or None,
-                            )
-                            cgb_rows += len(_snap.rows)
-                            cgb_locs += 1
-                    st.success(
-                        f"✓ {cgb_locs} location(s) — {cgb_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"CGB scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --cgb-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape SOW now", key="sotw_scrape_btn"):
-            from sotw_scraper import fetch_sotw_bids as _fetch_sotw
-            from parsers.sotw_parser import parse_sotw_location as _parse_sotw
-            from database import upsert_location_meta as _ulm_sotw
-            with st.spinner("Fetching Star of the West bids…"):
-                try:
-                    _locs = _fetch_sotw()
-                    sotw_rows = sotw_locs = 0
-                    for _loc in _locs:
-                        _snap = _parse_sotw(_loc)
-                        if _snap:
-                            upsert_snapshot(_snap.model_dump())
-                            _ulm_sotw(
-                                "Star of West", _snap.location,
-                                state         = _loc.get("state") or None,
-                                facility_type = _loc.get("facility_type") or None,
-                            )
-                            sotw_rows += len(_snap.rows)
-                            sotw_locs += 1
-                    st.success(f"✓ {sotw_locs} location(s) — {sotw_rows} bid row(s) upserted.")
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Star of the West scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --sotw-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Mennel now", key="mennel_scrape_btn"):
-            from mennel_scraper import fetch_mennel_bids as _fetch_mennel
-            from parsers.mennel_parser import parse_mennel_location as _parse_mennel
-            from database import upsert_location_meta as _ulm_mennel
-            with st.spinner("Fetching Mennel bids…"):
-                try:
-                    _locs = _fetch_mennel()
-                    mn_rows = mn_locs = 0
-                    for _loc in _locs:
-                        _snap = _parse_mennel(_loc)
-                        if _snap:
-                            upsert_snapshot(_snap.model_dump())
-                            _ulm_mennel(
-                                "Mennel", _snap.location,
-                                state         = _loc.get("state") or None,
-                                facility_type = _loc.get("facility_type") or None,
-                            )
-                            mn_rows += len(_snap.rows)
-                            mn_locs += 1
-                    st.success(f"✓ {mn_locs} location(s) — {mn_rows} bid row(s) upserted.")
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Mennel scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --mennel-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Agtegra now", key="agtegra_scrape_btn"):
-            from agtegra_scraper import fetch_agtegra_bids as _fetch_agt
-            from parsers.agtegra_parser import parse_agtegra_location as _parse_agt
-            from database import upsert_location_meta as _ulm_agt
-            with st.spinner("Fetching Agtegra bids…"):
-                try:
-                    _locs = _fetch_agt()
-                    agt_rows = agt_locs = 0
-                    for _loc in _locs:
-                        _snap = _parse_agt(_loc)
-                        if _snap:
-                            upsert_snapshot(_snap.model_dump())
-                            _ulm_agt(
-                                "Agtegra", _snap.location,
-                                state         = _loc.get("state") or None,
-                                facility_type = _loc.get("facility_type") or None,
-                            )
-                            agt_rows += len(_snap.rows)
-                            agt_locs += 1
-                    st.success(f"✓ {agt_locs} location(s) — {agt_rows} bid row(s) upserted.")
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Agtegra scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --agtegra-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🌾 Cargill")
-        if st.button("Scrape Cargill now", key="cargill_scrape_btn"):
-            from cargill_scraper import fetch_cargill_bids as _fetch_cargill
-            from parsers.cargill_parser import parse_cargill_location as _parse_cargill
-            from database import upsert_location_meta as _ulm2
-            with st.spinner("Fetching Cargill bids (~81 locations)…"):
-                try:
-                    _clocs = _fetch_cargill()
-                    cargill_rows = 0
-                    cargill_locs = 0
-                    for _cloc in _clocs:
-                        _csnap = _parse_cargill(_cloc)
-                        if _csnap:
-                            upsert_snapshot(_csnap.model_dump())
-                            _ulm2(
-                                "Cargill", _csnap.location,
-                                state         = _cloc.get("state") or None,
-                                facility_type = None,
-                            )
-                            cargill_rows += len(_csnap.rows)
-                            cargill_locs += 1
-                    st.success(
-                        f"✓ {cargill_locs} location(s) — {cargill_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Cargill scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --cargill-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🔴 Bunge")
-        if st.button("Scrape Bunge now", key="bunge_scrape_btn"):
-            from bunge_scraper import fetch_bunge_bids as _fetch_bunge
-            from parsers.bunge_parser import parse_bunge_location as _parse_bunge
-            from database import upsert_location_meta as _ulm4
-            with st.spinner("Fetching Bunge bids (~20 locations)…"):
-                try:
-                    _blocs = _fetch_bunge()
-                    bunge_rows = 0
-                    bunge_locs = 0
-                    for _bloc in _blocs:
-                        _bsnap = _parse_bunge(_bloc)
-                        if _bsnap:
-                            upsert_snapshot(_bsnap.model_dump())
-                            _ulm4(
-                                "Bunge", _bsnap.location,
-                                state         = _bloc.get("state") or None,
-                                facility_type = None,
-                            )
-                            bunge_rows += len(_bsnap.rows)
-                            bunge_locs += 1
-                    st.success(
-                        f"✓ {bunge_locs} location(s) — {bunge_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Bunge scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --bunge-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🌾 Andersons")
-        if st.button("Scrape Andersons now", key="andersons_scrape_btn"):
-            from andersons_scraper import fetch_andersons_bids as _fetch_andersons
-            from parsers.andersons_parser import parse_andersons_location as _parse_andersons
-            from database import upsert_location_meta as _ulm3
-            with st.spinner("Fetching The Andersons bids (18 locations)…"):
-                try:
-                    _alocs = _fetch_andersons()
-                    andersons_rows = 0
-                    andersons_locs = 0
-                    for _aloc in _alocs:
-                        _asnap = _parse_andersons(_aloc)
-                        if _asnap:
-                            upsert_snapshot(_asnap.model_dump())
-                            _ulm3(
-                                "Andersons", _asnap.location,
-                                state         = _aloc.get("state") or None,
-                                facility_type = None,
-                            )
-                            andersons_rows += len(_asnap.rows)
-                            andersons_locs += 1
-                    st.success(
-                        f"✓ {andersons_locs} location(s) — {andersons_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Andersons scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --andersons-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🟠 Scoular")
-        if st.button("Scrape Scoular now", key="scoular_scrape_btn"):
-            from scoular_scraper import fetch_scoular_bids as _fetch_scoular
-            from parsers.scoular_parser import parse_scoular_location as _parse_scoular
-            from database import upsert_location_meta as _ulm5
-            with st.spinner("Fetching Scoular bids (~66 US locations)…"):
-                try:
-                    _slocs = _fetch_scoular()
-                    scoular_rows = 0
-                    scoular_locs = 0
-                    for _sloc in _slocs:
-                        _ssnap = _parse_scoular(_sloc)
-                        if _ssnap:
-                            upsert_snapshot(_ssnap.model_dump())
-                            _ulm5(
-                                "Scoular", _ssnap.location,
-                                state         = _sloc.get("state") or None,
-                                facility_type = None,
-                            )
-                            scoular_rows += len(_ssnap.rows)
-                            scoular_locs += 1
-                    st.success(
-                        f"✓ {scoular_locs} location(s) — {scoular_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Scoular scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --scoular-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🔵 LDC")
-        if st.button("Scrape LDC now", key="ldc_scrape_btn"):
-            from ldc_scraper import fetch_ldc_bids as _fetch_ldc
-            from parsers.ldc_parser import parse_ldc_location as _parse_ldc
-            from database import upsert_location_meta as _ulm7
-            with st.spinner("Fetching LDC bids (8 US facilities)…"):
-                try:
-                    _ldclocs = _fetch_ldc()
-                    ldc_rows = 0
-                    ldc_locs = 0
-                    for _ldcloc in _ldclocs:
-                        _ldcsnap = _parse_ldc(_ldcloc)
-                        if _ldcsnap:
-                            upsert_snapshot(_ldcsnap.model_dump())
-                            _ulm7(
-                                "LDC", _ldcsnap.location,
-                                state         = _ldcloc.get("state") or None,
-                                facility_type = None,
-                            )
-                            ldc_rows += len(_ldcsnap.rows)
-                            ldc_locs += 1
-                    st.success(
-                        f"✓ {ldc_locs} location(s) — {ldc_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"LDC scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --ldc-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🟢 AGP")
-        if st.button("Scrape AGP now", key="agp_scrape_btn"):
-            from agp_scraper import fetch_agp_bids as _fetch_agp
-            from parsers.agp_parser import parse_agp_location as _parse_agp
-            from database import upsert_location_meta as _ulm6
-            with st.spinner("Fetching AGP bids (16 locations — Soybeans, Meal, Corn)…"):
-                try:
-                    _agplocs = _fetch_agp()
-                    agp_rows = 0
-                    agp_locs = 0
-                    for _agploc in _agplocs:
-                        _agpsnap = _parse_agp(_agploc)
-                        if _agpsnap:
-                            upsert_snapshot(_agpsnap.model_dump())
-                            _ulm6(
-                                "AGP", _agpsnap.location,
-                                state         = _agploc.get("state") or None,
-                                facility_type = None,
-                            )
-                            agp_rows += len(_agpsnap.rows)
-                            agp_locs += 1
-                    st.success(
-                        f"✓ {agp_locs} location(s) — {agp_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"AGP scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --agp-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        st.markdown("---")
-        st.markdown("### 🌽 GPRE")
-        if st.button("Scrape GPRE now", key="gpre_scrape_btn"):
-            from gpre_scraper import fetch_gpre_bids as _fetch_gpre
-            from parsers.gpre_parser import parse_gpre_location as _parse_gpre
-            with st.spinner("Fetching GPRE corn bids (8 locations)…"):
-                try:
-                    _glocs = _fetch_gpre()
-                    gpre_rows = 0
-                    gpre_locs = 0
-                    for _gloc in _glocs:
-                        _gsnap = _parse_gpre(_gloc)
-                        if _gsnap:
-                            upsert_snapshot(_gsnap.model_dump())
-                            gpre_rows += len(_gsnap.rows)
-                            gpre_locs += 1
-                    st.success(
-                        f"✓ {gpre_locs} location(s) — {gpre_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"GPRE scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python auto_import.py --gpre-only</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape ZFS now", key="zfs_scrape_btn"):
-            from zfs_scraper import fetch_zfs_bids as _fetch_zfs
-            from parsers.zfs_parser import parse_zfs_location as _parse_zfs
-            with st.spinner("Fetching ZFS soybean bids (Zeeland + Ithaca)…"):
-                try:
-                    _zlocs = _fetch_zfs()
-                    zfs_rows = 0
-                    zfs_locs = 0
-                    for _zloc in _zlocs:
-                        _zsnap = _parse_zfs(_zloc)
-                        if _zsnap:
-                            upsert_snapshot(_zsnap.model_dump())
-                            zfs_rows += len(_zsnap.rows)
-                            zfs_locs += 1
-                    st.success(
-                        f"✓ {zfs_locs} location(s) — {zfs_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"ZFS scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python zfs_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape MNSP now", key="mnsp_scrape_btn"):
-            from mnsoy_scraper import fetch_mnsoy_bids as _fetch_mnsp
-            from parsers.mnsoy_parser import parse_mnsoy_location as _parse_mnsp
-            with st.spinner("Fetching MNSP soybean bids (Brewster)…"):
-                try:
-                    _mlocs = _fetch_mnsp()
-                    mnsp_rows = 0
-                    mnsp_locs = 0
-                    for _mloc in _mlocs:
-                        _msnap = _parse_mnsp(_mloc)
-                        if _msnap:
-                            upsert_snapshot(_msnap.model_dump())
-                            mnsp_rows += len(_msnap.rows)
-                            mnsp_locs += 1
-                    st.success(
-                        f"✓ {mnsp_locs} location(s) — {mnsp_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"MNSP scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python mnsoy_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Primient now", key="primient_scrape_btn"):
-            from primient_scraper import fetch_primient_bids as _fetch_pri
-            from parsers.primient_parser import parse_primient_location as _parse_pri
-            with st.spinner("Fetching Primient bids (17 locations)…"):
-                try:
-                    _plocs = _fetch_pri()
-                    pri_rows = 0
-                    pri_locs = 0
-                    for _ploc in _plocs:
-                        _psnap = _parse_pri(_ploc)
-                        if _psnap:
-                            upsert_snapshot(_psnap.model_dump())
-                            pri_rows += len(_psnap.rows)
-                            pri_locs += 1
-                    st.success(
-                        f"✓ {pri_locs} location(s) — {pri_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Primient scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python primient_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Platinum now", key="platinum_scrape_btn"):
-            from platinum_scraper import fetch_platinum_bids as _fetch_plat
-            from parsers.platinum_parser import parse_platinum_location as _parse_plat
-            with st.spinner("Fetching Platinum Crush soybean bids (Alta)…"):
-                try:
-                    _ptlocs = _fetch_plat()
-                    plat_rows = 0
-                    plat_locs = 0
-                    for _ptloc in _ptlocs:
-                        _ptsnap = _parse_plat(_ptloc)
-                        if _ptsnap:
-                            upsert_snapshot(_ptsnap.model_dump())
-                            plat_rows += len(_ptsnap.rows)
-                            plat_locs += 1
-                    st.success(
-                        f"✓ {plat_locs} location(s) — {plat_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Platinum scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python platinum_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Shell Rock now", key="shellrock_scrape_btn"):
-            from shellrock_scraper import fetch_shellrock_bids as _fetch_sr
-            from parsers.shellrock_parser import parse_shellrock_location as _parse_sr
-            with st.spinner("Fetching Shell Rock soybean bids…"):
-                try:
-                    _srlocs = _fetch_sr()
-                    sr_rows = 0
-                    sr_locs = 0
-                    for _srloc in _srlocs:
-                        _srsnap = _parse_sr(_srloc)
-                        if _srsnap:
-                            upsert_snapshot(_srsnap.model_dump())
-                            sr_rows += len(_srsnap.rows)
-                            sr_locs += 1
-                    st.success(
-                        f"✓ {sr_locs} location(s) — {sr_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Shell Rock scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python shellrock_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape White River now", key="whiteriver_scrape_btn"):
-            from whiteriver_scraper import fetch_whiteriver_bids as _fetch_wr
-            from parsers.whiteriver_parser import parse_whiteriver_location as _parse_wr
-            with st.spinner("Fetching White River Soy bids (Seymour)…"):
-                try:
-                    _wrlocs = _fetch_wr()
-                    wr_rows = 0
-                    wr_locs = 0
-                    for _wrloc in _wrlocs:
-                        _wrsnap = _parse_wr(_wrloc)
-                        if _wrsnap:
-                            upsert_snapshot(_wrsnap.model_dump())
-                            wr_rows += len(_wrsnap.rows)
-                            wr_locs += 1
-                    st.success(
-                        f"✓ {wr_locs} location(s) — {wr_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"White River scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python whiteriver_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape HPPSD now", key="hppsd_scrape_btn"):
-            from hppsd_scraper import fetch_hppsd_bids as _fetch_hpp
-            from parsers.hppsd_parser import parse_hppsd_location as _parse_hpp
-            with st.spinner("Fetching HPPSD soybean bids (Mitchell)…"):
-                try:
-                    _hplocs = _fetch_hpp()
-                    hpp_rows = 0
-                    hpp_locs = 0
-                    for _hploc in _hplocs:
-                        _hpsnap = _parse_hpp(_hploc)
-                        if _hpsnap:
-                            upsert_snapshot(_hpsnap.model_dump())
-                            hpp_rows += len(_hpsnap.rows)
-                            hpp_locs += 1
-                    st.success(
-                        f"✓ {hpp_locs} location(s) — {hpp_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"HPPSD scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python hppsd_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Norfolk Crush now", key="norfolkcrush_scrape_btn"):
-            from norfolkcrush_scraper import fetch_norfolkcrush_bids as _fetch_nfc
-            from parsers.norfolkcrush_parser import parse_norfolkcrush_location as _parse_nfc
-            with st.spinner("Fetching Norfolk Crush soybean bids (Norfolk, NE)…"):
-                try:
-                    _nfclocs = _fetch_nfc()
-                    nfc_rows = 0
-                    nfc_locs = 0
-                    for _nfcloc in _nfclocs:
-                        _nfcsnap = _parse_nfc(_nfcloc)
-                        if _nfcsnap:
-                            upsert_snapshot(_nfcsnap.model_dump())
-                            nfc_rows += len(_nfcsnap.rows)
-                            nfc_locs += 1
-                    st.success(
-                        f"✓ {nfc_locs} location(s) — {nfc_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Norfolk Crush scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python norfolkcrush_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if st.button("Scrape Bartlett now", key="bartlett_scrape_btn"):
-            from bartlett_scraper import fetch_bartlett_bids as _fetch_brt
-            from parsers.bartlett_parser import parse_bartlett_location as _parse_brt
-            with st.spinner("Fetching Bartlett Grain bids (17 locations)..."):
-                try:
-                    _brtlocs = _fetch_brt()
-                    brt_rows = 0
-                    brt_locs = 0
-                    for _brtloc in _brtlocs:
-                        _brtsnap = _parse_brt(_brtloc)
-                        if _brtsnap:
-                            upsert_snapshot(_brtsnap.model_dump())
-                            brt_rows += len(_brtsnap.rows)
-                            brt_locs += 1
-                    st.success(
-                        f"✓ {brt_locs} location(s) — {brt_rows} bid row(s) upserted."
-                    )
-                    st.rerun()
-                except Exception as _exc:
-                    st.error(f"Bartlett scrape failed: {_exc}")
-        st.markdown(
-            '<div style="font-size:9px;color:#94a3b8;padding-top:4px">'
-            'CLI: <code style="color:#0693e3">python bartlett_scraper.py</code>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
 
 # ── Header ────────────────────────────────────────────────────────────────────
 # ── Branded header (JPSI / John Stewart & Associates) ────────────────────────
@@ -3893,7 +3198,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No ADM data yet.<br><br>'
-                'Click <b>Scrape ADM now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --adm-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -3920,7 +3225,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No CGB data yet.<br><br>'
-                'Click <b>Scrape CGB now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --cgb-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -3970,7 +3275,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No GPRE data yet.<br><br>'
-                'Click <b>Scrape GPRE now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --gpre-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -3993,7 +3298,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Cargill data yet.<br><br>'
-                'Click <b>Scrape Cargill now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --cargill-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4043,7 +3348,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Andersons data yet.<br><br>'
-                'Click <b>Scrape Andersons now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --andersons-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4093,7 +3398,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Bunge data yet.<br><br>'
-                'Click <b>Scrape Bunge now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --bunge-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4143,7 +3448,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No Scoular data yet.<br><br>'
-                'Click <b>Scrape Scoular now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --scoular-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4193,7 +3498,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No AGP data yet.<br><br>'
-                'Click <b>Scrape AGP now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --agp-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4242,7 +3547,7 @@ with tab_bids:
             st.markdown(
                 '<div style="color:#64748b;text-align:center;padding:40px;font-size:12px">'
                 'No LDC data yet.<br><br>'
-                'Click <b>Scrape LDC now</b> in the sidebar or run:<br>'
+                'Run:<br>'
                 '<code style="color:#0693e3">python auto_import.py --ldc-only</code>'
                 '</div>',
                 unsafe_allow_html=True,
@@ -4360,7 +3665,7 @@ with tab_bids:
             {r["location"] for r in _cached_list_locations() if r["provider"] == provider}
         )
         if not _ag_locs:
-            _hint = (f'Click <b>{_ag_btn}</b> in the sidebar or run:<br>'
+            _hint = (f'Run:<br>'
                      f'<code style="color:#0693e3">python auto_import.py {_ag_cli}</code>'
                      if _ag_cli else
                      'This location is fed in manually — paste a bid sheet to archive it.')
@@ -4425,11 +3730,11 @@ with tab_bids:
         if _p == "POET":
             hint = 'Run <code style="color:#0693e3">python auto_import.py --poet-only</code> to scrape this location, then refresh.'
         elif _p == "ADM":
-            hint = 'Run <code style="color:#0693e3">python auto_import.py --adm-only</code> or click <b>Scrape ADM now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --adm-only</code>, then refresh.'
         elif _p == "CGB":
-            hint = 'Run <code style="color:#0693e3">python auto_import.py --cgb-only</code> or click <b>Scrape CGB now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --cgb-only</code>, then refresh.'
         elif _p == "CHS":
-            hint = 'Run <code style="color:#0693e3">python auto_import.py --chs-only</code> or click <b>Scrape CHS now</b> in the sidebar, then refresh.'
+            hint = 'Run <code style="color:#0693e3">python auto_import.py --chs-only</code>, then refresh.'
         elif _p == "Cargill":
             hint = 'Run <code style="color:#0693e3">python auto_import.py --cargill-only</code>, then refresh.'
         elif _p == "GPRE":
