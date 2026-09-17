@@ -2538,7 +2538,7 @@ with tab_railfob:
             ["CSX Freight"],
         ]),
         ("Gulf Export Rail", [
-            ["CN 105s", "CN 25's"],
+            ["CN 105s", "CN 105s Beans", "CN 25's"],
         ]),
         ("UP Western Rail", [
             ["UP Group 3", "UP Interior IA", ["UP Illinois (Dom)", "UP Illinois (Mex)"]],

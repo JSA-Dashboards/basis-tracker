@@ -30,9 +30,16 @@ import re
 from datetime import date, datetime
 
 from rail_corridors import (RAIL_BY_CORRIDOR, canonical_corridor, corn_futures,
-                            corn_fnd, period_start_month)
+                            corn_fnd, period_start_month, soy_futures_for_period,
+                            soy_fnd)
 
 _TAG2SHORT = {"u": "CU", "z": "CZ", "h": "CH", "k": "CK", "n": "CN"}
+# Soybean tag letters (desk writes them the same way as corn): x=Nov, f=Jan, etc.
+_SOY_TAG = {"f": "SF", "h": "SH", "k": "SK", "n": "SN", "q": "SQ", "u": "SU", "x": "SX"}
+# Corridors kept as SEPARATE board cards per commodity — beans route to the
+# "<x> Beans" market so corn and soybeans don't collide under one market name.
+_BEANS_MARKET = {"CN 105s": "CN 105s Beans"}
+_BEAN_WORDS = ("soybeans", "soybean", "beans", "yellow soybeans", "yellow soybean")
 _CM = {"CH": 3, "CK": 5, "CN": 7, "CU": 9, "CZ": 12}     # contract → month
 
 # Desk notations that ride along with a value but are NOT part of the period and
@@ -96,19 +103,41 @@ def _to_full(short: str, as_of: date) -> str:
     return f"ZC{short[1]}{y % 100:02d}"
 
 
+def _soy_to_full(short: str, as_of: date) -> str:
+    """Short soybean code ('SX') → full CME symbol ('ZSX26') for the active year at
+    `as_of`, rolling forward once that contract is past First Notice."""
+    y = as_of.year
+    for _ in range(8):
+        if soy_fnd(short, y) >= as_of:
+            break
+        y += 1
+    return f"ZS{short[1]}{y % 100:02d}"
+
+
 def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
                  commodity: str = "Corn"):
-    """Resolve a cell's futures: full symbol (ZCZ26), 'R' (spanning), or None.
+    """Resolve a cell's futures: full symbol (ZCZ26 / ZSX26), 'R' (spanning), or None.
 
-    The corn-contract cycle only applies to corn. For any other commodity we don't
-    stamp a corn symbol on it — return None (the reviewer can fill it) so bean/wheat
-    bids aren't mislabeled with ZC contracts."""
-    if (commodity or "Corn").strip().lower() not in ("corn", "yellow corn", ""):
+    Corn and soybeans each get their own contract cycle + FND roll; the cell's tag
+    (corn u/z/h/k/n, soybean f/h/k/n/q/u/x) picks the contract when present. Wheat/
+    other commodities are left blank (None) for the reviewer."""
+    c = (commodity or "Corn").strip().lower()
+    if c in _BEAN_WORDS:                               # ── soybeans ──
+        if tag and tag.lower() in _SOY_TAG:
+            short = _SOY_TAG[tag.lower()]              # explicit bean tag wins
+        else:
+            short = soy_futures_for_period(period, as_of)
+        if not short or short == "R":
+            return short
+        return _soy_to_full(short, as_of)
+    if c not in ("corn", "yellow corn", ""):           # wheat / other → blank
         return None
     short = corn_futures(period, rail, as_of)          # 'CH' / 'CZ' / 'R' / None
-    if tag and tag.lower() in _TAG2SHORT:
-        short = _TAG2SHORT[tag.lower()]                # explicit corn tag wins
-    elif period_start_month(period) == 12:
+    # A tag picks the contract for a single-contract cell, but must NOT collapse a
+    # spanning package (AMJJ tagged "kn" stays 'R', not CK).
+    if tag and tag.lower() in _TAG2SHORT and short != "R":
+        short = _TAG2SHORT[tag.lower()]
+    elif short != "R" and period_start_month(period) == 12:
         short = "CH"                                   # Dec defaults to CH unless tagged z
     if not short or short == "R":
         return short                                   # None or 'R' (no year/roll math)
@@ -163,6 +192,10 @@ def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn")
         as_of = as_of.date()
     text = _NOISE.sub(" ", _normalize_punct(text))
     corridor = canonical_corridor(corridor)
+    # A soybean paste on a corn/beans dual corridor routes to its own board card
+    # (e.g. CN 105s → CN 105s Beans) so the two commodities don't collide.
+    if (commodity or "").strip().lower() in _BEAN_WORDS:
+        corridor = _BEANS_MARKET.get(corridor, corridor)
     rail = RAIL_BY_CORRIDOR.get(corridor)
 
     # UP Illinois is posted as ONE bare rundown whose cells carry (dom)/(mex)

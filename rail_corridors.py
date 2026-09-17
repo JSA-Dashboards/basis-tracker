@@ -35,7 +35,8 @@ CORRIDORS = [
     ("BN PNW BE",        "BNSF"),
     ("BN PNW CP",        "BNSF"),
     ("BN COBO",          "BNSF"),
-    ("CN 105s",          "CN"),      # Canadian National
+    ("CN 105s",          "CN"),      # Canadian National (corn)
+    ("CN 105s Beans",    "CN"),      # soybean version of CN 105s (kept a separate card)
     ("CN 25's",          "CN"),
 ]
 RAIL_BY_CORRIDOR = {n: r for n, r in CORRIDORS}
@@ -123,6 +124,43 @@ def corn_futures_for_period(period: str, as_of=None) -> Optional[str]:
         c  = _CORN_SEQ[(idx + step) % 5]
         cy = dyear + (idx + step) // 5
         if corn_fnd(c, cy) >= as_of:
+            return c
+    return base
+
+
+# ── Soybeans ────────────────────────────────────────────────────────────────
+# Cash-basis month → CME soybean contract. Sep prices vs SX (Nov) per JSA (SU is
+# thin and rolls off fast); Dec has no bean contract so it references the next SF.
+_SOY_BY_MONTH = {1: "SF", 2: "SH", 3: "SH", 4: "SK", 5: "SK", 6: "SN",
+                 7: "SN", 8: "SQ", 9: "SX", 10: "SX", 11: "SX", 12: "SF"}
+_SOY_SEQ = ["SF", "SH", "SK", "SN", "SQ", "SU", "SX"]
+_SOY_CM  = {"SF": 1, "SH": 3, "SK": 5, "SN": 7, "SQ": 8, "SU": 9, "SX": 11}
+
+
+def soy_fnd(contract: str, year: int) -> _dt.date:
+    """First Notice Day for a soybean contract = last business day of the month
+    before the contract month (SX → last business day of October)."""
+    cm = _SOY_CM[contract]
+    fm, fy = (cm - 1, year) if cm > 1 else (12, year - 1)
+    return _last_business_day(fy, fm)
+
+
+def soy_futures_for_period(period: str, as_of=None) -> Optional[str]:
+    """Standard CME soybean contract ('SX') for a delivery period, with the same
+    First-Notice-Day roll as corn (once a contract is past FND, roll to the next
+    option month). Returns the 2-char short (no year) or None."""
+    m = period_start_month(period)
+    base = _SOY_BY_MONTH.get(m) if m else None
+    if not base or as_of is None:
+        return base
+    if hasattr(as_of, "date"):
+        as_of = as_of.date()
+    dyear = as_of.year if m >= as_of.month else as_of.year + 1
+    idx = _SOY_SEQ.index(base)
+    for step in range(8):
+        c  = _SOY_SEQ[(idx + step) % 7]
+        cy = dyear + (idx + step) // 7
+        if soy_fnd(c, cy) >= as_of:
             return c
     return base
 
