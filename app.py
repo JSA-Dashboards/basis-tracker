@@ -2413,6 +2413,45 @@ with tab_railfob:
                     _by_md.get((market, closest(30, 4))),
                     _by_md.get((market, closest(365, 4))))
 
+        _PARTIAL_PFX = re.compile(r"^(?:FH|LH|MP|LP|FP|Split|Full)\s+", re.I)
+        _DAY_RANGE = re.compile(r"\s*\d{1,2}\s*-\s*\d{1,2}\s*$")
+        _MON_ONLY = re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$", re.I)
+
+        def _base_window(period):
+            """A single-month partial (FH/LH/MP/Split Oct, 'Dec 1-20') → its base
+            month. Packages (JFM/AMJJ/DJFM/OND), straddles (LH Oct/FH Nov) and
+            non-month labels (Spot, Nearby) are returned unchanged, so only true
+            single-month partials fold."""
+            s = str(period or "").strip()
+            core = _PARTIAL_PFX.sub("", s)
+            core = _DAY_RANGE.sub("", core).strip()
+            core = re.sub(r"\s*'?\d\d$", "", core).strip()      # drop crop-year 'YY
+            m = _MON_ONLY.match(core)
+            return m.group(1).title() if m else s
+
+        def _fold(rows):
+            """Fold single-month partials onto their base month for board display —
+            the pre-parser behavior. A plain-month posting wins over its partials;
+            packages and non-month labels pass through. Returns {label: row} with each
+            row's period relabeled to the fold label and a '_ord' sort key."""
+            acc = {}
+            for r in rows:
+                p = r.get("period")
+                label = _base_window(p)
+                exact = str(p or "").strip().lower() == label.lower()
+                po = r.get("period_order")
+                po = po if po is not None else 99
+                cur = acc.get(label)
+                if cur is None:
+                    acc[label] = {**r, "period": label, "_ord": po, "_exact": exact}
+                else:
+                    ordv = min(cur["_ord"], po)
+                    if exact and not cur["_exact"]:
+                        acc[label] = {**r, "period": label, "_ord": ordv, "_exact": True}
+                    else:
+                        cur["_ord"] = ordv
+            return acc
+
         def _market_html(_m):
             _elig = [d for d in _mkt_dates.get(_m, ()) if d <= _msel]
             if not _elig:
@@ -2424,11 +2463,16 @@ with tab_railfob:
             # continuous; don't double-show it on the board when Return Trip is present.
             if any(r.get("period") == "Return Trip" for r in _cells):
                 _cells = [r for r in _cells if r.get("period") != "Spot"]
+            # Fold partial windows onto their base month — one clean row per month.
+            _cells = sorted(_fold(_cells).values(), key=lambda r: r["_ord"])
             if not _cells:
                 return ''
             _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
             _pd, _pw, _pmo, _pyr = _prior_maps(_m, _eff)
+            # Fold prior postings the same way so Δ compares month-to-month.
+            _pd, _pw, _pmo, _pyr = (_fold(m.values()) if m else {}
+                                    for m in (_pd, _pw, _pmo, _pyr))
             _asof = ""
             if _eff != _msel:    # carried forward — stamp with its actual posting date
                 _yy, _mo2, _dd = _eff.split("-")
