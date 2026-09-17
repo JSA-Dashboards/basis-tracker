@@ -6659,22 +6659,6 @@ if not _view_only():
         _ed = _by_name.get(_pick) or {}
         _k = f"_{_pick}"          # suffix keys with the pick so switching clients resets fields
 
-        _c1, _c2 = st.columns(2)
-        with _c1:
-            _name = st.text_input("Client name", value=_ed.get("client_name", ""), key="cr_name" + _k)
-            _email = st.text_input("Email", value=_ed.get("email", ""), key="cr_email" + _k)
-        with _c2:
-            _cc = st.text_input("CC (optional)", value=_ed.get("cc") or "", key="cr_cc" + _k)
-            _freq = st.selectbox("Frequency", ["daily", "weekly", "monthly"],
-                                 index=["daily", "weekly", "monthly"].index(_ed.get("frequency", "daily")),
-                                 key="cr_freq" + _k)
-        _dow = None
-        if _freq == "weekly":
-            _days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-            _dow = st.selectbox("Day of week", list(range(5)), format_func=lambda i: _days[i],
-                                index=int(_ed.get("day_of_week") or 0), key="cr_dow" + _k)
-        _active = st.checkbox("Active", value=_ed.get("active", True), key="cr_active" + _k)
-
         # Existing subscriptions may have stored grain per location — collapse to
         # the Provider · Location label the picker now uses.
         _cur = []
@@ -6682,10 +6666,30 @@ if not _view_only():
             _lbl = f'{x["provider"]} · {x["location"]}'
             if _lbl in _opt_label and _lbl not in _cur:
                 _cur.append(_lbl)
-        # The location/commodity pickers live in a FORM so adding many locations
-        # doesn't rerun the whole (now large) dashboard on every pick — you add
-        # them all with zero reruns, then Save/Preview submits once.
+
+        # EVERY field lives in ONE form, so editing a value, adding a CC, picking a
+        # commodity, or stacking many locations does NOT rerun the whole (now large)
+        # ~14-tab dashboard on each change — it all submits once on Save. That
+        # per-change full-app rerun was the freeze/lock-up. (The client picker above
+        # stays outside so choosing a client still loads its saved values.)
+        _days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         with st.form("cr_form" + _k):
+            _c1, _c2 = st.columns(2)
+            with _c1:
+                _name = st.text_input("Client name", value=_ed.get("client_name", ""), key="cr_name" + _k)
+                _email = st.text_input("Email", value=_ed.get("email", ""), key="cr_email" + _k)
+            with _c2:
+                _cc = st.text_input("CC (optional)", value=_ed.get("cc") or "", key="cr_cc" + _k)
+                _freq = st.selectbox("Frequency", ["daily", "weekly", "monthly"],
+                                     index=["daily", "weekly", "monthly"].index(_ed.get("frequency", "daily")),
+                                     key="cr_freq" + _k)
+            _cw1, _cw2 = st.columns(2)
+            with _cw1:
+                _dow = st.selectbox("Day of week (weekly reports only)", list(range(5)),
+                                    format_func=lambda i: _days[i],
+                                    index=int(_ed.get("day_of_week") or 0), key="cr_dow" + _k)
+            with _cw2:
+                _active = st.checkbox("Active", value=_ed.get("active", True), key="cr_active" + _k)
             _sel = st.multiselect("Locations (Provider · Location)", sorted(_opt_label),
                                   default=_cur, key="cr_locs" + _k)
             _cc1, _cc2 = st.columns([3, 2])
@@ -6704,6 +6708,7 @@ if not _view_only():
             _do_prev = _fs2.form_submit_button("👁️ Preview")
 
         _sel_locs = [_opt_label[s] for s in _sel]
+        _dow = _dow if _freq == "weekly" else None   # only weekly reports use a day
 
         def _client_rec():
             return {"id": _ed.get("id") or _uuid.uuid4().hex, "client_name": _name,
