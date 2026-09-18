@@ -6,22 +6,42 @@ RIVER_DATABASE_URL is set we read/write that dedicated DB; otherwise we fall
 back to the basis tracker's main connection (the old shared DB) for backward
 compatibility. The River FOB portal remains the place data is entered/saved.
 """
+import logging
 import os
 from database import get_conn, _use_pg
+
+log = logging.getLogger(__name__)
+_CONN_ERROR: str | None = None      # last river-connect failure, for the UI warning
 
 
 def _river_url() -> str:
     return os.environ.get("RIVER_DATABASE_URL", "").strip()
 
 
+def river_conn_error() -> str | None:
+    """The last RIVER_DATABASE_URL connection failure (e.g. a malformed DSN pasted
+    into secrets), or None when the dedicated river DB connected or isn't configured.
+    Lets the app warn it's serving fallback data instead of silently going stale."""
+    return _CONN_ERROR
+
+
 def _river_conn():
     """Connection to the dedicated river DB (RIVER_DATABASE_URL) if configured,
-    else the basis tracker's main connection."""
+    else the basis tracker's main connection. A bad/unreachable RIVER_DATABASE_URL
+    (e.g. a malformed DSN) must NOT crash the whole app — this connection is used
+    early (Spot/Forward tab) — so fall back to the main connection and record why."""
+    global _CONN_ERROR
     url = _river_url()
     if url:
-        import psycopg2
-        import psycopg2.extras
-        return psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            import psycopg2
+            import psycopg2.extras
+            conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+            _CONN_ERROR = None
+            return conn
+        except Exception as exc:
+            _CONN_ERROR = (str(exc).strip() or exc.__class__.__name__)[:200]
+            log.warning("River DB connect failed — falling back to main DB: %s", exc)
     return get_conn()
 
 

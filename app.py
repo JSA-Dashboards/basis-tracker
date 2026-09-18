@@ -3026,6 +3026,18 @@ with tab_riverfob:
             "switched to its dedicated database. Add the `RIVER_DATABASE_URL` "
             "secret to this deployment to pull live data."
         )
+    else:
+        # RIVER_DATABASE_URL is set but the connection may have failed (e.g. a
+        # malformed DSN) — the reader falls back to the main DB instead of crashing.
+        import river_fob_data as _rfd
+        _rerr = getattr(_rfd, "river_conn_error", lambda: None)()
+        if _rerr:
+            st.warning(
+                "⚠️ **River DB connection failed — showing fallback (main) data.** "
+                f"`RIVER_DATABASE_URL` is set but couldn't be used (`{_rerr}`). It should "
+                "be a single-line `postgresql://…` connection string — re-check the "
+                "secret's value. Until it's fixed this tab reads the stale main database."
+            )
 
     if not _view_only():
         with st.expander("🔄 Update from the FOB sheet — pull in before the 4:30 PM auto-import"):
