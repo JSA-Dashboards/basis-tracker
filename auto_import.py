@@ -133,6 +133,7 @@ from fse_scraper import fetch_fse                         # Farm Service Elevato
 from cpi_scraper import fetch_cpi                          # CPI (static HTML tables)
 from bushel_powered_scraper import fetch_bushel_powered    # newer Bushel (bushelpowered API)
 from landus_scraper import fetch_landus                    # Landus (Next.js API routes)
+from hec_scraper import fetch_hec                          # Hopkinsville Elevator (cash-basis PDF)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -801,6 +802,38 @@ def run_landus() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("Landus done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_hec() -> int:
+    """Scrape Hopkinsville Elevator Co. (KY/TN) cash-basis PDF (corn/soy/wheat).
+    Local-only (pdfplumber); skips gracefully on Cloud."""
+    log.info("=" * 60)
+    log.info("HEC (Hopkinsville Elevator) scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_hec()
+    except Exception as exc:
+        log.error("HEC scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("HEC scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("HEC bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("Hopkinsville Elevator",
+                              [{"location": m["location"], "state": m.get("state"),
+                                "facility_type": m.get("facility_type")} for m in metas])
+    except Exception as exc:
+        log.error("HEC meta upsert failed: %s", exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("HEC done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -2035,6 +2068,7 @@ def run(
     run_cpi_scrape: bool = True,
     run_bushel_powered_scrape: bool = True,
     run_landus_scrape: bool = True,
+    run_hec_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -2132,6 +2166,8 @@ def run(
         total += _run_guarded(run_bushel_powered, "Bushel-powered", 120)
     if run_landus_scrape:
         total += _run_guarded(run_landus, "Landus", 180)
+    if run_hec_scrape:
+        total += _run_guarded(run_hec, "HEC", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2412,6 +2448,9 @@ if __name__ == "__main__":
     landus_group = parser.add_mutually_exclusive_group()
     landus_group.add_argument("--no-landus", dest="no_landus", action="store_true", help="Skip Landus Cooperative (IA) scrape")
     landus_group.add_argument("--landus-only", dest="landus_only", action="store_true", help="Run Landus Cooperative (IA) scrape only")
+    hec_group = parser.add_mutually_exclusive_group()
+    hec_group.add_argument("--no-hec", dest="no_hec", action="store_true", help="Skip Hopkinsville Elevator (KY/TN) PDF scrape")
+    hec_group.add_argument("--hec-only", dest="hec_only", action="store_true", help="Run Hopkinsville Elevator (KY/TN) PDF scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2581,6 +2620,9 @@ if __name__ == "__main__":
     elif args.landus_only:
         init_db()
         run_landus()
+    elif args.hec_only:
+        init_db()
+        run_hec()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2640,6 +2682,7 @@ if __name__ == "__main__":
             run_cpi_scrape=not args.no_cpi,
             run_bushel_powered_scrape=not args.no_bushel_powered,
             run_landus_scrape=not args.no_landus,
+            run_hec_scrape=not args.no_hec,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
