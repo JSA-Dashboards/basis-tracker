@@ -3013,31 +3013,32 @@ with tab_riverfob:
     except Exception:
         _rfi = None
 
-    # Surface the silent-fallback case: with no RIVER_DATABASE_URL configured the
-    # reader falls back to the main DB, whose river tables froze when the portal
-    # moved to the dedicated river DB — so the data would be stale without warning.
-    # Checked inline via the env var (not river_fob_data.using_fallback) so a
-    # Streamlit hot-reload that keeps the old module cached can't AttributeError.
-    if not os.environ.get("RIVER_DATABASE_URL", "").strip():
+    # The River FOB portal now writes to Snowflake (RIVER_FOB.PUBLIC), which is the
+    # CURRENT source read on the main Snowflake connection with NO RIVER_DATABASE_URL.
+    # So: (a) RIVER_DATABASE_URL set = the RETIRED Supabase copy (stale/failing) — tell
+    # them to remove it; (b) using_fallback() = the old shared DB (non-Snowflake, no
+    # RIVER_URL) — truly stale; (c) otherwise Snowflake RIVER_FOB — current, no warning.
+    # getattr guards a hot-reload that kept an older river_fob_data cached.
+    import river_fob_data as _rfd
+    _rurl = os.environ.get("RIVER_DATABASE_URL", "").strip()
+    _rerr = getattr(_rfd, "river_conn_error", lambda: None)()
+    _river_fb = getattr(_rfd, "using_fallback", lambda: not _rurl)()
+    if _rurl:
         st.warning(
-            "⚠️ **River DB not configured — data may be stale.** "
-            "`RIVER_DATABASE_URL` isn't set, so this tab is reading the fallback "
-            "(main) database, which stopped updating when the River FOB portal "
-            "switched to its dedicated database. Add the `RIVER_DATABASE_URL` "
-            "secret to this deployment to pull live data."
+            "⚠️ **`RIVER_DATABASE_URL` is set — remove it.** The River FOB portal now "
+            "writes to Snowflake (`RIVER_FOB.PUBLIC`); this secret points at the retired "
+            "Supabase copy"
+            + (f", **and its connection is failing** (`{_rerr}`)" if _rerr
+               else " (frozen in early September)")
+            + ". Delete the secret from this deployment and reboot to read the current "
+              "Snowflake data."
         )
-    else:
-        # RIVER_DATABASE_URL is set but the connection may have failed (e.g. a
-        # malformed DSN) — the reader falls back to the main DB instead of crashing.
-        import river_fob_data as _rfd
-        _rerr = getattr(_rfd, "river_conn_error", lambda: None)()
-        if _rerr:
-            st.warning(
-                "⚠️ **River DB connection failed — showing fallback (main) data.** "
-                f"`RIVER_DATABASE_URL` is set but couldn't be used (`{_rerr}`). It should "
-                "be a single-line `postgresql://…` connection string — re-check the "
-                "secret's value. Until it's fixed this tab reads the stale main database."
-            )
+    elif _river_fb:
+        st.warning(
+            "⚠️ **River DB reading the stale main database.** This deployment isn't on "
+            "Snowflake and `RIVER_DATABASE_URL` isn't set, so the River tab is reading "
+            "the old shared DB, frozen when the portal moved to its dedicated database."
+        )
 
     if not _view_only():
         with st.expander("🔄 Update from the FOB sheet — pull in before the 4:30 PM auto-import"):
