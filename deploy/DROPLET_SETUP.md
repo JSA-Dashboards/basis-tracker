@@ -55,7 +55,7 @@ It must contain at least:
 - `USE_SNOWFLAKE=1` and the full `SNOWFLAKE_*` block (account/user/password/role/warehouse; `SNOWFLAKE_SCHEMA=BASIS_TRACKER`)
 - `GRAPH_TENANT_ID` / `GRAPH_CLIENT_ID` / `GRAPH_CLIENT_SECRET` / `GRAPH_SENDER` — so the daily Changes email sends via Graph
 - `CHANGES_EMAIL_TO` (defaults to kpostin@jpsi.com) and optional `CHANGES_EMAIL_CC`
-- `MASSIVE_S3_ACCESS_KEY` / `MASSIVE_S3_SECRET_KEY` (futures feed), `RIVER_DATABASE_URL` if any step cross-reads it
+- `MASSIVE_S3_ACCESS_KEY` / `MASSIVE_S3_SECRET_KEY` (futures feed). `RIVER_DATABASE_URL` is **not** needed — River FOB data is read from Snowflake now, and `auto_import` doesn't touch it anyway.
 
 Do **not** put `APP_PASSWORD` here — that's only for the Streamlit admin app.
 

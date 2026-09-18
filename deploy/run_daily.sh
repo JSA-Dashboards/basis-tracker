@@ -25,11 +25,16 @@ if ! flock -n 9; then
     exit 0
 fi
 
+rc=0
 {
     echo "=== auto_import start $(date -Is) ==="
     "$VENV/bin/python" auto_import.py
-    echo "=== auto_import finished $(date -Is) rc=$? ==="
+    rc=$?    # capture immediately — must precede any other command (e.g. date)
+    echo "=== auto_import finished $(date -Is) rc=$rc ==="
 } >>"$LOG" 2>&1
 
 # Keep 30 days of logs.
 find "$LOG_DIR" -name 'auto_import_*.log' -mtime +30 -delete 2>/dev/null || true
+
+# Surface auto_import's real exit code to cron, so a failed run can alert via MAILTO.
+exit "$rc"
