@@ -103,6 +103,12 @@ SITES: list[dict] = [
     {"provider": "Guardian Energy", "location": "Lima, OH", "state": "OH",
      "facility_type": "Corn Processing", "company_id": 85741, "commodity_ids": "",
      "origin": "https://www.guardiannrg.com"},
+    # MNSP (Minnesota Soybean Processors, Brewster MN) — soybeans; folded in from the
+    # former standalone mnsoy_scraper (same v2 CIHedging widget). Location string kept
+    # as "Brewster" (no state suffix) to preserve its existing history/meta.
+    {"provider": "MNSP", "location": "Brewster", "state": "MN",
+     "facility_type": "Soy Processing", "company_id": 145642, "commodity_ids": "",
+     "origin": "https://mnsoy.com"},
 ]
 
 _MONTH_CODES = {"Jan": "F", "Feb": "G", "Mar": "H", "Apr": "J", "May": "K", "Jun": "M",
@@ -117,6 +123,10 @@ _COMMODITY = {
 }
 # Short id prefix per root, so a row id is stable + unique within a location.
 _PFX = {"ZC": "CN", "ZS": "SB", "ZW": "WH"}
+# Valid CME contract months per root — some widgets emit chart/placeholder rows
+# with an impossible contract (e.g. soybeans have no Z/Dec) and a junk basis; the
+# old per-site scrapers filtered these by hand, so drop them generically here.
+_VALID_MONTHS = {"ZC": set("HKNUZ"), "ZS": set("FHKNQUX"), "ZW": set("HKNUZ")}
 
 _FUT_RE = re.compile(r"([A-Za-z]{3})\s+(\d{2})")
 
@@ -198,6 +208,12 @@ def parse_site(cfg: dict) -> NewSnapshotRequest | None:
             try:
                 basis_cents = int(round(float(basis_txt) * 100))
             except ValueError:
+                continue
+            # Drop garbage rows: an impossible contract month for the commodity, or
+            # an absurd basis (|x| > $5) — these are chart/placeholder artifacts.
+            if len(cme) >= 3 and cme[2] not in _VALID_MONTHS.get(cme[:2], {cme[2]}):
+                continue
+            if abs(basis_cents) > 500:
                 continue
             # Keep a 4-digit year in the delivery label; half-month labels
             # ("Fh Aug"/"Lh Aug") gain the year from the row's data attribute.

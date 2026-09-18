@@ -98,8 +98,6 @@ from gpc_scraper import fetch_gpc_bids
 from parsers.gpc_parser import parse_gpc_location
 from zfs_scraper import fetch_zfs_bids
 from parsers.zfs_parser import parse_zfs_location
-from mnsoy_scraper import fetch_mnsoy_bids
-from parsers.mnsoy_parser import parse_mnsoy_location
 from platinum_scraper import fetch_platinum_bids
 from parsers.platinum_parser import parse_platinum_location
 from shellrock_scraper import fetch_shellrock_bids
@@ -1858,10 +1856,6 @@ def run_zfs() -> int:
     return _run_simple("ZFS", fetch_zfs_bids, parse_zfs_location)
 
 
-def run_mnsp() -> int:
-    return _run_simple("MNSP", fetch_mnsoy_bids, parse_mnsoy_location)
-
-
 def run_platinum() -> int:
     return _run_simple("Platinum", fetch_platinum_bids, parse_platinum_location)
 
@@ -2076,7 +2070,6 @@ def run(
     run_tyson_scrape: bool = True,
     run_gpc_scrape: bool = True,
     run_zfs_scrape: bool = True,
-    run_mnsp_scrape: bool = True,
     run_platinum_scrape: bool = True,
     run_shellrock_scrape: bool = True,
     run_whiteriver_scrape: bool = True,
@@ -2150,8 +2143,6 @@ def run(
         total += _run_guarded(run_gpc, "GPC")
     if run_zfs_scrape:
         total += _run_guarded(run_zfs, "ZFS")
-    if run_mnsp_scrape:
-        total += _run_guarded(run_mnsp, "MN Soy")
     if run_platinum_scrape:
         total += _run_guarded(run_platinum, "Platinum")
     if run_shellrock_scrape:
@@ -2395,10 +2386,6 @@ if __name__ == "__main__":
     zfs_group.add_argument("--no-zfs", dest="no_zfs", action="store_true", help="Skip ZFS scrape")
     zfs_group.add_argument("--zfs-only", dest="zfs_only", action="store_true", help="Run ZFS scrape only")
 
-    mnsp_group = parser.add_mutually_exclusive_group()
-    mnsp_group.add_argument("--no-mnsp", dest="no_mnsp", action="store_true", help="Skip MNSP scrape")
-    mnsp_group.add_argument("--mnsp-only", dest="mnsp_only", action="store_true", help="Run MNSP scrape only")
-
     platinum_group = parser.add_mutually_exclusive_group()
     platinum_group.add_argument("--no-platinum", dest="no_platinum", action="store_true", help="Skip Platinum scrape")
     platinum_group.add_argument("--platinum-only", dest="platinum_only", action="store_true", help="Run Platinum scrape only")
@@ -2585,9 +2572,6 @@ if __name__ == "__main__":
     elif args.zfs_only:
         init_db()
         run_zfs()
-    elif args.mnsp_only:
-        init_db()
-        run_mnsp()
     elif args.platinum_only:
         init_db()
         run_platinum()
@@ -2699,7 +2683,6 @@ if __name__ == "__main__":
             run_tyson_scrape=not args.no_tyson,
             run_gpc_scrape=not args.no_gpc,
             run_zfs_scrape=not args.no_zfs,
-            run_mnsp_scrape=not args.no_mnsp,
             run_platinum_scrape=not args.no_platinum,
             run_shellrock_scrape=not args.no_shellrock,
             run_whiteriver_scrape=not args.no_whiteriver,
