@@ -134,6 +134,7 @@ from cpi_scraper import fetch_cpi                          # CPI (static HTML ta
 from bushel_powered_scraper import fetch_bushel_powered    # newer Bushel (bushelpowered API)
 from landus_scraper import fetch_landus                    # Landus (Next.js API routes)
 from hec_scraper import fetch_hec                          # Hopkinsville Elevator (cash-basis PDF)
+from georges_scraper import fetch_georges                  # Georges Inc. feed mills (corn basis PDF)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
@@ -834,6 +835,37 @@ def run_hec() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("HEC done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_georges() -> int:
+    """Scrape Georges Inc. feed-mill corn basis PDF (AR/MO/VA). Local-only
+    (pdfplumber); a freshness guard skips a stale sheet, and it skips on Cloud."""
+    log.info("=" * 60)
+    log.info("Georges scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_georges()
+    except Exception as exc:
+        log.error("Georges scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("Georges scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("Georges bulk snapshot upsert failed: %s", exc)
+    try:
+        upsert_location_metas("Georges", [{"location": m["location"], "state": m.get("state"),
+                                           "facility_type": m.get("facility_type")} for m in metas])
+    except Exception as exc:
+        log.error("Georges meta upsert failed: %s", exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("Georges done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -2069,6 +2101,7 @@ def run(
     run_bushel_powered_scrape: bool = True,
     run_landus_scrape: bool = True,
     run_hec_scrape: bool = True,
+    run_georges_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
     run_pruning: bool = True,
@@ -2168,6 +2201,8 @@ def run(
         total += _run_guarded(run_landus, "Landus", 180)
     if run_hec_scrape:
         total += _run_guarded(run_hec, "HEC", 120)
+    if run_georges_scrape:
+        total += _run_guarded(run_georges, "Georges", 120)
     if run_agmd_scrape:
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
@@ -2451,6 +2486,9 @@ if __name__ == "__main__":
     hec_group = parser.add_mutually_exclusive_group()
     hec_group.add_argument("--no-hec", dest="no_hec", action="store_true", help="Skip Hopkinsville Elevator (KY/TN) PDF scrape")
     hec_group.add_argument("--hec-only", dest="hec_only", action="store_true", help="Run Hopkinsville Elevator (KY/TN) PDF scrape only")
+    georges_group = parser.add_mutually_exclusive_group()
+    georges_group.add_argument("--no-georges", dest="no_georges", action="store_true", help="Skip Georges Inc. (AR/MO/VA) PDF scrape")
+    georges_group.add_argument("--georges-only", dest="georges_only", action="store_true", help="Run Georges Inc. (AR/MO/VA) PDF scrape only")
     agmd_group = parser.add_mutually_exclusive_group()
     agmd_group.add_argument("--no-agmd", dest="no_agmd", action="store_true", help="Skip AgriCharts-MD plants (Homeland) scrape")
     agmd_group.add_argument("--agmd-only", dest="agmd_only", action="store_true", help="Run AgriCharts-MD plants (Homeland) scrape only")
@@ -2623,6 +2661,9 @@ if __name__ == "__main__":
     elif args.hec_only:
         init_db()
         run_hec()
+    elif args.georges_only:
+        init_db()
+        run_georges()
     elif args.agmd_only:
         init_db()
         run_agricharts_md()
@@ -2683,6 +2724,7 @@ if __name__ == "__main__":
             run_bushel_powered_scrape=not args.no_bushel_powered,
             run_landus_scrape=not args.no_landus,
             run_hec_scrape=not args.no_hec,
+            run_georges_scrape=not args.no_georges,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
             run_pruning=not args.no_prune,
