@@ -32,16 +32,18 @@ def _pg_url() -> str:
 
 
 def _backend() -> str:
-    """Active backend: 'snowflake' | 'postgres' | 'sqlite'.
+    """Active backend: 'snowflake' | 'sqlite'.
 
-    Snowflake wins when USE_SNOWFLAKE is truthy (even if DATABASE_URL is still
-    set), so the cutover is a single env flag. Otherwise Postgres if a
-    DATABASE_URL exists, else local SQLite."""
+    Snowflake in production — USE_SNOWFLAKE truthy, or running inside
+    Streamlit-in-Snowflake; local SQLite otherwise. The old Postgres/Supabase
+    fallback was retired (2026-09): the data lives on Snowflake, so a Snowflake
+    misconfig now fails to an (empty) local SQLite — obviously broken — instead of
+    quietly serving stale Supabase data. DATABASE_URL is no longer consulted here."""
     if os.getenv("USE_SNOWFLAKE", "").strip().lower() in ("1", "true", "yes", "on"):
         return "snowflake"
     if _sf_active_session_conn() is not None:   # running inside Streamlit-in-Snowflake
         return "snowflake"
-    return "postgres" if os.getenv("DATABASE_URL") else "sqlite"
+    return "sqlite"
 
 
 def _use_pg() -> bool:

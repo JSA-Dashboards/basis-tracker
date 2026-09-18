@@ -12,9 +12,15 @@ still set**.
 
 The Supabase Postgres database is a stale copy — as of 2026-09-06 Snowflake was
 ahead on every table (`SNAPSHOT_ROWS` +9,715, `FREIGHT_HISTORY` +45,749). If a
-number looks wrong, do not "fix" it by pointing back at Postgres. `DATABASE_URL`
-remains in secrets only as a fallback and should eventually be removed so a
-Snowflake outage fails loudly instead of quietly serving July data.
+number looks wrong, do not "fix" it by pointing back at Postgres.
+
+**Supabase is retired (2026-09-18).** `_backend()` no longer selects Postgres — it's
+Snowflake (prod) or local SQLite only — so a Snowflake misconfig now fails to an
+empty SQLite (obviously broken) instead of quietly serving stale Supabase data.
+`DATABASE_URL` is ignored by the picker (the Postgres SQL branches remain as dead
+code, not yet ripped out); the `RIVER_DATABASE_URL` path was removed entirely
+(River FOB reads Snowflake `RIVER_FOB.PUBLIC`). Both secrets can be deleted from
+the Cloud apps, and the Supabase project decommissioned.
 
 ## This repo deploys as two separate Streamlit apps
 
