@@ -28,7 +28,7 @@ load_dotenv()
 # so that database.py and other modules can read them via os.getenv().
 try:
     _secret_keys = (
-        "DATABASE_URL", "RIVER_DATABASE_URL", "APP_PASSWORD", "VIEW_ONLY",
+        "DATABASE_URL", "APP_PASSWORD", "VIEW_ONLY",   # RIVER_DATABASE_URL retired (River is on Snowflake)
         # Snowflake backend (set USE_SNOWFLAKE=1 in Cloud secrets to read Snowflake)
         "USE_SNOWFLAKE", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
         "SNOWFLAKE_ROLE", "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
@@ -3013,31 +3013,16 @@ with tab_riverfob:
     except Exception:
         _rfi = None
 
-    # The River FOB portal now writes to Snowflake (RIVER_FOB.PUBLIC), which is the
-    # CURRENT source read on the main Snowflake connection with NO RIVER_DATABASE_URL.
-    # So: (a) RIVER_DATABASE_URL set = the RETIRED Supabase copy (stale/failing) — tell
-    # them to remove it; (b) using_fallback() = the old shared DB (non-Snowflake, no
-    # RIVER_URL) — truly stale; (c) otherwise Snowflake RIVER_FOB — current, no warning.
-    # getattr guards a hot-reload that kept an older river_fob_data cached.
+    # River data is read from the portal's current Snowflake RIVER_FOB.PUBLIC archive.
+    # RIVER_DATABASE_URL is retired and ignored by the reader now, so the only case
+    # worth a banner is the non-Snowflake fallback (the main connection's own, stale
+    # river tables). getattr guards a hot-reload that kept an older module cached.
     import river_fob_data as _rfd
-    _rurl = os.environ.get("RIVER_DATABASE_URL", "").strip()
-    _rerr = getattr(_rfd, "river_conn_error", lambda: None)()
-    _river_fb = getattr(_rfd, "using_fallback", lambda: not _rurl)()
-    if _rurl:
-        st.warning(
-            "⚠️ **`RIVER_DATABASE_URL` is set — remove it.** The River FOB portal now "
-            "writes to Snowflake (`RIVER_FOB.PUBLIC`); this secret points at the retired "
-            "Supabase copy"
-            + (f", **and its connection is failing** (`{_rerr}`)" if _rerr
-               else " (frozen in early September)")
-            + ". Delete the secret from this deployment and reboot to read the current "
-              "Snowflake data."
-        )
-    elif _river_fb:
+    if getattr(_rfd, "using_fallback", lambda: False)():
         st.warning(
             "⚠️ **River DB reading the stale main database.** This deployment isn't on "
-            "Snowflake and `RIVER_DATABASE_URL` isn't set, so the River tab is reading "
-            "the old shared DB, frozen when the portal moved to its dedicated database."
+            "Snowflake, so the River tab is reading the main connection's own river "
+            "tables instead of the portal's current Snowflake `RIVER_FOB.PUBLIC` archive."
         )
 
     if not _view_only():

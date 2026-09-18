@@ -1,90 +1,49 @@
 """Read layer for the River FOB archive (cif_history / freight_history /
 calendar_history).
 
-River data lives in its OWN Supabase now (the portal writes there). If
-RIVER_DATABASE_URL is set we read/write that dedicated DB; otherwise we fall
-back to the basis tracker's main connection (the old shared DB) for backward
-compatibility. The River FOB portal remains the place data is entered/saved.
+River data lives in the portal's standalone Snowflake database RIVER_FOB.PUBLIC,
+read cross-database on the basis tracker's main Snowflake connection. (The old
+dedicated-Supabase path via RIVER_DATABASE_URL was retired 2026-09 once the portal
+moved to Snowflake — that secret is now ignored.) On a non-Snowflake backend the
+reads hit the main connection's own river tables, which is a stale fallback. The
+portal remains the place data is entered/saved.
 """
-import logging
-import os
-from database import get_conn, _use_pg
-
-log = logging.getLogger(__name__)
-_CONN_ERROR: str | None = None      # last river-connect failure, for the UI warning
-
-
-def _river_url() -> str:
-    return os.environ.get("RIVER_DATABASE_URL", "").strip()
-
-
-def river_conn_error() -> str | None:
-    """The last RIVER_DATABASE_URL connection failure (e.g. a malformed DSN pasted
-    into secrets), or None when the dedicated river DB connected or isn't configured.
-    Lets the app warn it's serving fallback data instead of silently going stale."""
-    return _CONN_ERROR
+from database import get_conn
 
 
 def _river_conn():
-    """Connection to the dedicated river DB (RIVER_DATABASE_URL) if configured,
-    else the basis tracker's main connection. A bad/unreachable RIVER_DATABASE_URL
-    (e.g. a malformed DSN) must NOT crash the whole app — this connection is used
-    early (Spot/Forward tab) — so fall back to the main connection and record why."""
-    global _CONN_ERROR
-    url = _river_url()
-    if url:
-        try:
-            import psycopg2
-            import psycopg2.extras
-            conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
-            _CONN_ERROR = None
-            return conn
-        except Exception as exc:
-            _CONN_ERROR = (str(exc).strip() or exc.__class__.__name__)[:200]
-            log.warning("River DB connect failed — falling back to main DB: %s", exc)
+    """River reads/writes go through the basis tracker's main connection —
+    Snowflake, where the portal's RIVER_FOB.PUBLIC archive lives."""
     return get_conn()
 
 
 def _ph() -> str:
-    # Dedicated river Postgres → %s. Otherwise follow the main backend's placeholder
-    # (Snowflake & Postgres = %s, SQLite = ?) so queries bind correctly under SiS.
-    if _river_url():
-        return "%s"
+    # Follow the main backend's placeholder (Snowflake & Postgres = %s, SQLite = ?).
     from database import _ph as _db_ph
     return _db_ph()
 
 
 def _tbl(name: str) -> str:
-    """Qualify a River FOB table. The portal moved its archive to its own
-    standalone Snowflake database (RIVER_FOB.PUBLIC), so on the Snowflake main
-    connection we read/write there cross-database. On the dedicated-Postgres path
-    (RIVER_DATABASE_URL) the tables are unqualified in that DB."""
-    if not _river_url():
-        try:
-            from database import _use_sf
-            if _use_sf():
-                return f"RIVER_FOB.PUBLIC.{name}"
-        except Exception:
-            pass
+    """Qualify a River FOB table. On Snowflake the portal's archive is a standalone
+    RIVER_FOB.PUBLIC database, read cross-database; other backends read the main
+    connection's own (unqualified) river tables."""
+    try:
+        from database import _use_sf
+        if _use_sf():
+            return f"RIVER_FOB.PUBLIC.{name}"
+    except Exception:
+        pass
     return name
 
 
 def using_fallback() -> bool:
-    """True only when reads fall back to the basis tracker's own (stale) DB.
-
-    With RIVER_DATABASE_URL set we read that dedicated river DB. On Snowflake we
-    read the portal's standalone RIVER_FOB database (current), which is NOT a
-    stale fallback. Only the non-Snowflake, no-RIVER_DATABASE_URL path hits the
-    old shared DB — that's the one worth a staleness banner."""
-    if _river_url():
-        return False
+    """True only when reads fall back to the main (non-Snowflake) DB's own river
+    tables — stale. On Snowflake we read the current RIVER_FOB.PUBLIC archive."""
     try:
         from database import _use_sf
-        if _use_sf():
-            return False
+        return not _use_sf()
     except Exception:
-        pass
-    return True
+        return True
 
 
 def list_dates() -> list:
