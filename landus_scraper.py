@@ -15,6 +15,7 @@ plain-requests scraper (no headless browser needed).
 from __future__ import annotations
 
 import logging
+import os
 import re
 from datetime import datetime, timezone
 
@@ -71,6 +72,14 @@ def fetch_landus() -> tuple[list[NewSnapshotRequest], list[dict]]:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
     sess = requests.Session()
     sess.headers.update(_HEADERS)
+    # Landus's Vercel bot-protection blocks datacenter IPs — the DigitalOcean Droplet
+    # gets an HTML challenge instead of JSON. Route through a proxy when LANDUS_PROXY
+    # (or a generic SCRAPER_PROXY) is set, e.g. "http://user:pass@host:port". Unset =
+    # direct connection (works from a normal/office IP such as the desktop).
+    proxy = (os.environ.get("LANDUS_PROXY") or os.environ.get("SCRAPER_PROXY") or "").strip()
+    if proxy:
+        sess.proxies.update({"http": proxy, "https": proxy})
+        log.info("Landus: routing requests through configured proxy")
     try:
         locs = sess.get(f"{_BASE}/api/locations", timeout=25).json()
     except Exception as exc:

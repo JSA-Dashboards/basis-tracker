@@ -907,6 +907,14 @@ def run_dtn_playwright() -> int:
     """Scrape DTN/aghost plants whose basis is client-injected (no JSON endpoint) by
     rendering them in headless Chromium — e.g. Heron Lake. Local-only (playwright is
     a dev dep); guarded on a larger budget since a render is seconds, not ms."""
+    from dtn_playwright_scraper import SITES as _PW_SITES
+    if not _PW_SITES:
+        # Every DTN plant is browser-free now (see dtn_http / dtn_content), so SITES is
+        # empty. Skip cleanly — otherwise cloud/Droplet runs (no Chromium installed) log
+        # a false "returned no data" warning that trips the scraper-health alert. Kept as
+        # a hook: if a site reverts to a JS-only render, re-add it to SITES.
+        log.info("DTN(pw): no headless-render sites configured — skipping.")
+        return 0
     log.info("=" * 60)
     log.info("DTN (headless render) plants scrape starting…")
     log.info("=" * 60)
