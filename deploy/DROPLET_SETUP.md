@@ -83,11 +83,16 @@ Runs 3:45 PM Central, Mon–Fri (matches the desk's old schedule; the weekly
 auto-prune still fires on Mondays). Add it to the user's crontab:
 
 ```bash
-( crontab -l 2>/dev/null; echo "45 15 * * 1-5 /opt/basis-tracker/deploy/run_daily.sh" ) | crontab -
+chmod +x deploy/run_daily.sh deploy/run_rail_recap.sh
+( crontab -l 2>/dev/null | grep -v -e run_daily.sh -e run_rail_recap.sh
+  echo "45 15 * * 1-5 /opt/basis-tracker/deploy/run_daily.sh"
+  echo "0 11 * * 1 /opt/basis-tracker/deploy/run_rail_recap.sh" ) | crontab -
 crontab -l    # verify
 ```
 
-(If you'd rather run every day including weekends, use `45 15 * * *`.)
+Two jobs: the daily scrape+email (3:45 PM Central, Mon–Fri) and the weekly JSA
+Rail Basis recap (`run_rail_recap.sh`, 11 AM Central Mondays). (For the daily job
+every day including weekends, use `45 15 * * *`.)
 
 ## 6. Monitoring
 
