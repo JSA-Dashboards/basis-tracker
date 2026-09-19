@@ -28,7 +28,11 @@ fi
 rc=0
 {
     echo "=== auto_import start $(date -Is) ==="
-    "$VENV/bin/python" auto_import.py
+    # Landus is skipped: it blocks datacenter IPs (Vercel bot-protection), so it only
+    # works from a residential IP. To re-enable, drop --no-landus AND set a LANDUS_PROXY
+    # in .env (residential proxy) — see landus_scraper.py. (DTN/Barchart/Farmbucks were
+    # checked as free alternatives — all dead ends since Landus went private.)
+    "$VENV/bin/python" auto_import.py --no-landus
     rc=$?    # capture immediately — must precede any other command (e.g. date)
     echo "=== auto_import finished $(date -Is) rc=$rc ==="
 } >>"$LOG" 2>&1
