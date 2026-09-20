@@ -3,7 +3,7 @@
 # pdfplumber) live in requirements-dev.txt for local use / auto_import.
 streamlit>=1.40.0
 msal>=1.28.0              # Graph app-only OAuth for outbound email on Cloud
-python-dotenv==1.0.1
+python-dotenv>=1.2.2
 psycopg2-binary>=2.9.9          # legacy Postgres path / rollback
 snowflake-connector-python>=3.12  # DB backend when USE_SNOWFLAKE=1 (Cloud→Snowflake)
 pydantic>=2.0.0
