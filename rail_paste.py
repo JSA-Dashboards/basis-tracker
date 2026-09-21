@@ -54,6 +54,23 @@ _DROP_NOTES = re.compile(r"(?i)\b(pkg|pk|wtx|dctx|mex|dom|ks/mo|ks|mo|center|ctr
 # descriptor doesn't leak into the first period.
 _NOISE = re.compile(r"(?i)\b(ysbs|ysb|yc|yb|fob|champaign|champ|update)\b")
 
+# A delivery-DATE window like "25-30" — a hyphen between two 1-2 digit day numbers,
+# NOT a bid/offer (which uses '/'). Without stripping it, "Sep 25-30 90/*" reads
+# "25" as the Sep bid and the real 90 falls through with no period. Bounded so it
+# never touches a 3-digit basis value ("122-128" is left for the reviewer) or a
+# negative sign ("-5").
+_DATE_WINDOW = re.compile(r"(?<!\d)[0-3]?\d\s*-\s*[0-3]?\d(?!\d)")
+
+# Desk notations that abut a VALUE with no space ("128FH", "123pk", "128wtx").
+# _CELL only takes ONE trailing letter as the futures tag, so the rest of a multi-
+# letter note leaks into the next period ("128FH" -> value 128 + stray "H" that
+# became "H JFM"). Stripped here BEFORE tokenizing. Multi-char alternatives only,
+# so a single futures-tag letter (u/z/h/k/n) abutting a value is preserved; longer
+# alternatives first so "wtx" wins over "tx". Standalone notations (space-separated)
+# are left for _clean_period/_DROP_NOTES.
+_VALUE_NOTE = re.compile(
+    r"(?i)(?<=\d)(pkg|wtx|dctx|ks/mo|center|split|pk|fh|lh|mp|tx|mex|dom|ks|mo|ctr)\b")
+
 # A single value token: a signed number (optionally trailing '?'), 'Flat', '*',
 # or a bare '?'. Guarded by (?<![\w'.]) so it can't start mid-number and a forward
 # crop-year like '26 isn't read as a value — while still allowing a leading +/-
@@ -191,6 +208,8 @@ def parse_rundown(text: str, corridor: str, as_of=None, commodity: str = "Corn")
     if isinstance(as_of, datetime):
         as_of = as_of.date()
     text = _NOISE.sub(" ", _normalize_punct(text))
+    text = _DATE_WINDOW.sub(" ", text)      # drop delivery-date windows ("Sep 25-30")
+    text = _VALUE_NOTE.sub("", text)        # drop value-abutting notations ("128FH", "123pk")
     corridor = canonical_corridor(corridor)
     # A soybean paste on a corn/beans dual corridor routes to its own board card
     # (e.g. CN 105s → CN 105s Beans) so the two commodities don't collide.
