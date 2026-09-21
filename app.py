@@ -32,6 +32,9 @@ try:
         # Snowflake backend (set USE_SNOWFLAKE=1 in Cloud secrets to read Snowflake)
         "USE_SNOWFLAKE", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PASSWORD",
         "SNOWFLAKE_ROLE", "SNOWFLAKE_WAREHOUSE", "SNOWFLAKE_DATABASE", "SNOWFLAKE_SCHEMA",
+        # Key-pair auth — the account enforces MFA on password sign-ins, so Cloud must
+        # authenticate with the RSA key (PEM text pasted into the SNOWFLAKE_PRIVATE_KEY secret).
+        "SNOWFLAKE_PRIVATE_KEY", "SNOWFLAKE_PRIVATE_KEY_PWD", "SNOWFLAKE_PRIVATE_KEY_PATH",
     )
     for _secret_key in _secret_keys:
         if _secret_key in st.secrets and not os.environ.get(_secret_key):
