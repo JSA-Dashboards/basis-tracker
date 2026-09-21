@@ -11,24 +11,46 @@ PROJ = pathlib.Path(__file__).resolve().parent.parent
 load_dotenv(PROJ / ".env", override=True)
 
 
+def _load_private_key():
+    """RSA private key for Snowflake key-pair auth (the account enforces MFA on
+    password sign-ins), as DER bytes; None if not configured (falls back to password).
+    Source: SNOWFLAKE_PRIVATE_KEY_PATH (.p8 file) or SNOWFLAKE_PRIVATE_KEY (PEM text)."""
+    path = (os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH") or "").strip()
+    pem = os.environ.get("SNOWFLAKE_PRIVATE_KEY") or ""
+    if not path and not pem.strip():
+        return None
+    from cryptography.hazmat.primitives import serialization
+    data = open(path, "rb").read() if path else pem.replace("\\n", "\n").encode()
+    pwd = os.environ.get("SNOWFLAKE_PRIVATE_KEY_PWD") or None
+    key = serialization.load_pem_private_key(data, password=pwd.encode() if pwd else None)
+    return key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption())
+
+
 def connect(database: str | None = None, schema: str | None = None):
     """Open a Snowflake connection from the .env settings. Optional db/schema
     override (used before the target DB exists)."""
     import snowflake.connector as sc
 
-    acct = os.environ["SNOWFLAKE_ACCOUNT"]
-    pwd = os.environ.get("SNOWFLAKE_PASSWORD") or ""
-    if not pwd:
-        raise SystemExit("SNOWFLAKE_PASSWORD is empty in .env — set it and retry.")
     kw = dict(
-        account=acct,
+        account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
-        password=pwd,
         role=os.environ.get("SNOWFLAKE_ROLE") or None,
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
         login_timeout=30,
         network_timeout=30,
     )
+    pkey = _load_private_key()
+    if pkey is not None:
+        kw["private_key"] = pkey
+    else:
+        pwd = os.environ.get("SNOWFLAKE_PASSWORD") or ""
+        if not pwd:
+            raise SystemExit("No Snowflake auth configured — set SNOWFLAKE_PRIVATE_KEY_PATH "
+                             "(key-pair) or SNOWFLAKE_PASSWORD in .env and retry.")
+        kw["password"] = pwd
     db = database if database is not None else os.environ.get("SNOWFLAKE_DATABASE")
     sc_ = schema if schema is not None else os.environ.get("SNOWFLAKE_SCHEMA")
     if db:
