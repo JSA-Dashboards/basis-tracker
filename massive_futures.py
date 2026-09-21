@@ -95,7 +95,16 @@ def _fetch_session_file(s3, date: datetime) -> bytes | None:
     try:
         return s3.get_object(Bucket=_BUCKET, Key=key)["Body"].read()
     except ClientError as exc:
-        if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+        # 404/NoSuchKey  = no session that day (weekend/holiday).
+        # 403/Forbidden  = a valid session date whose file Massive has NOT published
+        #   to us yet — the current day before its post-close upload returns 403,
+        #   not 404. Both mean "not available", so the caller's walk-back should
+        #   skip to the previous session rather than log an error. A genuine auth
+        #   failure 403s on EVERY key (including old ones and list_objects), so the
+        #   walk-back exhausts to an empty curve and surfaces as "no session file
+        #   found in the last N days" instead.
+        code = exc.response.get("Error", {}).get("Code")
+        if code in ("NoSuchKey", "404", "403", "Forbidden", "AccessDenied"):
             return None
         raise
 
