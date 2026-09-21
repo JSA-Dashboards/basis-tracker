@@ -178,15 +178,40 @@ def _sf_alive(conn) -> bool:
         return False
 
 
+def _load_private_key():
+    """RSA private key for Snowflake key-pair auth, as DER bytes — or None if not
+    configured (then we fall back to password). Snowflake enforces MFA on this
+    account for password sign-ins, so programmatic connections MUST use key-pair.
+    Source: SNOWFLAKE_PRIVATE_KEY_PATH (a .p8 file, e.g. on the Droplet) or
+    SNOWFLAKE_PRIVATE_KEY (the PEM text itself, e.g. a Streamlit Cloud secret)."""
+    path = (os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH") or "").strip()
+    pem = os.environ.get("SNOWFLAKE_PRIVATE_KEY") or ""
+    if not path and not pem.strip():
+        return None
+    from cryptography.hazmat.primitives import serialization
+    if path:
+        with open(path, "rb") as f:
+            data = f.read()
+    else:
+        data = pem.replace("\\n", "\n").encode()   # tolerate an escaped-newline secret
+    pwd = os.environ.get("SNOWFLAKE_PRIVATE_KEY_PWD") or None
+    key = serialization.load_pem_private_key(data, password=pwd.encode() if pwd else None)
+    return key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption())
+
+
 def _sf_connect_raw():
     """Open a fresh Snowflake connection from SNOWFLAKE_* env (local / Cloud / jobs).
-    login_timeout is generous (this account's auth runs ~15s and Cloud adds latency);
-    keep-alive stops the pooled session idling out between reruns."""
+    Prefers key-pair auth (required — the account enforces MFA on password sign-ins);
+    falls back to password when no key is configured. login_timeout is generous (this
+    account's auth runs ~15s and Cloud adds latency); keep-alive stops the pooled
+    session idling out between reruns."""
     import snowflake.connector as sc
     kw = dict(
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
-        password=os.environ.get("SNOWFLAKE_PASSWORD") or None,
         role=os.environ.get("SNOWFLAKE_ROLE") or None,
         warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
         database=os.environ.get("SNOWFLAKE_DATABASE") or None,
@@ -194,6 +219,11 @@ def _sf_connect_raw():
         login_timeout=60,
         client_session_keep_alive=True,
     )
+    pkey = _load_private_key()
+    if pkey is not None:
+        kw["private_key"] = pkey
+    else:
+        kw["password"] = os.environ.get("SNOWFLAKE_PASSWORD") or None
     conn = sc.connect(**{k: v for k, v in kw.items() if v is not None})
     _force_pyformat(conn)
     return conn
