@@ -1,0 +1,11 @@
+# /opt/alerting/alert.conf  -- droplet cron failure alerting
+#
+# Holds no secrets. The Graph client secret stays in the app .env named below,
+# so there is one copy on the box to rotate (it expires 2028-09-16).
+
+# Who gets failure emails. Comma-separated for more than one.
+ALERT_TO = "kpostin@jpsi.com"
+
+# Where GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / GRAPH_SENDER
+# are read from. Alerts stop if this app is removed from the droplet.
+GRAPH_ENV_FILE = "/opt/basis-tracker/.env"

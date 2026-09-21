@@ -94,6 +94,62 @@ Two jobs: the daily scrape+email (3:45 PM Central, Mon–Fri) and the weekly JSA
 Rail Basis recap (`run_rail_recap.sh`, 11 AM Central Mondays). (For the daily job
 every day including weekends, use `45 15 * * *`.)
 
+## 5b. Failure alerting (shared by every job on the droplet)
+
+cron here has **no `MAILTO` and the box has no MTA**, so a failing job is
+silent — the only trace is a log file nobody opens. `deploy/alerting/` fixes
+that for every job on this droplet, not just the basis tracker's.
+
+```bash
+# install (once, as root)
+mkdir -p /opt/alerting
+scp deploy/alerting/{cron-alert,notify.py,alert.conf.example} root@<droplet>:/opt/alerting/
+ssh root@<droplet> 'cd /opt/alerting && chmod 755 cron-alert notify.py     && cp -n alert.conf.example alert.conf && chmod 600 alert.conf'
+ssh root@<droplet> '/usr/bin/python3 /opt/alerting/notify.py --check'   # auth only, sends nothing
+```
+
+Then wrap each crontab entry:
+
+```
+45 15 * * 1-5 /opt/alerting/cron-alert "Basis tracker daily import"     "/opt/basis-tracker/logs/auto_import_*.log" /opt/basis-tracker/deploy/run_daily.sh
+```
+
+`cron-alert "<name>" "<log glob>" <command...>` emails on failure and exits
+with the job's own code. It catches three things a bare entry does not:
+
+| | |
+|---|---|
+| non-zero exit | the ordinary case, otherwise invisible |
+| a hung job | killed at `ALERT_TIMEOUT` (default 90m). This matters: `run_*.sh` uses `flock` and **exits 0** when a previous run still holds the lock, so one hang would make every later run "succeed" while doing nothing |
+| failure before logging | stdout/stderr is captured separately, so "venv missing" or "not executable" still reaches the email with no job log to quote |
+
+Design notes worth keeping:
+
+- **`notify.py` is standard library only** — no venv, no `msal`, no `requests`.
+  The alerter must not share failure modes with the jobs it watches; if an
+  app's virtualenv breaks, the alert about it still has to go out.
+- **Secrets are stripped from the email.** Job logs get pasted into a message
+  that lands in mailboxes and Exchange archives, and a traceback can carry a
+  DSN or password. Every secret-looking value in `/opt/*/.env` is replaced
+  literally, plus a regex for inline `user:pass@host` credentials.
+- **The Graph client secret is not copied here.** `alert.conf` points at
+  `/opt/basis-tracker/.env`, so there is one copy on the box to rotate
+  (it expires 2028-09-16).
+- Every alert is also written to syslog (`journalctl -t cron-alert`), and a
+  send that fails is appended to `/opt/alerting/undelivered.log` so a mail
+  problem can never hide a job problem.
+
+**Not covered:** if the droplet is down or cron itself dies, nothing runs, so
+nothing can alert. That needs an external heartbeat (healthchecks.io or
+similar) pinged on success — worth adding if these jobs become business
+critical.
+
+Test without touching real jobs:
+
+```bash
+ALERT_DRY_RUN=1 /opt/alerting/cron-alert "test" "/tmp/none_*.log" /bin/bash -c 'exit 3'
+```
+
 ## 6. Monitoring
 
 ```bash

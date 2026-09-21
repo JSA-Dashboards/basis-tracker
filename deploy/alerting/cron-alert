@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# cron-alert -- run a droplet job and email if it fails.
+#
+#   cron-alert "<job name>" "<log glob>" <command> [args...]
+#
+# Wraps the job instead of editing it, so the five run_*.sh scripts in three
+# repos stay untouched and adding a new job is a one-line crontab change.
+#
+# Catches three things a bare crontab entry does not:
+#   1. a non-zero exit             -- silent otherwise, since cron has no MAILTO
+#                                     and the box has no MTA
+#   2. a hung job                  -- ALERT_TIMEOUT (default 90m) kills it. This
+#                                     matters because the run_*.sh scripts use
+#                                     flock and exit 0 when a previous run still
+#                                     holds the lock, so one hang would make
+#                                     every later run "succeed" doing nothing
+#   3. a failure before logging    -- stdout/stderr is captured separately, so
+#                                     "venv missing" or "not executable" still
+#                                     reaches the email even with no job log
+#
+# Exit code is the job's own, so cron still sees the truth.
+#
+# ALERT_TIMEOUT=2h cron-alert ...   per-job override
+# ALERT_DRY_RUN=1  cron-alert ...   print the email instead of sending
+set -uo pipefail
+
+if [ "$#" -lt 3 ]; then
+    echo "usage: cron-alert \"<job name>\" \"<log glob>\" <command> [args...]" >&2
+    exit 64
+fi
+
+NAME=$1
+LOG_GLOB=$2
+shift 2
+
+NOTIFY=${ALERT_NOTIFY:-/opt/alerting/notify.py}
+TIMEOUT=${ALERT_TIMEOUT:-90m}
+
+start_epoch=$(date +%s)
+start_iso=$(date -Is)
+out=$(mktemp /tmp/cron-alert.XXXXXX)
+trap 'rm -f "$out"' EXIT
+
+# No --foreground: timeout puts itself in its own process group and signals the
+# whole group, so the python grandchild dies too and releases the flock fd it
+# inherited. --kill-after escalates to SIGKILL if SIGTERM is ignored.
+/usr/bin/timeout --kill-after=60s "$TIMEOUT" "$@" >"$out" 2>&1
+rc=$?
+end_iso=$(date -Is)
+
+[ "$rc" -eq 0 ] && exit 0
+
+# Newest file matching the glob, but only if this run actually wrote it --
+# otherwise we would quote a previous, healthy run's log in a failure email.
+log=""
+# shellcheck disable=SC2086
+newest=$(ls -1t $LOG_GLOB 2>/dev/null | head -1)
+if [ -n "$newest" ] && [ -f "$newest" ]; then
+    mtime=$(stat -c %Y "$newest" 2>/dev/null || echo 0)
+    [ "$mtime" -ge "$start_epoch" ] && log="$newest"
+fi
+
+/usr/bin/logger -t cron-alert "FAILED name='$NAME' rc=$rc log='${log:-none}'"
+
+/usr/bin/python3 "$NOTIFY" \
+    --name "$NAME" --rc "$rc" --start "$start_iso" --end "$end_iso" \
+    --cmd "$*" --log "$log" --stdout "$out" \
+    || /usr/bin/logger -t cron-alert "ALERT SEND FAILED name='$NAME' rc=$rc"
+
+exit "$rc"
