@@ -1,11 +1,38 @@
 # /opt/alerting/alert.conf  -- droplet cron failure alerting
 #
-# Holds no secrets. The Graph client secret stays in the app .env named below,
-# so there is one copy on the box to rotate (it expires 2028-09-16).
+# Holds no app secrets. The Graph client secret stays in the app .env named
+# below, so there is one copy on the box to rotate (it expires 2028-09-16).
 
+# ── Email on failure (Microsoft Graph) ───────────────────────────────────────
 # Who gets failure emails. Comma-separated for more than one.
 ALERT_TO = "kpostin@jpsi.com"
 
 # Where GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / GRAPH_SENDER
 # are read from. Alerts stop if this app is removed from the droplet.
 GRAPH_ENV_FILE = "/opt/basis-tracker/.env"
+
+# ── External heartbeat (healthchecks.io) ─────────────────────────────────────
+# Covers what the email path cannot: this droplet being down, cron dying, a job
+# quietly dropped from the crontab, or Graph auth breaking. Anything running
+# here cannot report that the box is unreachable.
+#
+# Leave HC_PING_KEY empty and nothing pings -- the wrapper stays fully working.
+#
+# Setup:
+#   1. Create a free account at https://healthchecks.io (20 checks).
+#   2. Make a project, then Settings -> Ping key -> Create.
+#   3. Paste it below. Checks auto-create on the first ping (create=1).
+#   4. In each check: set Schedule to "Cron", paste the crontab expression,
+#      timezone America/Chicago, and Grace Time 2h. Two hours is deliberate --
+#      cron-alert kills any job past ALERT_TIMEOUT (90m), so a successful run
+#      can never exceed it, and you will not be paged on a slow day.
+#   5. Add your email under Integrations. A second address is worth it so
+#      alerting is not tied to one person on holiday.
+#
+# Slugs are derived from the job name in the crontab, so they will appear as:
+#   river-fob-vessel-pull, basis-tracker-daily-import, basis-tracker-rail-recap,
+#   cme-feeder-index-update, cme-ftp-check
+HC_PING_KEY = ""
+
+# Only change for a self-hosted healthchecks instance.
+HC_BASE_URL = "https://hc-ping.com"

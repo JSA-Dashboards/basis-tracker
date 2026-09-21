@@ -35,11 +35,39 @@ shift 2
 
 NOTIFY=${ALERT_NOTIFY:-/opt/alerting/notify.py}
 TIMEOUT=${ALERT_TIMEOUT:-90m}
+CONF=${ALERT_CONF:-/opt/alerting/alert.conf}
+
+# ── healthchecks.io heartbeat (optional) ─────────────────────────────────────
+# Email alerting lives on this box, so it cannot report that this box is down,
+# that cron died, or that a job was quietly dropped from the crontab. An
+# external dead-man's switch covers exactly that gap. Inert until HC_PING_KEY
+# is set in alert.conf, so this is safe to ship before the account exists.
+#
+# One project-wide ping key plus a slug per job, rather than five UUIDs pasted
+# into the crontab. The slug is derived from the job name; override with HC_SLUG.
+HC_PING_KEY=$(sed -nE 's/^[[:space:]]*HC_PING_KEY[[:space:]]*=[[:space:]]*"?([^"#]*)"?.*/\1/p' "$CONF" 2>/dev/null | head -1 | tr -d ' ')
+HC_BASE=$(sed -nE 's/^[[:space:]]*HC_BASE_URL[[:space:]]*=[[:space:]]*"?([^"#]*)"?.*/\1/p' "$CONF" 2>/dev/null | head -1 | tr -d ' ')
+HC_BASE=${HC_BASE:-https://hc-ping.com}
+slug=${HC_SLUG:-$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')}
+
+# $1 = "" | /start | /fail. Must never change the job's exit code and never
+# block it: ${1:-} because of set -u, and an unconditional `return 0` because a
+# monitoring call that can fail a healthy job is worse than no monitoring.
+hc_ping() {
+    local kind=${1:-}
+    [ -n "$HC_PING_KEY" ] || return 0
+    /usr/bin/curl -fsS -m 10 --retry 2 -o /dev/null \
+        "$HC_BASE/$HC_PING_KEY/$slug$kind?create=1" \
+        || /usr/bin/logger -t cron-alert "heartbeat ping '$slug$kind' failed"
+    return 0
+}
 
 start_epoch=$(date +%s)
 start_iso=$(date -Is)
 out=$(mktemp /tmp/cron-alert.XXXXXX)
 trap 'rm -f "$out"' EXIT
+
+hc_ping /start
 
 # No --foreground: timeout puts itself in its own process group and signals the
 # whole group, so the python grandchild dies too and releases the flock fd it
@@ -48,7 +76,11 @@ trap 'rm -f "$out"' EXIT
 rc=$?
 end_iso=$(date -Is)
 
-[ "$rc" -eq 0 ] && exit 0
+if [ "$rc" -eq 0 ]; then
+    hc_ping
+    exit 0
+fi
+hc_ping /fail
 
 # Newest file matching the glob, but only if this run actually wrote it --
 # otherwise we would quote a previous, healthy run's log in a failure email.

@@ -139,10 +139,42 @@ Design notes worth keeping:
   send that fails is appended to `/opt/alerting/undelivered.log` so a mail
   problem can never hide a job problem.
 
-**Not covered:** if the droplet is down or cron itself dies, nothing runs, so
-nothing can alert. That needs an external heartbeat (healthchecks.io or
-similar) pinged on success — worth adding if these jobs become business
-critical.
+### External heartbeat (healthchecks.io)
+
+Email alerting runs *on this box*, so it cannot report that the box is down,
+that cron died, that a job was quietly dropped from the crontab, or that Graph
+auth broke. A dead-man's switch covers exactly that: the job pings on success,
+and the service emails when an expected ping does not arrive.
+
+`cron-alert` pings `/start` before the job, the bare slug on success and
+`/fail` on failure. **Inert until `HC_PING_KEY` is set in `alert.conf`**, so it
+ships safely before the account exists.
+
+1. Free account at https://healthchecks.io — 20 checks, well past the five here.
+2. Create a project, then **Settings → Ping key → Create**, and paste it into
+   `HC_PING_KEY` in `/opt/alerting/alert.conf`.
+3. Checks auto-create on first ping (`create=1`) with slugs derived from the
+   job names: `river-fob-vessel-pull`, `basis-tracker-daily-import`,
+   `basis-tracker-rail-recap`, `cme-feeder-index-update`, `cme-ftp-check`.
+4. In each check set **Schedule → Cron**, paste the crontab expression,
+   timezone `America/Chicago`, **Grace Time 2h**. Two hours is deliberate:
+   `ALERT_TIMEOUT` kills anything past 90m, so a healthy run can never exceed
+   it and a slow day will not page you.
+5. Add recipients under Integrations. Use a second address so alerting is not
+   tied to one person being on holiday.
+
+The ping can never affect the job: it runs outside the job's redirect, always
+returns 0, and a failed ping is logged to syslog rather than swallowed. Verify
+with a bogus key — the job's exit code must be unchanged:
+
+```bash
+printf 'HC_PING_KEY = "x"
+HC_BASE_URL = "https://httpbin.org"
+' >> /tmp/t.conf
+ALERT_CONF=/tmp/t.conf /opt/alerting/cron-alert "t" "/tmp/n_*.log" /bin/true; echo $?   # 0
+```
+
+Only job names and timings leave the network. No data does.
 
 Test without touching real jobs:
 
