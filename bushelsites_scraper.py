@@ -61,9 +61,17 @@ SITES: dict[str, dict] = {
         "locmap": {"__single__": ("One Earth Energy, IL", "IL", "Corn Processing")},
     },
     "Harvestone": {
-        "url": "https://www.harvestonelcp.com/cash-bids/",
-        "style": "h2", "facility": "Corn Processing",
-        "locmap": {"IBEC": ("Harvestone IBEC", None, "Corn Processing")},
+        # Restructured 2026-09: the combined /cash-bids/ page (all plants as h2
+        # blocks) now shows only ONE plant, so it silently stopped refreshing the
+        # others. Each plant now lives on its own per-facility page embedding a
+        # single Bushel board at /cashbidssingle-<id>; scrape those three directly.
+        # Locations match the existing archive names so history stays continuous.
+        "style": "pages", "facility": "Corn Processing",
+        "pages": [
+            {"url": "https://harvestonelcp.com/cashbidssingle-2582", "loc": ("Harvestone IBEC", None, "Corn Processing")},
+            {"url": "https://harvestonelcp.com/cashbidssingle-1720", "loc": ("Dakota Spirit", "ND", "Corn Processing")},
+            {"url": "https://harvestonelcp.com/cashbidssingle-1703", "loc": ("Blue Flint", "ND", "Corn Processing")},
+        ],
     },
     "BioUrja": {
         # akronservices.com is the BioUrja Peoria plant's live bid page (no BioUrja
@@ -149,6 +157,26 @@ def _rows_of(div) -> list[dict]:
 
 def scrape_site(cfg: dict) -> list[dict]:
     """Return [{location, state, facility_type, grain, rows}] for one site config."""
+    # "pages" style: a fixed list of single-facility pages, each its own URL with a
+    # pinned (location, state, facility). Every cbCommodity board on the page takes
+    # that location; the board's <h3> only sets the grain. Used where a site moved
+    # to one page per plant (Harvestone's /cashbidssingle-<id>).
+    if cfg.get("style") == "pages":
+        out = []
+        for pg in cfg["pages"]:
+            r = requests.get(pg["url"], headers=HEADERS, timeout=40)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, "html.parser")
+            loc, state, ftype = pg["loc"]
+            for div in soup.find_all("div", class_="cbCommodity"):
+                h = div.find("h3")
+                rows = _rows_of(div)
+                if rows:
+                    out.append({"location": loc, "state": state, "facility_type": ftype,
+                                "grain": _grain(h.get_text(strip=True) if h else ""),
+                                "rows": rows})
+        return out
+
     r = requests.get(cfg["url"], headers=HEADERS, timeout=40)
     r.raise_for_status()
     soup = BeautifulSoup(r.text, "html.parser")
