@@ -59,14 +59,12 @@ SITES: list[dict] = [
     {"provider": "NuGen Energy", "location": "Marion, SD", "state": "SD",
      "facility_type": "Corn Processing",
      "url": "https://www.nugenmarion.com/markets/cash.php?location_filter=52414"},
-    # Dawson Grain (MN) — own-domain AgriCharts; the co-op elevator plus the AGP
-    # soybean crush plant it posts delivered bids for.
+    # Dawson Grain (MN) — own-domain AgriCharts; just the co-op elevator. Its
+    # AGP Dawson soybean-plant board was dropped 2026-09-23 as redundant with the
+    # native AGP scraper's Dawson, MN location (agp_scraper.py id 2361).
     {"provider": "Dawson Grain", "location": "Dawson, MN", "state": "MN",
      "facility_type": "Country Elevator",
      "url": "https://www.dawsongrain.com/markets/cash.php?location_filter=1639"},
-    {"provider": "Dawson Grain", "location": "AGP Dawson, MN", "state": "MN",
-     "facility_type": "Oilseed Processing",
-     "url": "https://www.dawsongrain.com/markets/cash.php?location_filter=1939"},
     # Central Farmers Cooperative (SD) — 11 elevators via centralfarmersresp.agricharts.com
     *[{"provider": "Central Farmers Co-op", "location": f"{_town}, SD", "state": "SD",
        "facility_type": "Country Elevator",
