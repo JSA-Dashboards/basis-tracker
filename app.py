@@ -2395,6 +2395,34 @@ with tab_railfob:
                 return f'<td style="{_TDR};color:#94a3b8">0{_mk}</td>'
             return f'<td style="{_TDR};color:{"#16a34a" if d > 0 else "#dc2626"};font-weight:700">{d:+d}{_mk}</td>'
 
+        def _chg_yr_html(cur_bid, yr_map, cell, cur_fut, spot_cell):
+            """Δ vs ~1 year ago. Prefer an exact-period match (roll-adjusted, like the
+            other columns) so it self-heals once a full year of per-period live history
+            exists. Until then the rebuilt rail history is weekly Spot-only, so the
+            spot/front row falls back to comparing raw basis to that Spot value — a
+            year-apart contract roll is not a basis move, so no spread adjustment."""
+            period = cell["period"]
+            if yr_map and yr_map.get(period) is not None:
+                return _chg_html(cur_bid, yr_map, period, cur_fut)
+            # No exact-period match: fall back to comparing the spot/front row to last
+            # year's spot — its "Spot" row (rebuilt corridors) or, failing that, the
+            # nearest year-ago bid (non-rebuilt corridors with named-period history).
+            _sp = None
+            if cell is spot_cell and cur_bid is not None and yr_map:
+                _sp = yr_map.get("Spot") or next(
+                    (r for r in sorted(yr_map.values(),
+                                       key=lambda r: (r.get("period_order")
+                                                      if r.get("period_order") is not None else 99))
+                     if r.get("bid") is not None), None)
+            if _sp is not None and _sp.get("bid") is not None:
+                syb = _sp["bid"]
+                d = cur_bid - syb
+                col = "#94a3b8" if d == 0 else ("#16a34a" if d > 0 else "#dc2626")
+                txt = "0" if d == 0 else f"{d:+d}"
+                return (f'<td style="{_TDR};color:{col};font-weight:700" '
+                        f'title="vs last year&#39;s spot {syb:+d}">{txt}</td>')
+            return f'<td style="{_TDR};color:#cbd5e1">—</td>'
+
         def _prior_maps(market, cur):
             """(last update, ~1wk, ~1mo, ~1yr) prior postings for a corridor.
 
@@ -2470,6 +2498,9 @@ with tab_railfob:
             _cells = sorted(_fold(_cells).values(), key=lambda r: r["_ord"])
             if not _cells:
                 return ''
+            # Spot/front row = nearest period that actually carries a bid; it's what
+            # the year-ago column falls back onto (last year is weekly Spot-only).
+            _spot_cell = next((r for r in _cells if r.get("bid") is not None), None)
             _rail = _cells[0].get("rail") or ""
             _rcol = _railcolors.get(_rail, "#64748b")
             _pd, _pw, _pmo, _pyr = _prior_maps(_m, _eff)
@@ -2499,7 +2530,7 @@ with tab_railfob:
                       + _chg_html(_b, _pd, c["period"], _cf)
                       + _chg_html(_b, _pw, c["period"], _cf)
                       + _chg_html(_b, _pmo, c["period"], _cf)
-                      + _chg_html(_b, _pyr, c["period"], _cf)
+                      + _chg_yr_html(_b, _pyr, c, _cf, _spot_cell)
                       + '</tr>')
             h += '</table></div>'
             return h

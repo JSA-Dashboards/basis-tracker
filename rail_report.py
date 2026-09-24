@@ -85,7 +85,7 @@ def _prior_maps(market, cur, by_md, mkt_dates):
     return (by_md.get((market, earlier[-1])),
             by_md.get((market, closest(7, 4))),
             by_md.get((market, closest(30, 4))),
-            by_md.get((market, closest(365, 60))))
+            by_md.get((market, closest(365, 4))))   # ±4 days of the year-ago date
 
 
 # ── cell formatters ──────────────────────────────────────────────────────────
@@ -124,6 +124,29 @@ def _chg_cell(cur_bid, prior_map, period, tdr, cur_fut=None, curve=None):
     if d == 0:
         return f'<td style="{tdr};color:#94a3b8">0{mark}</td>'
     return f'<td style="{tdr};color:{_GAIN if d > 0 else _LOSS};font-weight:700">{d:+d}{mark}</td>'
+
+
+def _chg_yr_cell(cur_bid, yr_map, cell, tdr, cur_fut=None, curve=None, spot_cell=None):
+    """Δ vs ~1 year ago — exact-period match (roll-adjusted) when available, else the
+    spot/front row falls back to last year's spot (its "Spot" row, or the nearest
+    year-ago bid). Raw basis; a year-apart contract roll is not a basis move. The
+    rebuilt rail history is weekly Spot-only, so named-period rows have no exact match."""
+    period = cell["period"]
+    if yr_map and yr_map.get(period) is not None:
+        return _chg_cell(cur_bid, yr_map, period, tdr, cur_fut, curve)
+    sp = None
+    if cell is spot_cell and cur_bid is not None and yr_map:
+        sp = yr_map.get("Spot") or next(
+            (r for r in sorted(yr_map.values(),
+                               key=lambda r: (r.get("period_order")
+                                              if r.get("period_order") is not None else 99))
+             if r.get("bid") is not None), None)
+    if sp is not None and sp.get("bid") is not None:
+        d = cur_bid - sp["bid"]
+        if d == 0:
+            return f'<td style="{tdr};color:#94a3b8">0</td>'
+        return f'<td style="{tdr};color:{_GAIN if d > 0 else _LOSS};font-weight:700">{d:+d}</td>'
+    return f'<td style="{tdr};color:#cbd5e1">—</td>'
 
 
 # ── spot seasonal chart (front-period bid by marketing week) ──────────────────
@@ -386,6 +409,9 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
             cells = [r for r in cells if r.get("period") != "Spot"]
         if not cells:
             continue
+        # Spot/front row = nearest period with a bid; the year-ago column falls back
+        # onto it (last year's rail history is weekly Spot-only).
+        spot_cell = next((r for r in cells if r.get("bid") is not None), None)
         rail = cells[0].get("rail") or ""
         rcol = _RAIL_COLORS.get(rail, "#64748b")
         pd_, pw, pmo, pyr = _prior_maps(m, eff, by_md, mkt_dates)
@@ -410,7 +436,7 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
                      + _chg_cell(b, pd_, c["period"], tdr, cf, _curve)
                      + _chg_cell(b, pw, c["period"], tdr, cf, _curve)
                      + _chg_cell(b, pmo, c["period"], tdr, cf, _curve)
-                     + _chg_cell(b, pyr, c["period"], tdr, cf, _curve)
+                     + _chg_yr_cell(b, pyr, c, tdr, cf, _curve, spot_cell)
                      + '</tr>')
         body += '</table>'
 
