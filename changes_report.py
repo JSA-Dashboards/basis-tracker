@@ -741,10 +741,14 @@ def send_via_graph(subject: str, html: str, to_addr: str, cc: str | None = None,
         from email.utils import getaddresses
         return [{"emailAddress": {"address": a}} for _, a in getaddresses([addrs]) if a]
 
+    # Display name on the From line — the shared mailbox's directory name would
+    # otherwise show. Override with GRAPH_FROM_NAME; address stays the sender.
+    from_name = _email_cfg("GRAPH_FROM_NAME") or "JSA Basis Tracker"
     message: dict = {
         "subject": subject,
         "body": {"contentType": "HTML", "content": html},
         "toRecipients": _recips(to_addr),
+        "from": {"emailAddress": {"address": sender, "name": from_name}},
     }
     if cc:
         message["ccRecipients"] = _recips(cc)
