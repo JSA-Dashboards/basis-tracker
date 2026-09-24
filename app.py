@@ -2080,6 +2080,8 @@ with tab_railfob:
         import altair as _alt
 
         _rows = []
+        _spot_seen = set()                     # (market, date) with an explicit "Spot" row
+        _mdate = {}                            # (market, date, commodity) -> [(period_order, bid)]
         for _src in ("manual", "palmetto"):
             for _r in _cached_rail_fob_all(_src):
                 if _r.get("bid") is None:
@@ -2088,6 +2090,24 @@ with tab_railfob:
                 if _b:                      # None = not a tracked seasonal period
                     _rows.append((_r["market"], _b, _r["date"], _r["bid"],
                                   _r.get("commodity") or "Corn"))
+                    if _b == "Spot":
+                        _spot_seen.add((_r["market"], _r["date"]))
+                # Keep every bid so live rundowns — which post named-month fronts, not a
+                # literal "Spot" row — still feed the Spot seasonal via a derived spot.
+                _po = _r.get("period_order")
+                _mdate.setdefault((_r["market"], _r["date"], _r.get("commodity") or "Corn"),
+                                  []).append((_po if _po is not None else 99, _r["bid"]))
+        # Derived Spot = nearest-period bid, added only where no explicit "Spot" exists
+        # (live rundowns after the SA-Master weekly-Spot history ends ~2026-08). Mirrors
+        # the board/email spot series so the Spot chart stays continuous into the current
+        # marketing year instead of freezing at the last rebuilt year.
+        for (_m, _d, _c), _lst in _mdate.items():
+            if (_m, _d) in _spot_seen:
+                continue
+            _lst.sort(key=lambda t: t[0])
+            _sb = next((b for _o, b in _lst if b is not None), None)
+            if _sb is not None:
+                _rows.append((_m, "Spot", _d, _sb, _c))
         if not _rows:
             st.caption("No rail history archived yet — the seasonal chart fills in as postings are saved.")
             return

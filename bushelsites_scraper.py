@@ -68,7 +68,7 @@ SITES: dict[str, dict] = {
         # Locations match the existing archive names so history stays continuous.
         "style": "pages", "facility": "Corn Processing",
         "pages": [
-            {"url": "https://harvestonelcp.com/cashbidssingle-2582", "loc": ("Harvestone IBEC", None, "Corn Processing")},
+            {"url": "https://harvestonelcp.com/cashbidssingle-2582", "loc": ("Harvestone IBEC", "IN", "Corn Processing")},  # Rensselaer, IN
             {"url": "https://harvestonelcp.com/cashbidssingle-1720", "loc": ("Dakota Spirit", "ND", "Corn Processing")},
             {"url": "https://harvestonelcp.com/cashbidssingle-1703", "loc": ("Blue Flint", "ND", "Corn Processing")},
         ],
