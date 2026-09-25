@@ -94,9 +94,18 @@ SITES: dict[str, dict] = {
         },
     },
     "Prairie Grain Partners": {
-        "url": "https://www.prairiegrainpartners.com/cashbidssingle-",
-        "style": "h2", "facility": "Country Elevator",
-        "locmap": {"Boyd": ("Boyd, MN", "MN", "Country Elevator")},
+        # Per-facility Bushel pages (cashbidssingle-<id>). The combined /cash-bids page
+        # only renders Boyd and its location dropdown switches client-side, so scrape
+        # each facility's own page. Boyd kept as "Boyd, MN" for archive continuity;
+        # Clarkfield (MN) + the three SD elevators added 2026-09-25.
+        "style": "pages", "facility": "Country Elevator",
+        "pages": [
+            {"url": "https://www.prairiegrainpartners.com/cashbidssingle-1542", "loc": ("Boyd, MN", "MN", "Country Elevator")},
+            {"url": "https://www.prairiegrainpartners.com/cashbidssingle-1607", "loc": ("Clarkfield, MN", "MN", "Country Elevator")},
+            {"url": "https://www.prairiegrainpartners.com/cashbidssingle-2661", "loc": ("Hitchcock-Tulare, SD", "SD", "Country Elevator")},
+            {"url": "https://www.prairiegrainpartners.com/cashbidssingle-2662", "loc": ("Miller, SD", "SD", "Country Elevator")},
+            {"url": "https://www.prairiegrainpartners.com/cashbidssingle-2663", "loc": ("Harrold, SD", "SD", "Country Elevator")},
+        ],
     },
     "Madison Farmers Elevator": {
         "url": "https://madisonfarmerselevator.com/cash-bids",
