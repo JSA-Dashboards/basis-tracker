@@ -87,16 +87,29 @@ def _fetch_location(session, slug, meta, today_utc) -> dict | None:
         log.error("Cargill fetch failed for %s (id=%s): %s", slug, barchart_id, exc)
         return None
 
+    # Barchart normally returns an object, but for some locations it returns a bare
+    # list (empty/error payload). Guard every .get() so one odd response skips just
+    # that location instead of crashing the whole Cargill batch.
+    if not isinstance(data, dict):
+        log.warning("Cargill %s (id=%s): non-object response (%s) — skipped",
+                    slug, barchart_id, type(data).__name__)
+        return None
+
     # ── Extract location metadata from API response ────────────────────
-    loc_details = (data.get("locationDetails", {}).get(str(barchart_id), {}) or {})
+    _loc_map = data.get("locationDetails")
+    loc_details = (_loc_map.get(str(barchart_id), {}) if isinstance(_loc_map, dict) else {}) or {}
     state = loc_details.get("state") or ""
     city  = loc_details.get("city")  or ""
 
     # ── Extract cashbids from bigGroups ───────────────────────────────
     cashbids: list[dict] = []
     for bg in data.get("bigGroups") or []:
+        if not isinstance(bg, dict):
+            continue
         grain_raw = bg.get("name") or ""
         for bid in bg.get("cashbids") or []:
+            if not isinstance(bid, dict):
+                continue
             basis_str    = bid.get("basis")
             barchart_sym = bid.get("futuresymbol") or ""
             if basis_str is None or not barchart_sym:
@@ -169,7 +182,11 @@ def fetch_cargill_bids(slugs: list[str] | None = None) -> list[dict]:
         futs = {pool.submit(_fetch_location, session, slug, meta, today_utc): slug
                 for slug, meta in all_locs.items()}
         for fut in as_completed(futs):
-            res = fut.result()
+            try:
+                res = fut.result()
+            except Exception as exc:
+                log.error("Cargill location %s failed: %s", futs[fut], exc)
+                continue
             if res is None:
                 continue
             results.append(res)
