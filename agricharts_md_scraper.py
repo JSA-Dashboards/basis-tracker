@@ -30,6 +30,11 @@ SITES: list[dict] = [
     {"provider": "Homeland Energy", "location": "Lawler, IA", "state": "IA",
      "facility_type": "Corn Processing",
      "url": "https://www.farmerswin.com/markets/cash.php?location_filter=12602"},
+    # Valero Charles City ethanol plant — same Farmers Win Coop AgriCharts host as
+    # Homeland, location id 12603 (distinct board; the co-op lists many nearby plants).
+    {"provider": "Valero", "location": "Charles City, IA", "state": "IA",
+     "facility_type": "Corn Processing",
+     "url": "https://www.farmerswin.com/markets/cash.php?location_filter=12603"},
     {"provider": "KAAPA", "location": "Aurora, NE", "state": "NE", "facility_type": "Corn Processing",
      "url": "https://kaapagrains.agricharts.com/markets/cash.php?location_filter=83493"},
     {"provider": "KAAPA", "location": "Minden, NE", "state": "NE", "facility_type": "Corn Processing",
