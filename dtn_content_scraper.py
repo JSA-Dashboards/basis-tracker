@@ -56,7 +56,10 @@ SITES: list[dict] = [
      "facility_type": "Country Elevator", "origin": "https://centralunitedcoop.com"},
     {"provider": "Premier Cooperative", "site_id": "E0266901",
      "api_key": "Ymv7TuCB46yoIZwTzFaXgijkFTIBGpHc", "state": "WI",
-     "facility_type": "Country Elevator", "origin": "https://www.premiercooperative.com"},
+     "facility_type": "Country Elevator", "origin": "https://www.premiercooperative.com",
+     # Shell Rock Soy (IA) is tracked by its own dedicated shellrock_scraper, so drop
+     # Premier's duplicate of it (Kolten 2026-09-28).
+     "exclude": ["Shell Rock Soy"]},
     {"provider": "Keystone Cooperative", "site_id": "E0135301",
      "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl", "state": "IN",
      "facility_type": "Country Elevator", "origin": "https://www.keystonecoop.com"},
@@ -110,8 +113,11 @@ def fetch_dtn_content() -> tuple[list[NewSnapshotRequest], list[dict]]:
         by_loc: dict[str, list[SnapshotRow]] = {}
         states: dict[str, str | None] = {}
         seen: dict[str, set] = {}
+        _excl = [e.lower() for e in cfg.get("exclude") or []]
         for b in data:
             loc = ((b.get("location") or {}).get("name") or "").strip()
+            if loc and any(x in loc.lower() for x in _excl):
+                continue        # location covered by a dedicated scraper — skip the dup
             grain = _grain_for(b.get("commodityDisplayName"))
             cme = _fut_symbol(b.get("symbol") or "")
             basis = b.get("basisPrice")
