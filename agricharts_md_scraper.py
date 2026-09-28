@@ -35,6 +35,23 @@ SITES: list[dict] = [
     {"provider": "Valero", "location": "Charles City, IA", "state": "IA",
      "facility_type": "Corn Processing",
      "url": "https://www.farmerswin.com/markets/cash.php?location_filter=12603"},
+    # Farmers Win Cooperative (NE Iowa / SE Minnesota) — the co-op's own elevators on
+    # the same farmerswin.com host. AGP Mason City, Poet Fairbank/Shell Rock and SRSP
+    # (Shell Rock soybean plant) also appear on this host but are separate companies
+    # (AGP/Poet already have their own scrapers), so they're excluded here. Added 2026-09-27.
+    *[{"provider": "Farmers Win Cooperative", "location": f"{_town}, {_st}", "state": _st,
+       "facility_type": "Country Elevator",
+       "url": f"https://www.farmerswin.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id, _st in [
+          ("Bremer", 12588, "IA"), ("Cresco", 51092, "IA"), ("Cresco East", 12589, "IA"),
+          ("Cresco West", 12590, "IA"), ("Decorah", 12591, "IA"), ("Fredericksburg", 12592, "IA"),
+          ("Granger", 12594, "IA"), ("Hawkeye", 12595, "IA"), ("Houston", 51093, "MN"),
+          ("Mabel", 12596, "MN"), ("Ridgeway", 12597, "IA"), ("Rushford", 51094, "MN"),
+          ("Spring Grove", 51095, "MN"), ("Sumner", 12598, "IA")]],
+    # Viserion Grain — McGregor, IA Mississippi-river terminal on the farmerswin.com host.
+    {"provider": "Viserion", "location": "McGregor, IA", "state": "IA",
+     "facility_type": "Country Elevator",
+     "url": "https://www.farmerswin.com/markets/cash.php?location_filter=79915"},
     {"provider": "KAAPA", "location": "Aurora, NE", "state": "NE", "facility_type": "Corn Processing",
      "url": "https://kaapagrains.agricharts.com/markets/cash.php?location_filter=83493"},
     {"provider": "KAAPA", "location": "Minden, NE", "state": "NE", "facility_type": "Corn Processing",
