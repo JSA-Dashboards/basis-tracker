@@ -134,6 +134,20 @@ SITES: list[dict] = [
           ("Larchwood", 87558, "IA"), ("Lester", 87560, "IA"), ("Ocheyedan", 87561, "IA"),
           ("Rock Rapids", 87562, "IA"), ("Rock Valley", 87563, "IA"),
           ("Rushmore", 87564, "MN"), ("Sibley", 87565, "IA")]],
+    # Ag State (NW Iowa) — agstate.org is WAF-blocked (403), but the AgriCharts data
+    # host agstate.agricharts.com is open (same trick as CFE). 31 elevators, all IA.
+    *[{"provider": "Ag State", "location": f"{_town}, IA", "state": "IA",
+       "facility_type": "Country Elevator",
+       "url": f"https://agstate.agricharts.com/markets/cash.php?location_filter={_id}"}
+      for _town, _id in [
+          ("A.C.", 84205), ("Alta", 25731), ("Alton Terminal", 84206), ("Aurelia", 81789),
+          ("Battle Creek", 84015), ("Calumet", 81791), ("Cleghorn", 81793), ("Ellsworth", 25734),
+          ("Emmetsburg", 84017), ("Fonda", 25735), ("Galva", 81794), ("Granville", 81795),
+          ("Hartley", 25736), ("Holstein", 81796), ("Hospers", 25737), ("Kingsley", 81797),
+          ("Larrabee", 81798), ("Linn Grove", 81800), ("Marathon", 81801), ("Marcus", 81802),
+          ("Maurice", 25739), ("Nemaha", 81806), ("Newell", 60129), ("Paullina", 81807),
+          ("Peterson", 81808), ("Rembrandt", 81809), ("Royal", 25740), ("Schaller", 81810),
+          ("Sheldon North", 84018), ("Sutherland", 25742), ("Webb", 81813)]],
     # AgKota (SD) via agkotagrain.com
     *[{"provider": "AgKota", "location": f"{_town}", "state": _st,
        "facility_type": "Country Elevator",
