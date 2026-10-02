@@ -2629,15 +2629,19 @@ with tab_railfob:
             if _prows and _pcurr != _pprev:
                 save_rail_fob(_ptoday, "palmetto", _prows)
 
-    st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX / NS</div>',
-                unsafe_allow_html=True)
-    if _rf and _rf.get("updated"):
-        st.caption(f"source: palmettograin.com · live updated {_rf.get('updated')}")
-    _PALMETTO_SECTIONS = [
-        ("", [["COL, OH Corn 90's", "EVILLE, Corn- 90's",
-               "NS FT. WAYNE, IN Corn- 105's", "COL, OH Beans 90's"]]),
-    ]
-    _rail_board("palmetto", _PALMETTO_SECTIONS, "pal")
+    # Palmetto CSX/NS board hidden on the Rail FOB tab (Kolten 2026-10-02). Still
+    # archived above (kept for seasonal history); flip to True to show it again.
+    _SHOW_PALMETTO_BOARD = False
+    if _SHOW_PALMETTO_BOARD:
+        st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX / NS</div>',
+                    unsafe_allow_html=True)
+        if _rf and _rf.get("updated"):
+            st.caption(f"source: palmettograin.com · live updated {_rf.get('updated')}")
+        _PALMETTO_SECTIONS = [
+            ("", [["COL, OH Corn 90's", "EVILLE, Corn- 90's",
+                   "NS FT. WAYNE, IN Corn- 105's", "COL, OH Beans 90's"]]),
+        ]
+        _rail_board("palmetto", _PALMETTO_SECTIONS, "pal")
 
     # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
     st.markdown(f'<div style="{_RF_BOARDHDR}">Rail Corridors · archived (corn)</div>',
