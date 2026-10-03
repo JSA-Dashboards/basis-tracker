@@ -390,7 +390,7 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
         f'<div style="color:#fff;font-size:18px;font-weight:800">{title}</div>'
         f'<div style="color:{JPSI_BLUE};font-size:13px;font-weight:600;margin-top:2px">'
         f'Manual rail FOB corridors · {datetime.now():%A, %B %d, %Y}</div></div>'
-        f'{dashboard_cta_html("View the live rail FOB dashboard")}'
+        f'{dashboard_cta_html(hint="Rail FOB tab has the full board")}'
         f'<div style="padding:4px 2px 0">')
 
     imgs = {}

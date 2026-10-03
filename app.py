@@ -168,15 +168,18 @@ def _jsa_watermark_uri() -> str:
         return ""
 
 
-def _jsa_watermark_css(cls: str, size: str = "42% auto", opacity: str = ".07") -> str:
+def _jsa_watermark_css(cls: str, size: str = "42% auto", opacity: str = ".07",
+                       inset: str = "0") -> str:
     """A faint 50-year-logo watermark stamped as an overlay on any table tagged with
     `cls`. Unlike the Changes-tab version (behind transparent rows), this overlays the
-    table, so it works even where rows/cells have meaningful background colors."""
+    table, so it works even where rows/cells have meaningful background colors.
+    `inset` shrinks the box the mark is fitted into (CSS inset shorthand) — pair it
+    with size="contain" for short tables, where a width-based size would be clipped."""
     uri = _jsa_watermark_uri()
     if not uri:
         return ""
     return (f"<style>.{cls}{{position:relative}}"
-            f".{cls}::after{{content:'';position:absolute;inset:0;pointer-events:none;"
+            f".{cls}::after{{content:'';position:absolute;inset:{inset};pointer-events:none;"
             f"z-index:4;background:url('{uri}') center center no-repeat;"
             f"background-size:{size};opacity:{opacity}}}</style>")
 
@@ -625,6 +628,11 @@ st.markdown("""
 st.markdown(_jsa_watermark_css("jsawm"), unsafe_allow_html=True)
 # Trends cards span the full width, so use a smaller (zoomed-out) watermark there.
 st.markdown(_jsa_watermark_css("jsawmt", size="22% auto"), unsafe_allow_html=True)
+# Rail FOB corridor tables are short (~4-12 rows), so a width-based size like the Summary's
+# 42% would be clipped top and bottom. Fit the mark INSIDE the table instead ("contain",
+# inset top/bottom) so it is always fully visible, whatever the row count.
+st.markdown(_jsa_watermark_css("jsawmr", size="contain", opacity=".08", inset="8% 0"),
+            unsafe_allow_html=True)
 
 
 # ── Header ────────────────────────────────────────────────────────────────────
@@ -2558,7 +2566,7 @@ with tab_railfob:
                  f"font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:#32373c\">"
                  f'{_RAIL_DISPLAY.get(_m, _m)} <span style="font-size:9px;color:#fff;background:{_rcol};'
                  f'padding:1px 5px;border-radius:3px">{_rail}</span>{_asof}</div>')
-            h += '<div style="overflow-x:auto"><table style="border-collapse:collapse">'
+            h += '<div style="overflow-x:auto"><table class="jsawmr" style="border-collapse:collapse">'
             h += (f'<tr><td style="{_THL}">Period</td><td style="{_THL}">Fut</td>'
                   f'<td style="{_THR}">Bid</td><td style="{_THR}">Offer</td>'
                   f'<td style="{_THR}">Δ Last</td><td style="{_THR}">Δ Wk</td>'

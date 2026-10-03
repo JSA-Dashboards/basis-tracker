@@ -461,18 +461,24 @@ def _table_watermark() -> str | None:
         return None
 
 
-def dashboard_cta_html(label: str = "View the live dashboard",
-                       url: str | None = None) -> str:
-    """A pronounced, centered JPSI-blue button linking to the view-only dashboard,
-    for the very top of the branded emails (daily changes + rail update)."""
+def dashboard_cta_html(label: str = "Open the Basis Tracker",
+                       url: str | None = None, hint: str | None = None) -> str:
+    """A pronounced, centered JPSI-blue button linking to the VIEW-ONLY Basis Tracker,
+    for the very top of the branded emails (daily changes + rail update). The line under
+    it says "view-only" and shows the address, so a recipient (or a client that strips
+    buttons) can see exactly where it goes. `hint` adds a short pointer after that."""
     url = url or VIEW_DASHBOARD_URL
+    host = url.split("://", 1)[-1].rstrip("/")
+    sub = "View-only dashboard" + (f" &middot; {hint}" if hint else "")
     return (
-        f'<div style="background:#ffffff;padding:16px 18px 4px;text-align:center;'
+        f'<div style="background:#ffffff;padding:16px 18px 6px;text-align:center;'
         f'font-family:Arial,Helvetica,sans-serif">'
         f'<a href="{url}" style="display:inline-block;background:{JPSI_BLUE};color:#ffffff;'
         f'font-size:15px;font-weight:700;text-decoration:none;padding:12px 30px;'
         f'border-radius:6px;box-shadow:0 1px 3px rgba(6,147,227,.4)">'
-        f'{label} &rarr;</a></div>'
+        f'{label} &rarr;</a>'
+        f'<div style="font-size:11px;color:#64748b;margin-top:7px">{sub} &middot; '
+        f'<a href="{url}" style="color:#64748b;text-decoration:underline">{host}</a></div></div>'
     )
 
 
@@ -558,7 +564,7 @@ def build_changes_email_html(mode: str = "spot") -> str:
         f'<div style="font-size:16px;font-weight:700">Daily Basis Changes</div>'
         f'<div style="font-size:12px;color:#cbd5e1">{today.day} {today.strftime("%b %Y")} '
         f'· nearest & next delivery month vs prior posting</div></td></tr></table>'
-        f'{dashboard_cta_html("View the live basis dashboard")}'
+        f'{dashboard_cta_html()}'
         f'<div style="padding:8px 18px 14px;background:#ffffff">{body}</div>'
         f'<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:10px 18px;'
         f'font-size:11px;color:#64748b">John Stewart &amp; Associates · '
