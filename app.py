@@ -2020,6 +2020,7 @@ with tab_railfob:
     _RF_BOARDHDR = ("margin-top:20px;border-top:2px solid #e2e8f0;padding-top:10px;"
                     "font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:#32373c")
     _RAIL_DISPLAY = {
+        "COL, OH Beans 90's": "CSX Columbus Beans",
         "BN PNW CP":         "CP PNW",
         "UP Illinois (Dom)": "Allen Station (Dom)",
         "UP Illinois (Mex)": "Allen Station (Mex)",
@@ -2377,10 +2378,12 @@ with tab_railfob:
     except Exception as _rs_err:
         st.warning(f"Seasonal chart error: {_rs_err}")
 
-    def _rail_board(source, sections, key):
+    def _rail_board(source, sections, key, hide=()):
         """Grid board for a stored rail-FOB source (palmetto / manual): labeled
         section headings + per-corridor tables with Day/Wk/Mo bid changes and
-        carry-forward of corridors not posted on the selected date."""
+        carry-forward of corridors not posted on the selected date. Markets not
+        placed in `sections` fall into an auto "Other" section, so `hide` is how a
+        market is kept OFF the board entirely."""
         _dates = _cached_rail_fob_dates(source)
         if not _dates:
             st.caption("No postings stored yet — this board fills in as data is saved.")
@@ -2479,6 +2482,8 @@ with tab_railfob:
         _PARTIAL_PFX = re.compile(r"^(?:FH|LH|MP|LP|FP|Split|Full)\s+", re.I)
         _DAY_RANGE = re.compile(r"\s*\d{1,2}\s*-\s*\d{1,2}\s*$")
         _MON_ONLY = re.compile(r"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)$", re.I)
+        _FULL_MON_UP = frozenset(("JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE", "JULY",
+                                  "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"))
 
         def _base_window(period):
             """A single-month partial (FH/LH/MP/Split Oct, 'Dec 1-20') → its base
@@ -2486,6 +2491,11 @@ with tab_railfob:
             non-month labels (Spot, Nearby) are returned unchanged, so only true
             single-month partials fold."""
             s = str(period or "").strip()
+            # Palmetto's archive up to 9/24 stores ALL-CAPS full month names ('OCTOBER');
+            # the feed now sends 'October'. Fold the caps onto Title case or every Δ
+            # column goes blank across the switch (exact-string period match).
+            if s in _FULL_MON_UP:
+                return s.title()
             core = _PARTIAL_PFX.sub("", s)
             core = _DAY_RANGE.sub("", core).strip()
             core = re.sub(r"\s*'?\d\d$", "", core).strip()      # drop crop-year 'YY
@@ -2579,7 +2589,8 @@ with tab_railfob:
             for _row in _rows:
                 for _spec in _row:
                     _placed.update(_spec if isinstance(_spec, (list, tuple)) else [_spec])
-        _elig_markets = {m for m, ds in _mkt_dates.items() if any(d <= _msel for d in ds)}
+        _elig_markets = {m for m, ds in _mkt_dates.items()
+                         if any(d <= _msel for d in ds) and m not in hide}
         _leftover = [[m] for m in sorted(_elig_markets) if m not in _placed]
         _secs = list(sections) + ([("Other", _leftover)] if _leftover else [])
         _ncols = max((len(r) for _t, _rows in _secs for r in _rows), default=1)
@@ -2629,19 +2640,20 @@ with tab_railfob:
             if _prows and _pcurr != _pprev:
                 save_rail_fob(_ptoday, "palmetto", _prows)
 
-    # Palmetto CSX/NS board hidden on the Rail FOB tab (Kolten 2026-10-02). Still
-    # archived above (kept for seasonal history); flip to True to show it again.
-    _SHOW_PALMETTO_BOARD = False
+    # Palmetto board: only the CSX Columbus SOYBEAN bid is shown (Kolten 2026-10-02).
+    # The corn markets (CSX Columbus / Evansville, NS Ft Wayne) stay hidden — still
+    # archived above for seasonal history, and tracked on the manual corridors below.
+    # `hide` is required: anything not placed in a section lands in an auto "Other".
+    _PALMETTO_BEANS = "COL, OH Beans 90's"
+    _PALMETTO_HIDE = ("COL, OH Corn 90's", "EVILLE, Corn- 90's",
+                      "NS FT. WAYNE, IN Corn- 105's")
+    _SHOW_PALMETTO_BOARD = True
     if _SHOW_PALMETTO_BOARD:
-        st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX / NS</div>',
+        st.markdown(f'<div style="{_RF_BOARDHDR}">Palmetto Rail FOB · CSX Beans</div>',
                     unsafe_allow_html=True)
         if _rf and _rf.get("updated"):
             st.caption(f"source: palmettograin.com · live updated {_rf.get('updated')}")
-        _PALMETTO_SECTIONS = [
-            ("", [["COL, OH Corn 90's", "EVILLE, Corn- 90's",
-                   "NS FT. WAYNE, IN Corn- 105's", "COL, OH Beans 90's"]]),
-        ]
-        _rail_board("palmetto", _PALMETTO_SECTIONS, "pal")
+        _rail_board("palmetto", [("", [[_PALMETTO_BEANS]])], "pal", hide=_PALMETTO_HIDE)
 
     # ── Manual rail corridors (archived; fed via chat ~2×/week) ──────────────
     st.markdown(f'<div style="{_RF_BOARDHDR}">Rail Corridors · archived (corn)</div>',
