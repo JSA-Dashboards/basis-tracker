@@ -30,11 +30,17 @@ two:
 | main file | app | password |
 |---|---|---|
 | `app.py` | full admin build | `APP_PASSWORD` set |
-| `view_app.py` | read-only client build | `APP_PASSWORD` **unset** — that is what keeps it an open link |
+| `view_app.py` | read-only client build | **never gated** — an open link, whatever its Secrets say |
 
 `view_app.py` forces `VIEW_ONLY=true` then runs `app.py` via `runpy`, so it
-needs the same backend secrets. **Do not add `APP_PASSWORD` to the view app** —
-it would lock out the clients who hold that URL.
+needs the same backend secrets. Leave `APP_PASSWORD` out of the view app's
+Secrets — but if it ends up there (the two Secrets blocks are easy to re-paste
+from one to the other, which is how the view link got a password prompt on
+2026-10-02) it is **ignored**: `view_app.py` passes `_OPEN_VIEW_BUILD` to `app.py`
+through `runpy`'s `init_globals`, and `_require_password()` skips the gate when it
+sees it. The flag is an in-process Python global on purpose — no env var, Secret or
+`VIEW_ONLY` setting can set it, so nothing can open the admin build (`app.py` run
+directly). Every email button links to the view app, so it must stay open.
 
 `_view_only()` in `app.py` hides everything that downloads or modifies data:
 scrapes, exports, copy buttons, the River FOB update, snapshot deletes.

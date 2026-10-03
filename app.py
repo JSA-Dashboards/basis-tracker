@@ -71,7 +71,16 @@ except TypeError:  # older Streamlit without st.html JS support
 
 
 def _require_password():
-    """Gate the app behind APP_PASSWORD (secret / env). No password set → open."""
+    """Gate the app behind APP_PASSWORD (secret / env). No password set → open.
+
+    The read-only VIEW build is ALWAYS open. view_app.py injects `_OPEN_VIEW_BUILD`
+    through runpy's init_globals, so a stray APP_PASSWORD in the view app's Secrets (it
+    has its own Secrets block, easily re-pasted from the admin app's) can never lock out
+    the clients who hold its link. It is deliberately a Python global — NOT an env var,
+    a Secret, or `_view_only()` — because any of those could also be set on the ADMIN
+    app by mistake, and none of them may ever open that one."""
+    if globals().get("_OPEN_VIEW_BUILD") is True:
+        return
     _pw = os.getenv("APP_PASSWORD", "")
     if not _pw or st.session_state.get("_authed"):
         return
