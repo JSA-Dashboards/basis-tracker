@@ -23,7 +23,8 @@ from datetime import datetime, date, timedelta
 from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
                             _GAIN, _LOSS, _SIG_LOGO, _SIG_LOGO_CID,
                             _table_watermark, _TBL_WM_CID,
-                            _roll_adjust, _futures_curve, JSA_GROUP_BCC)
+                            _roll_adjust, _futures_curve, JSA_GROUP_BCC,
+                            dashboard_cta_html)
 from database import get_rail_fob_all
 
 # Load DATABASE_URL when rail_report is invoked standalone (a script or the scheduled
@@ -389,6 +390,7 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
         f'<div style="color:#fff;font-size:18px;font-weight:800">{title}</div>'
         f'<div style="color:{JPSI_BLUE};font-size:13px;font-weight:600;margin-top:2px">'
         f'Manual rail FOB corridors · {datetime.now():%A, %B %d, %Y}</div></div>'
+        f'{dashboard_cta_html("View the live rail FOB dashboard")}'
         f'<div style="padding:4px 2px 0">')
 
     imgs = {}

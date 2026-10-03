@@ -42,6 +42,8 @@ _CME_MONTH_TO_INT = {
 # ── JPSI brand (jpsi.com) ────────────────────────────────────────────────────
 JPSI_DARK  = "#32373c"
 JPSI_BLUE  = "#0693e3"
+VIEW_DASHBOARD_URL = os.getenv("VIEW_DASHBOARD_URL",
+                               "https://basis-tracker-view.streamlit.app")
 JPSI_LOGO  = "https://www.jpsi.com/wp-content/themes/gate39media/img/logo-white.png"
 _GAIN, _LOSS = "#16a34a", "#dc2626"
 
@@ -459,6 +461,21 @@ def _table_watermark() -> str | None:
         return None
 
 
+def dashboard_cta_html(label: str = "View the live dashboard",
+                       url: str | None = None) -> str:
+    """A pronounced, centered JPSI-blue button linking to the view-only dashboard,
+    for the very top of the branded emails (daily changes + rail update)."""
+    url = url or VIEW_DASHBOARD_URL
+    return (
+        f'<div style="background:#ffffff;padding:16px 18px 4px;text-align:center;'
+        f'font-family:Arial,Helvetica,sans-serif">'
+        f'<a href="{url}" style="display:inline-block;background:{JPSI_BLUE};color:#ffffff;'
+        f'font-size:15px;font-weight:700;text-decoration:none;padding:12px 30px;'
+        f'border-radius:6px;box-shadow:0 1px 3px rgba(6,147,227,.4)">'
+        f'{label} &rarr;</a></div>'
+    )
+
+
 def build_changes_email_html(mode: str = "spot") -> str:
     """A branded, email-ready HTML report of daily basis changes (JPSI styling)."""
     today = datetime.now()
@@ -541,6 +558,7 @@ def build_changes_email_html(mode: str = "spot") -> str:
         f'<div style="font-size:16px;font-weight:700">Daily Basis Changes</div>'
         f'<div style="font-size:12px;color:#cbd5e1">{today.day} {today.strftime("%b %Y")} '
         f'· nearest & next delivery month vs prior posting</div></td></tr></table>'
+        f'{dashboard_cta_html("View the live basis dashboard")}'
         f'<div style="padding:8px 18px 14px;background:#ffffff">{body}</div>'
         f'<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:10px 18px;'
         f'font-size:11px;color:#64748b">John Stewart &amp; Associates · '
