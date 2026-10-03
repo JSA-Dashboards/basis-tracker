@@ -7,6 +7,13 @@ used to run on Kolten's local machine — moving it here means the PDF scrapers
 always on. **The Streamlit apps still run on Streamlit Cloud** — this Droplet only
 runs the scrape/ETL and writes to the shared Snowflake DB the apps read.
 
+Just before the scrape, `run_daily.sh` also runs `inco_bids.py carry`: Incobrasa
+(Gilman, IL) hand-feeds a bid sheet that holds until the next one, so this repeats the
+last sheet onto today (and any missed weekday) in the bids archive. It never overwrites
+a real snapshot, refuses to carry a sheet older than 21 days, and is non-fatal. A new
+sheet is recorded with `inco_bids.py post --date YYYY-MM-DD [--commit]` (see its
+docstring), which replaces that day and re-carries the days after it.
+
 Assumes Ubuntu 22.04/24.04. Adjust `APP_DIR` if you clone somewhere other than
 `/opt/basis-tracker` (also edit it at the top of `deploy/run_daily.sh`).
 

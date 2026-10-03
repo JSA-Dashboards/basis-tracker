@@ -27,6 +27,11 @@ fi
 
 rc=0
 {
+    # Inco (Gilman, IL) sends a sheet that HOLDS until the next one, so repeat the last
+    # sheet onto today (and any missed weekday) before the scrape + email run. It never
+    # overwrites a real snapshot, and it is non-fatal: it must not block the daily email.
+    echo "=== inco carry-forward $(date -Is) ==="
+    "$VENV/bin/python" inco_bids.py carry || echo "WARN: inco carry-forward failed (non-fatal)"
     echo "=== auto_import start $(date -Is) ==="
     # Landus is skipped: it blocks datacenter IPs (Vercel bot-protection), so it only
     # works from a residential IP. To re-enable, drop --no-landus AND set a LANDUS_PROXY

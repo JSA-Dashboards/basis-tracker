@@ -2679,7 +2679,12 @@ with tab_railfob:
             ["CPKC Freight"],
         ]),
     ]
-    _rail_board("manual", _MANUAL_SECTIONS, "man")
+    # "BN COBO Buyers" is a dead side-market (last posted 9/2) that the catch-all
+    # "Other" section kept surfacing (Kolten 2026-10-02). The rail EMAILS already drop it
+    # via their 21-day inactivity cutoff; this keeps the on-screen board consistent.
+    # Anything NEW that isn't placed above still lands in "Other" on purpose.
+    _MANUAL_HIDE = ("BN COBO Buyers",)
+    _rail_board("manual", _MANUAL_SECTIONS, "man", hide=_MANUAL_HIDE)
 
     # ── Email the rail board on demand (full build only; sends via local Outlook) ──
     if not _view_only():
