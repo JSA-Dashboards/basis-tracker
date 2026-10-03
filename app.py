@@ -1487,7 +1487,10 @@ def _paste_clean(html: str) -> str:
 
 
 _admin = not _view_only()
-_tab_labels = ["🔔 Changes", "🌙 Nightly Recap", "📋 Bids", "🚂 Rail FOB"]
+_tab_labels = ["🔔 Changes"]
+if _admin:
+    _tab_labels.append("🌙 Nightly Recap")   # admin only — dropped from the read-only build (Kolten 2026-10-02)
+_tab_labels += ["📋 Bids", "🚂 Rail FOB"]
 if _admin:
     _tab_labels.append("✏️ Rail Entry")      # admin: paste-in rail rundowns
 _tab_labels += ["💵 Net Carry", "🌊 River FOB", "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
@@ -1497,7 +1500,7 @@ if _admin:
 _tabs = st.tabs(_tab_labels)
 _ti = {lbl: t for lbl, t in zip(_tab_labels, _tabs)}
 tab_changes  = _ti["🔔 Changes"]
-tab_spotfwd  = _ti["🌙 Nightly Recap"]
+tab_spotfwd  = _ti.get("🌙 Nightly Recap")     # None on the read-only build
 tab_bids     = _ti["📋 Bids"]
 tab_railfob  = _ti["🚂 Rail FOB"]
 tab_netcarry = _ti["💵 Net Carry"]
@@ -1583,7 +1586,12 @@ with tab_changes:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: SPOT & FORWARD  (18 fixed locations: spot/forward basis with daily changes)
 # ═══════════════════════════════════════════════════════════════════════════════
-with tab_spotfwd:
+# Admin only: the read-only build has no such tab (tab_spotfwd is None), so this whole block —
+# and its queries — is skipped there. NOTE the `with` is indented 2 while its body stays at 4:
+# that keeps the ~430-line body untouched (it holds multi-line HTML strings that a mechanical
+# re-indent could alter) and is still valid Python.
+if tab_spotfwd is not None:
+  with tab_spotfwd:
     st.caption("Nightly Recap — 18-location spot &amp; next-month basis with daily changes.")
 
     # As-of selector — defaults to the current business day (today if a weekday,
