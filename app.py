@@ -206,6 +206,16 @@ def _cached_fed_funds():
     import carry_rate
     return carry_rate.load_fed_funds()
 
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_eth_proxy(product: str, asof_iso: str):
+    """The Nightly Recap's Platts-ethanol pre-fill: the latest daily capture, on/before the as-of
+    date, of the CME futures that settle against it (CU = Chicago, AEZ = NY), or None.
+    See ethanol_capture."""
+    from datetime import date as _d
+    import ethanol_capture
+    return ethanol_capture.proxy(product, _d.fromisoformat(asof_iso))
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_rail_fob_all(source: str) -> list:
     """Every rail_fob cell for a source across all dates (Net Carry / trends)."""
@@ -1687,18 +1697,53 @@ if tab_spotfwd is not None:
 
     # CIF and IL freight come straight from the latest River FOB snapshot — no manual
     # entry. Spot = current calendar month, Next = following month. River CIF $/bu
-    # → ×100 = ¢; IL freight stored → ×100 = %. Ethanol stays manual.
+    # → ×100 = ¢; IL freight stored → ×100 = %. Ethanol is typed by hand, pre-filled from a futures proxy when there is one.
     corn_cif_spot, corn_cif_next, corn_cif_sc, corn_cif_nc = _riv_cif_cents("Corn")
     bean_cif_spot, bean_cif_next, bean_cif_sc, bean_cif_nc = _riv_cif_cents("Soybeans")
     ilr_spot,      ilr_next,      ilr_sc,      ilr_nc      = _riv_il_pct()
 
+    # Chi / NY Platts ethanol ($/gal). Pre-filled from the daily capture of the CME futures that
+    # settle against them (ethanol_capture: CU = Chicago, AEZ = NY) when there is one; the boxes
+    # stay editable — type the real Platts print over a proxy. The widget key carries the as-of
+    # date so the default is re-derived when the date changes (a widget keeps its first value).
+    _eth_day = sf_asof.isoformat()
+    _chi_px = _cached_eth_proxy("CU", _eth_day)
+    _ny_px = _cached_eth_proxy("AEZ", _eth_day)
     _e1, _e2, _ = st.columns([2, 2, 6])
     with _e1:
-        chi_eth_input = st.number_input("Chi Platts Eth ($/gal)", value=0.0, step=0.0001,
-                                        format="%.4f", key="chi_eth")
+        chi_eth_input = st.number_input(
+            "Chi Platts Eth ($/gal)", value=(round(_chi_px.settle, 4) if _chi_px else 0.0),
+            step=0.0001, format="%.4f", key=f"chi_eth_{_eth_day}",
+            help="Pre-filled with the CME Chicago Ethanol (Platts) FUTURES settle (the current-month "
+                 "contract) when a recent daily capture exists. That is a proxy, not the Platts "
+                 "assessment — type the actual print over it.")
     with _e2:
-        ny_eth_input = st.number_input("NY Platts Eth ($/gal)", value=0.0, step=0.0001,
-                                       format="%.4f", key="ny_eth")
+        ny_eth_input = st.number_input(
+            "NY Platts Eth ($/gal)", value=(round(_ny_px.settle, 4) if _ny_px else 0.0),
+            step=0.0001, format="%.4f", key=f"ny_eth_{_eth_day}")
+
+    def _eth_note(px, name, label, entered):
+        """One caption line: where a pre-filled value came from, or why a box is blank."""
+        if px is None:
+            return (f"{name}: no recent futures capture — enter the Platts price by hand."
+                    if name == "Chi" else
+                    "NY: Massive lists the NY ethanol contracts (AEZ) but none has a settlement yet — "
+                    "enter the Platts price by hand.")
+        mon = datetime.strptime(px.contract_ym, "%Y-%m").strftime("%b %Y")
+        traded = f"last traded {px.last_trade_at[:10]}" if px.last_trade_at else "no trade on record"
+        lots = f", {px.volume} lot{'s' if px.volume != 1 else ''}" if px.volume is not None else ""
+        if abs((entered or 0.0) - round(px.settle, 4)) > 1e-9:
+            return f"{name}: your entry (the futures proxy would be {px.settle:.4f}, {px.ticker})."
+        return (f"{name} pre-filled from CME {label} futures {px.ticker} ({mon}) settle "
+                f"{px.settle:.4f}, captured {px.captured_for:%a %b %d}; {traded}{lots}. A futures "
+                f"proxy, not the Platts assessment — type the print over it.")
+
+    _chi_proxied = (_chi_px is not None
+                    and abs((chi_eth_input or 0.0) - round(_chi_px.settle, 4)) <= 1e-9)
+    _ny_proxied = (_ny_px is not None
+                   and abs((ny_eth_input or 0.0) - round(_ny_px.settle, 4)) <= 1e-9)
+    st.caption(_eth_note(_chi_px, "Chi", "Chicago Ethanol (Platts)", chi_eth_input) + " · "
+               + _eth_note(_ny_px, "NY", "NY Ethanol (Platts)", ny_eth_input))
     if _riv_dates:
         _riv_cap_d = f"{_riv_cur} vs {_riv_prev}" if _riv_prev else f"{_riv_cur}"
         st.caption(f"CIF &amp; IL barge freight from the River FOB sheet "
@@ -1968,8 +2013,14 @@ if tab_spotfwd is not None:
         _du = "%" if _is_pct else ""
         sc_str = f'<span style="color:#{"16a34a" if sc > 0 else "dc2626"};font-weight:700">{sc:+d}{_du}</span>' if sc else '<span style="color:#cbd5e1">—</span>'
         nc_str = f'<span style="color:#{"16a34a" if nc > 0 else "dc2626"};font-weight:700">{nc:+d}{_du}</span>' if nc else '<span style="color:#cbd5e1">—</span>'
+        # An un-edited futures proxy says so in the row (it is copied with the table).
+        _mark = ""
+        if (name == "Chi Platts Eth" and _chi_proxied) or (name == "NY Platts Eth" and _ny_proxied):
+            _mk_px = _chi_px if name == "Chi Platts Eth" else _ny_px
+            _mark = (f' <span style="color:#94a3b8;font-weight:400;font-size:8px">'
+                     f'{_mk_px.ticker} fut</span>')
         html += (f'<tr style="background:{bg}">'
-                 f'<td style="{td};font-weight:600;color:#1e293b">{name}</td>'
+                 f'<td style="{td};font-weight:600;color:#1e293b">{name}{_mark}</td>'
                  f'<td style="{td};color:#94a3b8;font-size:8px">{fut_str}</td>'
                  f'<td style="{tdr};font-weight:700;color:{spot_col}">{spot_str}</td>'
                  f'<td style="{tdr}">{sc_str}</td>'
@@ -1987,10 +2038,14 @@ if tab_spotfwd is not None:
             st.caption("Raw values: ¢ for basis rows, % for IL Barge Freight, $ for "
                        "BN Shuttle Freight. Blank a cell to revert it to the computed "
                        "value. Overrides are saved for the selected as-of date only.")
+            # The two Platts ethanol rows are $/gal with 4 decimals, edited in their own boxes
+            # above; this editor's columns are whole numbers (Int64 below), and a fractional
+            # price in them raises "cannot safely cast ... to int64" — so keep them out.
             _edf = _pd.DataFrame(
                 [{"Item": it[0], "Spot": it[1], "Next": it[2],
                   "Δ Spot": it[3], "Δ Next": it[4], "Fut": it[5] or ""}
-                 for it in items_18 if it[0]])
+                 for it in items_18
+                 if it[0] and it[0] not in ("Chi Platts Eth", "NY Platts Eth")])
             for _col in ("Spot", "Next", "Δ Spot", "Δ Next"):
                 _edf[_col] = _edf[_col].astype("Int64")
             _edited = st.data_editor(_edf, hide_index=True, use_container_width=True,

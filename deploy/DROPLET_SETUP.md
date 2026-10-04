@@ -14,6 +14,18 @@ a real snapshot, refuses to carry a sheet older than 21 days, and is non-fatal. 
 sheet is recorded with `inco_bids.py post --date YYYY-MM-DD [--commit]` (see its
 docstring), which replaces that day and re-carries the days after it.
 
+A separate weekday job, `deploy/run_ethanol_capture.sh` (cron `40 16 * * 1-5`, wrapped in
+`/opt/alerting/cron-alert`), runs `ethanol_capture.py`: it snapshots the CME Chicago / NY
+Ethanol (Platts) futures (`CU`, `AEZ`) from Massive into the `ETHANOL_FUTURES` table so the
+Nightly Recap can pre-fill its "Chi Platts Eth" box with the current-month settle (a futures
+proxy, not the Platts assessment). Massive keeps no history for these thin contracts, so a
+missed day is lost — that is why it alerts on failure. Needs `MASSIVE_API_KEY` in `.env`. The
+installed line:
+
+```
+40 16 * * 1-5 /opt/alerting/cron-alert "Ethanol Platts capture" "/opt/basis-tracker/logs/ethanol_capture_*.log" /opt/basis-tracker/deploy/run_ethanol_capture.sh
+```
+
 Assumes Ubuntu 22.04/24.04. Adjust `APP_DIR` if you clone somewhere other than
 `/opt/basis-tracker` (also edit it at the top of `deploy/run_daily.sh`).
 
