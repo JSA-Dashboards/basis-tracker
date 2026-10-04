@@ -11,10 +11,13 @@ Definitions (confirmed against Kolten's screenshot):
     futures contract (the reference, e.g. CZ26), so the levels are comparable
     across the curve:  basis_ref = raw_basis + futures(own) - futures(ref)
     (the same algebra as futures_spread.anchor_basis).
-  • **Interest** — the cost of carrying grain from an anchor month forward, at an
-    annual interest rate applied to the reference board price:
-        interest = months_from_anchor × (ref_price × annual_rate / 12)
-    Months at or before the anchor carry no interest (blank).
+  • **Interest** — the cost of carrying grain from an anchor month forward, priced
+    exactly like the Cost of Carry sheet (cost-of-carry-calculator, interest_full):
+        interest = ref_price × annual_rate × days / 360
+    where `days` is the actual calendar days from the first of the anchor month to the
+    first of the delivery month, and annual_rate is fed funds + 2.25% (see carry_rate).
+    Deliveries at or before the anchor month carry no interest (blank). (Until
+    2026-10-04 this was months × (ref_price × a hand-set 9% / 12) — too high.)
   • **Net of Interest Basis** = Basis vs REF − Interest.
   • **Inverse(+)/Carry(-)** = prior delivery's Net − this delivery's Net.
     Positive ⇒ inverse (market pays to move now); negative ⇒ carry (market pays
@@ -104,6 +107,7 @@ class CarryRow:
     basis_ref: float | None
     converted: bool      # True if spread-adjusted to the reference (else raw)
     months: int          # months from anchor (0 or negative ⇒ no interest)
+    days: int            # actual calendar days from the anchor month (0 ⇒ no interest)
     interest: float | None
     net: float | None
     carry: float | None
@@ -127,9 +131,11 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     ref_symbol: the common contract to express everything against (CZ26, …).
     curve: {symbol -> cents} futures prices for spread conversion + board price.
     anchor_month: 1–12, the month interest starts accruing from (0 there).
-    annual_rate: decimal (0.09 = 9%) applied to the reference board price.
+    annual_rate: decimal (0.0613 = 6.13%) applied to the reference board price on an
+                 actual/360 basis — the Cost of Carry sheet's convention.
 
-    Returns (rows_sorted, meta) where meta has ref_price, per_month, all_converted.
+    Returns (rows_sorted, meta) where meta has ref_price, per_month (the sheet's
+    30-day "Monthly interest"), all_converted.
     """
     # Normalize + sort by nearness (delivery window, not just the futures month).
     # A carry ladder needs a concrete (year, month) per delivery, so quotes that
@@ -149,7 +155,8 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     norm.sort(key=lambda r: _dp.deliv_key(r["delivery"], r["futures"] or ""))
 
     ref_price = (curve or {}).get(ref_symbol) if ref_symbol else None
-    per_month = (ref_price * annual_rate / 12.0) if ref_price is not None else None
+    # The Cost of Carry sheet's "Monthly interest" (a 30-day month): price × rate × 30/360.
+    per_month = (ref_price * annual_rate * 30.0 / 360.0) if ref_price is not None else None
     anchor_ym = _anchor_ym(norm, anchor_month)
 
     rows: list[CarryRow] = []
@@ -173,13 +180,17 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
         # Interest accrues from the anchor month forward.
         if r["ym"] and anchor_ym:
             months = _mi(*r["ym"]) - _mi(*anchor_ym)
+            # actual calendar days, first of the anchor month → first of the delivery month
+            days = (date(r["ym"][0], r["ym"][1], 1)
+                    - date(anchor_ym[0], anchor_ym[1], 1)).days
         else:
-            months = 0
-        if per_month is None:
+            months = days = 0
+        if ref_price is None:
             interest = None
             net = basis_ref
         else:
-            interest = per_month * months if months > 0 else 0.0
+            # Cost of Carry sheet: interest_full = price × annual_rate × days / 360
+            interest = ref_price * annual_rate * days / 360.0 if days > 0 else 0.0
             net = basis_ref - interest
         carry = None if prev_net is None else (prev_net - net)
         prev_net = net
@@ -188,6 +199,7 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
             delivery=r["delivery"], futures=own, ym=r["ym"], raw_basis=raw,
             basis_ref=basis_ref, converted=converted,
             months=months if months > 0 else 0,
+            days=days if days > 0 else 0,
             interest=interest, net=net, carry=carry,
         ))
 

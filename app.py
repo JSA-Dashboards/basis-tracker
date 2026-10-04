@@ -198,6 +198,14 @@ def _cached_rail_fob() -> dict:
     import palmetto_rail_scraper
     return palmetto_rail_scraper.fetch_rail_fob() or {}
 
+
+@st.cache_data(ttl=6 * 3600, show_spinner=False)
+def _cached_fed_funds():
+    """Effective fed funds history behind the Net Carry interest rate (FRED, with the
+    committed data/fed_funds_dff.csv snapshot as the offline fallback). See carry_rate."""
+    import carry_rate
+    return carry_rate.load_fed_funds()
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_rail_fob_all(source: str) -> list:
     """Every rail_fob cell for a source across all dates (Net Carry / trends)."""
@@ -2914,6 +2922,7 @@ if tab_railentry is not None:
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_netcarry:
     import net_carry as _ncmod
+    import carry_rate as _carry_rate
     import pandas as _nc_pd
     import altair as _nc_alt
     from datetime import date as _nc_date
@@ -3021,9 +3030,18 @@ with tab_netcarry:
         with _o2:
             _anchor_lbl = st.selectbox("Carry starts (interest = 0)", _MONTHS,
                                        index=9, key="nc_anchor")   # default October
+        # The rate is the Cost of Carry sheet's: effective fed funds on the as-of date + 2.25%
+        # (carry_rate). The widget key carries the as-of date so the default is recomputed
+        # when the date changes — a widget otherwise keeps the value it first showed.
+        _cr = _carry_rate.rate_for(_nc_asof, _cached_fed_funds())
         with _o3:
-            _rate_pct = st.number_input("Interest rate (annual %)", min_value=0.0,
-                                        max_value=25.0, value=9.0, step=0.25, key="nc_rate")
+            _rate_pct = st.number_input(
+                "Interest rate (annual %)", min_value=0.0, max_value=25.0,
+                value=min(25.0, round(_cr.rate_pct, 2)), step=0.01,
+                key=f"nc_rate_{_nc_asof.isoformat()}",
+                help="Defaults to the Cost of Carry sheet's rate: effective fed funds on the "
+                     f"as-of date + {_carry_rate.FED_FUNDS_SPREAD_PCT:.2f}%. Edit to use your "
+                     "own cost of funds.")
         _anchor_month = _MONTHS.index(_anchor_lbl) + 1
 
         _curve = _cached_futures_curve_for(_nc_asof.isoformat())
@@ -3042,8 +3060,17 @@ with tab_netcarry:
             _bits.append(f"interest <b>{_pm:.2f}¢/mo</b> @ {_rate_pct:.2f}%")
         _bits.append(f"carry from <b>{_anchor_lbl}</b>")
         st.markdown(
-            f'<div style="font-size:11px;color:#64748b;margin:6px 0 10px">'
+            f'<div style="font-size:11px;color:#64748b;margin:6px 0 4px">'
             f'{" · ".join(_bits)}</div>', unsafe_allow_html=True)
+        if _cr.source == "fallback":
+            _rate_src = (f"Fed funds history is unavailable, so the default is the Cost of Carry "
+                         f"fallback rate, {_carry_rate.FALLBACK_ANNUAL_RATE_PCT:.2f}%.")
+        else:
+            _rate_src = (f"Default rate = effective fed funds {_cr.fed_funds_pct:.2f}% "
+                         f"({_cr.obs_date:%b %d, %Y}, FRED) + "
+                         f"{_carry_rate.FED_FUNDS_SPREAD_PCT:.2f}% = {_cr.rate_pct:.2f}%.")
+        st.caption("Interest = reference board price × rate × days ÷ 360 (actual days from the "
+                   "carry-start month) — the same formula as the Cost of Carry sheet. " + _rate_src)
         if not _nc_meta["all_converted"]:
             st.caption("⚠️ Some deliveries lack a futures spread to the reference contract — "
                        "those rows show raw basis (flagged ·) and their carry may be off.")
