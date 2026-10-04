@@ -8,9 +8,17 @@ Kolten's Net Carry sheet:
 
 Definitions (confirmed against Kolten's screenshot):
   • **Basis vs REF** — every delivery's basis re-expressed against ONE common
-    futures contract (the reference, e.g. CZ26), so the levels are comparable
-    across the curve:  basis_ref = raw_basis + futures(own) - futures(ref)
-    (the same algebra as futures_spread.anchor_basis).
+    futures contract (the reference), so the levels are comparable across the curve:
+        basis_ref = raw_basis + futures_spread
+        futures_spread = futures(own contract) - futures(reference)       (cents)
+    The futures spread is the credit a delivery gets for being quoted off a later (or
+    earlier) month than the reference — the market's own carry along the futures
+    curve. By default the reference is the contract the FRONT delivery is quoted off
+    (the front reads exactly as quoted; every later month is credited its spread vs
+    that contract); the alternative is the nearest new-crop contract. (Same algebra as
+    futures_spread.anchor_basis.) Because the reference only shifts every row by the
+    same constant, it never changes the carry BETWEEN deliveries (except through the
+    interest base, the reference's board price).
   • **Interest** — the cost of carrying grain from an anchor month forward, priced
     exactly like the Cost of Carry sheet (cost-of-carry-calculator, interest_full):
         interest = ref_price × annual_rate × days / 360
@@ -22,11 +30,18 @@ Definitions (confirmed against Kolten's screenshot):
   • **Inverse(+)/Carry(-)** = prior delivery's Net − this delivery's Net.
     Positive ⇒ inverse (market pays to move now); negative ⇒ carry (market pays
     to store). Blank on the first (nearest) delivery.
+  • **NC / New Crop** quotes (no month named) are the harvest-time bid — the earliest
+    new-crop delivery — so they are placed AT the carry anchor and sorted first (see
+    is_new_crop), not at their futures contract's month.
+  • `monthly_carry` collapses weekly / half-month slots to ONE point per calendar month
+    (the nearest slot) and measures each against the PREVIOUS quoted month. That is the
+    chart; the table keeps every slot.
 
 Everything is in cents/bu, matching the rest of the app.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date
 
@@ -70,13 +85,91 @@ def _mi(year: int, month: int) -> int:
     return year * 12 + month
 
 
+# A generic NEW-CROP quote: "NC", "N/C", "NC 26", "New Crop", "New Crop 2026" — it names no
+# month. delivery_period reads such a label as its futures contract's month (Dec for corn),
+# which drops it in the middle of the ladder; it is really the harvest-time bid, the EARLIEST
+# new-crop delivery (corn NC 26 −25 vs Nov +3; soy NC 26 +3 vs Nov +28), so here it is the
+# carry anchor and the front. A label that names a month ("NC Nov") is an ordinary month.
+_NC_RE = re.compile(r"^\s*(?:n\s*/?\s*c|new[\s-]*crop)(?![a-z])", re.I)
+_MONTH_WORD = re.compile(r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)", re.I)
+
+
+def is_new_crop(label: str) -> bool:
+    return bool(_NC_RE.match(label or "")) and not _MONTH_WORD.search(label or "")
+
+
+def _new_crop_year(label: str, fut: str | None) -> int | None:
+    """The crop year an NC quote belongs to: the year in its label ('NC 26', 'New Crop
+    2026'), else its futures contract's marketing year (Jul–Dec contract → that year,
+    Jan–Jun contract → the year before). None if neither is available."""
+    m = re.search(r"(?<!\d)(20\d\d)(?!\d)", label or "") or re.search(r"(?<!\d)(\d{2})(?!\d)", label or "")
+    if m:
+        y = int(m.group(1))
+        return y if y >= 2000 else 2000 + y
+    p = parse_symbol(fut or "")
+    if p:
+        return p[2] if p[1] >= 7 else p[2] - 1
+    return None
+
+
+def _normalize(items: list[dict], anchor_month: int = 10) -> tuple[list[dict], list[str]]:
+    """Normalize + sort the quotes by nearness (delivery window, not just the futures
+    month). A carry ladder needs a concrete (year, month) per delivery, so quotes that
+    don't map to one — packages like "Jan-July"/"R", note rows like "NoBN" — are set
+    aside (returned as `skipped`) rather than polluting the timeline. A generic NC / New
+    Crop quote is placed AT the carry anchor (its crop year, `anchor_month`) and sorted
+    ahead of any explicit quote in that month: it is the front the carry runs from."""
+    norm, skipped = [], []
+    for it in items:
+        b = it.get("basis")
+        if b is None:
+            continue
+        deliv, fut = it.get("delivery") or "", it.get("futures")
+        nc, ym = False, None
+        if is_new_crop(deliv):
+            cy = _new_crop_year(deliv, fut)
+            if cy is not None:
+                nc, ym = True, (cy, anchor_month)
+        if ym is None:
+            ym = _dp.canonical(deliv, fut or "")
+        if ym is None:
+            skipped.append(deliv or "?")
+            continue
+        norm.append({"delivery": deliv, "futures": fut, "basis": float(b), "ym": ym, "nc": nc})
+
+    def _key(r):
+        if r["nc"]:
+            return (r["ym"][0], r["ym"][1], -1, 0)      # ahead of any explicit quote that month
+        return _dp.deliv_key(r["delivery"], r["futures"] or "")
+
+    norm.sort(key=_key)
+    return norm, skipped
+
+
+def front_symbol(items: list[dict], curve: dict, anchor_month: int = 10) -> str | None:
+    """The futures contract the FRONT delivery is quoted off: the nearest delivery on
+    the ladder whose own futures is a CME outright with a price in `curve`. (Normally
+    the first row; the next one if the front's contract can't be priced.)"""
+    norm, _ = _normalize(items, anchor_month)
+    for r in norm:
+        s = r["futures"]
+        if s and parse_symbol(s) and (curve or {}).get(s) is not None:
+            return s
+    return None
+
+
 def reference_symbol(commodity: str, mode: str, curve: dict,
-                     as_of: date | None = None) -> str | None:
+                     as_of: date | None = None, items: list[dict] | None = None,
+                     anchor_month: int = 10) -> str | None:
     """Pick the ONE contract every basis is expressed against.
 
+    mode='front'   → the futures month the FRONT delivery is quoted off (needs `items`;
+                     every later delivery is credited its futures spread vs that contract).
+                     Without items, or if none of them can be priced, it falls back to the
+                     nearest active outright in the curve.
     mode='newcrop' → the nearest new-crop contract (corn Dec/ZCZ, soy Nov/ZSX,
-    wheat Jul/ZWN); mode='front' → the nearest active contract present in the
-    futures curve (rolls as contracts expire). Returns a CME symbol or None.
+                     wheat Jul/ZWN).
+    Returns a CME symbol or None.
     """
     as_of = as_of or date.today()
     root, nc_code = _root_for(commodity)
@@ -84,7 +177,11 @@ def reference_symbol(commodity: str, mode: str, curve: dict,
         nc_month = _MCODE[nc_code]
         year = as_of.year if as_of.month <= nc_month else as_of.year + 1
         return f"{root}{nc_code}{year % 100:02d}"
-    # front / nearest active: the smallest-dated outright of this root in the curve
+    if items:
+        fs = front_symbol(items, curve, anchor_month)
+        if fs:
+            return fs
+    # nearest active: the smallest-dated outright of this root in the curve
     # whose delivery is not already behind us; else the earliest one we have.
     now = _mi(as_of.year, as_of.month)
     cands = []
@@ -103,14 +200,17 @@ class CarryRow:
     delivery: str
     futures: str | None
     ym: tuple            # (year, month)
-    raw_basis: float     # cents, vs own futures
-    basis_ref: float | None
+    raw_basis: float     # cents, as quoted vs its OWN futures contract
+    credit: float | None  # futures spread credited: futures(own) − futures(ref), cents
+                          # (0 when own == ref; None when it can't be priced)
+    basis_ref: float | None   # raw_basis + credit
     converted: bool      # True if spread-adjusted to the reference (else raw)
     months: int          # months from anchor (0 or negative ⇒ no interest)
     days: int            # actual calendar days from the anchor month (0 ⇒ no interest)
     interest: float | None
     net: float | None
     carry: float | None
+    new_crop: bool = False   # a generic NC / New Crop quote, placed at the carry anchor
 
 
 def _anchor_ym(rows: list, anchor_month: int) -> tuple | None:
@@ -137,22 +237,7 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     Returns (rows_sorted, meta) where meta has ref_price, per_month (the sheet's
     30-day "Monthly interest"), all_converted.
     """
-    # Normalize + sort by nearness (delivery window, not just the futures month).
-    # A carry ladder needs a concrete (year, month) per delivery, so quotes that
-    # don't map to one — packages like "Jan-July"/"R", note rows like "NoBN" — are
-    # set aside (reported in meta) rather than polluting the timeline.
-    norm, skipped = [], []
-    for it in items:
-        b = it.get("basis")
-        if b is None:
-            continue
-        deliv, fut = it.get("delivery") or "", it.get("futures")
-        ym = _dp.canonical(deliv, fut or "")
-        if ym is None:
-            skipped.append(deliv or "?")
-            continue
-        norm.append({"delivery": deliv, "futures": fut, "basis": float(b), "ym": ym})
-    norm.sort(key=lambda r: _dp.deliv_key(r["delivery"], r["futures"] or ""))
+    norm, skipped = _normalize(items, anchor_month)
 
     ref_price = (curve or {}).get(ref_symbol) if ref_symbol else None
     # The Cost of Carry sheet's "Monthly interest" (a 30-day month): price × rate × 30/360.
@@ -165,15 +250,18 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     for r in norm:
         raw = r["basis"]
         own = r["futures"]
-        # Re-express vs the reference contract via the futures spread.
+        # Re-express vs the reference contract: credit the futures spread between the
+        # contract this delivery is quoted off and the reference (own − ref, in cents).
         if not ref_symbol or not own or own == ref_symbol:
             basis_ref, converted = raw, (own == ref_symbol or not ref_symbol)
+            credit = 0.0 if own == ref_symbol else None
         else:
             po, pr = (curve or {}).get(own), (curve or {}).get(ref_symbol)
             if po is None or pr is None:
-                basis_ref, converted = raw, False   # fall back to raw
+                basis_ref, converted, credit = raw, False, None   # fall back to raw
             else:
-                basis_ref, converted = raw + (po - pr), True
+                credit = po - pr
+                basis_ref, converted = raw + credit, True
         if not converted and own and own != ref_symbol:
             all_converted = False
 
@@ -197,13 +285,45 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
 
         rows.append(CarryRow(
             delivery=r["delivery"], futures=own, ym=r["ym"], raw_basis=raw,
-            basis_ref=basis_ref, converted=converted,
+            credit=credit, basis_ref=basis_ref, converted=converted,
             months=months if months > 0 else 0,
             days=days if days > 0 else 0,
-            interest=interest, net=net, carry=carry,
+            interest=interest, net=net, carry=carry, new_crop=r["nc"],
         ))
 
     meta = {"ref_price": ref_price, "per_month": per_month,
             "all_converted": all_converted, "anchor_ym": anchor_ym,
             "skipped": skipped}
     return rows, meta
+
+
+_ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+         7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+
+
+def monthly_carry(rows: list[CarryRow]) -> list[dict]:
+    """One point per calendar month for the carry chart, each vs the PREVIOUS quoted month.
+
+    The table has a row per delivery SLOT (weekly at some plants, FH/LH at others), so its
+    carry column compares a slot with the slot before it — fine as a sheet, noisy as a chart
+    (a run of near-zero bars within a month). Here each month is represented by its nearest
+    slot (rows arrive in ladder order, so the first one seen for a month is it) and
+        carry = previous quoted month's net of interest − this month's net of interest
+    (+ inverse: the nearer month is worth more; − carry: the market pays to store). If a
+    month is not quoted at all, the bar compares to the last month that was.
+
+    Returns [{ym, label, delivery, net, carry, vs}] in time order; the first point has
+    carry None. An NC / New Crop quote keeps its own label (it stands for the anchor month).
+    """
+    pts, seen = [], set()
+    for r in rows:
+        if r.ym in seen or r.net is None:
+            continue
+        seen.add(r.ym)
+        label = r.delivery if r.new_crop else f"{_ABBR[r.ym[1]]} {r.ym[0] % 100:02d}"
+        pts.append({"ym": r.ym, "label": label, "delivery": r.delivery, "net": r.net})
+    for i, p in enumerate(pts):
+        prev = pts[i - 1] if i else None
+        p["carry"] = None if prev is None else prev["net"] - p["net"]
+        p["vs"] = prev["label"] if prev else None
+    return pts

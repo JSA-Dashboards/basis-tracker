@@ -3023,8 +3023,11 @@ with tab_netcarry:
         _o1, _o2, _o3 = st.columns(3)
         with _o1:
             _ref_mode_lbl = st.radio(
-                "Express basis vs", ["Nearest new-crop", "Front / nearest active"],
-                horizontal=True, key="nc_refmode")
+                "Express basis vs", ["Front delivery's futures", "Nearest new-crop"],
+                horizontal=True, key="nc_refmode2",    # new key: the options changed (2026-10-04)
+                help="Front delivery's futures: the contract the nearest delivery is quoted off. "
+                     "It reads exactly as quoted, and every later month is credited its futures "
+                     "spread vs that contract. Nearest new-crop: corn Dec / soy Nov / wheat Jul.")
         _MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         with _o2:
@@ -3045,15 +3048,17 @@ with tab_netcarry:
         _anchor_month = _MONTHS.index(_anchor_lbl) + 1
 
         _curve = _cached_futures_curve_for(_nc_asof.isoformat())
-        _ref_mode = "newcrop" if _ref_mode_lbl.startswith("Nearest new") else "front"
-        _ref_sym = _ncmod.reference_symbol(_nc_grain, _ref_mode, _curve, _nc_asof)
+        _ref_mode = "front" if _ref_mode_lbl.startswith("Front") else "newcrop"
+        _ref_sym = _ncmod.reference_symbol(_nc_grain, _ref_mode, _curve, _nc_asof,
+                                           items=_nc_items, anchor_month=_anchor_month)
         _nc_rows, _nc_meta = _ncmod.compute_net_carry(
             _nc_items, _ref_sym, _curve, _anchor_month, _rate_pct / 100.0)
 
         # ── Summary line ──────────────────────────────────────────────────────
         _refp = _nc_meta["ref_price"]
         _pm = _nc_meta["per_month"]
-        _bits = [f"Reference <b>{_ref_sym or '—'}</b>"]
+        _bits = [f"Reference <b>{_ref_sym or '—'}</b> "
+                 + ("(front delivery's futures)" if _ref_mode == "front" else "(nearest new-crop)")]
         if _refp is not None:
             _bits.append(f"board {_refp/100:.2f}")
         if _pm is not None:
@@ -3071,6 +3076,13 @@ with tab_netcarry:
                          f"{_carry_rate.FED_FUNDS_SPREAD_PCT:.2f}% = {_cr.rate_pct:.2f}%.")
         st.caption("Interest = reference board price × rate × days ÷ 360 (actual days from the "
                    "carry-start month) — the same formula as the Cost of Carry sheet. " + _rate_src)
+        st.caption(f"Futures spread = the futures price of the contract each delivery is quoted off "
+                   f"minus {_ref_sym or 'the reference'}'s, in cents. It is credited to the quoted "
+                   f"basis so every month is on the same footing: quoted basis + futures spread = "
+                   f"basis vs {_ref_sym or 'reference'}.")
+        if any(_r.new_crop for _r in _nc_rows):
+            st.caption("NC (new crop) is the harvest-time bid — the earliest new-crop delivery — so it is "
+                       f"the front of the ladder and the carry anchor: interest starts there ({_anchor_lbl}).")
         if not _nc_meta["all_converted"]:
             st.caption("⚠️ Some deliveries lack a futures spread to the reference contract — "
                        "those rows show raw basis (flagged ·) and their carry may be off.")
@@ -3084,8 +3096,13 @@ with tab_netcarry:
                 return "—"
             return (f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}")
 
-        _hdr = ("Delivery", f"Basis {_ref_sym or ''}", "Interest",
+        _hdr = ("Delivery", "Futures", "Quoted basis", f"Futures spread vs {_ref_sym or 'ref'}",
+                f"Basis {_ref_sym or ''}", "Interest",
                 f"Net of Interest {_ref_sym or ''}", "Inverse(+)/Carry(−)")
+
+        def _q(v):      # quoted basis: whole cents when it is whole, else one decimal
+            return _f(v, 0 if float(v).is_integer() else 1)
+
         _cells = []
         for _r in _nc_rows:
             _icell = "" if _r.months == 0 else _f(_r.interest, 1, sign=False)
@@ -3096,18 +3113,25 @@ with tab_netcarry:
                         "#c0392b" if _r.carry < -0.0049 else "#64748b")
                 _ccell = f'<span style="color:{_col};font-weight:600">{_f(_r.carry)}</span>'
             _flag = "" if _r.converted else ' <span style="color:#c0392b">·</span>'
-            _cells.append((f"{_r.delivery}{_flag}", _f(_r.basis_ref), _icell,
-                           _f(_r.net), _ccell))
+            _fcell = f'<span style="color:#64748b">{_r.futures or "—"}</span>'
+            if _r.credit is None:
+                _scell = '<span style="color:#94a3b8">—</span>'
+            elif abs(_r.credit) < 0.05:          # quoted off the reference itself: nothing to credit
+                _scell = '<span style="color:#94a3b8">0.0</span>'
+            else:
+                _scell = _f(_r.credit)
+            _cells.append((f"{_r.delivery}{_flag}", _fcell, _q(_r.raw_basis), _scell,
+                           _f(_r.basis_ref), _icell, _f(_r.net), _ccell))
 
         _th = "".join(
-            f'<th style="text-align:{"left" if i==0 else "right"};padding:6px 12px;'
+            f'<th style="text-align:{"left" if i<2 else "right"};padding:6px 12px;'
             f'border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;'
             f'text-transform:uppercase;letter-spacing:.03em;white-space:nowrap">{h}</th>'
             for i, h in enumerate(_hdr))
         _tr = ""
         for _row in _cells:
             _tds = "".join(
-                f'<td style="text-align:{"left" if i==0 else "right"};padding:5px 12px;'
+                f'<td style="text-align:{"left" if i<2 else "right"};padding:5px 12px;'
                 f'border-bottom:1px solid #eef2f6;font-size:13px;'
                 f'font-variant-numeric:tabular-nums">{c}</td>'
                 for i, c in enumerate(_row))
@@ -3115,31 +3139,39 @@ with tab_netcarry:
         st.markdown(
             f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:4px 0 6px">'
             f'{_nc_title}</div>'
-            f'<table style="border-collapse:collapse;min-width:560px">'
-            f'<thead><tr>{_th}</tr></thead><tbody>{_tr}</tbody></table>',
+            f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:780px">'
+            f'<thead><tr>{_th}</tr></thead><tbody>{_tr}</tbody></table></div>',
             unsafe_allow_html=True)
 
         # ── Carry-by-month bar (green inverse / red carry) ────────────────────
-        _bar_pts = [{"Delivery": _r.delivery, "Carry": _r.carry}
-                    for _r in _nc_rows if _r.carry is not None]
+        # ONE bar per calendar month, each vs the PREVIOUS quoted month (net_carry.monthly_carry).
+        # The table above keeps every weekly / half-month slot; charting those as separate bars
+        # gave a run of near-zero bars inside each month, which read as noise.
+        _bar_pts = [{"Month": p["label"], "Carry": p["carry"], "vs": p["vs"] or ""}
+                    for p in _ncmod.monthly_carry(_nc_rows) if p["carry"] is not None]
         if _bar_pts:
-            _bar_order = [p["Delivery"] for p in _bar_pts]
+            _bar_order = [p["Month"] for p in _bar_pts]
             _bar_df = _nc_pd.DataFrame(_bar_pts)
             st.markdown(
                 '<div style="margin-top:16px;margin-bottom:4px;font-size:10px;color:#64748b;'
                 'font-weight:700;text-transform:uppercase;letter-spacing:.1em">'
-                'Inverse (+) / Carry (−) by delivery</div>', unsafe_allow_html=True)
+                'Inverse (+) / Carry (−) vs the previous month</div>', unsafe_allow_html=True)
             _bar = (
                 _nc_alt.Chart(_bar_df).mark_bar().encode(
-                    x=_nc_alt.X("Delivery:N", sort=_bar_order, title=None,
+                    x=_nc_alt.X("Month:N", sort=_bar_order, title=None,
                                axis=_nc_alt.Axis(labelAngle=-30, labelFontSize=10)),
                     y=_nc_alt.Y("Carry:Q", title="¢/bu", axis=_nc_alt.Axis(labelFontSize=10)),
                     color=_nc_alt.condition(_nc_alt.datum.Carry > 0,
                                             _nc_alt.value("#0a7f3f"), _nc_alt.value("#c0392b")),
-                    tooltip=[_nc_alt.Tooltip("Delivery:N"),
+                    tooltip=[_nc_alt.Tooltip("Month:N"),
+                             _nc_alt.Tooltip("vs:N", title="vs previous month"),
                              _nc_alt.Tooltip("Carry:Q", title="Inverse(+)/Carry(−)", format="+.1f")],
                 ).properties(height=180))
             st.altair_chart(_bar, use_container_width=True)
+            st.caption("Each bar = the previous month's net of interest minus this month's. Green (+) = "
+                       "inverse: the nearer month is worth more. Red (−) = carry: the market pays to "
+                       "store. One bar per calendar month — weekly or half-month quotes use the nearest "
+                       "slot (the table above keeps every slot).")
     elif _nc_items is not None:
         st.info("Not enough forward quotes to build a carry curve for this selection.")
 
