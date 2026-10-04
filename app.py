@@ -2977,7 +2977,9 @@ if tab_railentry is not None:
 # ═══════════════════════════════════════════════════════════════════════════════
 with tab_netcarry:
     import net_carry as _ncmod
+    import net_carry_chart as _ncchart
     import carry_rate as _carry_rate
+    import html as _nc_html
     import pandas as _nc_pd
     import altair as _nc_alt
     from datetime import date as _nc_date
@@ -3108,6 +3110,12 @@ with tab_netcarry:
                                            items=_nc_items, anchor_month=_anchor_month)
         _nc_rows, _nc_meta = _ncmod.compute_net_carry(
             _nc_items, _ref_sym, _curve, _anchor_month, _rate_pct / 100.0)
+        # One point per calendar month (its best quote) feeds both charts and the "top of net
+        # carry" — the month where Net of Interest peaks. Without a board price there is no
+        # interest, so no "net" to rank.
+        _mpts = _ncmod.monthly_carry(_nc_rows)
+        _top = (_ncmod.top_of_net_carry(_mpts, _nc_meta["anchor_ym"])
+                if _nc_meta["ref_price"] is not None else None)
 
         # ── Summary line ──────────────────────────────────────────────────────
         _refp = _nc_meta["ref_price"]
@@ -3122,6 +3130,16 @@ with tab_netcarry:
         st.markdown(
             f'<div style="font-size:11px;color:#64748b;margin:6px 0 4px">'
             f'{" · ".join(_bits)}</div>', unsafe_allow_html=True)
+        if _top:
+            # The headline answer: where net of interest peaks. Amber = the chart's net line.
+            st.markdown(
+                '<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:5px solid #f28e2b;'
+                'border-radius:8px;padding:10px 14px;margin:8px 0 8px;font-size:13px;line-height:1.5;'
+                'color:#7c2d12">'
+                '<span style="color:#f28e2b;font-size:15px;margin-right:6px">▲</span>'
+                f'<b>{_nc_html.escape(_ncmod.top_headline(_top))}.</b> '
+                f'{_nc_html.escape(_ncmod.top_detail(_top))}</div>',
+                unsafe_allow_html=True)
         if _cr.source == "fallback":
             _rate_src = (f"Fed funds history is unavailable, so the default is the Cost of Carry "
                          f"fallback rate, {_carry_rate.FALLBACK_ANNUAL_RATE_PCT:.2f}%.")
@@ -3158,8 +3176,12 @@ with tab_netcarry:
         def _q(v):      # quoted basis: whole cents when it is whole, else one decimal
             return _f(v, 0 if float(v).is_integer() else 1)
 
+        _top_row = _top["row"] if _top else None      # the table row holding the top of net carry
+        _TOP_TAG = ('<span style="background:#f28e2b;color:#fff;font-size:9px;font-weight:700;'
+                    'letter-spacing:.05em;padding:2px 7px;border-radius:9px;margin-left:8px;'
+                    'white-space:nowrap;vertical-align:1px">▲ TOP OF NET CARRY</span>')
         _cells = []
-        for _r in _nc_rows:
+        for _ri, _r in enumerate(_nc_rows):
             _icell = "" if _r.months == 0 else _f(_r.interest, 1, sign=False)
             if _r.carry is None:
                 _ccell = ""
@@ -3175,8 +3197,12 @@ with tab_netcarry:
                 _scell = '<span style="color:#94a3b8">0.0</span>'
             else:
                 _scell = _f(_r.credit)
-            _cells.append((f"{_r.delivery}{_flag}", _fcell, _q(_r.raw_basis), _scell,
-                           _f(_r.basis_ref), _icell, _f(_r.net), _ccell))
+            _dcell, _netcell = f"{_r.delivery}{_flag}", _f(_r.net)
+            if _ri == _top_row:
+                _dcell += _TOP_TAG
+                _netcell = f"<b>{_netcell}</b>"
+            _cells.append((_dcell, _fcell, _q(_r.raw_basis), _scell,
+                           _f(_r.basis_ref), _icell, _netcell, _ccell))
 
         _th = "".join(
             f'<th style="text-align:{"left" if i<2 else "right"};padding:6px 12px;'
@@ -3184,11 +3210,13 @@ with tab_netcarry:
             f'text-transform:uppercase;letter-spacing:.03em;white-space:nowrap">{h}</th>'
             for i, h in enumerate(_hdr))
         _tr = ""
-        for _row in _cells:
+        for _ri, _row in enumerate(_cells):
+            _hl = _ri == _top_row
             _tds = "".join(
                 f'<td style="text-align:{"left" if i<2 else "right"};padding:5px 12px;'
-                f'border-bottom:1px solid #eef2f6;font-size:13px;'
-                f'font-variant-numeric:tabular-nums">{c}</td>'
+                f'border-bottom:1px solid #eef2f6;font-size:13px;font-variant-numeric:tabular-nums'
+                f'{";background:#fff4e5" if _hl else ""}'
+                f'{";box-shadow:inset 4px 0 0 #f28e2b" if _hl and i == 0 else ""}">{c}</td>'
                 for i, c in enumerate(_row))
             _tr += f"<tr>{_tds}</tr>"
         st.markdown(
@@ -3198,12 +3226,34 @@ with tab_netcarry:
             f'<thead><tr>{_th}</tr></thead><tbody>{_tr}</tbody></table></div>',
             unsafe_allow_html=True)
 
+        # ── Cash forward curve — the River FOB sheet's chart ──────────────────
+        # Solid blue = basis vs the reference; orange dashed = net of interest from the carry
+        # start, with the top of net carry marked. One point per month (net_carry.monthly_carry).
+        if len(_mpts) >= 2:
+            _show_net = _nc_meta["ref_price"] is not None
+            _ttl, _sub = _ncchart.chart_titles(_nc_grain, _ref_sym, _nc_title)
+            st.altair_chart(
+                _ncchart.build_curve_chart(
+                    _mpts, _top, title=_ttl, subtitle=_sub,
+                    curve_label=_nc_asof.strftime("%m/%d/%y"),
+                    net_label=f"Net of int (from {_anchor_lbl})",
+                    anchor_ym=_nc_meta["anchor_ym"], show_net=_show_net,
+                    logo_uri=_jsa_watermark_uri() or None),
+                use_container_width=True)
+            st.caption(
+                f"Solid blue = each month's basis re-expressed against {_ref_sym or 'its own futures'} "
+                f"(the Basis column). "
+                + (f"Orange dashed = the same curve net of interest from {_anchor_lbl} (the Net of "
+                   f"Interest column); ▲ marks its top. " if _show_net else "")
+                + "One point per calendar month — a month quoted more than once uses its best quote "
+                  "(the table above keeps every one).")
+
         # ── Carry-by-month bar (green inverse / red carry) ────────────────────
         # ONE bar per calendar month, each vs the PREVIOUS quoted month (net_carry.monthly_carry).
         # The table above keeps every weekly / half-month slot; charting those as separate bars
         # gave a run of near-zero bars inside each month, which read as noise.
         _bar_pts = [{"Month": p["label"], "Carry": p["carry"], "vs": p["vs"] or ""}
-                    for p in _ncmod.monthly_carry(_nc_rows) if p["carry"] is not None]
+                    for p in _mpts if p["carry"] is not None]
         if _bar_pts:
             _bar_order = [p["Month"] for p in _bar_pts]
             _bar_df = _nc_pd.DataFrame(_bar_pts)
@@ -3225,8 +3275,8 @@ with tab_netcarry:
             st.altair_chart(_bar, use_container_width=True)
             st.caption("Each bar = the previous month's net of interest minus this month's. Green (+) = "
                        "inverse: the nearer month is worth more. Red (−) = carry: the market pays to "
-                       "store. One bar per calendar month — weekly or half-month quotes use the nearest "
-                       "slot (the table above keeps every slot).")
+                       "store. One bar per calendar month — a month quoted more than once (weekly or "
+                       "half-month slots) uses its best quote (the table above keeps every slot).")
     elif _nc_items is not None:
         st.info("Not enough forward quotes to build a carry curve for this selection.")
 

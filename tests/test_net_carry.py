@@ -191,13 +191,16 @@ rsoy, _ = nc.compute_net_carry(
      {"delivery": "Dec 26", "futures": "ZSF27", "basis": 27}], "ZSX26", {"ZSX26": 1284.0, "ZSF27": 1290.0}, 10, RATE)
 check("soybeans: NC 26 is first too (it used to land on Nov)", [r.delivery for r in rsoy] == ["NC 26", "Nov 26", "Dec 26"])
 
-print("net_carry: monthly_carry — one bar per calendar month, each vs the previous quoted month")
+print("net_carry: monthly_carry — one point per calendar month (its BEST slot), each vs the previous quoted month")
 mc = nc.monthly_carry(rs)
 check("STL: 10 months -> 10 points, NC first", [p["label"] for p in mc][:4] == ["NC 26", "Nov 26", "Dec 26", "Jan 27"] and len(mc) == 10, [p["label"] for p in mc])
 check("the first point has no carry; the rest compare to the previous point",
       mc[0]["carry"] is None and all(close(mc[i]["carry"], mc[i - 1]["net"] - mc[i]["net"]) for i in range(1, len(mc))))
 check("on a monthly-quoted plant the chart equals the table's carry column", all(close(p["carry"], r.carry) for p, r in zip(mc[1:], rs[1:])))
 check("each point says what it was compared to", mc[1]["vs"] == "NC 26" and mc[2]["vs"] == "Nov 26")
+check("each point carries what the charts and the table need: row, slots, basis vs REF, interest, net",
+      all(p["slots"] == 1 and rs[p["row"]].net == p["net"] and rs[p["row"]].basis_ref == p["basis_ref"]
+          and rs[p["row"]].interest == p["interest"] for p in mc))
 
 WK = []
 for mon, fut, base in (("Nov", "ZCZ26", -19), ("Dec", "ZCZ26", -12), ("Jan", "ZCH27", -22)):
@@ -205,18 +208,100 @@ for mon, fut, base in (("Nov", "ZCZ26", -19), ("Dec", "ZCZ26", -12), ("Jan", "ZC
         WK.append({"delivery": "%s Wk %d" % (mon, w), "futures": fut, "basis": base + w})
 rw, _ = nc.compute_net_carry(WK, "ZCZ26", {"ZCZ26": 528.25, "ZCH27": 542.0}, 10, RATE)
 mw = nc.monthly_carry(rw)
-check("weekly plant: 12 slot rows collapse to 3 monthly bars (not 12)", len(rw) == 12 and [p["label"] for p in mw] == ["Nov 26", "Dec 26", "Jan 27"])
-check("each month is represented by its NEAREST slot (Wk 1)", [p["delivery"] for p in mw] == ["Nov Wk 1", "Dec Wk 1", "Jan Wk 1"])
-check("Dec vs Nov uses those Wk 1 nets", close(mw[1]["carry"], rw[0].net - rw[4].net))
+check("weekly plant: 12 slot rows collapse to 3 monthly points (not 12)", len(rw) == 12 and [p["label"] for p in mw] == ["Nov 26", "Dec 26", "Jan 27"])
+check("each month is represented by its BEST slot (the basis climbs through the month: Wk 4)",
+      [p["delivery"] for p in mw] == ["Nov Wk 4", "Dec Wk 4", "Jan Wk 4"] and [p["slots"] for p in mw] == [4, 4, 4], [p["delivery"] for p in mw])
+check("`row` points at that slot in the table", [p["row"] for p in mw] == [3, 7, 11] and all(rw[p["row"]].net == p["net"] for p in mw))
+check("Dec vs Nov uses those best-slot nets", close(mw[1]["carry"], rw[3].net - rw[7].net))
 FH = [{"delivery": "Oct 26 - LH", "futures": "ZCZ26", "basis": -70}, {"delivery": "Oct 26 - FH", "futures": "ZCZ26", "basis": -75},
       {"delivery": "Nov 26 - FH", "futures": "ZCZ26", "basis": -58}, {"delivery": "Nov 26 - LH", "futures": "ZCZ26", "basis": -58}]
 rf2, _ = nc.compute_net_carry(FH, "ZCZ26", CURVE, 10, RATE)
 mf2 = nc.monthly_carry(rf2)
-check("half-month plant: FH is the nearest slot of its month, even if LH was listed first",
-      [p["delivery"] for p in mf2] == ["Oct 26 - FH", "Nov 26 - FH"], [p["delivery"] for p in mf2])
+check("half-month plant: the table lists FH ahead of LH even if LH came first", rf2[0].delivery == "Oct 26 - FH" and rf2[1].delivery == "Oct 26 - LH")
+check("Oct picks the better slot (LH -70 beats FH -75); Nov's two slots tie, so the NEARER one (FH) wins",
+      [p["delivery"] for p in mf2] == ["Oct 26 - LH", "Nov 26 - FH"], [p["delivery"] for p in mf2])
 gap = nc.monthly_carry(nc.compute_net_carry([{"delivery": "Nov", "futures": "ZCZ26", "basis": 0},
                                               {"delivery": "Feb", "futures": "ZCH27", "basis": 9}], "ZCZ26", CURVE, 10, RATE)[0])
 check("a month that isn't quoted: the bar compares to the last month that was (Feb vs Nov)", gap[1]["vs"] == "Nov 26", gap)
+check("no rows -> no points", nc.monthly_carry([]) == [])
+
+print("net_carry: top_of_net_carry — the highest Net of Interest, from the carry start on")
+CSX = [   # CSX Columbus, 2026-10-02 (a whole-month quote sits beside half-month ones: the old 'nearest slot' missed Dec)
+    {"delivery": "FH Oct", "futures": "ZCZ26", "basis": -10}, {"delivery": "LH Oct/FH Nov", "futures": "ZCZ26", "basis": -17},
+    {"delivery": "LH Oct", "futures": "ZCZ26", "basis": -17}, {"delivery": "FH Nov", "futures": "ZCZ26", "basis": -17},
+    {"delivery": "Nov", "futures": "ZCZ26", "basis": 16}, {"delivery": "FH Dec", "futures": "ZCH27", "basis": 8},
+    {"delivery": "Dec", "futures": "ZCH27", "basis": 14}, {"delivery": "JFM", "futures": "ZCH27", "basis": 17}]
+CSX_CURVE = {"ZCZ26": 502.25, "ZCH27": 516.75}
+rc, mcx = nc.compute_net_carry(CSX, "ZCZ26", CSX_CURVE, 10, RATE)
+pc = nc.monthly_carry(rc)
+tc = nc.top_of_net_carry(pc, mcx["anchor_ym"])
+best_in_table = max(r.net for r in rc if r.ym >= mcx["anchor_ym"])
+check("CSX Columbus: the top is the highest Net of Interest ANYWHERE in the table (Dec, not JFM)",
+      tc is not None and close(tc["net"], best_in_table) and tc["label"] == "Dec 26" and rc[tc["row"]].delivery == "Dec", tc)
+check("...and the monthly point for that month is the whole-month 'Dec' quote, one of 2 slots", tc["delivery"] == "Dec" and tc["slots"] == 2)
+check("it is not the front and not the last month; the next month (JFM) gives back its net difference",
+      not tc["is_front"] and not tc["is_last"] and tc["next_label"] == "Mar 27" and close(tc["give_back"], rc[-1].net - rc[tc["row"]].net) and tc["give_back"] < 0)
+check("x is the index into the monthly points", pc[tc["x"]]["label"] == "Dec 26")
+check("gain = peak - the first month in range (the Oct anchor)", close(tc["gain"], tc["net"] - pc[0]["net"]) and tc["front_label"] == "Oct 26")
+
+# the promise, over every dataset above: what is highlighted == the highest Net of Interest the table shows
+for name, items, ref, cv in (("ITEMS", ITEMS, "ZCZ26", CURVE), ("AUG", AUG, "ZCU26", CURVE2), ("STL", STL, "ZCZ26", STL_CURVE),
+                             ("WK", WK, "ZCZ26", {"ZCZ26": 528.25, "ZCH27": 542.0}), ("FH", FH, "ZCZ26", CURVE), ("CSX", CSX, "ZCZ26", CSX_CURVE)):
+    rr, mm = nc.compute_net_carry(items, ref, cv, 10, RATE)
+    tt = nc.top_of_net_carry(nc.monthly_carry(rr), mm["anchor_ym"])
+    want = max(r.net for r in rr if r.ym >= mm["anchor_ym"])
+    check("%s: top net == the table's highest Net of Interest from the anchor on (%.2f)" % (name, want),
+          tt is not None and close(tt["net"], want) and close(rr[tt["row"]].net, want), tt)
+
+top_sty = nc.top_of_net_carry(mc, (2026, 10))
+check("STL: every month's carry is negative, so the top is the LAST month (Jul 27) and it says so",
+      top_sty["label"] == "Jul 27" and top_sty["is_last"] and not top_sty["is_front"] and top_sty["give_back"] is None
+      and close(top_sty["net"], rs[-1].net) and top_sty["next_label"] is None)
+
+
+def pt(i, net, label=None, **kw):
+    ym = (2026 + (9 + i) // 12, (9 + i) % 12 + 1)
+    d = {"ym": ym, "label": label or "%s %02d" % (nc._ABBR[ym[1]], ym[0] % 100), "delivery": label or "x", "new_crop": False,
+         "slots": 1, "row": i, "basis_ref": net, "interest": 0.0, "net": net}
+    d.update(kw)
+    return d
+
+
+ANC = (2026, 10)
+check("no points / nothing at or after the anchor -> None", nc.top_of_net_carry([], ANC) is None
+      and nc.top_of_net_carry([pt(0, 5.0)], (2027, 1)) is None)
+falling = [pt(0, -10.0), pt(1, -13.2), pt(2, -20.0)]
+tf = nc.top_of_net_carry(falling, ANC)
+check("a curve that only falls: the top is the front and it says carrying does not pay",
+      tf["is_front"] and tf["label"] == "Oct 26" and close(tf["give_back"], -3.2)
+      and "does not pay" in nc.top_detail(tf) and "3.2" in nc.top_detail(tf), nc.top_summary(tf))
+check("the front's headline", nc.top_headline(tf) == "Top of net carry: Oct 26 at -10.0¢ net of interest", nc.top_headline(tf))
+flat = nc.top_of_net_carry([pt(0, 4.0), pt(1, 4.0), pt(2, 1.0)], ANC)
+check("a tie goes to the EARLIEST month", flat["label"] == "Oct 26" and flat["is_front"])
+check("flat into the next month: 'stays flat', not 'falls 0.0'", "stays flat into Nov 26" in nc.top_detail(flat), nc.top_detail(flat))
+mid = nc.top_of_net_carry([pt(0, -11.0), pt(1, 20.0), pt(2, 37.5), pt(3, 35.1)], ANC)
+check("a peak in the middle: gain over the start and what carrying past it gives back",
+      mid["label"] == "Dec 26" and close(mid["gain"], 48.5) and close(mid["give_back"], -2.4) and mid["next_label"] == "Jan 27"
+      and nc.top_summary(mid) == "Top of net carry: Dec 26 at +37.5¢ net of interest. 48.5¢ above Oct 26 (-11.0¢), where the carry starts. "
+                                 "Carrying past it gives back 2.4¢ by Jan 27.", nc.top_summary(mid))
+rising = nc.top_of_net_carry([pt(0, -11.0), pt(1, 20.0)], ANC)
+check("a curve that rises to the last month", rising["is_last"] and "still paying to carry through the last quoted month" in nc.top_detail(rising))
+only = nc.top_of_net_carry([pt(0, 3.0)], ANC)
+check("a single month", only["is_front"] and only["is_last"] and "only month on the curve" in nc.top_detail(only))
+pre = nc.top_of_net_carry([pt(-2, 99.0), pt(-1, 80.0), pt(0, -5.0), pt(1, -7.0)], ANC)
+check("months BEFORE the carry start never win (they carry no interest)", pre["label"] == "Oct 26" and close(pre["net"], -5.0) and pre["x"] == 2, pre)
+check("...but with no anchor every month counts", nc.top_of_net_carry([pt(-2, 99.0), pt(0, -5.0)], None)["label"] == pt(-2, 0)["label"])
+check("no top -> empty text", nc.top_summary(None) == "" and nc.top_headline(None) == "" and nc.top_detail(None) == "")
+
+print("net_carry: the exact quote is named only when it adds something")
+w = lambda d, lab, sl: nc._top_where({"label": lab, "delivery": d, "slots": sl})
+check("several slots + 'LH Apr 27' -> 'Apr 27 (LH Apr 27)'", w("LH Apr 27", "Apr 27", 2) == "Apr 27 (LH Apr 27)")
+check("a plain restatement of the month adds nothing ('Dec', 'December 2026', 'Oct 2026')",
+      w("Dec", "Dec 26", 2) == "Dec 26" and w("December 2026", "Dec 26", 2) == "Dec 26" and w("Oct 2026", "Oct 26", 2) == "Oct 26")
+check("a single slot never needs it", w("LH Apr 27", "Apr 27", 1) == "Apr 27")
+check("a rail/truck qualifier is kept", w("June/July 2027 RAIL", "Jun 27", 2) == "Jun 27 (June/July 2027 RAIL)")
+check("the headline uses it", nc.top_headline(nc.top_of_net_carry([pt(0, 1.0, "Apr 27", delivery="LH Apr 27", slots=2)], ANC))
+      == "Top of net carry: Apr 27 (LH Apr 27) at +1.0¢ net of interest")
 
 print("\n" + ("ALL PASS" if not FAILS else "FAILURES: %s" % FAILS))
 sys.exit(1 if FAILS else 0)

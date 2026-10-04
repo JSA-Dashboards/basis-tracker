@@ -33,9 +33,11 @@ Definitions (confirmed against Kolten's screenshot):
   • **NC / New Crop** quotes (no month named) are the harvest-time bid — the earliest
     new-crop delivery — so they are placed AT the carry anchor and sorted first (see
     is_new_crop), not at their futures contract's month.
-  • `monthly_carry` collapses weekly / half-month slots to ONE point per calendar month
-    (the nearest slot) and measures each against the PREVIOUS quoted month. That is the
-    chart; the table keeps every slot.
+  • `monthly_carry` collapses weekly / half-month / duplicate slots to ONE point per calendar
+    month — the slot with the HIGHEST net of interest, so the monthly curve never hides a better
+    quote that the table shows — and measures each against the PREVIOUS quoted month. That is
+    the charts; the table keeps every slot. `top_of_net_carry` finds the month where that
+    curve peaks (the highest Net of Interest, from the carry start on).
 
 Everything is in cents/bu, matching the rest of the app.
 """
@@ -302,28 +304,129 @@ _ABBR = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
 
 
 def monthly_carry(rows: list[CarryRow]) -> list[dict]:
-    """One point per calendar month for the carry chart, each vs the PREVIOUS quoted month.
+    """One point per calendar month for the charts, each vs the PREVIOUS quoted month.
 
-    The table has a row per delivery SLOT (weekly at some plants, FH/LH at others), so its
-    carry column compares a slot with the slot before it — fine as a sheet, noisy as a chart
-    (a run of near-zero bars within a month). Here each month is represented by its nearest
-    slot (rows arrive in ladder order, so the first one seen for a month is it) and
+    The table has a row per delivery SLOT (weekly at some plants, FH/LH at others, a whole-month
+    and a half-month quote side by side on a rail corridor), so its carry column compares a
+    slot with the slot before it — fine as a sheet, noisy as a chart (a run of near-zero bars
+    within a month). Here each month is represented by its BEST slot — the one with the highest
+    net of interest (every slot of a month carries the same interest, so that is also the
+    highest basis; a tie goes to the nearer slot) — which keeps the monthly curve, its peak and
+    the table in agreement: the highest Net of Interest the table shows is never hidden.
         carry = previous quoted month's net of interest − this month's net of interest
     (+ inverse: the nearer month is worth more; − carry: the market pays to store). If a
     month is not quoted at all, the bar compares to the last month that was.
 
-    Returns [{ym, label, delivery, net, carry, vs}] in time order; the first point has
-    carry None. An NC / New Crop quote keeps its own label (it stands for the anchor month).
+    Returns [{ym, label, delivery, new_crop, slots, row, basis_ref, interest, net, carry, vs}] in
+    time order (`row` = the chosen slot's index in `rows`, so the table can mark it; `slots` =
+    how many quotes that month had); the first point has carry None. An NC / New Crop quote that
+    is the month's best keeps its own label (it stands for the anchor month). The same points
+    feed the "Cash Fwd Curve" line chart.
     """
-    pts, seen = [], set()
-    for r in rows:
-        if r.ym in seen or r.net is None:
+    best, slots, order = {}, {}, []
+    for i, r in enumerate(rows):
+        if r.net is None:
             continue
-        seen.add(r.ym)
-        label = r.delivery if r.new_crop else f"{_ABBR[r.ym[1]]} {r.ym[0] % 100:02d}"
-        pts.append({"ym": r.ym, "label": label, "delivery": r.delivery, "net": r.net})
+        slots[r.ym] = slots.get(r.ym, 0) + 1
+        j = best.get(r.ym)
+        if j is None:
+            best[r.ym] = i
+            order.append(r.ym)
+        elif r.net > rows[j].net + 1e-9:          # strictly better; a tie keeps the nearer slot
+            best[r.ym] = i
+    order.sort(key=lambda ym: _mi(*ym))
+    pts = []
+    for ym in order:
+        i = best[ym]
+        r = rows[i]
+        label = r.delivery if r.new_crop else f"{_ABBR[ym[1]]} {ym[0] % 100:02d}"
+        pts.append({"ym": ym, "label": label, "delivery": r.delivery, "new_crop": r.new_crop,
+                    "slots": slots[ym], "row": i, "basis_ref": r.basis_ref,
+                    "interest": r.interest, "net": r.net})
     for i, p in enumerate(pts):
         prev = pts[i - 1] if i else None
         p["carry"] = None if prev is None else prev["net"] - p["net"]
         p["vs"] = prev["label"] if prev else None
     return pts
+
+
+def top_of_net_carry(points: list[dict], anchor_ym: tuple | None = None) -> dict | None:
+    """The month where Net of Interest PEAKS — past it, carrying the grain further stops paying.
+
+    Looks at the monthly points (monthly_carry) from the carry anchor on — all of them if there is
+    no anchor; on a tie the EARLIEST month wins. Because a month's point is its best slot, the
+    peak is the highest Net of Interest anywhere in the table from the anchor on. Returns None
+    for no points, else
+      {x, row, ym, label, delivery, slots, net, basis_ref,      the peak month (x = its index in `points`,
+                                                                 row = its slot's index in the table rows)
+       front_label, front_net, gain,                            the first month in range, and peak − front
+       is_front, is_last, next_label, give_back}                where it sits, and what the next month gives back
+    """
+    cands = [i for i, p in enumerate(points)
+             if p.get("net") is not None and (anchor_ym is None or p["ym"] >= anchor_ym)]
+    if not cands:
+        return None
+    best_k = 0
+    for k in range(1, len(cands)):
+        if points[cands[k]]["net"] > points[cands[best_k]]["net"] + 1e-9:
+            best_k = k
+    bi, fi = cands[best_k], cands[0]
+    best, first = points[bi], points[fi]
+    nxt = points[cands[best_k + 1]] if best_k + 1 < len(cands) else None
+    return {"x": bi, "row": best.get("row"), "ym": best["ym"], "label": best["label"],
+            "delivery": best.get("delivery"), "slots": best.get("slots", 1),
+            "net": best["net"], "basis_ref": best.get("basis_ref"),
+            "front_label": first["label"], "front_net": first["net"],
+            "gain": best["net"] - first["net"], "is_front": best_k == 0, "is_last": nxt is None,
+            "next_label": nxt["label"] if nxt else None,
+            "give_back": (nxt["net"] - best["net"]) if nxt else None}
+
+
+_MONTH_WORDS = re.compile(r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"
+                          r"sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b", re.I)
+
+
+def _top_where(top: dict) -> str:
+    """The peak month, plus the exact quote when that month had several AND the quote says more than
+    the month ('Apr 27 (LH Apr 27)'; a plain 'Dec' next to 'Dec 26' adds nothing, so it is left off)."""
+    d = (top.get("delivery") or "").strip()
+    if top.get("slots", 1) > 1 and d and d != top["label"]:
+        extra = re.sub(r"[\d\W_]+", "", _MONTH_WORDS.sub(" ", d))
+        if extra:
+            return f"{top['label']} ({d})"
+    return top["label"]
+
+
+def top_headline(top: dict | None) -> str:
+    """'Top of net carry: Apr 27 at +37.5¢ net of interest' — the part to show in bold."""
+    if not top:
+        return ""
+    return f"Top of net carry: {_top_where(top)} at {top['net']:+.1f}¢ net of interest"
+
+
+def top_detail(top: dict | None) -> str:
+    """The sentence after the headline: how far above the start, and what carrying past it does."""
+    if not top:
+        return ""
+    if top["is_front"] and top["is_last"]:
+        return "It is the only month on the curve."
+    flat = top["give_back"] is not None and abs(top["give_back"]) < 0.05
+    if top["is_front"]:
+        if flat:
+            return f"That is where the carry starts — it stays flat into {top['next_label']}."
+        return (f"That is where the carry starts — it falls {abs(top['give_back']):.1f}¢ by "
+                f"{top['next_label']}, so carrying the grain does not pay.")
+    above = (f"{top['gain']:.1f}¢ above {top['front_label']} ({top['front_net']:+.1f}¢), "
+             f"where the carry starts.")
+    if top["is_last"]:
+        return f"{above} It is still paying to carry through the last quoted month."
+    if flat:
+        return f"{above} It stays flat into {top['next_label']}."
+    return f"{above} Carrying past it gives back {abs(top['give_back']):.1f}¢ by {top['next_label']}."
+
+
+def top_summary(top: dict | None) -> str:
+    """The headline and the detail as one plain string ('' when there is no top)."""
+    if not top:
+        return ""
+    return f"{top_headline(top)}. {top_detail(top)}"
