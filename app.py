@@ -1487,16 +1487,18 @@ def _paste_clean(html: str) -> str:
 
 
 _admin = not _view_only()
-_tab_labels = ["🔔 Changes"]
-if _admin:
-    _tab_labels.append("🌙 Nightly Recap")   # admin only — dropped from the read-only build (Kolten 2026-10-02)
-_tab_labels += ["📋 Bids", "🚂 Rail FOB"]
+# Tab ORDER (Kolten 2026-10-04): Changes, Trends, Summary, Bids, Rail FOB, [Rail Entry],
+# River FOB, Spread, Net Carry, Map, [Client Reports, Export, Nightly Recap]. [bracketed] =
+# admin only, absent from the read-only build. This list is display order ONLY — each tab's
+# content is bound by `with tab_x:` further down, so nothing else moves with it.
+_tab_labels = ["🔔 Changes", "📈 Trends", "📊 Summary", "📋 Bids", "🚂 Rail FOB"]
 if _admin:
     _tab_labels.append("✏️ Rail Entry")      # admin: paste-in rail rundowns
-_tab_labels += ["💵 Net Carry", "🌊 River FOB", "🗺️ Map", "📊 Summary", "📈 Trends", "🔀 Spread"]
+_tab_labels += ["🌊 River FOB", "🔀 Spread", "💵 Net Carry", "🗺️ Map"]
 if _admin:
-    _tab_labels.append("📥 Export")          # no download tab in the read-only build
     _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
+    _tab_labels.append("📥 Export")          # no download tab in the read-only build
+    _tab_labels.append("🌙 Nightly Recap")   # admin only — dropped from the read-only build (2026-10-02)
 _tabs = st.tabs(_tab_labels)
 _ti = {lbl: t for lbl, t in zip(_tab_labels, _tabs)}
 tab_changes  = _ti["🔔 Changes"]
