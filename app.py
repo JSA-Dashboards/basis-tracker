@@ -235,6 +235,34 @@ def _cached_snaps_asof(pairs: tuple, asof_iso: str) -> dict:
     from database import get_snapshots_asof
     return get_snapshots_asof(list(pairs), asof_iso, 10)
 
+@st.cache_data(ttl=21600, show_spinner="Loading the futures history…")
+def _cached_rtc_futures() -> dict:
+    """{date: {symbol: cents}} for every corn contract from 1996: the analyst's workbook weeks before the settlement
+    archive starts (return_to_carry_data.load_sheet_futures) under the stored settlements (futures_prices)."""
+    from datetime import date as _dt
+    import return_to_carry_data as _rd
+    from database import get_futures_prices_range
+    return _rd.merge_futures(_rd.load_sheet_futures(),
+                             get_futures_prices_range("ZC", "2004-01-01", _dt.today().isoformat()))
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _cached_prime():
+    """Bank prime rate history (FRED DPRIME, committed snapshot if FRED is unreachable)."""
+    import carry_rate as _cr
+    return _cr.load_prime()
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_rtc_obs_rail(market: str, commodity: str) -> list:
+    """A corridor's weekly nearby bid with the contract it is quoted off (return_to_carry_data.obs_from_rail)."""
+    import return_to_carry_data as _rd
+    return _rd.obs_from_rail(_cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto"), market, commodity)
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_rtc_obs_basis(provider: str, location: str, grain: str) -> list:
+    """A basis location's weekly nearby bid: its spot row, else its front forward row."""
+    import return_to_carry_data as _rd
+    return _rd.obs_from_snapshots(_cached_get_snapshots(provider, location), grain, _grain_disp)
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_rail_fob_dates(source: str) -> list:
     """Distinct posting dates for a rail source (cached — was a per-rerun query)."""
@@ -2988,12 +3016,10 @@ if tab_railentry is not None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: NET CARRY  (forward basis vs one contract, net of the cost to carry)
 # ═══════════════════════════════════════════════════════════════════════════════
-@st.fragment
-def _nc_compare_section(kind, main_key, main_name, main_items, asof, grain, ref_sym, curve,
-                        anchor_month, anchor_ym, anchor_lbl, rate):
+def _nc_compare_block(kind, main_key, main_name, main_items, asof, grain, ref_sym, curve,
+                      anchor_month, anchor_ym, anchor_lbl, rate, measure):
     """Net of interest (or gross carry) by delivery month for several locations side by side, all
-    re-based to the SAME reference contract / futures day / interest clock (net_carry_compare).
-    A fragment: picking locations or flipping the measure re-runs only this block, not the whole app."""
+    re-based to the SAME reference contract / futures day / interest clock (net_carry_compare)."""
     import net_carry_compare as _cmp
     from datetime import date as _d
 
@@ -3011,6 +3037,8 @@ def _nc_compare_section(kind, main_key, main_name, main_items, asof, grain, ref_
     rail_rows = _cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto")
     opts_r = {}                                    # label -> corridor
     for m in sorted({r["market"] for r in rail_rows if (r.get("commodity") or "Corn") == grain}):
+        if m.endswith("Freight"):                  # the freight-rate lines ('CSX Freight' ...) are not FOB bids
+            continue
         if _cmp.pick_latest(_cmp.rail_dates(rail_rows, m, grain), asof, 10):
             opts_r[f"🚂 {m}"] = m
     skip = {main_name, f"🚂 {main_name}"}
@@ -3025,17 +3053,10 @@ def _nc_compare_section(kind, main_key, main_name, main_items, asof, grain, ref_
         default = [f"🚂 {m}" for m in _cmp.rail_peers(main_name, list(opts_r.values()), 3)]
     default = [d for d in default if d in options]
 
-    c1, c2 = st.columns([7, 3])
-    with c1:
-        picked = st.multiselect(
-            "Compare with", options, default=default, key=f"nc_cmp_{main_key}_{grain}_{asof_iso}",
-            help="Basis locations and rail corridors that posted this commodity in the last 10 days. "
-                 "Starts with the nearest locations (or the same railroad's corridors). Type to search.")
-    with c2:
-        measure_lbl = st.radio("Show", ["Net of interest", "Gross carry (before interest)"],
-                               key="nc_measure", help="Net of interest = Basis vs the reference less the "
-                               "interest to carry there. Gross = the same curve before the interest.")
-    measure = "net" if measure_lbl.startswith("Net") else "gross"
+    picked = st.multiselect(
+        "Compare with", options, default=default, key=f"nc_cmp_{main_key}_{grain}_{asof_iso}",
+        help="Basis locations and rail corridors that posted this commodity in the last 10 days. "
+             "Starts with the nearest locations (or the same railroad's corridors). Type to search.")
 
     entries = [_cmp.Entry(main_key, main_name, "rail" if kind == "Rail corridor" else "basis",
                           main_items, asof, True)]
@@ -3063,6 +3084,91 @@ def _nc_compare_section(kind, main_key, main_name, main_items, asof, grain, ref_
         f"a different date is flagged under its name.")
     if len(entries) == 1:
         st.caption("Pick more locations above to compare them with this one.")
+
+
+def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
+    """The Return to Carry tracker: what buying corn at harvest and storing it has paid, crop year by crop year
+    (return_to_carry; the Research Analyst's yearly workbooks, automated). `ref` = ('basis', provider, location)
+    or ('rail', corridor)."""
+    import return_to_carry_data as _rd
+    import return_to_carry_view as _vw
+    import carry_rate as _cr
+
+    st.markdown(
+        '<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#64748b;font-weight:700;'
+        'text-transform:uppercase;letter-spacing:.1em">Return to carry — what storing from harvest has paid</div>',
+        unsafe_allow_html=True)
+    if grain != "Corn":
+        st.info("The Return to Carry tracker is built for corn (the report's commodity); soybeans and wheat "
+                "need their own contract chain and harvest window.")
+        return
+    if ref[0] == "rail" and ref[1].endswith("Freight"):
+        st.info("This line is a freight rate, not an FOB bid, so there is no storage return to track.")
+        return
+    obs = (_cached_rtc_obs_rail(ref[1], grain) if ref[0] == "rail" else _cached_rtc_obs_basis(ref[1], ref[2], grain))
+    obs = [o for o in obs if o["date"] <= asof]
+    if len(obs) < 12:
+        st.info("No weekly spot history for this location to track (the tracker needs a bid every week from "
+                "October through July; most locations only began posting forward curves in 2026).")
+        return
+    mode = st.radio("Interest", ["Prime rate (as in the Return to Carry report)",
+                                 f"The rate above ({tab_rate_pct:.2f}% flat)"], horizontal=True, key="nc_rtc_rate")
+    prime = _cached_prime()
+    rate_on = ((lambda d: _cr.prime_on(prime, d, None)) if mode.startswith("Prime") else (lambda d: tab_rate_pct))
+    try:
+        res, _skipped = _rd.run_history_noted(obs, _cached_rtc_futures(), rate_on)
+    except Exception as _e:                      # the futures history comes from the database
+        st.warning(f"Couldn't build the Return to Carry history right now ({type(_e).__name__}: {_e}).")
+        return
+    if not res:
+        st.info("Not enough weekly history yet to build a crop year for this location.")
+        return
+    rows = _rd.summary_rows(res, measure)
+    st.markdown(_vw.headline_html(rows, measure), unsafe_allow_html=True)
+    ch = _vw.seasonal_chart(res, measure, logo_uri=_jsa_watermark_uri() or None)
+    if ch is not None:
+        st.altair_chart(ch, use_container_width=True)
+    bar = _vw.best_bar_chart(rows, measure)
+    if bar is not None:
+        st.altair_chart(bar, use_container_width=True)
+    st.markdown(_vw.table_html(rows, measure), unsafe_allow_html=True)
+    if _skipped:
+        st.caption(f"Not shown: {', '.join(_skipped)} — the weekly archive repeats the previous year's bids for it "
+                   "(a copy, not that year's market).")
+    st.caption(
+        "Same method as the Research Analyst's Return to Carry workbooks: buy at the harvest basis, hedge, carry. "
+        "Weekly return = that week's bid − the harvest basis + the futures carry banked rolling the hedge "
+        "Dec→Mar→May→Jul→Sep − interest. Gross = the same without the interest. Weeks run to July 31.")
+    with st.expander("How the return is calculated"):
+        st.markdown(
+            "- **Harvest basis** — the average of the first 7 weekly bids from the first Wednesday of October "
+            "(\"Oct / F-H Nov\"), all quoted off Dec; a few years used a different window in the sheets, and those "
+            "are kept (2009-10 and 2019-20 started later, 2012-13 in September, 1998-2001, 2010 and 2015 used 6 weeks).\n"
+            "- **Weekly bid** — the corridor's Spot bid; since the 2026 rundowns stopped posting Spot, the nearest "
+            "forward period. It is quoted off Dec in Oct-Nov, Mar Dec-Feb, May Mar-Apr, Jul May-Jun, Sep Jul-Aug.\n"
+            "- **Futures carry** — each roll spread (Mar−Dec, May−Mar, Jul−May, Sep−Jul) is measured the last "
+            "Wednesday before the expiring month and counted from the week the bid moves to the new contract "
+            "(the sheets' own exceptions: Apr 21 2021, Jul 1-2 in 2025-26).\n"
+            "- **Interest** — the weekly prime rate ÷ 52 on the cash price (futures + basis), from the third "
+            "weekly bid (about Oct 20), as in the sheets.\n"
+            "- **Data** — weekly corridor bids from the archive (true Wednesdays from Oct 2004, so history starts "
+            "2004-05); settlements from the futures archive, and for 2004-07 from the workbooks. Reproduces the "
+            "yearly workbooks to the cent in most weeks (tests/test_return_to_carry.py).")
+
+
+@st.fragment
+def _nc_extras(kind, ref, main_key, main_name, main_items, asof, grain, ref_sym, curve,
+               anchor_month, anchor_ym, anchor_lbl, rate):
+    """Everything under the carry charts: the Return to Carry tracker, then the side-by-side comparison. One
+    fragment with one Net / Gross switch, so flipping it or picking locations re-runs only this block."""
+    measure_lbl = st.radio("View", ["Net of interest", "Gross carry (before interest)"], horizontal=True,
+                           key="nc_measure", help="Net of interest = after the interest to carry the grain. "
+                           "Gross carry = the same numbers before the interest. Applies to the tracker and the "
+                           "location comparison below.")
+    measure = "net" if measure_lbl.startswith("Net") else "gross"
+    _nc_return_block(ref, asof, grain, measure, rate * 100)
+    _nc_compare_block(kind, main_key, main_name, main_items, asof, grain, ref_sym, curve,
+                      anchor_month, anchor_ym, anchor_lbl, rate, measure)
 
 
 with tab_netcarry:
@@ -3368,8 +3474,9 @@ with tab_netcarry:
                        "store. One bar per calendar month — a month quoted more than once (weekly or "
                        "half-month slots) uses its best quote (the table above keeps every slot).")
 
-        _nc_compare_section(
-            kind=_nc_kind, main_key=(f"b|{_nc_prov}|{_nc_loc}" if _nc_kind == "Basis location" else f"r|{_nc_mkt}"),
+        _nc_extras(
+            kind=_nc_kind, ref=(("basis", _nc_prov, _nc_loc) if _nc_kind == "Basis location" else ("rail", _nc_mkt)),
+            main_key=(f"b|{_nc_prov}|{_nc_loc}" if _nc_kind == "Basis location" else f"r|{_nc_mkt}"),
             main_name=_nc_title, main_items=_nc_items, asof=_nc_asof, grain=_nc_grain, ref_sym=_ref_sym,
             curve=_curve, anchor_month=_anchor_month, anchor_ym=_nc_meta["anchor_ym"],
             anchor_lbl=_anchor_lbl, rate=_rate_pct / 100.0)

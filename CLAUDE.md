@@ -64,6 +64,29 @@ FOB Postgres database, which is **not** yet in Snowflake.
 Also note `MASSIVE_S3_ACCESS_KEY` / `MASSIVE_S3_SECRET_KEY` for the futures
 feed, and `APP_PASSWORD` on the admin build only.
 
+## Net Carry tab — modules and data
+
+The 💵 Net Carry tab is a stack of small pure modules (each has a `tests/test_*.py`; run them with `python tests/<file>`):
+
+| module | what |
+|---|---|
+| `net_carry.py` | the forward curve: basis vs one reference contract, interest, NC/front, monthly points, top of net carry |
+| `net_carry_chart.py` | the River-style "Cash Fwd Curve" chart |
+| `net_carry_compare.py` | several locations / corridors side by side, same reference + same interest clock |
+| `return_to_carry.py` (+ `_data`, `_view`) | the Research Analyst's **Return to Carry** (return to storage) automated for corn: harvest basis, weekly prime interest, roll spreads banked, by crop year, net or gross |
+| `carry_rate.py` | the interest rates: fed funds + 2.25% (Cost of Carry) and bank prime (the Return to Carry report), FRED with committed snapshots in `data/` |
+
+`return_to_carry.py` reproduces the analyst's yearly workbooks (`JSA - Documents/Research Analyst/Misc/Return to Carry`); the
+per-year quirks of those sheets (harvest-basis window, roll days) are kept in `WINDOW_OVERRIDES` / `ROLL_OVERRIDES`.
+Its history reads `futures_prices` for 2006+ and `data/rtc_futures_1996_2006.csv` (extracted from the old sheets) before that.
+
+### `futures_prices` was backfilled (2026-10-04)
+
+The daily capture only began 2026-06-22. `backfill_futures_history.py` copied ZC/ZS (from 2006-11) and ZW/KE (from 2021-10)
+settlements from `JSA.COST_OF_CARRY` into it (rows tagged `captured_at = 'backfill:…'`; re-runnable; undo with
+`DELETE FROM futures_prices WHERE captured_at LIKE 'backfill:%'`). A past as-of date therefore gets its own day's curve,
+not today's.
+
 ## Scrapers
 
 One module per source (`adm_`, `chs_`, `cargill_`, `bunge_`, `scoular_`, …).

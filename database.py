@@ -1551,6 +1551,30 @@ def get_futures_curve(date: str) -> dict:
         conn.close()
 
 
+def get_futures_prices_range(prefix: str, date_from: str, date_to: str) -> dict:
+    """Every stored settlement of the contracts whose symbol starts with `prefix` ('ZC' = corn) between two
+    ISO dates inclusive: {date: {symbol: cents}} with real `date` keys. One query for a whole history
+    (the Return to Carry tracker reads ~20 crop years at once)."""
+    from datetime import date as _date
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = _ph()
+    try:
+        c.execute(f"""SELECT date, symbol, price_cents FROM futures_prices
+                      WHERE symbol LIKE {ph} AND date >= {ph} AND date <= {ph}""",
+                  (prefix + "%", date_from, date_to))
+        out: dict = {}
+        for r in c.fetchall():
+            try:
+                d = _date.fromisoformat(str(r["date"])[:10])
+            except ValueError:
+                continue
+            out.setdefault(d, {})[r["symbol"]] = r["price_cents"]
+        return out
+    finally:
+        conn.close()
+
+
 def get_roll_spread(from_sym: str, to_sym: str):
     """Futures spread in cents = price(from) - price(to) at the most recent date where
     BOTH contracts had a stored price. While both still trade this equals today's

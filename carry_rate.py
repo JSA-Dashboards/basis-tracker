@@ -15,7 +15,7 @@ Funds Effective Rate [DFF], via FRED (https://fred.stlouisfed.org/series/DFF). P
 domain, citation requested. DFF is published for every calendar day (weekends carry the
 prior business day). The live FRED download is preferred; if it is unreachable the
 committed snapshot in data/fed_funds_dff.csv is used instead, and if that is missing too
-the 5.89% fallback applies. Refresh the snapshot with `python carry_rate.py`.
+the 5.89% fallback applies. Refresh the snapshot with `python carry_rate.py` (that also refreshes the prime snapshot below).
 
 One small convention difference from the Cost of Carry app: there, *today's* rate is the
 front-month ZQ fed-funds FUTURES price (100 − price) from the Massive API; its history
@@ -39,6 +39,12 @@ FALLBACK_ANNUAL_RATE_PCT = 5.89
 
 FRED_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF&cosd=2006-01-01"
 SNAPSHOT_PATH = Path(__file__).parent / "data" / "fed_funds_dff.csv"
+
+# The Return to Carry report charges interest at the bank PRIME rate (weekly, from its yearly workbooks),
+# not fed funds + 2.25%: FRED's DPRIME. Same two-column CSV, same step-series lookup; the snapshot keeps
+# only the dates the rate CHANGED (~100 rows back to 1990), which is all a step series needs.
+FRED_PRIME_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DPRIME&cosd=1990-01-01"
+PRIME_SNAPSHOT_PATH = Path(__file__).parent / "data" / "prime_rate.csv"
 
 
 class FedFunds:
@@ -94,6 +100,33 @@ def load_fed_funds(timeout: float = 10.0) -> FedFunds:
     return FedFunds([], [], "none")
 
 
+def load_prime(timeout: float = 10.0) -> FedFunds:
+    """Bank prime loan rate (percent) as a step series: FRED, then the committed snapshot, then empty.
+    (Reuses FedFunds — it is just 'the latest observation on or before a date'.)"""
+    try:
+        resp = requests.get(FRED_PRIME_URL, timeout=timeout)
+        resp.raise_for_status()
+        ds, vs = parse_dff(resp.text)
+        if ds:
+            return FedFunds(ds, vs, "fred")
+    except Exception:
+        pass
+    try:
+        ds, vs = parse_dff(PRIME_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+        if ds:
+            return FedFunds(ds, vs, "snapshot")
+    except Exception:
+        pass
+    return FedFunds([], [], "none")
+
+
+def prime_on(prime: FedFunds | None, d: date, default_pct: float | None = None) -> float | None:
+    """The prime rate (percent) in force on `d` — the last change on or before it; `default_pct`
+    when there is no series or `d` is before it."""
+    hit = prime.on(d) if prime is not None and len(prime) else None
+    return hit[1] if hit else default_pct
+
+
 @dataclass
 class CarryRate:
     rate_pct: float                   # the annual rate to charge, percent
@@ -129,5 +162,25 @@ def refresh_snapshot() -> int:
     return len(ds)
 
 
+def refresh_prime_snapshot() -> int:
+    """Rewrite data/prime_rate.csv from FRED as CHANGE POINTS only. Returns the rows written."""
+    resp = requests.get(FRED_PRIME_URL, timeout=30)
+    resp.raise_for_status()
+    ds, vs = parse_dff(resp.text)
+    if not ds:
+        raise RuntimeError("FRED returned no usable rows")
+    PRIME_SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    n, last = 0, None
+    with PRIME_SNAPSHOT_PATH.open("w", encoding="utf-8", newline="") as fh:
+        w = csv.writer(fh, lineterminator="\n")
+        w.writerow(["observation_date", "DPRIME"])
+        for d, v in zip(ds, vs):
+            if v != last:
+                w.writerow([d.isoformat(), v])
+                n, last = n + 1, v
+    return n
+
+
 if __name__ == "__main__":
     print(f"wrote {refresh_snapshot():,} rows to {SNAPSHOT_PATH}")
+    print(f"wrote {refresh_prime_snapshot():,} prime-rate change points to {PRIME_SNAPSHOT_PATH}")
