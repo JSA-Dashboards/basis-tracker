@@ -222,6 +222,19 @@ def _cached_rail_fob_all(source: str) -> list:
     from database import get_rail_fob_all
     return get_rail_fob_all(source)
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_forward_locations(asof_iso: str) -> list:
+    """Every (provider, location, raw grain) that posted forward basis in the 10 days up to a date —
+    the pick-list for the Net Carry comparison."""
+    from database import get_forward_locations
+    return get_forward_locations(asof_iso, 10)
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _cached_snaps_asof(pairs: tuple, asof_iso: str) -> dict:
+    """{(provider, location): the latest snapshot on/before the date, within 10 days} — one lean query."""
+    from database import get_snapshots_asof
+    return get_snapshots_asof(list(pairs), asof_iso, 10)
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_rail_fob_dates(source: str) -> list:
     """Distinct posting dates for a rail source (cached — was a per-rerun query)."""
@@ -2975,6 +2988,83 @@ if tab_railentry is not None:
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: NET CARRY  (forward basis vs one contract, net of the cost to carry)
 # ═══════════════════════════════════════════════════════════════════════════════
+@st.fragment
+def _nc_compare_section(kind, main_key, main_name, main_items, asof, grain, ref_sym, curve,
+                        anchor_month, anchor_ym, anchor_lbl, rate):
+    """Net of interest (or gross carry) by delivery month for several locations side by side, all
+    re-based to the SAME reference contract / futures day / interest clock (net_carry_compare).
+    A fragment: picking locations or flipping the measure re-runs only this block, not the whole app."""
+    import net_carry_compare as _cmp
+    from datetime import date as _d
+
+    asof_iso = asof.isoformat()
+    st.markdown(
+        '<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#64748b;font-weight:700;'
+        'text-transform:uppercase;letter-spacing:.1em">Compare locations along the curve</div>',
+        unsafe_allow_html=True)
+
+    # the pick-list: basis locations that posted this grain's forward curve lately + rail corridors
+    opts_b = {}                                    # label -> (provider, location)
+    for r in _cached_forward_locations(asof_iso):
+        if _grain_disp(r["grain"]) == grain:
+            opts_b[f'{r["provider"]} · {r["location"]}'] = (r["provider"], r["location"])
+    rail_rows = _cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto")
+    opts_r = {}                                    # label -> corridor
+    for m in sorted({r["market"] for r in rail_rows if (r.get("commodity") or "Corn") == grain}):
+        if _cmp.pick_latest(_cmp.rail_dates(rail_rows, m, grain), asof, 10):
+            opts_r[f"🚂 {m}"] = m
+    skip = {main_name, f"🚂 {main_name}"}
+    options = [l for l in opts_b if l not in skip] + [l for l in opts_r if l not in skip]
+
+    # default peers: the nearest basis locations (by lat/lon), or the same-railroad corridors
+    if kind == "Basis location":
+        coords = {f'{x["provider"]} · {x["location"]}': (float(x["lat"]), float(x["lon"]))
+                  for x in _cached_get_bids_filter_data() if x.get("lat") is not None and x.get("lon") is not None}
+        default = _cmp.nearest_peers(main_name, coords, [l for l in opts_b if l not in skip], 3)
+    else:
+        default = [f"🚂 {m}" for m in _cmp.rail_peers(main_name, list(opts_r.values()), 3)]
+    default = [d for d in default if d in options]
+
+    c1, c2 = st.columns([7, 3])
+    with c1:
+        picked = st.multiselect(
+            "Compare with", options, default=default, key=f"nc_cmp_{main_key}_{grain}_{asof_iso}",
+            help="Basis locations and rail corridors that posted this commodity in the last 10 days. "
+                 "Starts with the nearest locations (or the same railroad's corridors). Type to search.")
+    with c2:
+        measure_lbl = st.radio("Show", ["Net of interest", "Gross carry (before interest)"],
+                               key="nc_measure", help="Net of interest = Basis vs the reference less the "
+                               "interest to carry there. Gross = the same curve before the interest.")
+    measure = "net" if measure_lbl.startswith("Net") else "gross"
+
+    entries = [_cmp.Entry(main_key, main_name, "rail" if kind == "Rail corridor" else "basis",
+                          main_items, asof, True)]
+    basis_pairs = tuple(opts_b[l] for l in picked if l in opts_b)
+    snaps = _cached_snaps_asof(basis_pairs, asof_iso) if basis_pairs else {}
+    for lab in picked:
+        if lab in opts_b:
+            sn = snaps.get(opts_b[lab])
+            entries.append(_cmp.Entry(
+                f"b|{lab}", lab, "basis", _cmp.snapshot_items(sn, grain, _grain_disp) if sn else [],
+                _d.fromisoformat(sn.timestamp[:10]) if sn else None))
+        elif lab in opts_r:
+            m = opts_r[lab]
+            d = _cmp.pick_latest(_cmp.rail_dates(rail_rows, m, grain), asof, 10)
+            entries.append(_cmp.Entry(f"r|{m}", m, "rail",
+                                      _cmp.rail_items(rail_rows, m, grain, d.isoformat()) if d else [], d))
+
+    res = _cmp.build_comparison(entries, ref_sym, curve, anchor_month, anchor_ym, rate, measure, asof)
+    st.markdown(_cmp.render_html(res), unsafe_allow_html=True)
+    st.caption(
+        f"Every location is re-based to {ref_sym or 'its own futures'} on the same futures day, with interest "
+        f"from {anchor_lbl} at {rate * 100:.2f}% — so the columns compare directly. ★ = the location above · "
+        f"amber ▲ = that location's top of {'net' if measure == 'net' else 'gross'} carry · green = the best "
+        f"in that month. Each location shows its latest posting on or before {asof:%b %d} (within 10 days); "
+        f"a different date is flagged under its name.")
+    if len(entries) == 1:
+        st.caption("Pick more locations above to compare them with this one.")
+
+
 with tab_netcarry:
     import net_carry as _ncmod
     import net_carry_chart as _ncchart
@@ -3277,6 +3367,12 @@ with tab_netcarry:
                        "inverse: the nearer month is worth more. Red (−) = carry: the market pays to "
                        "store. One bar per calendar month — a month quoted more than once (weekly or "
                        "half-month slots) uses its best quote (the table above keeps every slot).")
+
+        _nc_compare_section(
+            kind=_nc_kind, main_key=(f"b|{_nc_prov}|{_nc_loc}" if _nc_kind == "Basis location" else f"r|{_nc_mkt}"),
+            main_name=_nc_title, main_items=_nc_items, asof=_nc_asof, grain=_nc_grain, ref_sym=_ref_sym,
+            curve=_curve, anchor_month=_anchor_month, anchor_ym=_nc_meta["anchor_ym"],
+            anchor_lbl=_anchor_lbl, rate=_rate_pct / 100.0)
     elif _nc_items is not None:
         st.info("Not enough forward quotes to build a carry curve for this selection.")
 

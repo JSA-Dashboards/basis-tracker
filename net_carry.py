@@ -225,7 +225,8 @@ def _anchor_ym(rows: list, anchor_month: int) -> tuple | None:
 
 
 def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
-                      anchor_month: int, annual_rate: float) -> tuple[list[CarryRow], dict]:
+                      anchor_month: int, annual_rate: float,
+                      anchor_ym: tuple | None = None) -> tuple[list[CarryRow], dict]:
     """Build the Net Carry rows.
 
     items: [{'delivery': str, 'futures': str|None, 'basis': float(cents)}] — the
@@ -235,6 +236,10 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     anchor_month: 1–12, the month interest starts accruing from (0 there).
     annual_rate: decimal (0.0613 = 6.13%) applied to the reference board price on an
                  actual/360 basis — the Cost of Carry sheet's convention.
+    anchor_ym: optional (year, month) that FIXES the interest clock. By default each curve finds its
+               own anchor (its earliest delivery in `anchor_month`, else its front), which is right for
+               one location; a comparison across locations passes the same ym to all of them so
+               every column accrues interest from the same date.
 
     Returns (rows_sorted, meta) where meta has ref_price, per_month (the sheet's
     30-day "Monthly interest"), all_converted.
@@ -244,7 +249,7 @@ def compute_net_carry(items: list[dict], ref_symbol: str | None, curve: dict,
     ref_price = (curve or {}).get(ref_symbol) if ref_symbol else None
     # The Cost of Carry sheet's "Monthly interest" (a 30-day month): price × rate × 30/360.
     per_month = (ref_price * annual_rate * 30.0 / 360.0) if ref_price is not None else None
-    anchor_ym = _anchor_ym(norm, anchor_month)
+    anchor_ym = anchor_ym or _anchor_ym(norm, anchor_month)
 
     rows: list[CarryRow] = []
     all_converted = True

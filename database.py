@@ -1731,6 +1731,86 @@ def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> d
     return dict(result)
 
 
+def get_snapshots_asof(pairs: list[tuple[str, str]], asof_iso: str, max_age_days: int = 10) -> dict:
+    """The LATEST snapshot (with rows) of each (provider, location) on or before `asof_iso`
+    (YYYY-MM-DD) and no older than `max_age_days` — one lean query for a side-by-side comparison,
+    instead of loading every location's whole history. A pair with nothing in the window is absent.
+    Returns {(provider, location): Snapshot}."""
+    if not pairs:
+        return {}
+    from datetime import date, timedelta
+
+    d = date.fromisoformat(asof_iso[:10])
+    lo = (d - timedelta(days=max_age_days)).isoformat() + "T00:00:00"
+    hi = (d + timedelta(days=1)).isoformat() + "T00:00:00"
+    conn = get_conn()
+    c = conn.cursor()
+    ph = _ph()
+    try:
+        pair_conds = " OR ".join(f"(s2.provider={ph} AND s2.location={ph})" for _ in pairs)
+        params = [v for p in pairs for v in p] + [lo, hi]
+        c.execute(f"""
+            SELECT s.id AS snap_id, s.timestamp, s.provider, s.location, s.source,
+                   r.row_id, r.grain, r.delivery_month, r.futures_symbol,
+                   r.basis_cents, r.is_spot, r.spot_grain
+            FROM snapshots s
+            JOIN snapshot_rows r ON r.snapshot_id = s.id
+            WHERE s.id IN (
+                SELECT t.sid FROM (
+                    SELECT s2.id AS sid,
+                           ROW_NUMBER() OVER (PARTITION BY s2.provider, s2.location
+                                              ORDER BY s2.timestamp DESC) AS rn
+                    FROM snapshots s2
+                    WHERE ({pair_conds}) AND s2.timestamp >= {ph} AND s2.timestamp < {ph}
+                ) t WHERE t.rn = 1
+            )
+            ORDER BY s.provider, s.location, r.id
+        """, params)
+        db_rows = c.fetchall()
+    finally:
+        conn.close()
+
+    result: dict = {}
+    for row in db_rows:
+        key = (row["provider"], row["location"])
+        snap = result.get(key)
+        if snap is None:
+            snap = result[key] = Snapshot(
+                id=row["snap_id"], timestamp=row["timestamp"], provider=row["provider"],
+                location=row["location"], source=row["source"], rows=[])
+        snap.rows.append(SnapshotRow(
+            id=row["row_id"], grain=row["grain"], deliveryMonth=row["delivery_month"],
+            futuresSymbol=row["futures_symbol"], basisCents=row["basis_cents"],
+            isSpot=bool(row["is_spot"]), spotGrain=row["spot_grain"]))
+    return result
+
+
+def get_forward_locations(asof_iso: str, days: int = 10) -> list[dict]:
+    """Every distinct (provider, location, grain) that posted FORWARD (non-spot) basis in the `days`
+    days up to `asof_iso` — the pick-list for a side-by-side comparison. `grain` is the raw grain
+    string (map it with the grain map). Returns [{provider, location, grain}]."""
+    from datetime import date, timedelta
+
+    d = date.fromisoformat(asof_iso[:10])
+    lo = (d - timedelta(days=days)).isoformat() + "T00:00:00"
+    hi = (d + timedelta(days=1)).isoformat() + "T00:00:00"
+    conn = get_conn()
+    c = conn.cursor()
+    ph = _ph()
+    try:
+        c.execute(f"""
+            SELECT DISTINCT s.provider, s.location, r.grain
+            FROM snapshots s
+            JOIN snapshot_rows r ON r.snapshot_id = s.id
+            WHERE s.timestamp >= {ph} AND s.timestamp < {ph}
+              AND r.is_spot = 0 AND r.basis_cents IS NOT NULL
+        """, (lo, hi))
+        return [{"provider": r["provider"], "location": r["location"], "grain": r["grain"]}
+                for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
 # ── Data retention / pruning ───────────────────────────────────────────────────
 
 def save_spot_forward_manual(date: str, corn_cif: int | None = None, bean_cif: int | None = None,
