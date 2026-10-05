@@ -73,12 +73,32 @@ The 💵 Net Carry tab is a stack of small pure modules (each has a `tests/test_
 | `net_carry.py` | the forward curve: basis vs one reference contract, interest, NC/front, monthly points, top of net carry |
 | `net_carry_chart.py` | the River-style "Cash Fwd Curve" chart |
 | `net_carry_compare.py` | several locations / corridors side by side, same reference + same interest clock |
-| `return_to_carry.py` (+ `_data`, `_view`) | the Research Analyst's **Return to Carry** (return to storage) automated for corn: harvest basis, weekly prime interest, roll spreads banked, by crop year, net or gross |
+| `return_to_carry.py` (+ `_data`, `_view`) | the Research Analyst's **Return to Carry** (return to storage) automated for corn: harvest basis, weekly interest, roll spreads banked, by crop year, net or gross — and the report's front page, the **shipment-by-month table** (break-even basis, current/best bid and return for each shipment month Nov-Jul) |
 | `carry_rate.py` | the interest rates: fed funds + 2.25% (Cost of Carry) and bank prime (the Return to Carry report), FRED with committed snapshots in `data/` |
 
 `return_to_carry.py` reproduces the analyst's yearly workbooks (`JSA - Documents/Research Analyst/Misc/Return to Carry`); the
 per-year quirks of those sheets (harvest-basis window, roll days) are kept in `WINDOW_OVERRIDES` / `ROLL_OVERRIDES`.
 Its history reads `futures_prices` for 2006+ and `data/rtc_futures_1996_2006.csv` (extracted from the old sheets) before that.
+
+**Interest = the tab's own logic (Kolten 2026-10-04: "use the same interest rate logic we have used on the other net carry
+calcs").** The tracker's "Interest" switch defaults to effective fed funds on each date + 2.25% (`carry_rate.rate_for`), moved
+by whatever the Net Carry rate box was edited by; bank prime (what the analyst's report charges) is the second choice, for tying
+out to her numbers. History charges it as her sheets do (that week's rate ÷ 52 on the cash price, from the 3rd weekly bid); the
+shipment table charges rate × days ÷ 360, like every other carry calc on the tab.
+
+**Shipment-by-month table** (`return_to_carry.build_shipment_table`, `return_to_carry_data.shipment_table`): the analyst's
+`NNcolcarryBA.xlsx`. Bought Oct 20 at the harvest basis b0; for each shipment date (20th of Nov-Jul) *Basis Cost* =
+`b0 - (F_M - F_Dec) + (F_Dec + b0) * rate * days / 360`, *Current Basis* = the latest posted bid for that month, *Return* = bid -
+cost, *Best YTD* = the best bid and the best (bid less THAT day's cost) since Oct 20. `F_M` is the report's "Current Futures"
+chain (`chain_levels`): live contracts at their settlement, rolled ones hung from the next by the spread measured the last Wednesday
+before the expiring month. Verified to 1e-13 against the analyst's 2026 Columbus template and her 2019-20 and 2024-25 St. Louis
+sheets (`tests/test_return_to_carry_ship.py`). Forward bids come from the rail rundown's posted periods (`rail_fob`, which only holds
+forward periods from Aug 2026 — older years are Spot only) or a location's snapshot rows; `parse_label` maps 'JFM'/'AMJJ'/'FH Dec'/
+'Dec 1-20' to months (a month's own quote beats a package; the narrowest package fills the rest, as her template does), and a bid
+quoted off another futures month than its column (JFM is quoted off Mar, the Mar column is in May terms) is moved by that day's
+spread — her sheet types the raw 18 there. Before the weekly harvest bids start (first Wednesday of October) b0 is estimated from
+the posted FH Oct / LH Oct / FH Nov bids and the table says so. Her 6-17-20 PDF types K/N as -8 where her weekly sheet measured -10
+(Apr 29) — a page-1 vs weekly-sheet inconsistency in her files, not the engine.
 
 ### `futures_prices` was backfilled (2026-10-04)
 

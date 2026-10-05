@@ -263,6 +263,18 @@ def _cached_rtc_obs_basis(provider: str, location: str, grain: str) -> list:
     import return_to_carry_data as _rd
     return _rd.obs_from_snapshots(_cached_get_snapshots(provider, location), grain, _grain_disp)
 
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_rtc_quotes_rail(market: str, commodity: str) -> list:
+    """Every posted period of a corridor with a bid — the forward quotes behind the shipment-by-month table."""
+    import return_to_carry_data as _rd
+    return _rd.quotes_from_rail(_cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto"), market, commodity)
+
+@st.cache_data(ttl=900, show_spinner=False)
+def _cached_rtc_quotes_basis(provider: str, location: str, grain: str) -> list:
+    """A basis location's forward rows, newest snapshot of each day."""
+    import return_to_carry_data as _rd
+    return _rd.quotes_from_snapshots(_cached_get_snapshots(provider, location), grain, _grain_disp)
+
 @st.cache_data(ttl=300, show_spinner=False)
 def _cached_rail_fob_dates(source: str) -> list:
     """Distinct posting dates for a rail source (cached — was a per-rerun query)."""
@@ -3107,21 +3119,40 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
         return
     obs = (_cached_rtc_obs_rail(ref[1], grain) if ref[0] == "rail" else _cached_rtc_obs_basis(ref[1], ref[2], grain))
     obs = [o for o in obs if o["date"] <= asof]
-    if len(obs) < 12:
+    quotes = (_cached_rtc_quotes_rail(ref[1], grain) if ref[0] == "rail" else _cached_rtc_quotes_basis(ref[1], ref[2], grain))
+    quotes = [q for q in quotes if q["date"] <= asof]
+    if len(obs) < 12 and not quotes:
         st.info("No weekly spot history for this location to track (the tracker needs a bid every week from "
                 "October through July; most locations only began posting forward curves in 2026).")
         return
-    mode = st.radio("Interest", ["Prime rate (as in the Return to Carry report)",
-                                 f"The rate above ({tab_rate_pct:.2f}% flat)"], horizontal=True, key="nc_rtc_rate")
-    prime = _cached_prime()
-    rate_on = ((lambda d: _cr.prime_on(prime, d, None)) if mode.startswith("Prime") else (lambda d: tab_rate_pct))
+    mode = st.radio("Interest", [f"Same as the rest of this tab (fed funds + {_cr.FED_FUNDS_SPREAD_PCT:.2f}%)",
+                                 "Bank prime (as in the Return to Carry report)"], horizontal=True, key="nc_rtc_rate2",
+                    help="By default the same rate as the Net Carry calculations above: the effective fed funds rate on "
+                         "each date plus the Cost of Carry spread, following the rate box (an edit there moves every "
+                         "date by the same amount). The second choice is the bank prime rate the Research Analyst's "
+                         "report uses, for tying out to it.")
+    prime_mode = mode.startswith("Bank prime")
+    if prime_mode:
+        prime = _cached_prime()
+        rate_on = (lambda d: _cr.prime_on(prime, d, None))
+        rate_note = "bank prime"
+    else:
+        ff = _cached_fed_funds()
+        offset = round(tab_rate_pct - _cr.rate_for(asof, ff).rate_pct, 4)     # how far the rate box was edited (0 = default)
+        rate_on = (lambda d: _cr.rate_for(d, ff).rate_pct + offset)
+        rate_note = f"fed funds + {_cr.FED_FUNDS_SPREAD_PCT:.2f}%, as in the rest of this tab" + (
+            f" ({offset:+.2f} from the rate box)" if abs(offset) >= 0.005 else "")
     try:
-        res, _skipped = _rd.run_history_noted(obs, _cached_rtc_futures(), rate_on)
-    except Exception as _e:                      # the futures history comes from the database
+        futs = _cached_rtc_futures()             # the futures history comes from the database
+        tbl, est = _rd.shipment_table(obs, quotes, futs, rate_on, asof, measure)
+        res, _skipped = _rd.run_history_noted(obs, futs, rate_on) if len(obs) >= 12 else ([], [])
+    except Exception as _e:
         st.warning(f"Couldn't build the Return to Carry history right now ({type(_e).__name__}: {_e}).")
         return
+    if tbl is not None and (tbl.b0 is not None or any(c.bid is not None for c in tbl.cols)):
+        st.markdown(_vw.shipment_html(tbl, est, rate_note), unsafe_allow_html=True)
     if not res:
-        st.info("Not enough weekly history yet to build a crop year for this location.")
+        st.info("Not enough weekly history yet to chart the crop years for this location.")
         return
     rows = _rd.summary_rows(res, measure)
     st.markdown(_vw.headline_html(rows, measure), unsafe_allow_html=True)
@@ -3141,6 +3172,14 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
         "Dec→Mar→May→Jul→Sep − interest. Gross = the same without the interest. Weeks run to July 31.")
     with st.expander("How the return is calculated"):
         st.markdown(
+            "- **Shipment by month** (the report's front page) — bought at the harvest basis on Oct 20; for each "
+            "shipment date (the 20th of Nov-Jul) the **basis cost** is the break-even: harvest basis − the futures carry "
+            "banked rolling to that month's contract + interest on (Dec futures + basis) at the rate × days ÷ 360. "
+            "**Current basis** is the latest posted bid for that month (a package such as JFM or AMJJ counts for each "
+            "month it covers; a bid quoted off another futures month is moved to the column's by that day's spread); "
+            "**return** = bid − basis cost; the best bid and best return are tracked from Oct 20, each return against "
+            "that day's break-even. Before the weekly harvest bids start, the harvest basis is estimated from the "
+            "posted FH Oct / LH Oct / FH Nov bids.\n"
             "- **Harvest basis** — the average of the first 7 weekly bids from the first Wednesday of October "
             "(\"Oct / F-H Nov\"), all quoted off Dec; a few years used a different window in the sheets, and those "
             "are kept (2009-10 and 2019-20 started later, 2012-13 in September, 1998-2001, 2010 and 2015 used 6 weeks).\n"
@@ -3149,8 +3188,11 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
             "- **Futures carry** — each roll spread (Mar−Dec, May−Mar, Jul−May, Sep−Jul) is measured the last "
             "Wednesday before the expiring month and counted from the week the bid moves to the new contract "
             "(the sheets' own exceptions: Apr 21 2021, Jul 1-2 in 2025-26).\n"
-            "- **Interest** — the weekly prime rate ÷ 52 on the cash price (futures + basis), from the third "
-            "weekly bid (about Oct 20), as in the sheets.\n"
+            "- **Interest** — the same rate as the rest of this tab: the effective fed funds rate on each date + 2.25% "
+            "(the Cost of Carry sheet's), moved by whatever the rate box above was edited by. In the weekly history it is "
+            "charged as the sheets do — that week's rate ÷ 52 on the cash price (futures + basis), from the third weekly "
+            "bid (about Oct 20); the shipment table charges rate × days ÷ 360 on the same price, as the carry calculations "
+            "above do. The second choice is the bank prime rate the report itself uses, to tie out to its numbers.\n"
             "- **Data** — weekly corridor bids from the archive (true Wednesdays from Oct 2004, so history starts "
             "2004-05); settlements from the futures archive, and for 2004-07 from the workbooks. Reproduces the "
             "yearly workbooks to the cent in most weeks (tests/test_return_to_carry.py).")

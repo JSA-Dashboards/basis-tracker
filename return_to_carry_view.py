@@ -14,11 +14,14 @@ and the top-of-net-carry marker above), dark red titles like the River FOB sheet
 """
 from __future__ import annotations
 
+import html
 import json
 import statistics
 
 import altair as alt
 import pandas as pd
+
+import return_to_carry as rtc
 
 BLUE, ORANGE, DARK_ORANGE, TITLE_RED = "#4e79a7", "#f28e2b", "#9a3412", "#c00000"
 AMBER_BG = "#fff4e5"
@@ -143,6 +146,193 @@ def table_html(rows: list[dict], measure: str = "net") -> str:
         foot = stat_row(f"Average of {len(done)} completed years", mean) + stat_row("Median", med)
     return (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>{head}</tr></thead>'
             f'<tbody>{body}{foot}</tbody></table></div>')
+
+
+# ── the report's page 1: shipment by month ───────────────────────────────────────────────────────
+def _n(v, dec: int = 2, sign: bool = True) -> str:
+    return "—" if v is None else (f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}")
+
+
+def _bid(v) -> str:
+    """A bid as a trader writes it: 17, 10.25 (no trailing zeros)."""
+    if v is None:
+        return "—"
+    s = f"{v:+.2f}".rstrip("0").rstrip(".")
+    return s
+
+
+def _short(d) -> str:
+    return "" if d is None else f"{d.strftime('%b')} {d.day}"
+
+
+def _ship_notes(tbl, est) -> str:
+    """The one line under the cards that says how firm the harvest basis is."""
+    if tbl.b0 is None:
+        return ("The harvest basis is not known yet — the first weekly bid posts the first Wednesday of October, and "
+                "until a harvest-period bid is posted there is nothing to measure the break-even from.")
+    if tbl.b0_est:
+        src = ""
+        if est:
+            src = f" ({html.escape(', '.join(est[2]))} posted {_short(est[1])})"
+        return ("<b>Estimate.</b> The weekly harvest bids have not started, so the harvest basis is the average of the "
+                f"posted harvest-period bids{src}. It becomes the average of the first 7 weekly bids as they post.")
+    if tbl.b0_weeks and tbl.b0_weeks < 7:
+        return (f"The harvest basis is the average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''} so far; "
+                "the report uses the first 7, so it can still move.")
+    return ""
+
+
+def _cost_tip(tbl, col) -> str:
+    """Hover text: how the break-even is built."""
+    if tbl.b0 is None or col.cost is None or tbl.levels is None:
+        return ""
+    lz = tbl.levels.levels.get("Z")
+    carry = 0.0 if lz is None or col.level is None else col.level - lz
+    parts = [f"harvest basis {tbl.b0:+.2f}"]
+    if abs(carry) > 1e-9:
+        parts.append(f"minus {carry:.2f} futures carry banked rolling to {rtc.LETTER_NAME[col.letter]}")
+    if tbl.measure != "gross" and tbl.rate is not None and lz is not None:
+        days = (col.ship - tbl.purchase).days
+        parts.append(f"plus interest {(lz + tbl.b0) * tbl.rate / 100 * days / 360:.2f} ({tbl.rate:.2f}% x {days} days on {lz + tbl.b0:.2f})")
+    return "; ".join(parts) + f" = {col.cost:+.2f}"
+
+
+def shipment_html(tbl, est=None, rate_note: str = "") -> str:
+    """The report's front page: for each shipment month Nov..Jul, the break-even basis, today's bid and what it returns, and
+    the best bid and return since the purchase. `tbl` is return_to_carry.ShipTable (net or gross); `rate_note` says where the
+    interest rate comes from ('fed funds + 2.25%, as in the rest of this tab', 'bank prime')."""
+    gross = tbl.measure == "gross"
+    best_now = rtc.best_column(tbl, "ret")
+    best_ytd = rtc.best_column(tbl, "best_ret")
+    head = (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:6px 0 8px">{tbl.label} shipment by month '
+            f'<span style="font-weight:400;color:#64748b">— bought {_short(tbl.purchase)} at the harvest basis, {measure_name(tbl.measure)}</span></div>')
+    lv = tbl.levels
+    sp = []
+    if lv is not None:
+        for key, name in (("ZH", "Dec→Mar"), ("HK", "Mar→May"), ("KN", "May→Jul")):
+            v = lv.spreads.get(key)
+            sp.append(f"{name} {v[0]:+.2f}{'*' if v[2] else ''}" if v else f"{name} —")
+    carry_total = None
+    if lv is not None and all(lv.spreads.get(k) for k in ("ZH", "HK", "KN")):
+        carry_total = sum(lv.spreads[k][0] for k in ("ZH", "HK", "KN"))
+    if tbl.b0 is None:
+        b0_sub = "waiting for the first harvest bids"
+    elif tbl.b0_est:
+        b0_sub = "estimate — average of the posted harvest-period bids"
+    else:
+        b0_sub = f"average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''}, vs Dec"
+    rate_sub = rate_note if tbl.rate is not None else "no rate"
+    if gross:
+        rate_val, rate_sub = "—", "not charged in the gross view"
+    else:
+        rate_val = f"{tbl.rate:.2f}%" if tbl.rate is not None else "—"
+    cards = (_card("Harvest basis", _n(tbl.b0, 1) + "¢" if tbl.b0 is not None else "—", b0_sub)
+             + _card("Dec futures", _n(tbl.f_dec, 2, False) if tbl.f_dec is not None else "—", "the price the interest is charged on, with the basis")
+             + _card("Interest", rate_val, rate_sub)
+             + _card("Futures carry", _n(carry_total, 1) + "¢" if carry_total is not None else "—", " · ".join(sp) if sp else "—"))
+    cards = f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">{cards}</div>'
+    note = _ship_notes(tbl, est)
+    note = f'<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">{note}</div>' if note else ""
+
+    callout = ""
+    if best_now is not None:
+        c = best_now
+        callout = (f'<div style="background:{AMBER_BG};border:1px solid #fcd9a8;border-left:4px solid {ORANGE};border-radius:8px;padding:8px 12px;'
+                   f'margin-bottom:8px;font-size:13px;color:#1f2937"><b>Best on today\'s bids: ship {MONTHS[c.month - 1]} {c.ship.day}</b> — '
+                   f'<b style="color:{DARK_ORANGE}">{c.ret:+.1f}¢</b> {"gross" if gross else "net"} '
+                   f'<span style="color:#64748b">(bid {_bid(c.bid)} against a break-even of {c.cost:+.1f}'
+                   + (f'; best so far this year {_short(best_ytd.best_ret_date)}: {best_ytd.best_ret:+.1f}¢ for {MONTHS[best_ytd.month - 1]}' if best_ytd is not None else "")
+                   + ")</span></div>")
+    elif tbl.b0 is not None and all(c.bid is None for c in tbl.cols):
+        callout = ('<div style="font-size:12px;color:#64748b;margin-bottom:8px">No forward bids were posted for this crop year in the '
+                   f'10 days to {_short(tbl.asof)} — the break-even row below is what a bid has to reach.</div>')
+
+    th = ("padding:6px 8px;border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;letter-spacing:.03em;"
+          "white-space:nowrap;text-align:right;font-weight:700")
+    lab = ("padding:5px 10px 5px 0;font-size:12px;color:#475569;font-weight:600;text-align:left;white-space:nowrap;position:sticky;left:0;"
+           "background:#fff;z-index:1")
+    td = "padding:5px 8px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap"
+    sep = "border-top:1px solid #e2e8f0"
+
+    def css(*parts) -> str:
+        return ";".join(p.strip(";") for p in parts if p and p.strip(";"))
+
+    def hl(col, now=False, ytd=False) -> str:
+        if now and best_now is col or ytd and best_ytd is col:
+            return f"background:{AMBER_BG}"
+        return ""
+
+    def row(label, cells, extra_label="", border=False, now=False, ytd=False):
+        b = sep if border else ""
+        out = f'<tr><td style="{css(lab, b)}">{label}{extra_label}</td>'
+        for col, (txt, style, tip) in zip(tbl.cols, cells):
+            t = f' title="{html.escape(tip)}"' if tip else ""
+            out += f'<td style="{css(td, b, hl(col, now, ytd), style)}"{t}>{txt}</td>'
+        return out + "</tr>"
+
+    heads = "".join(
+        f'<th style="{css(th, hl(c, now=True))}">{MONTHS[c.month - 1]} {c.ship.day}'
+        + ('<div style="margin-top:2px"><span style="background:#f28e2b;color:#fff;font-size:8px;font-weight:700;letter-spacing:.05em;'
+           'padding:1px 5px;border-radius:7px">BEST NOW</span></div>' if best_now is c else "") + "</th>" for c in tbl.cols)
+    corner = f'<th style="{th};text-align:left;position:sticky;left:0;background:#fff;z-index:1">Shipment date</th>'
+
+    r_month = row("Futures month", [(rtc.LETTER_NAME[c.letter], "color:#64748b", "") for c in tbl.cols])
+    r_level = row("Futures (current)", [(_n(c.level, 2, False), "color:#64748b", "") for c in tbl.cols])
+    r_cost = row("Basis cost" + (" (carry only)" if gross else " (break-even)"),
+                 [(_n(c.cost, 2), "font-weight:700", _cost_tip(tbl, c)) for c in tbl.cols], border=True, now=True)
+
+    def bid_cell(c):
+        if c.bid is None:
+            return ("—", "color:#94a3b8", "")
+        tip = f"Posted {_short(c.bid_date)} as '{c.bid_label}'"
+        mark = ""
+        if c.bid_posted is not None:
+            mark += "†"
+            tip += f" at {_bid(c.bid_posted)}; moved to {rtc.LETTER_NAME[c.letter]} terms by that day's spread ({c.bid - c.bid_posted:+.2f})"
+        if c.bid_label and parse_bundle(c.bid_label):
+            mark += "‡"
+            tip += " — a package that covers this month"
+        return (f"{_bid(c.bid)}{mark}", "font-weight:600", tip)
+
+    r_bid = row("Current basis", [bid_cell(c) for c in tbl.cols], border=True, now=True)
+
+    def ret_cell(c):
+        if c.ret is None:
+            return ("—", "color:#94a3b8", "")
+        return (_n(c.ret, 2), f"font-weight:700;color:{GREEN if c.ret > 0 else RED}", "")
+
+    r_ret = row("Return today", [ret_cell(c) for c in tbl.cols], now=True)
+
+    def best_bid_cell(c):
+        if c.best_bid is None:
+            return ("—", "color:#94a3b8", "")
+        return (f'{_bid(c.best_bid)}<div style="font-size:10px;font-weight:400;color:#64748b">{_short(c.best_bid_date)}</div>', "font-weight:600", "")
+
+    def best_ret_cell(c):
+        if c.best_ret is None:
+            return ("—", "color:#94a3b8", "")
+        win = "font-weight:800;" if best_ytd is c else "font-weight:600;"
+        return (f'{_n(c.best_ret, 2)}<div style="font-size:10px;font-weight:400;color:#64748b">{_short(c.best_ret_date)}</div>',
+                f"{win}color:{GREEN if c.best_ret > 0 else RED}", "")
+
+    since = f'<div style="font-size:10px;font-weight:400;color:#94a3b8">since {_short(tbl.purchase)}</div>'
+    r_bbid = row("Best basis YTD", [best_bid_cell(c) for c in tbl.cols], extra_label=since, border=True, ytd=True)
+    r_bret = row("Best return YTD", [best_ret_cell(c) for c in tbl.cols], extra_label=since, ytd=True)
+    table = (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:760px;width:100%"><thead><tr>{corner}{heads}</tr></thead>'
+             f'<tbody>{r_month}{r_level}{r_cost}{r_bid}{r_ret}{r_bbid}{r_bret}</tbody></table></div>')
+    foot = (f'<div style="font-size:11px;color:#64748b;line-height:1.5;margin:6px 0 20px">'
+            f'* Futures spreads measured the last Wednesday before the expiring month are held for the rest of the crop year; the others are today\'s. '
+            f'† A bid quoted off a different futures month than the column is moved to it by that day\'s spread. '
+            f'‡ A package (JFM, AMJJ …) counts for each month it covers. '
+            f'Best return = the bid less that day\'s basis cost, from the purchase on {_short(tbl.purchase)}.</div>')
+    return head + cards + note + callout + table + foot
+
+
+def parse_bundle(label) -> bool:
+    """True when a posted period is a package that covers several months."""
+    from return_to_carry_data import parse_label
+    info = parse_label(label)
+    return bool(info) and info["kind"] == "bundle"
 
 
 # ── chart 1: the best return of each crop year ────────────────────────────────────────────────────

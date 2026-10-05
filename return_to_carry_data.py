@@ -5,13 +5,18 @@
   obs_from_snapshots(snaps, grain, f)  the same for a basis location: its spot row, else its front forward row
   run_history(obs, futs, rate_on)      every crop year the series covers -> [CropYear]
   summary_rows / seasonal_points       the table and the chart's points, for the net or the gross measure
+  quotes_from_rail / _from_snapshots   every posted forward period of a corridor / location, with its futures tag
+  parse_label / shipment_quotes        which months a period covers ('JFM', 'FH Dec', 'Dec 1-20') -> one bid per shipment month
+  shipment_table(...)                  the report's page-1 table (break-even, current and best bids by shipment month)
 
 Pure functions over plain data (database access stays in the app): see return_to_carry for the method.
 """
 from __future__ import annotations
 
 import csv
+import re
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 
 import net_carry as nc
@@ -89,6 +94,188 @@ def obs_from_snapshots(snaps: list, grain: str, grain_disp) -> list[dict]:
         if norm:
             out.append({"date": d, "basis": float(norm[0]["basis"]), "tag": norm[0]["futures"] or None})
     return out
+
+
+# ── the forward quotes behind the report's page 1 ───────────────────────────────────────────────────
+_MON = {"jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3, "apr": 4, "april": 4, "may": 5,
+        "jun": 6, "june": 6, "jul": 7, "july": 7, "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
+        "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12}
+_NAME = re.compile(r"\b(" + "|".join(sorted(_MON, key=len, reverse=True)) + r")\b")
+_NOISE = re.compile(r"\b(bid|offer|split|late|early|bal|balance|thru|through|no holiday)\b")
+_RING = "JFMAMJJASOND" * 2
+
+
+def _expand_initials(tok: str):
+    """'JFM' -> (1, 2, 3), 'AMJJ' -> (4, 5, 6, 7): a run of month initials, if it spells exactly one run of months."""
+    s = tok.upper()
+    n = len(s)
+    if n < 2 or n > 12 or not re.fullmatch(r"[JFMASOND]+", s):
+        return None
+    starts = [i for i in range(12) if _RING[i:i + n] == s]
+    return tuple((starts[0] + k) % 12 + 1 for k in range(n)) if len(starts) == 1 else None
+
+
+@lru_cache(maxsize=4096)
+def parse_label(label: str | None) -> dict | None:
+    """What delivery window a posted period covers: {'months': (m, ...), 'kind', 'span', 'year'}, or None when it names
+    no month ('Spot', 'Nearby', 'NC 26', note rows). (Cached — a few hundred distinct labels cover years of postings;
+    the result is shared, so treat it as read-only.)
+
+    kind   'full'    a whole month ('Dec', 'Dec 2026', 'Nov (no holiday)')
+           'window'  a month's first weeks to about the 20th ('Dec 1-20', 'Nov 1-25')
+           'lh'/'fh' the last / first half of a month ('LH Nov', 'FH Dec')
+           'bundle'  several months at one price ('JFM', 'AMJJ', 'DJFM', 'Jan-Jul', 'Oct/Nov', 'LH Oct / FH Nov')"""
+    t = (label or "").lower()
+    t = re.sub(r"\([^)]*\)", " ", t)
+    t = re.sub(r"\s+", " ", _NOISE.sub(" ", t)).strip()
+    if not t:
+        return None
+    ym = re.search(r"(?<!\d)(20\d\d)(?!\d)", t)
+    year = int(ym.group(1)) if ym else None
+    names = list(_NAME.finditer(t))
+    if not names:
+        # a run of initials ('JFM', 'LH OND'): the one word that is not a half-month qualifier must spell the months —
+        # a stray letter ('k JFM', left by the old paste parser) or an unknown word ('ex AM') is not a package
+        core = [w for w in t.split() if w not in ("fh", "lh", "mp", "lp")]
+        months = _expand_initials(core[0]) if len(core) == 1 else None
+        return {"months": months, "kind": "bundle", "span": len(months), "year": None} if months else None
+    seq, prev_end = [], 0
+    for i, m in enumerate(names):
+        pre = t[prev_end:m.start()]
+        post = t[m.end():(names[i + 1].start() if i + 1 < len(names) else len(t))]
+        q = None
+        if re.search(r"\b(fh|f\.h\.|first half)\s*$", pre) or re.match(r"\s*(fh|first half)\b", post):
+            q = "fh"
+        elif re.search(r"\b(lh|l\.h\.|last half)\s*$", pre) or re.match(r"\s*(lh|last half)\b", post):
+            q = "lh"
+        seq.append((_MON[m.group(1)], q, post))
+        prev_end = m.end()
+    if len(seq) == 1:
+        month, q, post = seq[0]
+        kind = q or "full"
+        w = re.match(r"\s*(?:20\d\d\s*)?(\d{1,2})\s*-\s*(\d{1,2})\b", post)
+        if w and q is None:
+            s, e = int(w.group(1)), int(w.group(2))
+            kind = "full" if (s <= 1 and e >= 28) else "lh" if s >= 16 else "fh" if e <= 15 else "window"
+        return {"months": (month,), "kind": kind, "span": 1, "year": year}
+    months = [seq[0][0]]
+    for i in range(len(seq) - 1):
+        a, b = seq[i][0], seq[i + 1][0]
+        j = re.sub(r"\b(?:fh|lh|first half|last half)\b|\d+", " ", t[names[i].end():names[i + 1].start()])
+        if re.search(r"-|\bto\b", j) or not re.sub(r"[().:\s]", "", j):       # Jan-Jul, Oct-Mar, 'Jan July': every month in between
+            months += [(a - 1 + k) % 12 + 1 for k in range(1, ((b - a) % 12) + 1)]
+        else:                                                                # Oct/Nov, LH Oct / FH Nov, 'Nov, Dec': just those two
+            months.append(b)
+    months = tuple(dict.fromkeys(months))
+    return {"months": months, "kind": "bundle", "span": len(months), "year": None}
+
+
+_KIND_RANK = {"full": 0, "window": 1, "lh": 2, "fh": 3}
+
+
+def shipment_quotes(raw: list[dict], crop_year: int) -> list[dict]:
+    """One bid per (posting date, shipment month Nov .. Jul) of a crop year, picked from everything posted that day.
+    raw = [{'date', 'label', 'tag', 'basis'}]. A month's own quote beats a package that covers it (full month, then a
+    window to the 20th, then the last half, then the first), the narrowest package fills a month with no quote of its
+    own ('JFM' for Jan, Feb and Mar; 'AMJJ' for Apr-Jul — as in the analyst's template), and of equals the higher bid wins.
+    A label's year is read from its posting date (the next such month), so a 'Dec' posted in March is next year's."""
+    pick: dict = {}
+    lo, hi = date(crop_year, 8, 1), date(crop_year + 1, 7, 31)           # postings that can speak for this table
+    for q in raw:
+        if q.get("basis") is None or not (lo <= q["date"] <= hi):
+            continue
+        info = parse_label(q.get("label"))
+        if info is None:
+            continue
+        d = q["date"]
+        for m in info["months"]:
+            if m not in rtc.SHIP_MONTHS:
+                continue
+            y = info["year"] if (info["year"] is not None and info["kind"] != "bundle") else (d.year if m >= d.month else d.year + 1)
+            if y != (crop_year if m >= 10 else crop_year + 1):
+                continue
+            rank = (_KIND_RANK.get(info["kind"], 4 + info["span"] / 100.0), -float(q["basis"]))
+            cur = pick.get((d, m))
+            if cur is None or rank < cur[0]:
+                pick[(d, m)] = (rank, {"date": d, "month": m, "basis": float(q["basis"]), "tag": q.get("tag"),
+                                       "label": q.get("label"), "kind": info["kind"]})
+    return sorted((v[1] for v in pick.values()), key=lambda r: (r["date"], r["month"]))
+
+
+def quotes_from_rail(rows: list[dict], market: str, commodity: str = "Corn") -> list[dict]:
+    """Every posted period of a corridor with a bid: [{'date', 'label', 'tag', 'basis'}] (rail_fob rows)."""
+    out = []
+    for r in rows:
+        if r["market"] != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None:
+            continue
+        d = _parse_date(r["date"])
+        if d is not None:
+            out.append({"date": d, "label": r.get("period") or "", "tag": r.get("futures"), "basis": float(r["bid"])})
+    return out
+
+
+def quotes_from_snapshots(snaps: list, grain: str, grain_disp) -> list[dict]:
+    """Every forward row of a basis location's newest snapshot of each day, for the grain."""
+    by_day: dict = {}
+    for s in snaps:
+        d = _parse_date(s.timestamp)
+        if d is not None:
+            by_day[d] = s                                       # snapshots arrive oldest -> newest
+    out = []
+    for d, s in sorted(by_day.items()):
+        for r in s.rows:
+            if r.isSpot or r.basisCents is None or grain_disp(r.grain) != grain:
+                continue
+            out.append({"date": d, "label": r.deliveryMonth or "", "tag": r.futuresSymbol or None, "basis": float(r.basisCents)})
+    return out
+
+
+def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, max_age_days: int = 14):
+    """The harvest basis before the weekly bids exist (the first lands the first Wednesday of October): the average of
+    the latest posted FH Oct, LH Oct and FH Nov bids, all against Dec — else the one 'LH Oct / FH Nov' package, else the
+    average of the whole-month Oct and Nov bids. (value, posting date, [labels]) or None."""
+    wanted = {((10,), "fh"), ((10,), "lh"), ((11,), "fh")}
+    for d in sorted({q["date"] for q in raw if q["date"] <= asof and (asof - q["date"]).days <= max_age_days}, reverse=True):
+        vals, labels, pack, monthly = [], [], None, {}
+        for q in raw:
+            if q["date"] != d or q.get("basis") is None:
+                continue
+            info = parse_label(q.get("label"))
+            if info is None or (info["year"] not in (None, crop_year)):
+                continue
+            moved = rtc.rebase(q["basis"], q.get("tag"), "Z", crop_year, futs, d)
+            if moved is None:
+                continue
+            if (info["months"], info["kind"]) in wanted:
+                vals.append(moved[0])
+                labels.append(q["label"])
+            elif info["kind"] == "bundle" and info["months"] == (10, 11):
+                pack = (moved[0], q["label"])
+            elif info["kind"] in ("full", "window") and info["months"] in ((10,), (11,)):
+                m = info["months"][0]
+                if m not in monthly or moved[0] > monthly[m][0]:
+                    monthly[m] = (moved[0], q["label"])
+        if vals:
+            return sum(vals) / len(vals), d, labels
+        if pack is not None:
+            return pack[0], d, [pack[1]]
+        if monthly:
+            return sum(v for v, _ in monthly.values()) / len(monthly), d, [lab for _, lab in monthly.values()]
+    return None
+
+
+def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: date, measure: str = "net"):
+    """The report's page-1 table on `asof` for the crop year that is live: (ShipTable, estimate) — `estimate` is the
+    (value, date, labels) the harvest basis was taken from while the weekly bids are not in yet, else None."""
+    crop_year = rtc.shipment_crop_year(asof)
+    cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], futs, crop_year, rate_on)
+    b0, est = cy.b0, None
+    if b0 is None:
+        est = harvest_estimate(raw, crop_year, asof, futs)
+        b0 = est[0] if est else None
+    tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year), futs, rate_on, measure,
+                                   b0_weeks=cy.b0_weeks if cy.b0 is not None else 0, b0_est=est is not None)
+    return tbl, est
 
 
 def crop_years_in(obs: list[dict]) -> list[int]:
