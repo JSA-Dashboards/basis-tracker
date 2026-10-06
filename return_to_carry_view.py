@@ -251,8 +251,8 @@ def _ship_notes(tbl, est) -> str:
         return ("<b>Estimate.</b> The weekly harvest bids have not started, so the harvest basis is the average of the "
                 f"posted harvest-period bids{src}. It becomes the average of the first 7 weekly bids as they post.")
     if tbl.b0_weeks and tbl.b0_weeks < 7:
-        return (f"The harvest basis is the average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''} so far; "
-                "the report uses the first 7, so it can still move.")
+        first = "the first weekly bid" if tbl.b0_weeks == 1 else f"the average of the first {tbl.b0_weeks} weekly bids"
+        return (f"The harvest basis is {first} so far; the report uses the average of the first 7, so it can still move.")
     return ""
 
 
@@ -297,7 +297,10 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
     elif tbl.b0_est:
         b0_sub = "estimate — average of the posted harvest-period bids"
     else:
-        b0_sub = f"average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''}, vs {ln[spec.base]}"
+        n0 = tbl.b0_weeks
+        b0_sub = (f"average of the first {n0} weekly bids, vs {ln[spec.base]}" if n0 >= 7 else
+                  f"the first weekly bid so far, vs {ln[spec.base]}" if n0 == 1 else
+                  f"average of the first {n0} weekly bids so far, vs {ln[spec.base]}")
     rate_sub = rate_note if tbl.rate is not None else "no rate"
     if gross:
         rate_val, rate_sub = "—", "not charged in the gross view"
