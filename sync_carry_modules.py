@@ -41,7 +41,8 @@ RETURN_FILES = [
     "return_to_carry.py", "return_to_carry_data.py", "return_to_carry_view.py", "return_to_carry_block.py",
     "data/prime_rate.csv", "data/rtc_futures_1996_2006.csv", "data/rtc_futures_soy_2005_2007.csv",
     "tests/test_return_to_carry.py", "tests/test_return_to_carry_view.py", "tests/test_return_to_carry_ship.py",
-    "tests/test_return_to_carry_soy.py", "tests/fixtures/rtc_soy_sheets.json", "tests/fixtures/rtc_sheets.json",
+    "tests/test_return_to_carry_soy.py", "tests/test_return_to_carry_block.py",
+    "tests/fixtures/rtc_soy_sheets.json", "tests/fixtures/rtc_sheets.json",
 ]
 RIVER_FILES = ["river_carry.py", "tests/test_river_carry.py"]
 

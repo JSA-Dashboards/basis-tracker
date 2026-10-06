@@ -3171,7 +3171,7 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
     _rcb.render(obs=obs, quotes=quotes, asof=asof, grain=grain, measure=measure, tab_rate_pct=tab_rate_pct,
                 load_futures=_cached_rtc_futures, load_prime=_cached_prime, load_fed_funds=_cached_fed_funds,
                 logo_uri=_jsa_watermark_uri() or None, note=note, message=message,
-                location=f"{ref[1]} {ref[2]}" if ref[0] == "basis" else "", derived=derived)
+                location=f"{ref[1]} {ref[2]}" if ref[0] == "basis" else "", derived=derived, scope="|".join(str(x) for x in ref))
 
 
 @st.fragment

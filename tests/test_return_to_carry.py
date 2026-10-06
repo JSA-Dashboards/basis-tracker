@@ -168,6 +168,35 @@ check("on a zero-interest tie the EARLIER week is the best", ft.best["net"].idx 
 check("the best summer basis = the highest bid quoted off July (the report's blue triangle)",
       syn.summer is not None and syn.summer.tag == "N" and close(syn.summer.basis, 10.0))
 
+print("return_to_carry: the user's own harvest basis replaces the calculated one (synthetic year: calculated b0 = 10)")
+own = rtc.build_crop_year(OBS, FUT, 2025, rate, b0_override=4.0)
+check("the default is the calculated method: no override -> b0 is the average, b0_calc equals it, nothing is flagged own",
+      close(syn.b0, 10.0) and close(syn.b0_calc, 10.0) and syn.b0_own is False and syn.b0_weeks == 7)
+check("an override is the harvest basis every return is measured from; the calculated average is kept beside it",
+      close(own.b0, 4.0) and own.b0_own is True and close(own.b0_calc, 10.0) and own.b0_weeks == 7 and own.b0_dates == syn.b0_dates)
+paired = [(a, b) for a, b in zip(own.weeks, syn.weeks) if b.net is not None]
+check("every gross and net return moves by calculated - own (+6): the interest runs on each week's cash price, not on the harvest basis",
+      len(paired) >= 38 and all(close(a.gross - b.gross, 6.0) and close(a.net - b.net, 6.0) and close(a.interest, b.interest) and a.idx == b.idx and a.date == b.date
+                                for a, b in paired), len(paired))
+check("so the best week is the same week, 6 cents higher, on both measures; the summer basis and the futures carry are untouched",
+      own.best["net"].idx == syn.best["net"].idx and close(own.best["net"].net - syn.best["net"].net, 6.0)
+      and own.best["gross"].idx == syn.best["gross"].idx and close(own.best["gross"].gross - syn.best["gross"].gross, 6.0)
+      and own.summer.idx == syn.summer.idx and close(own.dec_jul_carry, syn.dec_jul_carry))
+same = rtc.build_crop_year(OBS, FUT, 2025, rate, b0_override=syn.b0)
+check("an override equal to the calculated value changes no number (it is only flagged own)",
+      same.b0_own is True and all(close(a.net, b.net) for a, b in zip(same.weeks, syn.weeks) if b.net is not None))
+late = [o for o in OBS if rtc.week_index(o["date"], 2025) >= 8]                           # nothing in the harvest window: no calculated average
+calc_none = rtc.build_crop_year(late, FUT, 2025, rate)
+own_late = rtc.build_crop_year(late, FUT, 2025, rate, b0_override=4.0)
+check("a location with no bid in the harvest window has no calculated basis and no returns — its own harvest basis gives it returns",
+      calc_none.b0 is None and calc_none.b0_calc is None and all(w.net is None for w in calc_none.weeks)
+      and own_late.b0_calc is None and close(own_late.b0, 4.0) and own_late.b0_own and any(w.net is not None for w in own_late.weeks)
+      and close(own_late.weeks[-1].gross, 10.0 - 4.0 + own_late.weeks[-1].carry))
+check("the weekly return is bid - the harvest basis + the banked carry, for any harvest basis (a negative one too)",
+      all(close(w.gross, w.basis - (-25.0) + w.carry) for w in rtc.build_crop_year(OBS, FUT, 2025, rate, b0_override=-25.0).weeks if w.gross is not None))
+soy_off = rtc.build_crop_year([{"date": date(2025, 10, 1) + timedelta(days=7 * k), "basis": -30.0, "tag": "F"} for k in range(0, 12)], {}, 2025, rate, rtc.SOY, b0_override=-10.0)
+check("soybeans take the same override (vs Jan)", soy_off.b0_own and close(soy_off.b0, -10.0) and close(soy_off.b0_calc, -30.0), (soy_off.b0, soy_off.b0_calc))
+
 print("return_to_carry: the analyst's per-year choices are honoured")
 syn19 = rtc.build_crop_year([{"date": START.replace(year=2019, month=10, day=2) + timedelta(days=7 * k), "basis": float(k)} for k in range(0, 43)],
                             {}, 2019, rate)
@@ -223,6 +252,21 @@ obs_rep2 = yr_obs(2005, real) + yr_obs(2006, real) + yr_obs(2007, [round(rng.uni
 res_b, skipped_b = rd.run_history_noted(obs_rep2, {}, rate, min_year=2004)
 check("2006-07 repeating 2005-06 is dropped and reported; the others stay", skipped_b == ["2006-07"] and [c.crop_year for c in res_b] == [2005, 2007], (skipped_b, [c.crop_year for c in res_b]))
 check("run_history is the same list without the note", [c.crop_year for c in rd.run_history(obs_rep2, {}, rate)] == [2005, 2007])
+hobs = yr_obs(2005, real) + yr_obs(2006, [round(rng.uniform(-30, 30)) for _ in range(44)]) + yr_obs(2007, [round(rng.uniform(-30, 30)) for _ in range(44)])
+h_calc = rd.run_history(hobs, {}, rate, min_year=2004)
+h_own = rd.run_history(hobs, {}, rate, min_year=2004, b0_overrides={2006: -15.0})
+check("run_history(b0_overrides={2006: -15}): that crop year is measured from -15 (flagged own, its calculated average kept), the others are untouched",
+      [c.crop_year for c in h_own] == [2005, 2006, 2007] and [c.b0_own for c in h_own] == [False, True, False] and close(h_own[1].b0, -15.0)
+      and close(h_own[1].b0_calc, h_calc[1].b0) and close(h_own[0].b0, h_calc[0].b0) and close(h_own[2].b0, h_calc[2].b0))
+r_calc, r_own = rd.summary_rows(h_calc, "net"), rd.summary_rows(h_own, "net")
+check("summary_rows say which year is measured from the user's own number, and what the calculated one would have been",
+      [r["b0_own"] for r in r_own] == [False, True, False] and close(r_own[1]["b0"], -15.0) and close(r_own[1]["b0_calc"], r_calc[1]["b0"])
+      and all(r["b0_own"] is False and close(r["b0_calc"], r["b0"]) for r in r_calc))
+ob_years = [{"date": date(2024, 10, 2)}, {"date": date(2025, 10, 1)}, {"date": date(2026, 10, 7)}]
+check("own_b0_map: nothing -> {} (the calculated method everywhere); a number -> the tracked crop year only; the what-if -> every crop year the series covers",
+      rd.own_b0_map(None, 2026, ob_years) == {} and rd.own_b0_map(-15, 2026, ob_years) == {2026: -15.0}
+      and rd.own_b0_map(-15, 2026, ob_years, every_year=True) == {2024: -15.0, 2025: -15.0, 2026: -15.0}
+      and rd.own_b0_map(-15, 2026, [], every_year=True) == {2026: -15.0} and rd.own_b0_map(0, 2026, ob_years) == {2026: 0.0})
 check("a year that only partly matches (a handful of equal weeks) is kept", rd.repeated_years(rd.run_history_noted(
     yr_obs(2005, real) + yr_obs(2006, real[:5] + [round(rng.uniform(40, 80)) for _ in range(39)]), {}, rate)[0]) == set())
 

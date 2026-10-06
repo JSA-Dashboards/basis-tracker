@@ -8,7 +8,9 @@ shipment-by-month table, the headline numbers, the season chart, the best-return
     render(obs=..., quotes=..., asof=date, grain='Corn', measure='net' | 'gross', tab_rate_pct=6.13,
            load_futures=lambda root: {date: {symbol: cents}}, load_prime=..., load_fed_funds=..., logo_uri=None, note=None)
 
-The Interest radio keeps the key `nc_rtc_rate2` (a page has one Return to Carry block at a time).
+The Interest radio keeps the key `nc_rtc_rate2` (a page has one Return to Carry block at a time). The Harvest basis switch (Calculated, or the
+user's own number) keys its widgets `nc_rtc_b0_{mode,val,all}_<scope>|<grain>|<crop year>`, so what was typed for one location never follows
+the user to another; pass `scope=` (the location's identity on the page) to every call.
 """
 from __future__ import annotations
 
@@ -29,9 +31,45 @@ HEADING = ('<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#
            'text-transform:uppercase;letter-spacing:.1em">Return to carry — what storing from harvest has paid</div>')
 
 
+def _harvest_basis_choice(spec, key: str, calc: float | None, label: str):
+    """The Harvest basis switch under the Interest one: the calculated average (the report's method) by default, or the user's own number.
+    Returns (value, every_year) when it is their own, else None. `key` carries the location, grain and crop year, so a number typed for one
+    location is never carried over to another; `calc` = what the calculated method gives now (the number box starts there)."""
+    base = rtc.LETTER_NAME[spec.base]
+    mode = st.radio("Harvest basis", [f"Calculated (average of the first {rtc.WINDOW_WEEKS} weekly bids, as in the report)", "My own"],
+                    horizontal=True, key=f"nc_rtc_b0_mode_{key}",
+                    help=(f"By default every crop year is measured from the harvest basis the Research Analyst's report calculates: the average of the "
+                          f"first {rtc.WINDOW_WEEKS} weekly bids, against {base} futures. Choose My own to enter the basis you actually bought at (cents per "
+                          f"bushel against {base}, negative when under): the shipment table, the headline numbers and the crop year being tracked are then "
+                          "measured from it. Earlier years keep their calculated basis unless you also tick the what-if box."))
+    if not mode.startswith("My own"):
+        return None
+    try:
+        c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
+    except TypeError:                                        # an older Streamlit has no vertical_alignment
+        c1, c2 = st.columns([1, 2])
+    default = 0.0 if calc is None else max(-500.0, min(500.0, round(float(calc), 2)))
+    kept = f"nc_rtc_b0_kept_{key}"                           # a widget's state is dropped while it is not drawn: keep what was typed, so
+    shown = max(-500.0, min(500.0, float(st.session_state.get(kept, default))))       # flipping to Calculated and back does not lose it
+    with c1:
+        value = st.number_input(f"Your harvest basis (¢/bu vs {base})", min_value=-500.0, max_value=500.0, step=0.25, format="%.2f",
+                                value=shown, key=f"nc_rtc_b0_val_{key}",
+                                help=f"Cents per bushel against {base} futures, negative when under: what the grain was (or would be) bought at "
+                                     "harvest. It starts at the calculated number.")
+    if abs(float(value) - default) > 1e-9:
+        st.session_state[kept] = float(value)
+    else:
+        st.session_state.pop(kept, None)                     # not typed over: it follows the calculated number again next time
+    with c2:
+        every = st.checkbox(f"Use it for every crop year too (a what-if), not only {label}", key=f"nc_rtc_b0_all_{key}",
+                            help="Measure every crop year in the history from this one harvest basis instead of its own calculated one — what storing "
+                                 "would have paid had the grain always been bought at that basis.")
+    return float(value), bool(every)
+
+
 def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_pct: float, load_futures, load_prime,
            load_fed_funds, logo_uri: str | None = None, note: str | None = None, message: str | None = None,
-           history_hint: str | None = None, location: str = "", derived: dict | None = None) -> None:
+           history_hint: str | None = None, location: str = "", derived: dict | None = None, scope: str = "") -> None:
     """Draw the block.
 
     obs / quotes   the location's weekly nearby bids and posted forward periods (return_to_carry_data's shapes), any dates;
@@ -45,7 +83,12 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
     location       the location's name (the derived-history banner says whose basis it is not)
     derived        when part of `obs` is ESTIMATED from another series (bids flagged 'derived': True, river_derived): that series' description
                    {fob_location, gap, q1, q3, pairs, own_from, derived_weeks, first}. A banner says so above the history and the years
-                   built from those bids are marked DERIVED / PART DERIVED in the table and drawn lighter in the bars."""
+                   built from those bids are marked DERIVED / PART DERIVED in the table and drawn lighter in the bars.
+    scope          what identifies this location + commodity on the page ('basis|ADM|Havana, IL', a corridor key ...): the Harvest basis widgets'
+                   keys carry it (with the grain and crop year) so a number typed for one location is not kept for the next. Defaults to `location`.
+
+    The Harvest basis switch (Calculated by default) lets the user measure the crop year being tracked — the shipment table, the headline,
+    the orange line, the latest row — from their OWN harvest basis, or, as a what-if, every crop year; see return_to_carry_data.own_b0_map."""
     st.markdown(HEADING, unsafe_allow_html=True)
     spec = rtc.SPECS.get(grain)
     if spec is None:
@@ -84,13 +127,26 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
         rate_on = (lambda d: cr.rate_for(d, ff).rate_pct + offset)
         rate_note = f"fed funds + {cr.FED_FUNDS_SPREAD_PCT:.2f}%, as in the rest of this tab" + (
             f" ({offset:+.2f} from the rate box)" if abs(offset) >= 0.005 else "")
+    crop_year = rtc.shipment_crop_year(asof)                 # the crop year being tracked: the shipment table's, and the history's newest
     try:
         futs = load_futures(spec.root)                       # the futures history comes from the database
-        tbl, est = rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec)
-        res, skipped = rd.run_history_noted(obs, futs, rate_on, spec=spec) if len(obs) >= 12 else ([], [])
+        tbl, est = rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec)             # the calculated harvest basis
     except Exception as e:                                   # noqa: BLE001 — a data problem must not take the tab down
         st.warning(f"Couldn't build the Return to Carry history right now ({type(e).__name__}: {e}).")
         return
+    own = _harvest_basis_choice(spec, f"{scope or location}|{grain}|{crop_year}", tbl.b0, rtc.crop_label(crop_year))   # None = calculated
+    try:
+        if own is not None:                                  # the user's own harvest basis: the table and the history are measured from it
+            tbl, est = rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec, b0_override=own[0])
+        res, skipped = (rd.run_history_noted(obs, futs, rate_on, spec=spec,
+                                             b0_overrides=rd.own_b0_map(own[0] if own else None, crop_year, obs, spec, every_year=bool(own and own[1])))
+                        if len(obs) >= 12 else ([], []))
+    except Exception as e:                                   # noqa: BLE001
+        st.warning(f"Couldn't build the Return to Carry history right now ({type(e).__name__}: {e}).")
+        return
+    if own is not None:
+        st.markdown(vw.own_basis_note_html(own[0], tbl.b0_calc, rtc.crop_label(crop_year), spec, every_year=own[1],
+                                           in_history=any(cy.crop_year == crop_year for cy in res)), unsafe_allow_html=True)
     if tbl is not None and (tbl.b0 is not None or any(c.bid is not None for c in tbl.cols)):
         st.markdown(vw.shipment_html(tbl, est, rate_note), unsafe_allow_html=True)
     if not res:

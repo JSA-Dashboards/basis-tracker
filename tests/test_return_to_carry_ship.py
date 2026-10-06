@@ -287,6 +287,36 @@ check("August builds the NEW crop's table; with no data at all it is empty, not 
 t_old, _ = rd.shipment_table(obs3, [], FW, lambda d: 6.0, D(2027, 1, 20), "net")
 check("later in the crop year the weekly bids are the harvest basis (window = the first 7 weeks) — 3 weeks of data here", t_old.crop_year == 2026 and t_old.b0_weeks == 3)
 
+print("shipment_table(): the user's OWN harvest basis in place of the calculated one")
+asof_o = start + timedelta(days=14)
+Qo = [{"date": start + timedelta(days=14), "month": 12, "basis": 5.0, "tag": "ZCH27", "label": "Dec"},       # Dec ships off Mar futures: no move needed
+      {"date": start + timedelta(days=14), "month": 3, "basis": 8.0, "tag": "ZCK27", "label": "Mar"}]
+t_c, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net")                      # calculated: average of 3 weekly bids = -12
+t_o, e_o = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", b0_override=-20.0)
+check("the default is the calculated method (not flagged own; b0_calc is the number it used)",
+      t_c.b0_own is False and close(t_c.b0, -12.0) and close(t_c.b0_calc, -12.0) and t_c.b0_weeks == 3)
+check("an own harvest basis is the table's: flagged, the calculated one kept beside it, not an estimate, no estimate handed back",
+      t_o.b0_own is True and close(t_o.b0, -20.0) and close(t_o.b0_calc, -12.0) and t_o.b0_est is False and t_o.b0_weeks == 0 and e_o is None)
+days = [(c.ship - t_o.purchase).days for c in t_o.cols]
+want = [(-20.0 - -12.0) * (1 + 0.06 * d / 360) for d in days]                                 # cost = b0 - carry + (F + b0) * rate * days / 360
+check("net break-evens move by (own - calculated) x (1 + rate x days / 360): the interest is charged on the futures PLUS the harvest basis",
+      all(close(o.cost - c.cost, w, 1e-9) for o, c, w in zip(t_o.cols, t_c.cols, want)), [(o.cost - c.cost, w) for o, c, w in zip(t_o.cols, t_c.cols, want)][:3])
+g_c, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "gross")
+g_o, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "gross", b0_override=-20.0)
+check("gross break-evens (carry only) move by exactly own - calculated (-8)", all(close(o.cost - c.cost, -8.0) for o, c in zip(g_o.cols, g_c.cols)))
+t_cq = rtc.build_shipment_table(2026, asof_o, -12.0, Qo, FW, lambda d: 6.0, "net")
+t_oq = rtc.build_shipment_table(2026, asof_o, -20.0, Qo, FW, lambda d: 6.0, "net", b0_own=True, b0_calc=-12.0)
+check("the same bid returns more against a lower harvest basis (return = bid - break-even): Dec +5 -> by exactly the break-even's move",
+      close(t_oq.cols[1].ret - t_cq.cols[1].ret, -(t_oq.cols[1].cost - t_cq.cols[1].cost)) and t_oq.cols[1].ret > t_cq.cols[1].ret and t_oq.cols[1].bid == t_cq.cols[1].bid == 5.0)
+t_ee, e_ee = rd.shipment_table([], rawh, FE, lambda d: 6.0, D(2026, 10, 4), "net", b0_override=-5.0)
+check("before the weekly bids exist the own number replaces the estimate (the estimate is still what b0_calc shows)",
+      close(t_ee.b0, -5.0) and t_ee.b0_est is False and e_ee is None and close(t_ee.b0_calc, -44 / 3) and t_ee.b0_own)
+t_nn, _ = rd.shipment_table([], [], {}, lambda d: 6.0, D(2026, 8, 21), "net", b0_override=-5.0)
+check("with no data at all the own number still stands (no break-even yet: there are no futures), and there is no calculated one to show",
+      close(t_nn.b0, -5.0) and t_nn.b0_own and t_nn.b0_calc is None and all(c.cost is None for c in t_nn.cols))
+t_zero, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", b0_override=0.0)
+check("an own harvest basis of 0 is a number, not 'unset'", t_zero.b0_own is True and t_zero.b0 == 0.0)
+
 print("shipment view: the table as the user sees it")
 tv = rtc.build_shipment_table(2026, D(2026, 12, 8), 10.0, Q, FS, RATE, "net", b0_weeks=7)
 h = vw.shipment_html(tv, None, "fed funds + 2.25%, as in the rest of this tab")

@@ -101,6 +101,21 @@ the posted FH Oct / LH Oct / FH Nov bids and the table says so. Her 6-17-20 PDF 
 (Apr 29) — a page-1 vs weekly-sheet inconsistency in her files, not the engine. `shipment_table` hands the engine only the
 futures up to the as-of date, so a past as-of date cannot use a roll spread measured after it.
 
+**The user's own harvest basis** (Kolten 2026-10-06: "add the ability to apply your own harvest basis into the models, but default to the
+calculated method"). A **Harvest basis** switch under the Interest one in `return_to_carry_block.render`: *Calculated* (the report's
+method, the default) or *My own*, a number in cents vs the base contract (Dec / Jan) that starts at the calculated value and is kept
+if the user flips back and forth (`nc_rtc_b0_kept_*`). It measures the crop year being tracked (`rtc.shipment_crop_year(asof)`): the
+shipment table (`shipment_table(b0_override=)`: break-even, returns and the interest on futures + harvest basis; `tbl.b0_own`,
+`tbl.b0_calc`) and, when that year has weekly bids, the history (`build_crop_year(b0_override=)` -> `cy.b0`, `cy.b0_own`, `cy.b0_calc`;
+`run_history_noted(b0_overrides={year: value})`, built by `own_b0_map`): the headline card, the orange line, the bar and the year's row
+(an OWN pill + legend). Earlier years keep their calculated basis, so the comparison with history is still the analyst's method. A
+what-if box applies the number to EVERY crop year. In the weekly history the interest runs on each week's cash price, not on b0, so an
+override shifts every gross and net return by (calculated - own) and the best WEEK does not move (`tests/test_return_to_carry.py`); the
+shipment table's net break-even moves by (own - calculated) x (1 + rate x days / 360). Widget keys are
+`nc_rtc_b0_{mode,val,all,kept}_<scope>|<grain>|<crop year>` — callers pass `scope=` (the tracker: the `ref` tuple; the portals: the corridor key
+/ `river|<location>`), so a number typed for one location never follows the user to another. `tests/test_return_to_carry_block.py` drives the
+block headless (AppTest) over a synthetic series.
+
 **Soybeans** (Kolten 2026-10-05, "yes, do soybeans next"): the same engine run from `return_to_carry.SOY`, validated against the
 analyst's `BeanCarry` workbooks (`Research Analyst/Misc/Return to Carry/BeanCarry/{Decatur,DesMoines,Hennepin,STL}CRY`, 2005-06 to
 2022-23, 61 usable sheets). Chain Nov → Jan → Mar → May → Jul → Aug → next Nov (labels X F H K N Q x — the lower-case `x` is NEXT

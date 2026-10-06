@@ -297,9 +297,12 @@ class CropYear:
     crop_year: int
     label: str
     weeks: list = field(default_factory=list)
-    b0: float | None = None                  # the Oct / F-H Nov harvest basis (cents vs the base contract)
-    b0_dates: tuple | None = None            # (first, last) week of that average
-    b0_weeks: int = 0                        # how many weeks it is built from (7 once complete)
+    b0: float | None = None                  # the harvest basis every return is measured from (cents vs the base contract): the Oct / F-H Nov
+                                             # average, or the user's own when build_crop_year(b0_override=...) was given one
+    b0_calc: float | None = None             # that average, whichever one `b0` is
+    b0_own: bool = False                     # `b0` is the user's own harvest basis, not the calculated average
+    b0_dates: tuple | None = None            # (first, last) week of the average
+    b0_weeks: int = 0                        # how many weeks the average is built from (7 once complete)
     spreads: dict = field(default_factory=dict)   # {pair key: (cents, date)|None, ...}
     season_carry: float | None = None        # the report's headline futures carry (corn Dec -> Jul, soybeans Jan -> Jul)
     best: dict = field(default_factory=dict)  # {'net': Week, 'gross': Week}
@@ -314,7 +317,7 @@ class CropYear:
 
 
 def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: Spec = CORN,
-                    window_start: int = 0) -> CropYear:
+                    window_start: int = 0, b0_override: float | None = None) -> CropYear:
     """Run the weekly return for one crop year.
 
     obs      [{'date', 'basis', 'tag'?}] — the nearby bid, about one per week (any order, any years); `tag`
@@ -325,6 +328,10 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
     spec     CORN or SOY.
     window_start  week index of the first week of the harvest-basis average (0 normally; the 2019-20 corn
              sheet started it two weeks late, which is why that year's published harvest basis is 39.29).
+    b0_override  the user's OWN harvest basis (cents vs the spec's base contract), used in place of the calculated average: every weekly
+             return is measured from it (`cy.b0`, `cy.b0_own`); the calculated average is kept in `cy.b0_calc`. None = the calculated one.
+             The interest does not depend on it (it runs on the week's cash price), so an override shifts every gross and net return, and
+             the best return, by the same amount (calculated - own) and leaves the best WEEK where it was.
 
     Like the sheets, time runs on a WEEKLY GRID from the first Wednesday of October: interest accrues for
     every week from the spec's accrual start on, whether or not a bid was posted that week (a week with no bid just
@@ -406,6 +413,9 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
         cy.b0 = sum(vals) / len(vals)
         cy.b0_weeks = len(vals)
         cy.b0_dates = (got[0], got[-1])                   # the bids' own dates
+    cy.b0_calc = cy.b0
+    if b0_override is not None:                           # the user's own harvest basis replaces the calculated average
+        cy.b0, cy.b0_own = float(b0_override), True
 
     run = 0.0                                           # running sum of the weekly rate, percent
     for k in range(0, last_k + 1):
@@ -599,6 +609,8 @@ class ShipTable:
     levels: Levels | None
     cols: list = field(default_factory=list)
     spec: Spec = CORN
+    b0_own: bool = False                # `b0` is the user's own harvest basis, not the calculated average / estimate
+    b0_calc: float | None = None        # what the calculated method gives (the average so far, or the estimate before the weekly bids)
 
     @property
     def f_dec(self) -> float | None:
@@ -607,10 +619,12 @@ class ShipTable:
 
 
 def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], futs: dict, rate_on, measure: str = "net",
-                         b0_weeks: int = 0, b0_est: bool = False, spec: Spec = CORN, max_age_days: int = 10) -> ShipTable:
+                         b0_weeks: int = 0, b0_est: bool = False, spec: Spec = CORN, max_age_days: int = 10,
+                         b0_own: bool = False, b0_calc: float | None = None) -> ShipTable:
     """The page-1 table on `asof`.
 
-    b0       the harvest basis (cents vs the base contract): the average of the first weekly bids so far, or an estimate before they post.
+    b0       the harvest basis (cents vs the base contract): the average of the first weekly bids so far, or an estimate before they post —
+             or the user's own (then `b0_own` is True and `b0_calc` is what the calculated method gives, to show beside it).
     quotes   one bid per (posting date, shipment month): [{'date', 'month', 'basis', 'tag', 'label'}] — the data layer
              (return_to_carry_data.shipment_quotes) picks them from a corridor's forward periods.
     rate_on  date -> annual percent (the bank prime in the report; the app's default is the tab's fed funds + 2.25%).
@@ -619,7 +633,7 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
     lv = chain_levels(futs, crop_year, asof, spec)
     rate_now = rate_on(asof) if rate_on else None
     tbl = ShipTable(crop_year, crop_label(crop_year), asof, measure, purchase, b0, b0_weeks, b0_est,
-                    lv.levels.get(spec.base), rate_now, lv, [], spec)
+                    lv.levels.get(spec.base), rate_now, lv, [], spec, b0_own, b0_calc)
     cols = {m: ShipCol(m, ship_date(crop_year, m), spec.ship_letter[m]) for m in spec.ship_months}
     tbl.cols = [cols[m] for m in spec.ship_months]
 

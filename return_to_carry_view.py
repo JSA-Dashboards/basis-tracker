@@ -95,7 +95,9 @@ def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.C
         last_sub += f" · a typical year's best is {avg_best:+.0f}¢"
     ln = rtc.LETTER_NAME
     n0 = r["b0_weeks"]
-    if r["b0"] is None:
+    if r.get("b0_own"):
+        b0_sub = f"your own, vs {ln[spec.base]}" + (f" · calculated {_f(r['b0_calc'])}" if r.get("b0_calc") is not None else "")
+    elif r["b0"] is None:
         b0_sub = "needs the first weeks of October"
     elif n0 >= 7:
         b0_sub = f"average of the first {n0} weekly bids, vs {ln[spec.base]}"
@@ -124,11 +126,18 @@ def _derived_pill(status: str) -> str:
             f'letter-spacing:.05em;padding:1px 6px;border-radius:8px;margin-left:6px;white-space:nowrap">{label}</span>')
 
 
+def _own_pill() -> str:
+    return ('<span title="the harvest basis you entered, in place of the calculated average of the first weekly bids" style="background:#eef5fc;'
+            'color:#1f4e79;border:1px solid #4e79a7;font-size:9px;font-weight:700;letter-spacing:.05em;padding:1px 6px;border-radius:8px;'
+            'margin-left:6px;white-space:nowrap">OWN</span>')
+
+
 def table_html(rows: list[dict], measure: str = "net", derived: dict | None = None) -> str:
     """A line per crop year, newest first. Harvest basis = the average of the first weekly bids; futures carry = the
     Dec->Jul roll spreads; summer basis = the best bid quoted off July; best return = the highest weekly return
     on the chosen measure (and its week); 'end' = the return at the last week to July. `derived` = {crop year: 'derived' | 'part'}
-    (return_to_carry_data.derived_years): those years carry a DERIVED / PART DERIVED pill and a line under the table says what it means."""
+    (return_to_carry_data.derived_years): those years carry a DERIVED / PART DERIVED pill and a line under the table says what it means.
+    A year measured from the user's own harvest basis (row['b0_own']) carries an OWN pill beside it."""
     if not rows:
         return ""
     th = ("padding:6px 10px;border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;"
@@ -149,7 +158,7 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
         end_col = ("" if r["last"] is None else (f";color:{GREEN}" if r["last"] > 0 else f";color:{RED}"))
         dstat = (derived or {}).get(r["crop_year"])
         body += (f'<tr><td style="{td};text-align:left{bg}">{r["label"]}{tag}{_derived_pill(dstat) if dstat else ""}</td>'
-                 f'<td style="{td}{bg}">{_f(r["b0"])}</td><td style="{td}{bg}">{_f(r["carry"])}</td>'
+                 f'<td style="{td}{bg}">{_f(r["b0"])}{_own_pill() if r.get("b0_own") else ""}</td><td style="{td}{bg}">{_f(r["carry"])}</td>'
                  f'<td style="{td}{bg}">{_f(r["summer"], 0)}</td><td style="{td}{bcol}{bg}">{_f(r["best"])}</td>'
                  f'<td style="{td};color:#64748b{bg}">{_md(r["best_date"])}</td><td style="{td}{end_col}{bg}">{_f(r["last"])}</td></tr>')
     done = completed(rows)
@@ -168,6 +177,9 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
     if derived:
         legend = ('<div style="font-size:11px;color:#9a3412;margin-top:4px">DERIVED / PART DERIVED = built from the River FOB sheet\'s FOB '
                   'values (less the gap in the note above), not this location\'s own basis history.</div>')
+    if any(r.get("b0_own") for r in rows):
+        legend += ('<div style="font-size:11px;color:#1f4e79;margin-top:4px">OWN = measured from the harvest basis you entered, in place of the '
+                   'calculated average of the first weekly bids.</div>')
     return (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>{head}</tr></thead>'
             f'<tbody>{body}{foot}</tbody></table></div>{legend}')
 
@@ -186,6 +198,28 @@ def derived_banner_html(location: str, dv: dict) -> str:
             'It is derived through the historical FOB river values, not actual basis history, and the gap is only measured over the last few months, '
             f'so read the earlier returns as an estimate of what storing here would have paid. Years tagged DERIVED are built entirely from it; '
             f'{first_year} is a mixture ({dv.get("mixed_weeks", dv["derived_weeks"])} derived weeks, then {name}\'s own bids).</div>')
+
+
+# ── the user's own harvest basis: the note that says where it is used ────────────────────────────
+def own_basis_note_html(value: float, calc: float | None, label: str, spec: rtc.Spec = rtc.CORN, every_year: bool = False,
+                        in_history: bool = True) -> str:
+    """The blue note under the Harvest basis switch when the user's OWN number is in use: which crop year(s) it measures, what it replaces.
+    value / calc = their number and what the calculated method gives (None = not known yet); label = the tracked crop year ('2026-27');
+    every_year = the what-if that applies it to every crop year; in_history = the tracked year has weekly bids to draw (else the shipment table only)."""
+    base = rtc.LETTER_NAME[spec.base]
+    if every_year:
+        body = (f"<b>What-if:</b> every crop year below is measured from your harvest basis of <b>{value:+.1f}¢</b> vs {base} instead of its own "
+                "calculated one (the average of its first weekly bids). Each year's returns move by the difference, the same for all its weeks, so the best "
+                "week stays where it was — this is what storing would have paid had the grain always been bought at that basis, not what the analyst's "
+                "workbooks computed.")
+    else:
+        where = ("the shipment table, the headline numbers, the orange line and bar, and the latest row of the table below" if in_history
+                 else "the shipment table (that year has no weekly bids to draw yet)")
+        calc_txt = "" if calc is None else f", in place of the calculated {calc:+.1f}¢"
+        body = (f"<b>Your own harvest basis, {value:+.1f}¢ vs {base}</b>{calc_txt}, measures {label}: {where}. Earlier years keep their calculated "
+                "harvest basis, so the comparison with history is still the analyst's method.")
+    return ('<div style="font-size:12px;color:#1f4e79;background:#eef5fc;border:1px solid #c5daf1;border-left:4px solid #4e79a7;border-radius:8px;'
+            f'padding:8px 12px;margin:6px 0 10px;line-height:1.5">{body}</div>')
 
 
 # ── the words that explain the method (per commodity) ────────────────────────────────────────────
@@ -240,6 +274,10 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
         data = ("- **Data** — weekly corridor bids from the archive (true Wednesdays from Oct 2004, so history starts "
                 "2004-05); settlements from the futures archive, and for 2004-07 from the workbooks. Reproduces the "
                 "yearly workbooks to the cent in most weeks (tests/test_return_to_carry.py).")
+    harvest += (" The Harvest basis switch above can use your own number instead (the calculated average is the default): it measures the "
+                "crop year being tracked, or, as a what-if, every crop year. In the weekly history the interest is charged on each week's cash price, "
+                "not on the harvest basis, so a different harvest basis moves every week's return by the same amount; the shipment table's "
+                "break-even does charge interest on it (futures + harvest basis).")
     interest = ("- **Interest** — the same rate as the rest of this tab: the effective fed funds rate on each date + 2.25% "
                 "(the Cost of Carry sheet's), moved by whatever the rate box above was edited by. In the weekly history it is "
                 f"charged as the sheets do — that week's rate ÷ 52 on the cash price (futures + basis), {start}; the shipment table "
@@ -267,6 +305,9 @@ def _short(d) -> str:
 
 def _ship_notes(tbl, est) -> str:
     """The one line under the cards that says how firm the harvest basis is."""
+    if tbl.b0 is not None and getattr(tbl, "b0_own", False):
+        return ("<b>Your own harvest basis</b> is in use: the break-even, the returns and the interest (charged on the futures plus the harvest basis) "
+                "are all measured from it.")
     if tbl.b0 is None:
         return ("The harvest basis is not known yet — the first weekly bid posts the first Wednesday of October, and "
                 "until a harvest-period bid is posted there is nothing to measure the break-even from.")
@@ -322,7 +363,9 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
     carry_total = None
     if lv is not None and all(lv.spreads.get(k) for k in spec.carry_pairs):
         carry_total = sum(lv.spreads[k][0] for k in spec.carry_pairs)
-    if tbl.b0 is None:
+    if tbl.b0 is not None and getattr(tbl, "b0_own", False):
+        b0_sub = f"your own, vs {ln[spec.base]}" + (f" · calculated {_n(tbl.b0_calc, 1)}" if tbl.b0_calc is not None else "")
+    elif tbl.b0 is None:
         b0_sub = "waiting for the first harvest bids"
     elif tbl.b0_est:
         b0_sub = "estimate — average of the posted harvest-period bids"

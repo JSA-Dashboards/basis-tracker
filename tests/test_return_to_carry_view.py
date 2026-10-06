@@ -113,6 +113,58 @@ check("derived_years: 'derived' = every bid of the crop year is flagged, 'part' 
       rd.derived_years([{"date": date(2024, 10, 2), "derived": True}, {"date": date(2025, 1, 8), "derived": True}, {"date": date(2025, 10, 1), "derived": True}, {"date": date(2025, 12, 3)}])
       == {2024: "derived", 2025: "part"} and rd.derived_years([{"date": date(2025, 10, 1)}]) == {} and rd.derived_years([]) == {})
 
+print("return_to_carry_view: the user's OWN harvest basis is marked wherever it is used")
+_, obs_all, futs_all = build(YEARS)
+res_own = rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, b0_overrides={2025: -20.0})
+rows_own = rd.summary_rows(res_own, "net")
+shift = rows[-1]["b0"] - (-20.0)
+check("the tracked year's best return moves by calculated - own, the other years' rows are untouched",
+      rows_own[-1]["b0_own"] and close(rows_own[-1]["b0"], -20.0) and close(rows_own[-1]["b0_calc"], rows[-1]["b0"]) and close(rows_own[-1]["best"] - rows[-1]["best"], shift)
+      and all(close(a["best"], b["best"]) and not a["b0_own"] for a, b in zip(rows_own[:-1], rows[:-1])), (rows_own[-1]["best"], rows[-1]["best"], shift))
+ho = vw.headline_html(rows_own, "net")
+check("the headline's harvest-basis card says it is your own and what the calculated one was",
+      "your own, vs Dec · calculated %+.1f" % rows[-1]["b0"] in ho and "-20.0¢" in ho and "average of the first 7 weekly bids" not in ho, ho[-700:])
+check("...and without an override it says what it always said", "your own" not in h and "average of the first 7 weekly bids, vs Dec" in h)
+to = vw.table_html(rows_own, "net")
+check("the by-year table marks the own year with an OWN pill and says what it means under the table",
+      to.count(">OWN<") == 1 and "OWN = measured from the harvest basis you entered" in to and to.index(">OWN<") < to.index("2024-25"), to.count(">OWN<"))
+check("no pill and no legend when every year is calculated", ">OWN<" not in t and "OWN =" not in t)
+res_all = rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, b0_overrides=rd.own_b0_map(-20.0, 2025, obs_all, every_year=True))
+ta = vw.table_html(rd.summary_rows(res_all, "net"), "net")
+check("the what-if marks every year, and every year's harvest basis reads the user's number", ta.count(">OWN<") == 12
+      and all(close(r["b0"], -20.0) for r in rd.summary_rows(res_all, "net")) and ta.count("-20.0") >= 12)
+tdo = vw.table_html(rows_own, "net", derived={2014: "derived"})
+check("it sits beside the derived tags when both apply (own pill + legend, derived pill + legend)", ">OWN<" in tdo and ">DERIVED<" in tdo and "OWN =" in tdo and "DERIVED / PART DERIVED =" in tdo)
+bo = vw.best_bar_chart(rows_own, "net").to_dict()
+dso = next(d for d in bo["datasets"].values() if d and "Crop year" in d[0])
+check("the bars read the own year's best return and show its harvest basis in the tooltip", close(dso[-1]["Best"], rows_own[-1]["best"]) and close(dso[-1]["Harvest basis"], -20.0))
+n1 = vw.own_basis_note_html(-20.0, -12.5, "2025-26")
+check("the note under the switch names the number, what it replaces, the crop year and where it is used, and says earlier years keep theirs",
+      "Your own harvest basis, -20.0¢ vs Dec" in n1 and "in place of the calculated -12.5¢" in n1 and "measures 2025-26" in n1 and "shipment table" in n1
+      and "latest row" in n1 and "Earlier years keep their calculated harvest basis" in n1)
+n2 = vw.own_basis_note_html(-20.0, -12.5, "2025-26", every_year=True)
+check("the what-if note says so: every year, a what-if, not what the analyst's workbooks computed, the best week stays",
+      "What-if" in n2 and "every crop year" in n2 and "-20.0¢</b> vs Dec" in n2 and "not what the analyst" in n2 and "stays where it was" in n2 and "Earlier years" not in n2)
+n3 = vw.own_basis_note_html(-20.0, None, "2026-27", in_history=False)
+check("a tracked year with no weekly bids yet: the number serves the shipment table only, and there is no 'calculated' to compare with",
+      "shipment table (that year has no weekly bids to draw yet)" in n3 and "calculated" not in n3.replace("calculated harvest basis", "") and "headline" not in n3)
+n4 = vw.own_basis_note_html(-30.0, -35.0, "2026-27", rtc.SOY)
+check("soybeans read vs Jan", "-30.0¢ vs Jan" in n4)
+check("balanced markup", all(n.count("<div") == n.count("</div>") == 1 for n in (n1, n2, n3, n4)))
+sh_c = rtc.build_shipment_table(2026, date(2026, 10, 21), -12.0, [], {date(2026, 10, 21): {"ZCZ26": 500.0, "ZCH27": 514.0, "ZCK27": 521.0, "ZCN27": 525.0}}, lambda d: 6.0, "net", b0_weeks=3)
+sh_o = rtc.build_shipment_table(2026, date(2026, 10, 21), -20.0, [], {date(2026, 10, 21): {"ZCZ26": 500.0, "ZCH27": 514.0, "ZCK27": 521.0, "ZCN27": 525.0}}, lambda d: 6.0, "net",
+                                b0_own=True, b0_calc=-12.0)
+hs = vw.shipment_html(sh_o, None, "bank prime")
+check("the shipment table's harvest-basis card and note say it is yours, with the calculated number beside it, and never call it an estimate or an average",
+      "your own, vs Dec · calculated -12.0" in hs and "Your own harvest basis</b> is in use" in hs and "Estimate." not in hs
+      and "weekly bids so far" not in hs and "-20.0¢" in hs)
+hc = vw.shipment_html(sh_c, None, "bank prime")
+check("...and the calculated table is unchanged", "your own" not in hc and "Your own harvest basis" not in hc and "average of the first 3 weekly bids so far" in hc)
+hs0 = vw.shipment_html(rtc.build_shipment_table(2026, date(2026, 10, 21), -5.0, [], {}, lambda d: 6.0, "net", b0_own=True, b0_calc=None), None, "")
+check("no calculated number to compare with -> the card just says it is yours", "your own, vs Dec" in hs0 and "· calculated" not in hs0 and "in place of the calculated" not in hs0)
+hw = vw.how_it_works()
+check("the 'how it is calculated' text tells the user about the switch", "Harvest basis switch above can use your own number" in hw and "what-if" in hw)
+
 print("return_to_carry_view: helpers")
 check("completed() keeps finished years that have a best return", len(vw.completed(rows)) == 12 and len(vw.completed(rd.summary_rows(inprog, "net"))) == 11)
 check("rank_of_latest: the newest synthetic year climbs the most, so it ranks first of 12", vw.rank_of_latest(rows) == (1, 12), vw.rank_of_latest(rows))

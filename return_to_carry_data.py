@@ -8,6 +8,7 @@
   quotes_from_rail / _from_snapshots   every posted forward period of a corridor / location, with its futures tag
   parse_label / shipment_quotes        which months a period covers ('JFM', 'FH Dec', 'Dec 1-20') -> one bid per shipment month
   shipment_table(...)                  the report's page-1 table (break-even, current and best bids by shipment month)
+  own_b0_map / b0_override(s)          the user's OWN harvest basis in place of the calculated average (shipment_table, run_history)
 
 Pure functions over plain data (database access stays in the app): see return_to_carry for the method.
 """
@@ -298,9 +299,13 @@ def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, ma
 
 
 def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: date, measure: str = "net",
-                   spec: rtc.Spec = rtc.CORN):
+                   spec: rtc.Spec = rtc.CORN, b0_override: float | None = None):
     """The report's page-1 table on `asof` for the crop year that is live: (ShipTable, estimate) — `estimate` is the
-    (value, date, labels) the harvest basis was taken from while the weekly bids are not in yet, else None."""
+    (value, date, labels) the harvest basis was taken from while the weekly bids are not in yet, else None.
+
+    b0_override  the user's OWN harvest basis (cents vs the spec's base contract) in place of the calculated one: the break-even,
+                 the returns and the interest all use it, `tbl.b0_own` is True and `tbl.b0_calc` keeps what the calculated method
+                 gives (the average so far, or the estimate before the weekly bids) to show beside it; no estimate is returned then."""
     crop_year = rtc.shipment_crop_year(asof)
     known = {d: px for d, px in futs.items() if d <= asof}      # a past as-of date must not see a roll spread measured after it
     cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], known, crop_year, rate_on, spec)
@@ -308,9 +313,24 @@ def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: 
     if b0 is None:
         est = harvest_estimate(raw, crop_year, asof, futs, spec=spec)
         b0 = est[0] if est else None
+    calc = b0                                                   # what the calculated method gives: the average so far, else the estimate
+    own = b0_override is not None
+    if own:
+        b0, est = float(b0_override), None
     tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year, spec), futs, rate_on, measure,
-                                   b0_weeks=cy.b0_weeks if cy.b0 is not None else 0, b0_est=est is not None, spec=spec)
+                                   b0_weeks=cy.b0_weeks if (cy.b0 is not None and not own) else 0, b0_est=est is not None, spec=spec,
+                                   b0_own=own, b0_calc=calc)
     return tbl, est
+
+
+def own_b0_map(value: float | None, crop_year: int, obs: list[dict], spec: rtc.Spec = rtc.CORN, every_year: bool = False) -> dict:
+    """{crop year: harvest basis} to hand run_history_noted: the user's own harvest basis for the crop year being tracked — or, as a what-if
+    ('what would storing have paid had I always bought at -15'), for every crop year the series covers (and the tracked one). {} when
+    `value` is None, i.e. the calculated method everywhere."""
+    if value is None:
+        return {}
+    years = (set(crop_years_in(obs, spec)) | {crop_year}) if every_year else {crop_year}
+    return {y: float(value) for y in years}
 
 
 def crop_years_in(obs: list[dict], spec: rtc.Spec = rtc.CORN) -> list[int]:
@@ -358,15 +378,17 @@ def repeated_years(results: list) -> set:
 
 
 def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
-                      spec: rtc.Spec = rtc.CORN) -> tuple:
+                      spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None) -> tuple:
     """(results, skipped): every crop year the series covers from `min_year` (default: the spec's first) on, oldest first,
     without the years that only repeat the previous one (`skipped` = their labels). A year needs some weeks to say anything,
-    so one with fewer than `min_weeks` of bids is left out unless it is the newest (the one in progress)."""
+    so one with fewer than `min_weeks` of bids is left out unless it is the newest (the one in progress).
+    `b0_overrides` = {crop year: the user's own harvest basis} (see own_b0_map()): those years are measured from it, the rest
+    from their calculated average."""
     min_year = spec.min_crop_year if min_year is None else min_year
     ys = [y for y in crop_years_in(obs, spec) if y >= min_year]
     out = []
     for y in ys:
-        cy = rtc.build_crop_year(obs, futs, y, rate_on, spec)
+        cy = rtc.build_crop_year(obs, futs, y, rate_on, spec, b0_override=(b0_overrides or {}).get(y))
         if len(cy.weeks) >= min_weeks or (y == ys[-1] and cy.weeks):
             out.append(cy)
     bad = repeated_years(out)
@@ -374,9 +396,9 @@ def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12,
 
 
 def run_history(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
-                spec: rtc.Spec = rtc.CORN) -> list:
+                spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None) -> list:
     """run_history_noted without the note."""
-    return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec)[0]
+    return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec, b0_overrides)[0]
 
 
 def _value(w, measure: str):
@@ -392,7 +414,7 @@ def summary_rows(results: list, measure: str = "net") -> list[dict]:
         last = next((w for w in reversed(cy.weeks) if _value(w, measure) is not None), None)
         rows.append({
             "crop_year": cy.crop_year, "label": cy.label, "weeks": len(cy.weeks), "complete": cy.complete,
-            "b0": cy.b0, "b0_weeks": cy.b0_weeks, "carry": cy.season_carry,
+            "b0": cy.b0, "b0_weeks": cy.b0_weeks, "b0_own": cy.b0_own, "b0_calc": cy.b0_calc, "carry": cy.season_carry,
             "summer": None if cy.summer is None else cy.summer.basis,
             "summer_date": None if cy.summer is None else cy.summer.date,
             "best": None if best is None else _value(best, measure),
