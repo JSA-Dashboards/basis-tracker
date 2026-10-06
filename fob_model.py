@@ -7,6 +7,8 @@ Mirrors the JSA FOB Sheet workbook. The core relationship is:
 
 Freight % is entered once (shared across all commodities). CIF and CBOT futures
 are per-commodity. Bushel weight differs by commodity (corn 56, soy/wheat 60).
+
+Module rev: 2 (carry helpers take optional contracts/months for archived dates).
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -15,18 +17,63 @@ from dataclasses import dataclass
 # Static structure
 # ---------------------------------------------------------------------------
 
-MONTHS = ["June", "July", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan"]
+import datetime as _dt
 
 COMMODITIES = ["Corn", "Soybeans", "Wheat"]
 
 BUSHEL_WEIGHT = {"Corn": 56, "Soybeans": 60, "Wheat": 60}
 
-# Futures contract symbol mapped to each month column, per commodity.
-CONTRACTS = {
-    "Corn":     ["CN", "CN", "CU", "CU", "CZ", "CZ", "CZ", "CH"],
-    "Soybeans": ["SN", "SN", "SQ", "SX", "SX", "SX", "SF", "SF"],
-    "Wheat":    ["WN", "WN", "WU", "WU", "WZ", "WZ", "WZ", "WH"],
+# ---------------------------------------------------------------------------
+# Rolling delivery window + futures-contract mapping
+# ---------------------------------------------------------------------------
+# The sheet shows an 8-month forward window that rolls each calendar month:
+# in June it is June..Jan; in July it drops June and adds February, etc.
+# Labels match the workbook (June/July spelled out, the rest 3-letter).
+
+_MONTH_LABEL = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "June",
+                7: "July", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+_LABEL_MONTH = {v.lower(): k for k, v in _MONTH_LABEL.items()}
+
+# Per-commodity futures cycle: contract-month number -> code letter. A cash
+# delivery month is priced against the first contract on/after it (wrapping).
+CONTRACT_CYCLE = {
+    "Corn":     {3: "H", 5: "K", 7: "N", 9: "U", 12: "Z"},
+    "Soybeans": {1: "F", 3: "H", 5: "K", 7: "N", 8: "Q", 11: "X"},
+    "Wheat":    {3: "H", 5: "K", 7: "N", 9: "U", 12: "Z"},
 }
+_CONTRACT_PREFIX = {"Corn": "C", "Soybeans": "S", "Wheat": "W"}
+
+
+def months_for(as_of):
+    """The 8-month rolling delivery window starting at the as-of month."""
+    return [_MONTH_LABEL[((as_of.month - 1 + i) % 12) + 1] for i in range(8)]
+
+
+def label_month_num(label):
+    """Month number for a window label ('June'->6), or None."""
+    return _LABEL_MONTH.get(str(label).strip().lower())
+
+
+def contract_for(commodity, month_num):
+    """Futures contract a cash delivery month is priced against (e.g. 'CN'):
+    the first contract in the crop's cycle on/after that month, wrapping."""
+    cyc = CONTRACT_CYCLE[commodity]
+    on_after = [mo for mo in cyc if mo >= month_num]
+    ref = min(on_after) if on_after else min(cyc)
+    return _CONTRACT_PREFIX[commodity] + cyc[ref]
+
+
+def contracts_for(commodity, as_of):
+    """Contract code for each column of the rolling window."""
+    return [contract_for(commodity, ((as_of.month - 1 + i) % 12) + 1)
+            for i in range(8)]
+
+
+# Static defaults (the June window) — kept so the import/backfill scripts, which
+# read June-era workbooks positionally, and any bare import keep working. The
+# Streamlit app overrides MONTHS / CONTRACTS per-run from the chosen as-of date.
+MONTHS = months_for(_dt.date(2026, 6, 1))
+CONTRACTS = {c: contracts_for(c, _dt.date(2026, 6, 1)) for c in COMMODITIES}
 
 # Freight reaches the user enters (the % of tariff, by month).
 # MTCT mirrors Lower Miss in the sheet, so Memphis/Cairo draw from Lower Miss.
@@ -75,6 +122,7 @@ LOCATIONS = [
     Location("Chicago",           5.78, "IL",              "Illinois River"),
     Location("Seneca",            5.24, "IL",              "Illinois River"),
     Location("Hennepin",          5.07, "IL",              "Illinois River"),
+    Location("Lacon",             5.07, "IL",              "Illinois River"),
     Location("Peoria",            4.81, "IL",              "Illinois River"),
     Location("Havana",            4.64, "IL",              "Illinois River"),
 ]
@@ -85,6 +133,26 @@ REACH_ORDER = [
 ]
 
 FACTOR = {loc.name: loc.factor for loc in LOCATIONS}
+
+# Fixed CBOT delivery-equivalent levels per location (a static reference column
+# on the sheet, not derived from CIF/freight and unchanged day to day). Corn and
+# Soybeans carry the Illinois River delivery points; Wheat carries St. Louis
+# only. Values supplied by the desk.
+DELIVERY_EQUIV = {
+    "Corn":     {"Chicago": 6.00, "Seneca": 10.75, "Hennepin": 12.25,
+                 "Lacon": 12.25, "Peoria": 14.75, "Havana": 16.25},
+    "Soybeans": {"Chicago": 12.00, "Seneca": 16.75, "Hennepin": 18.25,
+                 "Lacon": 18.25, "Peoria": 20.75, "Havana": 22.25},
+    "Wheat":    {"STL": 28.25},
+}
+
+# CBOT Illinois-River corn/soybean delivery zones: FOB location -> zone number.
+# A location shares its zone's delivery-equivalent level (e.g. Lacon = Zone 3 =
+# Hennepin's level). Locations not listed here aren't delivery houses.
+DELIVERY_ZONE = {
+    "Chicago": 1, "Seneca": 2, "Hennepin": 3, "Lacon": 3, "Peoria": 4,
+    "Havana": 5,
+}
 
 # Exact vertical row order of a commodity block, mirroring the workbook.
 # Each entry is one of:
@@ -98,6 +166,7 @@ BLOCK_LAYOUT = [
     ("fob", "Chicago"),
     ("fob", "Seneca"),
     ("fob", "Hennepin"),
+    ("fob", "Lacon"),
     ("fob", "Peoria"),
     ("fob", "Havana"),
     ("reach", "St. Louis"),
@@ -132,8 +201,14 @@ BLOCK_LAYOUT = [
 # ---------------------------------------------------------------------------
 
 def fob_value(cif, freight_pct, factor, bushel_weight):
-    """FOB barge basis for one location/month. Returns None if inputs missing."""
-    if cif is None or freight_pct is None:
+    """FOB barge basis for one location/month. Returns None if the CIF is missing,
+    or the barge freight is zero/blank.
+
+    A barge freight quote is never legitimately 0 — a 0 or blank means there's no
+    quote because the river is closed at that reach (typically the upper river in
+    winter). Computing FOB against zero freight would fabricate a value at the
+    "no-freight" level (= CIF), so treat it as undefined instead."""
+    if cif is None or not freight_pct:            # freight None or 0 -> closed
         return None
     return cif - (factor * freight_pct) / 2000 * bushel_weight
 
@@ -158,7 +233,7 @@ CARRY_CONFIG = {
                       ("STL Henn Carry (Spot Futures)", "Hennepin")],
     },
     "Wheat": {
-        "cash_loc": "STL", "cash_mode": "cumulative",
+        "cash_loc": "STL", "cash_mode": "flat",
         "cash_label": "Cash vs Delivery (STL)",
         "spread_labels": ["WN/WU", "WU/WZ", "WZ/H"],
         "top_carry": [("STL Top Carry (Spot Futures)", "STL")],
@@ -166,29 +241,35 @@ CARRY_CONFIG = {
 }
 
 
-def contract_indices(commodity):
-    """0-based index of each month's contract among the distinct contracts."""
+def contract_indices(commodity, contracts=None):
+    """0-based index of each month's contract among the distinct contracts.
+    Pass `contracts` to use an archived date's chain instead of the live one."""
     seen, idx = [], []
-    for c in CONTRACTS[commodity]:
+    for c in (contracts or CONTRACTS[commodity]):
         if c not in seen:
             seen.append(c)
         idx.append(seen.index(c))
     return idx
 
 
-def spread_offsets(commodity, spreads):
-    """Cumulative spread offset per month (sum of spreads before its contract)."""
+def spread_offsets(commodity, spreads, contracts=None):
+    """Cumulative spread offset per month (sum of spreads before its contract).
+
+    The window can hold more distinct contracts than there are spreads (e.g. a
+    5th contract rolls in) — those columns reuse the last cumulative offset
+    rather than indexing past the spread list."""
     cum = [0.0]
     for s in spreads:
         cum.append(cum[-1] + (s or 0.0))
-    return [cum[i] for i in contract_indices(commodity)]
+    return [cum[min(i, len(cum) - 1)]
+            for i in contract_indices(commodity, contracts)]
 
 
 def pct_full_carry(spreads, fullcarry):
     """% of full carry per spread = spread / -fullcarry."""
     out = []
     for s, fc in zip(spreads, fullcarry):
-        out.append(None if not fc else s / (-fc))
+        out.append(None if (s is None or not fc) else s / (-fc))
     return out
 
 
@@ -197,18 +278,28 @@ CONTRACT_MONTH = {"F": 1, "G": 2, "H": 3, "J": 4, "K": 5, "M": 6,
                   "N": 7, "Q": 8, "U": 9, "V": 10, "X": 11, "Z": 12}
 
 
-def distinct_contracts(commodity):
-    """The 4 distinct futures contracts of a commodity, in calendar order."""
+def distinct_contracts(commodity, contracts=None):
+    """The distinct futures contracts in the window, in column order. Follows the
+    active CONTRACTS, so if the front has rolled (e.g. SN -> SQ) the spot contract
+    and the whole chain roll with it. Pass `contracts` for an archived chain."""
     seen = []
-    for c in CONTRACTS[commodity]:
+    for c in (contracts or CONTRACTS[commodity]):
         if c not in seen:
             seen.append(c)
     return seen
 
 
-def spread_months(commodity):
+def spread_labels_for(commodity, contracts=None):
+    """Inter-contract spread labels for the current distinct contracts, e.g.
+    ['SQ/SX', 'SX/SF', 'SF/SH'] once the front has rolled to SQ. One fewer than
+    the number of distinct contracts."""
+    dc = distinct_contracts(commodity, contracts)
+    return [f"{dc[i]}/{dc[i + 1]}" for i in range(len(dc) - 1)]
+
+
+def spread_months(commodity, contracts=None):
     """Months between each consecutive contract pair (handles year wrap)."""
-    dc = distinct_contracts(commodity)
+    dc = distinct_contracts(commodity, contracts)
     out = []
     for a, b in zip(dc, dc[1:]):
         d = (CONTRACT_MONTH[b[-1]] - CONTRACT_MONTH[a[-1]]) % 12
@@ -216,26 +307,44 @@ def spread_months(commodity):
     return out
 
 
-def futures_by_contract(commodity, fut_row):
+def futures_by_contract(commodity, fut_row, contracts=None, months=None):
     """First futures price seen for each distinct contract."""
+    contracts = contracts or CONTRACTS[commodity]
+    months = months or MONTHS
     out = {}
-    for j, m in enumerate(MONTHS):
-        c = CONTRACTS[commodity][j]
+    for j, m in enumerate(months):
+        if j >= len(contracts):
+            break
+        c = contracts[j]
         if c not in out and fut_row.get(m) is not None:
             out[c] = fut_row[m]
     return out
 
 
-def compute_full_carry(commodity, fut_row, interest_annual, storage_per_mo):
+def spreads_from_futures(commodity, fut_row, contracts=None, months=None):
+    """Inter-contract spreads implied by the CBOT futures row: for each
+    consecutive distinct-contract pair, price(front) - price(next). Returns None
+    for a pair when either leg's price is missing. One per spread label."""
+    fbc = futures_by_contract(commodity, fut_row, contracts, months)
+    dc = distinct_contracts(commodity, contracts)
+    out = []
+    for a, b in zip(dc, dc[1:]):
+        pa, pb = fbc.get(a), fbc.get(b)
+        out.append(None if pa is None or pb is None else round(pa - pb, 4))
+    return out
+
+
+def compute_full_carry(commodity, fut_row, interest_annual, storage_per_mo,
+                       contracts=None, months=None):
     """Theoretical full carry per spread from interest + storage.
 
     full carry = months * (storage/bu/mo + front_price * annual_interest / 12)
     interest_annual is a decimal (e.g. 0.07).
     """
-    dc = distinct_contracts(commodity)
-    fbc = futures_by_contract(commodity, fut_row)
+    dc = distinct_contracts(commodity, contracts)
+    fbc = futures_by_contract(commodity, fut_row, contracts, months)
     out = []
-    for i, mo in enumerate(spread_months(commodity)):
+    for i, mo in enumerate(spread_months(commodity, contracts)):
         price = fbc.get(dc[i])
         if price is None:
             out.append(None)
@@ -245,34 +354,27 @@ def compute_full_carry(commodity, fut_row, interest_annual, storage_per_mo):
 
 
 def cash_vs_delivery(commodity, fob_row, cash_c, months=None):
-    """FOB(cash location) less the DVE cash distance, by month.
+    """FOB(cash location) less the DVE cash distance (a flat constant), by month —
+    the same idea for corn, soybeans and wheat.
 
-    Corn/soy subtract a flat constant; wheat is cumulative (each month
-    subtracts the prior month's result), matching the workbook exactly.
+    Wheat previously used a 'cumulative' mode that subtracted the prior month's
+    *result*, which oscillated (Sep -0.85, Oct +0.48, Nov -0.61 …) instead of
+    tracking the FOB curve; corrected to flat 2026-09 so it matches corn/soy.
     """
     months = months or MONTHS
-    mode = CARRY_CONFIG[commodity]["cash_mode"]
-    vals, prev = [], None
-    for m in months:
-        f = fob_row.get(m)
-        if f is None:
-            vals.append(None)
-            continue
-        base = cash_c if (mode == "cumulative" and prev is None) else (
-            prev if mode == "cumulative" else cash_c)
-        v = f - base
-        vals.append(v)
-        prev = v
-    return vals
+    return [None if fob_row.get(m) is None else fob_row.get(m) - cash_c
+            for m in months]
 
 
-def top_carry(commodity, fob_row, spreads):
-    """FOB(location) shifted to the spot (front) contract via spread offsets."""
-    off = spread_offsets(commodity, spreads)
+def top_carry(commodity, fob_row, spreads, contracts=None, months=None):
+    """FOB(location) shifted to the spot (front) contract via spread offsets.
+    Pass an archived chain/months to shift a historical date correctly."""
+    off = spread_offsets(commodity, spreads, contracts)
     out = []
-    for j, m in enumerate(MONTHS):
+    for j, m in enumerate(months or MONTHS):
         f = fob_row.get(m)
-        out.append(None if f is None else f - off[j])
+        off_j = off[j] if j < len(off) else (off[-1] if off else 0.0)
+        out.append(None if f is None else f - off_j)
     return out
 
 

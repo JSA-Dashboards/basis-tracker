@@ -42,6 +42,22 @@ def load_sheet_futures(path: Path | None = None, root: str = "ZC") -> dict:
     return out
 
 
+def futures_map(rows) -> dict:
+    """{date: {symbol: cents}} from stored settlement rows [{'date', 'symbol', 'price_cents'}] (a SELECT of futures_prices): the shape the
+    tracker and the shipment table read. Rows with no usable date or price are skipped; a date may arrive as a date or an ISO string."""
+    out: dict = {}
+    for r in rows or []:
+        d = _parse_date(r.get("date"))
+        sym, px = r.get("symbol"), r.get("price_cents")
+        if d is None or not sym or px is None:
+            continue
+        try:
+            out.setdefault(d, {})[str(sym).strip()] = float(px)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def merge_futures(*sources: dict) -> dict:
     """Combine {date: {symbol: cents}} maps; a later source wins where both have a (date, symbol)."""
     out: dict = {}

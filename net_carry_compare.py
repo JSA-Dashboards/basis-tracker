@@ -31,7 +31,7 @@ class Entry:
     """One location or corridor in the comparison."""
     key: str                         # unique id, e.g. 'b|ADM|St. Louis, MO (Elevator)' / 'r|CSX Columbus'
     name: str                        # what the column header says
-    kind: str                        # 'basis' | 'rail'
+    kind: str                        # 'basis' | 'rail' | 'river'
     items: list = field(default_factory=list)   # [{delivery, futures, basis}] — its quotes on its quote date
     quote_date: date | None = None   # the posting the items come from
     is_main: bool = False            # the location the tab is showing (always the first column)
@@ -113,7 +113,7 @@ def render_html(res: dict) -> str:
     head = f'<th style="{th_base};text-align:left;white-space:nowrap">DELIVERY</th>'
     for c in cols:
         e = c["entry"]
-        icon = "🚂 " if e.kind == "rail" else ""
+        icon = {"rail": "🚂 ", "river": "🌊 "}.get(e.kind, "")
         star = '<span style="color:#f28e2b" title="the location above">★ </span>' if e.is_main else ""
         sub = ""
         if c["no_data"]:
@@ -175,8 +175,9 @@ def render_html(res: dict) -> str:
         qd = f"{e.quote_date.month}/{e.quote_date.day}" if e.quote_date else "—"
         row_date += f'<td style="{foot2_td};color:#94a3b8">{qd}</td>'
 
+    ref_name = res["ref"] or "each location's own futures"      # (a backslash inside an f-string field is a SyntaxError before Python 3.12)
     return (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:4px 0 6px">'
-            f'{what[0].upper() + what[1:]} by delivery month · vs {res["ref"] or "each location\'s own futures"}</div>'
+            f'{what[0].upper() + what[1:]} by delivery month · vs {ref_name}</div>'
             f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:{140 + 104 * len(cols)}px">'
             f'<thead><tr>{head}</tr></thead><tbody>{body}</tbody>'
             f'<tfoot><tr>{row_top}</tr><tr>{row_gain}</tr><tr>{row_date}</tr></tfoot></table></div>')

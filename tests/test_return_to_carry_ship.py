@@ -240,6 +240,13 @@ qs = rd.quotes_from_snapshots(snaps, "Corn", lambda g: g)
 check("snapshots: the newest of each day, forward rows with a basis, this grain only",
       sorted((q["date"].isoformat(), q["label"], q["basis"]) for q in qs) == [("2026-10-01", "Dec 2026", 5.0), ("2026-10-02", "Dec 2026", 9.0), ("2026-10-02", "Jan 2027", 12.0)], qs)
 
+print("futures rows -> the {date: {symbol: cents}} map")
+fm = rd.futures_map([{"date": "2026-10-02", "symbol": "ZCZ26", "price_cents": 502.25}, {"date": D(2026, 10, 2), "symbol": "ZCH27 ", "price_cents": "516.75"},
+                     {"date": "2026-10-05", "symbol": "ZCZ26", "price_cents": None}, {"date": "bad", "symbol": "ZCZ26", "price_cents": 1.0},
+                     {"date": "2026-10-06", "symbol": "", "price_cents": 2.0}, {"date": "2026-10-07", "symbol": "ZCK27", "price_cents": "n/a"}])
+check("dates as strings or dates, symbols trimmed, prices as numbers; rows with no price, no usable date or symbol are dropped",
+      fm == {D(2026, 10, 2): {"ZCZ26": 502.25, "ZCH27": 516.75}} and rd.futures_map(None) == {} and rd.futures_map([]) == {}, fm)
+
 print("harvest basis before the weekly bids: the posted harvest-period quotes")
 FE = {D(2026, 10, 2): {"ZCZ26": 502.25, "ZCH27": 516.75}}
 rawh = [{"date": D(2026, 10, 2), "label": "FH Oct", "tag": "ZCZ26", "basis": -10.0}, {"date": D(2026, 10, 2), "label": "LH Oct", "tag": "ZCZ26", "basis": -17.0},

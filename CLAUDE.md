@@ -121,6 +121,33 @@ bids (no 2007-08), ADM St. Louis 2023-24 / 2024-25 are sparse, ADM Des Moines 20
 not yet the weekly history. **Line endings:** `app.py` is CRLF in the working copy (`.gitattributes` normalises to LF in the repo);
 write it in binary mode or through the Edit tool, never a text-mode Python rewrite.
 
+**River FOB = a third Net Carry location type, with the full history (Kolten 2026-10-05: "we should be able to do all the history
+... the numbers are still all there ... look in the existing FOB sheet archive for the river", not in workbooks).** The River FOB
+portal archives one sheet per as-of date in Snowflake `RIVER_FOB.PUBLIC` (`cif_history`, `freight_history`, `calendar_history`):
+weekly since **2006-09-07**, 1,119 sheets. The portal stores only CIF and barge freight; FOB = CIF − tariff × freight / 2000 × bushel
+weight (`fob_model`, owned by the river portal — keep this repo's copy identical; the 2026-10 sync added Lacon and the rule that a
+0/blank freight means the river is closed, so there is no FOB). `river_carry.py` (pure, `tests/test_river_carry.py`) turns the loaded
+archive (`river_fob_data.load_archive`, 3 queries) into the Net Carry tab's inputs: `curve_items` (one sheet's curve), `nearby_obs` (the
+weekly nearby FOB with the contract the sheet maps that month to — the first column, or the month after a leading 'Spot', never a
+later month) and `forward_quotes` (every posted month, labelled with its year, for the shipment table, which therefore works for any
+past as-of date). A sheet's columns carry no year: the first month must start 0-2 months after the sheet's date (a stale header sets
+the sheet aside — 2 soybean / 7 corn sheets of 1,119) and the contract year is the occurrence of the month letter nearest the delivery
+month. The upper-river reaches (Quincy, Burlington, Davenport, Prairie du Chien, Savage) have no freight in winter, so their series
+have gaps; Illinois River, STL, Ohio and the Lower Mississippi are complete. Every one of the 18 sheet locations gets 21 crop years of
+corn and soybean Return to Carry from 2006-07 (soybean average best +33 to +47¢, corn +35 to +53¢ — Hennepin soybeans +38.4, STL corn
++43.6); wheat gets the Net Carry curve only. **Corn 2007-08 has no best return for any location:** `futures_prices` holds no front
+contract (Dec 2007) that autumn and the corn workbook CSV stops at 2006-07, so the Dec→Mar roll cannot be measured (same gap in the
+tracker's other corn series). The FOB series is the sell side, not an elevator's buy basis — the existing truck series differ from it
+by a varying amount (the corn Hennepin series sits about 3¢ under FOB, interquartile 2-6¢; the soybean one about 11¢ under, interquartile
+2-22¢), which is why the river history is shown as its own location type rather than merged into the elevator rows. `return_to_carry_block.py` is the whole Return to Carry section as one
+Streamlit block (`render(obs=..., quotes=...)`), shared with the portals, which vendor it next to the `return_to_carry*.py` modules.
+
+**Vendored modules (portals).** `sync_carry_modules.py <portal dir> [--river] [--no-return] [--check]` copies the Net Carry modules,
+the Return to Carry modules and their data files (and `river_carry.py` with `--river`) into a portal. The rail portal's
+`environment.sis.yml` pins Python **3.11**, where an f-string may not hold a backslash, a comment, a line break or its own quote
+inside a replacement field (all legal from 3.12 on); `tests/test_vendored_syntax.py` scans every vendored file for them (the check
+needs Python 3.12+, i.e. it runs here and not on 3.11).
+
 ### `futures_prices` was backfilled (2026-10-04)
 
 The daily capture only began 2026-06-22. `backfill_futures_history.py` copied ZC/ZS (from 2006-11) and ZW/KE (from 2021-10)

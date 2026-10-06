@@ -86,6 +86,28 @@ def load_snapshot(as_of: str):
         conn.close()
 
 
+def load_archive() -> dict:
+    """The whole archive in three queries (about 110,000 rows, weekly sheets since 2006-09) for the history readers
+    (river_carry): {'cif': {as_of: {commodity: {month: value}}}, 'freight': {as_of: {region: {month: value}}},
+    'calendar': {as_of: {commodity: [(month, contract), ...]}}}. `as_of` is the archive's ISO date string."""
+    conn = _river_conn()
+    c = conn.cursor()
+    try:
+        cif, frt, cal = {}, {}, {}
+        c.execute(f"SELECT as_of, commodity, month, value FROM {_tbl('cif_history')}")
+        for r in c.fetchall():
+            cif.setdefault(r["as_of"], {}).setdefault(r["commodity"], {})[r["month"]] = _f(r["value"])
+        c.execute(f"SELECT as_of, region, month, value FROM {_tbl('freight_history')}")
+        for r in c.fetchall():
+            frt.setdefault(r["as_of"], {}).setdefault(r["region"], {})[r["month"]] = _f(r["value"])
+        c.execute(f"SELECT as_of, commodity, seq, month, contract FROM {_tbl('calendar_history')} ORDER BY as_of, commodity, seq")
+        for r in c.fetchall():
+            cal.setdefault(r["as_of"], {}).setdefault(r["commodity"], []).append((r["month"], r["contract"]))
+        return {"cif": cif, "freight": frt, "calendar": cal}
+    finally:
+        conn.close()
+
+
 def latest_date() -> str | None:
     ds = list_dates()
     return ds[0] if ds else None

@@ -298,6 +298,25 @@ def _cached_river_snapshot(as_of: str):
     import river_fob_data
     return river_fob_data.load_snapshot(as_of)
 
+@st.cache_data(ttl=21600, show_spinner="Loading the River FOB archive…")
+def _cached_river_archive() -> dict:
+    """The whole River FOB sheet archive (CIF, freight, contract calendar for every weekly sheet since 2006-09) — the Net Carry
+    tab's 'River FOB' location type and its Return to Carry history are built from it (river_carry)."""
+    import river_fob_data
+    return river_fob_data.load_archive()
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _cached_river_obs(location: str, grain: str) -> list:
+    """A river location's weekly nearby FOB with the contract it is quoted off (river_carry.nearby_obs)."""
+    import river_carry
+    return river_carry.nearby_obs(_cached_river_archive(), location, grain)
+
+@st.cache_data(ttl=21600, show_spinner=False)
+def _cached_river_quotes(location: str, grain: str) -> list:
+    """Every month every archived sheet posted a FOB for — the forward quotes behind the shipment-by-month table."""
+    import river_carry
+    return river_carry.forward_quotes(_cached_river_archive(), location, grain)
+
 def _grain_disp(raw: str) -> str | None:
     """Return canonical display name for a raw grain, or None if inactive."""
     entry = _GM.get(raw)
@@ -3056,27 +3075,41 @@ def _nc_compare_block(kind, main_key, main_name, main_items, asof, grain, ref_sy
             opts_r[f"🚂 {m}"] = m
     skip = {main_name, f"🚂 {main_name}"}
     options = [l for l in opts_b if l not in skip] + [l for l in opts_r if l not in skip]
+    opts_v, arch = {}, None                        # the River FOB sheet's locations on this date: label -> river location
+    if kind == "River FOB":
+        import river_carry as _rcar
+        arch = _cached_river_archive()
+        main_loc = main_key.split("|", 1)[1]
+        opts_v = {f"🌊 {l}": l for l in _rcar.CURRENT_LOCATIONS if l != main_loc and _rcar.curve_items(arch, asof_iso, l, grain)}
+        options = list(opts_v)                     # a river location is compared with the others on the same sheet
 
     # default peers: the nearest basis locations (by lat/lon), or the same-railroad corridors
     if kind == "Basis location":
         coords = {f'{x["provider"]} · {x["location"]}': (float(x["lat"]), float(x["lon"]))
                   for x in _cached_get_bids_filter_data() if x.get("lat") is not None and x.get("lon") is not None}
         default = _cmp.nearest_peers(main_name, coords, [l for l in opts_b if l not in skip], 3)
+    elif kind == "River FOB":
+        default = [f"🌊 {l}" for l in _rcar.reach_peers(main_loc, 3)]
     else:
         default = [f"🚂 {m}" for m in _cmp.rail_peers(main_name, list(opts_r.values()), 3)]
     default = [d for d in default if d in options]
 
     picked = st.multiselect(
         "Compare with", options, default=default, key=f"nc_cmp_{main_key}_{grain}_{asof_iso}",
-        help="Basis locations and rail corridors that posted this commodity in the last 10 days. "
-             "Starts with the nearest locations (or the same railroad's corridors). Type to search.")
+        help=("The other river locations on the same FOB sheet. Starts with the neighbours on the same reach. Type to search."
+              if kind == "River FOB" else
+              "Basis locations and rail corridors that posted this commodity in the last 10 days. "
+              "Starts with the nearest locations (or the same railroad's corridors). Type to search."))
 
-    entries = [_cmp.Entry(main_key, main_name, "rail" if kind == "Rail corridor" else "basis",
+    entries = [_cmp.Entry(main_key, main_name, {"Rail corridor": "rail", "River FOB": "river"}.get(kind, "basis"),
                           main_items, asof, True)]
     basis_pairs = tuple(opts_b[l] for l in picked if l in opts_b)
     snaps = _cached_snaps_asof(basis_pairs, asof_iso) if basis_pairs else {}
     for lab in picked:
-        if lab in opts_b:
+        if lab in opts_v:
+            entries.append(_cmp.Entry(f"v|{opts_v[lab]}", opts_v[lab], "river",
+                                      _rcar.curve_items(arch, asof_iso, opts_v[lab], grain), asof))
+        elif lab in opts_b:
             sn = snaps.get(opts_b[lab])
             entries.append(_cmp.Entry(
                 f"b|{lab}", lab, "basis", _cmp.snapshot_items(sn, grain, _grain_disp) if sn else [],
@@ -3094,85 +3127,35 @@ def _nc_compare_block(kind, main_key, main_name, main_items, asof, grain, ref_sy
         f"from {anchor_lbl} at {rate * 100:.2f}% — so the columns compare directly. ★ = the location above · "
         f"amber ▲ = that location's top of {'net' if measure == 'net' else 'gross'} carry · green = the best "
         f"in that month. Each location shows its latest posting on or before {asof:%b %d} (within 10 days); "
-        f"a different date is flagged under its name.")
+        f"a different date is flagged under its name."
+        + (" All the river locations are read from the same FOB sheet, so they share its date." if kind == "River FOB" else ""))
     if len(entries) == 1:
         st.caption("Pick more locations above to compare them with this one.")
 
 
 def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
     """The Return to Carry tracker: what buying corn or soybeans at harvest and storing them has paid, crop year by crop
-    year (return_to_carry; the Research Analyst's yearly workbooks, automated). `ref` = ('basis', provider, location)
-    or ('rail', corridor)."""
-    import return_to_carry as _rtc
-    import return_to_carry_data as _rd
-    import return_to_carry_view as _vw
-    import carry_rate as _cr
-
-    st.markdown(
-        '<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#64748b;font-weight:700;'
-        'text-transform:uppercase;letter-spacing:.1em">Return to carry — what storing from harvest has paid</div>',
-        unsafe_allow_html=True)
-    spec = _rtc.SPECS.get(grain)
-    if spec is None:
-        st.info("The Return to Carry tracker is built for corn and soybeans (the analyst's two reports); wheat "
-                "needs its own contract chain and harvest window.")
-        return
-    if ref[0] == "rail" and ref[1].endswith("Freight"):
-        st.info("This line is a freight rate, not an FOB bid, so there is no storage return to track.")
-        return
-    obs = (_cached_rtc_obs_rail(ref[1], grain) if ref[0] == "rail" else _cached_rtc_obs_basis(ref[1], ref[2], grain))
-    obs = [o for o in obs if o["date"] <= asof]
-    quotes = (_cached_rtc_quotes_rail(ref[1], grain) if ref[0] == "rail" else _cached_rtc_quotes_basis(ref[1], ref[2], grain))
-    quotes = [q for q in quotes if q["date"] <= asof]
-    if len(obs) < 12 and not quotes:
-        st.info("No weekly spot history for this location to track (the tracker needs a bid every week from "
-                "October through " + ("July" if spec.key == "corn" else "September") + "; most locations only began posting "
-                "forward curves in 2026).")
-        return
-    mode = st.radio("Interest", [f"Same as the rest of this tab (fed funds + {_cr.FED_FUNDS_SPREAD_PCT:.2f}%)",
-                                 "Bank prime (as in the Return to Carry report)"], horizontal=True, key="nc_rtc_rate2",
-                    help="By default the same rate as the Net Carry calculations above: the effective fed funds rate on "
-                         "each date plus the Cost of Carry spread, following the rate box (an edit there moves every "
-                         "date by the same amount). The second choice is the bank prime rate the Research Analyst's "
-                         "report uses, for tying out to it.")
-    prime_mode = mode.startswith("Bank prime")
-    if prime_mode:
-        prime = _cached_prime()
-        rate_on = (lambda d: _cr.prime_on(prime, d, None))
-        rate_note = "bank prime"
+    year (return_to_carry; the Research Analyst's yearly workbooks, automated). `ref` = ('basis', provider, location),
+    ('rail', corridor) or ('river', location); the block itself is return_to_carry_block (shared with the portals)."""
+    import return_to_carry_block as _rcb
+    message = note = None
+    if ref[0] == "rail":
+        if ref[1].endswith("Freight"):
+            message = "This line is a freight rate, not an FOB bid, so there is no storage return to track."
+            obs = quotes = []
+        else:
+            obs, quotes = _cached_rtc_obs_rail(ref[1], grain), _cached_rtc_quotes_rail(ref[1], grain)
+    elif ref[0] == "river":
+        obs, quotes = _cached_river_obs(ref[1], grain), _cached_river_quotes(ref[1], grain)
+        note = ("History: the nearby FOB barge basis of each weekly sheet in the River FOB archive (September 2006 on), quoted against the "
+                "contract the sheet maps that month to — FOB = CIF NOLA less barge freight (tariff x freight % / 2000 x bushel weight). "
+                "The upper-river reaches have no FOB while the river is closed in winter, so their weekly series has gaps; corn's 2007-08 "
+                "year cannot be rolled because the stored futures history lacks the front contract that autumn.")
     else:
-        ff = _cached_fed_funds()
-        offset = round(tab_rate_pct - _cr.rate_for(asof, ff).rate_pct, 4)     # how far the rate box was edited (0 = default)
-        rate_on = (lambda d: _cr.rate_for(d, ff).rate_pct + offset)
-        rate_note = f"fed funds + {_cr.FED_FUNDS_SPREAD_PCT:.2f}%, as in the rest of this tab" + (
-            f" ({offset:+.2f} from the rate box)" if abs(offset) >= 0.005 else "")
-    try:
-        futs = _cached_rtc_futures(spec.root)    # the futures history comes from the database
-        tbl, est = _rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec)
-        res, _skipped = _rd.run_history_noted(obs, futs, rate_on, spec=spec) if len(obs) >= 12 else ([], [])
-    except Exception as _e:
-        st.warning(f"Couldn't build the Return to Carry history right now ({type(_e).__name__}: {_e}).")
-        return
-    if tbl is not None and (tbl.b0 is not None or any(c.bid is not None for c in tbl.cols)):
-        st.markdown(_vw.shipment_html(tbl, est, rate_note), unsafe_allow_html=True)
-    if not res:
-        st.info("Not enough weekly history yet to chart the crop years for this location.")
-        return
-    rows = _rd.summary_rows(res, measure)
-    st.markdown(_vw.headline_html(rows, measure, spec), unsafe_allow_html=True)
-    ch = _vw.seasonal_chart(res, measure, logo_uri=_jsa_watermark_uri() or None, spec=spec)
-    if ch is not None:
-        st.altair_chart(ch, use_container_width=True)
-    bar = _vw.best_bar_chart(rows, measure)
-    if bar is not None:
-        st.altair_chart(bar, use_container_width=True)
-    st.markdown(_vw.table_html(rows, measure), unsafe_allow_html=True)
-    if _skipped:
-        st.caption(f"Not shown: {', '.join(_skipped)} — the weekly archive repeats the previous year's bids for it "
-                   "(a copy, not that year's market).")
-    st.caption(_vw.method_caption(spec))
-    with st.expander("How the return is calculated"):
-        st.markdown(_vw.how_it_works(spec))
+        obs, quotes = _cached_rtc_obs_basis(ref[1], ref[2], grain), _cached_rtc_quotes_basis(ref[1], ref[2], grain)
+    _rcb.render(obs=obs, quotes=quotes, asof=asof, grain=grain, measure=measure, tab_rate_pct=tab_rate_pct,
+                load_futures=_cached_rtc_futures, load_prime=_cached_prime, load_fed_funds=_cached_fed_funds,
+                logo_uri=_jsa_watermark_uri() or None, note=note, message=message)
 
 
 @st.fragment
@@ -3209,9 +3192,9 @@ with tab_netcarry:
         unsafe_allow_html=True,
     )
 
-    _nc_a, _nc_b = st.columns([3, 7])
+    _nc_a, _nc_b = st.columns([5, 5])
     with _nc_a:
-        _nc_kind = st.radio("Location type", ["Basis location", "Rail corridor"],
+        _nc_kind = st.radio("Location type", ["Basis location", "Rail corridor", "River FOB"],
                             horizontal=True, key="nc_kind")
 
     # ── Assemble the chosen location's forward quotes (items) + available dates ──
@@ -3260,7 +3243,7 @@ with tab_netcarry:
                 _nc_asof = _nc_date.fromisoformat(_dsel)
                 _nc_title = f"{_nc_prov} · {_nc_loc}"
 
-    else:  # Rail corridor
+    elif _nc_kind == "Rail corridor":
         _rail_all = _cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto")
         if not _rail_all:
             st.info("No rail corridor data yet.")
@@ -3289,6 +3272,37 @@ with tab_netcarry:
                 ]
                 _nc_asof = _nc_date.fromisoformat(_dsel[:10])
                 _nc_title = _nc_mkt
+
+    else:  # River FOB — the JSA FOB sheet archive (RIVER_FOB.PUBLIC): FOB barge basis by river location, weekly since 2006-09
+        import river_carry as _rcar
+        try:
+            _rarch = _cached_river_archive()
+        except Exception as _e:
+            _rarch = None
+            st.warning(f"Couldn't read the River FOB archive right now ({type(_e).__name__}: {_e}).")
+        if _rarch:
+            _c1, _c2, _c3 = st.columns(3)
+            with _c1:
+                _nc_rloc = st.selectbox("River location", list(_rcar.CURRENT_LOCATIONS),
+                                        index=list(_rcar.CURRENT_LOCATIONS).index("STL"), key="nc_rloc",
+                                        help="The river locations of the JSA FOB sheet: FOB barge basis = CIF NOLA less barge freight. "
+                                             "Twenty years of weekly sheets are archived, so every location has the full history.")
+            with _c2:
+                _nc_grain = st.selectbox("Commodity", ["Corn", "Soybeans", "Wheat"], key="nc_grain_v")
+            _vdates = _rcar.dates(_rarch, _nc_grain)
+            if not _vdates:
+                st.info("No archived FOB sheets for this commodity.")
+            else:
+                with _c3:
+                    _dsel = st.selectbox(
+                        "As-of date", _vdates, index=0, key=f"nc_date_v_{_nc_grain}",
+                        format_func=lambda d: _nc_date.fromisoformat(d[:10]).strftime("%b %d, %Y")
+                        + (" · latest" if d == _vdates[0] else ""))
+                _nc_items = _rcar.curve_items(_rarch, _dsel, _nc_rloc, _nc_grain)
+                _nc_asof = _nc_date.fromisoformat(_dsel[:10])
+                _nc_title = f"River FOB · {_nc_rloc}"
+                if not _nc_items:
+                    st.info("This location has no FOB on that sheet (the river is closed at its reach, or the sheet has no price for it).")
 
     # ── Controls: reference contract, carry anchor, interest rate ──────────────
     if _nc_items is not None and len(_nc_items) >= 1:
@@ -3494,8 +3508,10 @@ with tab_netcarry:
                        "half-month slots) uses its best quote (the table above keeps every slot).")
 
         _nc_extras(
-            kind=_nc_kind, ref=(("basis", _nc_prov, _nc_loc) if _nc_kind == "Basis location" else ("rail", _nc_mkt)),
-            main_key=(f"b|{_nc_prov}|{_nc_loc}" if _nc_kind == "Basis location" else f"r|{_nc_mkt}"),
+            kind=_nc_kind, ref=(("basis", _nc_prov, _nc_loc) if _nc_kind == "Basis location"
+                                else ("rail", _nc_mkt) if _nc_kind == "Rail corridor" else ("river", _nc_rloc)),
+            main_key=(f"b|{_nc_prov}|{_nc_loc}" if _nc_kind == "Basis location"
+                      else f"r|{_nc_mkt}" if _nc_kind == "Rail corridor" else f"v|{_nc_rloc}"),
             main_name=_nc_title, main_items=_nc_items, asof=_nc_asof, grain=_nc_grain, ref_sym=_ref_sym,
             curve=_curve, anchor_month=_anchor_month, anchor_ym=_nc_meta["anchor_ym"],
             anchor_lbl=_anchor_lbl, rate=_rate_pct / 100.0)
