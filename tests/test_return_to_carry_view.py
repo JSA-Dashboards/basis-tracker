@@ -72,6 +72,9 @@ inprog, _, _ = build(YEARS, last_weeks=9)
 hp = vw.headline_html(rd.summary_rows(inprog, "net"), "net")
 check("a year in progress says how many weeks it has", "9 weeks in" in hp and "2025-26 crop year" in hp, hp[:200])
 one, _, _ = build(YEARS, last_weeks=1)
+check("a harvest basis built from fewer than 7 bids says so ('the first weekly bid so far', not 'the first 1 weekly bids')",
+      "the first weekly bid so far, vs Dec" in vw.headline_html(rd.summary_rows(one, "net"), "net") and "average of the first 7 weekly bids, vs Dec" in vw.headline_html(rows, "net")
+      and "average of the first 3 weekly bids so far" in vw.headline_html(rd.summary_rows(build(YEARS, last_weeks=3)[0], "net"), "net"))
 check("...and one week is '1 week in'", "(1 week in)" in vw.headline_html(rd.summary_rows(one, "net"), "net"), vw.headline_html(rd.summary_rows(one, "net"), "net")[:200])
 
 print("return_to_carry_view: the by-year table")

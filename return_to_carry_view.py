@@ -94,7 +94,15 @@ def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.C
     if avg_best is not None and r["last"] is not None:
         last_sub += f" · a typical year's best is {avg_best:+.0f}¢"
     ln = rtc.LETTER_NAME
-    b0_sub = (f"average of the first {r['b0_weeks']} weekly bids, vs {ln[spec.base]}" if r["b0"] is not None else "needs the first weeks of October")
+    n0 = r["b0_weeks"]
+    if r["b0"] is None:
+        b0_sub = "needs the first weeks of October"
+    elif n0 >= 7:
+        b0_sub = f"average of the first {n0} weekly bids, vs {ln[spec.base]}"
+    elif n0 == 1:
+        b0_sub = f"the first weekly bid so far, vs {ln[spec.base]}"
+    else:
+        b0_sub = f"average of the first {n0} weekly bids so far, vs {ln[spec.base]}"
     carry_sub = (f"{ln[spec.carry_from]} → {ln[spec.carry_to]}, rolled the last Wednesday before each month" if r["carry"] is not None
                  else "known once the May roll is in")
     gross_note = "" if measure == "net" else " (before interest)"
