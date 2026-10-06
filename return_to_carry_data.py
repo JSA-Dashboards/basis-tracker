@@ -3,7 +3,7 @@
   obs_from_rail(rows, market)          a rail corridor's weekly nearby bid (the 'Spot' row; once a corridor stopped
                                        posting Spot, the nearest forward period) with the contract it is quoted off
   obs_from_snapshots(snaps, grain, f)  the same for a basis location: its spot row, else its front forward row
-  run_history(obs, futs, rate_on)      every crop year the series covers -> [CropYear]
+  run_history(obs, futs, rate_on)      every crop year the series covers -> [CropYear]   (spec=rtc.SOY for soybeans)
   summary_rows / seasonal_points       the table and the chart's points, for the net or the gross measure
   quotes_from_rail / _from_snapshots   every posted forward period of a corridor / location, with its futures tag
   parse_label / shipment_quotes        which months a period covers ('JFM', 'FH Dec', 'Dec 1-20') -> one bid per shipment month
@@ -23,15 +23,17 @@ import net_carry as nc
 import return_to_carry as rtc
 
 # Weekly futures from the analyst's yearly workbooks for the crop years BEFORE the settlement archive starts
-# (1996-97 .. 2006-07): date, symbol, price_cents. The database has everything from late 2006 on.
+# (corn 1996-97 .. 2006-07, soybeans 2005-06 .. Oct 2007): date, symbol, price_cents. The database has everything from late
+# 2006 on.
 SHEET_FUTURES_PATH = Path(__file__).parent / "data" / "rtc_futures_1996_2006.csv"
+SHEET_FUTURES_PATHS = {"ZC": SHEET_FUTURES_PATH, "ZS": Path(__file__).parent / "data" / "rtc_futures_soy_2005_2007.csv"}
 
 
-def load_sheet_futures(path: Path = SHEET_FUTURES_PATH) -> dict:
-    """{date: {symbol: cents}} from the committed CSV ({} if it is missing)."""
+def load_sheet_futures(path: Path | None = None, root: str = "ZC") -> dict:
+    """{date: {symbol: cents}} from the committed CSV of a commodity ({} if it is missing)."""
     out: dict = {}
     try:
-        with open(path, encoding="utf-8", newline="") as fh:
+        with open(path or SHEET_FUTURES_PATHS[root], encoding="utf-8", newline="") as fh:
             for r in csv.DictReader(fh):
                 d = date.fromisoformat(r["date"])
                 out.setdefault(d, {})[r["symbol"]] = float(r["price_cents"])
@@ -173,14 +175,14 @@ def parse_label(label: str | None) -> dict | None:
 _KIND_RANK = {"full": 0, "window": 1, "lh": 2, "fh": 3}
 
 
-def shipment_quotes(raw: list[dict], crop_year: int) -> list[dict]:
-    """One bid per (posting date, shipment month Nov .. Jul) of a crop year, picked from everything posted that day.
+def shipment_quotes(raw: list[dict], crop_year: int, spec: rtc.Spec = rtc.CORN) -> list[dict]:
+    """One bid per (posting date, shipment month Nov .. Jul — soybeans Nov .. Aug) of a crop year, picked from everything posted that day.
     raw = [{'date', 'label', 'tag', 'basis'}]. A month's own quote beats a package that covers it (full month, then a
     window to the 20th, then the last half, then the first), the narrowest package fills a month with no quote of its
     own ('JFM' for Jan, Feb and Mar; 'AMJJ' for Apr-Jul — as in the analyst's template), and of equals the higher bid wins.
     A label's year is read from its posting date (the next such month), so a 'Dec' posted in March is next year's."""
     pick: dict = {}
-    lo, hi = date(crop_year, 8, 1), date(crop_year + 1, 7, 31)           # postings that can speak for this table
+    lo, hi = date(crop_year, 8, 1), date(crop_year + 1, *spec.horizon)   # postings that can speak for this table
     for q in raw:
         if q.get("basis") is None or not (lo <= q["date"] <= hi):
             continue
@@ -189,7 +191,7 @@ def shipment_quotes(raw: list[dict], crop_year: int) -> list[dict]:
             continue
         d = q["date"]
         for m in info["months"]:
-            if m not in rtc.SHIP_MONTHS:
+            if m not in spec.ship_months:
                 continue
             y = info["year"] if (info["year"] is not None and info["kind"] != "bundle") else (d.year if m >= d.month else d.year + 1)
             if y != (crop_year if m >= 10 else crop_year + 1):
@@ -230,21 +232,30 @@ def quotes_from_snapshots(snaps: list, grain: str, grain_disp) -> list[dict]:
     return out
 
 
-def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, max_age_days: int = 14):
-    """The harvest basis before the weekly bids exist (the first lands the first Wednesday of October): the average of
-    the latest posted FH Oct, LH Oct and FH Nov bids, all against Dec — else the one 'LH Oct / FH Nov' package, else the
-    average of the whole-month Oct and Nov bids. (value, posting date, [labels]) or None."""
+def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, max_age_days: int = 14, spec: rtc.Spec = rtc.CORN):
+    """The harvest basis before the weekly bids exist (the first lands the first Wednesday of October), against the spec's base
+    contract (corn Dec, soybeans Jan). Corn: the average of the latest posted FH Oct, LH Oct and FH Nov bids — else the one
+    'LH Oct / FH Nov' package, else the average of the whole-month Oct and Nov bids. Soybeans: the October bids and the November
+    bids (halves averaged within each month), weighted 4 : 3 like the 4-5 October and 2-3 November weeks the sheets average.
+    (value, posting date, [labels]) or None."""
     wanted = {((10,), "fh"), ((10,), "lh"), ((11,), "fh")}
     for d in sorted({q["date"] for q in raw if q["date"] <= asof and (asof - q["date"]).days <= max_age_days}, reverse=True):
         vals, labels, pack, monthly = [], [], None, {}
+        by_month: dict = {}
         for q in raw:
             if q["date"] != d or q.get("basis") is None:
                 continue
             info = parse_label(q.get("label"))
             if info is None or (info["year"] not in (None, crop_year)):
                 continue
-            moved = rtc.rebase(q["basis"], q.get("tag"), "Z", crop_year, futs, d)
+            moved = rtc.rebase(q["basis"], q.get("tag"), spec.base, crop_year, futs, d, spec)
             if moved is None:
+                continue
+            if spec.key == "soy":
+                if info["months"] in ((10,), (11,)) and info["kind"] in ("full", "window", "fh", "lh"):
+                    by_month.setdefault(info["months"][0], []).append((moved[0], q["label"]))
+                elif info["kind"] == "bundle" and info["months"] == (10, 11):
+                    pack = (moved[0], q["label"])
                 continue
             if (info["months"], info["kind"]) in wanted:
                 vals.append(moved[0])
@@ -255,6 +266,11 @@ def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, ma
                 m = info["months"][0]
                 if m not in monthly or moved[0] > monthly[m][0]:
                     monthly[m] = (moved[0], q["label"])
+        if spec.key == "soy" and by_month:
+            avg = {m: sum(v for v, _ in xs) / len(xs) for m, xs in by_month.items()}
+            wt = {10: 4.0, 11: 3.0}
+            tot = sum(wt[m] for m in avg)
+            return (sum(avg[m] * wt[m] for m in avg) / tot, d, [lab for m in sorted(by_month) for _, lab in by_month[m]])
         if vals:
             return sum(vals) / len(vals), d, labels
         if pack is not None:
@@ -264,28 +280,30 @@ def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, ma
     return None
 
 
-def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: date, measure: str = "net"):
+def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: date, measure: str = "net",
+                   spec: rtc.Spec = rtc.CORN):
     """The report's page-1 table on `asof` for the crop year that is live: (ShipTable, estimate) — `estimate` is the
     (value, date, labels) the harvest basis was taken from while the weekly bids are not in yet, else None."""
     crop_year = rtc.shipment_crop_year(asof)
-    cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], futs, crop_year, rate_on)
+    known = {d: px for d, px in futs.items() if d <= asof}      # a past as-of date must not see a roll spread measured after it
+    cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], known, crop_year, rate_on, spec)
     b0, est = cy.b0, None
     if b0 is None:
-        est = harvest_estimate(raw, crop_year, asof, futs)
+        est = harvest_estimate(raw, crop_year, asof, futs, spec=spec)
         b0 = est[0] if est else None
-    tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year), futs, rate_on, measure,
-                                   b0_weeks=cy.b0_weeks if cy.b0 is not None else 0, b0_est=est is not None)
+    tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year, spec), futs, rate_on, measure,
+                                   b0_weeks=cy.b0_weeks if cy.b0 is not None else 0, b0_est=est is not None, spec=spec)
     return tbl, est
 
 
-def crop_years_in(obs: list[dict]) -> list[int]:
-    """The crop years a series has at least one bid in (Oct 1 .. Jul 31)."""
+def crop_years_in(obs: list[dict], spec: rtc.Spec = rtc.CORN) -> list[int]:
+    """The crop years a series has at least one bid in (Oct 1 .. the spec's horizon: Jul 31 for corn, Sep 30 for soybeans)."""
     ys = set()
     for o in obs:
         d = o["date"]
         if d.month >= 10:
             ys.add(d.year)
-        elif d.month <= 7:
+        elif d.month <= spec.horizon[0]:
             ys.add(d.year - 1)
     return sorted(ys)
 
@@ -307,23 +325,26 @@ def repeated_years(results: list) -> set:
     return bad
 
 
-def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int = MIN_CROP_YEAR) -> tuple:
-    """(results, skipped): every crop year the series covers from `min_year` on, oldest first, without the years that
-    only repeat the previous one (`skipped` = their labels). A year needs some weeks to say anything, so one with fewer
-    than `min_weeks` of bids is left out unless it is the newest (the one in progress)."""
-    ys = [y for y in crop_years_in(obs) if y >= min_year]
+def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
+                      spec: rtc.Spec = rtc.CORN) -> tuple:
+    """(results, skipped): every crop year the series covers from `min_year` (default: the spec's first) on, oldest first,
+    without the years that only repeat the previous one (`skipped` = their labels). A year needs some weeks to say anything,
+    so one with fewer than `min_weeks` of bids is left out unless it is the newest (the one in progress)."""
+    min_year = spec.min_crop_year if min_year is None else min_year
+    ys = [y for y in crop_years_in(obs, spec) if y >= min_year]
     out = []
     for y in ys:
-        cy = rtc.build_crop_year(obs, futs, y, rate_on)
+        cy = rtc.build_crop_year(obs, futs, y, rate_on, spec)
         if len(cy.weeks) >= min_weeks or (y == ys[-1] and cy.weeks):
             out.append(cy)
     bad = repeated_years(out)
     return [cy for cy in out if cy.crop_year not in bad], [rtc.crop_label(y) for y in sorted(bad)]
 
 
-def run_history(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int = MIN_CROP_YEAR) -> list:
+def run_history(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
+                spec: rtc.Spec = rtc.CORN) -> list:
     """run_history_noted without the note."""
-    return run_history_noted(obs, futs, rate_on, min_weeks, min_year)[0]
+    return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec)[0]
 
 
 def _value(w, measure: str):
@@ -331,7 +352,7 @@ def _value(w, measure: str):
 
 
 def summary_rows(results: list, measure: str = "net") -> list[dict]:
-    """One row per crop year for the table: harvest basis, Dec-Jul futures carry, best summer basis, the best return
+    """One row per crop year for the table: harvest basis, the headline futures carry, best summer basis, the best return
     on the measure (and its week), and the return at the last week."""
     rows = []
     for cy in results:
@@ -339,7 +360,7 @@ def summary_rows(results: list, measure: str = "net") -> list[dict]:
         last = next((w for w in reversed(cy.weeks) if _value(w, measure) is not None), None)
         rows.append({
             "crop_year": cy.crop_year, "label": cy.label, "weeks": len(cy.weeks), "complete": cy.complete,
-            "b0": cy.b0, "b0_weeks": cy.b0_weeks, "carry": cy.dec_jul_carry,
+            "b0": cy.b0, "b0_weeks": cy.b0_weeks, "carry": cy.season_carry,
             "summer": None if cy.summer is None else cy.summer.basis,
             "summer_date": None if cy.summer is None else cy.summer.date,
             "best": None if best is None else _value(best, measure),

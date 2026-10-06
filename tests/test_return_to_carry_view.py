@@ -71,6 +71,8 @@ check("no rows -> nothing", vw.headline_html([], "net") == "")
 inprog, _, _ = build(YEARS, last_weeks=9)
 hp = vw.headline_html(rd.summary_rows(inprog, "net"), "net")
 check("a year in progress says how many weeks it has", "9 weeks in" in hp and "2025-26 crop year" in hp, hp[:200])
+one, _, _ = build(YEARS, last_weeks=1)
+check("...and one week is '1 week in'", "(1 week in)" in vw.headline_html(rd.summary_rows(one, "net"), "net"), vw.headline_html(rd.summary_rows(one, "net"), "net")[:200])
 
 print("return_to_carry_view: the by-year table")
 t = vw.table_html(rows, "net")
@@ -122,6 +124,12 @@ check("the band is the completed years' middle 50% and 80% by week, only where 5
 check("subtitle (two short lines, for a phone) says how many years the shading is", "12 completed years" in json.dumps(ss["title"]) and len(ss["title"]["subtitle"]) == 2)
 check("the best week is labelled 'Best +x.x¢ · Mon d'", any(str(r.get("label", "")).startswith("Best +") for d in dsets for r in d))
 check("month names along the bottom start at Oct", "Oct" in json.dumps(ss["layer"][1]["encoding"]["x"]["axis"]["labelExpr"]))
+xe = ss["layer"][1]["encoding"]["x"]
+check("every month tick lies inside the chart's weeks", max(xe["axis"]["values"]) <= xe["scale"]["domain"][1])
+res26, _, _ = build(list(range(2019, 2027)))                       # 2026-27 starts Wednesday Oct 7: its week 43 is already August
+tk26, nm26 = vw._month_ticks(res26, 44, rtc.CORN.horizon)
+check("the month ticks stop with the season, July for corn, even when the latest year starts Oct 7 (no stray 'Aug' at week 43)",
+      nm26[0] == "Oct" and nm26[-1] == "Jul" and max(tk26) <= 42 and "Aug" in vw._month_ticks(res26, 44)[1], (tk26, nm26))
 few5 = vw.seasonal_chart(results[-3:], "net").to_dict()
 kinds5 = [(l["mark"] if isinstance(l["mark"], str) else l["mark"]["type"]) for l in few5["layer"]]
 check("with fewer than 5 completed years there is no band, just the lines", "area" not in kinds5 and "line" in kinds5, kinds5)

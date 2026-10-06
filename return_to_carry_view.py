@@ -78,13 +78,13 @@ def _card(label: str, value: str, sub: str, accent: str = "#32373c") -> str:
             f'<div style="font-size:11px;color:#64748b;line-height:1.35">{sub}</div></div>')
 
 
-def headline_html(rows: list[dict], measure: str = "net") -> str:
+def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.CORN) -> str:
     """Four numbers for the latest crop year with data: the best return so far, where it is now, the harvest basis
     it is measured from, and the futures carry. '' when there are no rows."""
     if not rows:
         return ""
     r = rows[-1]
-    state = "complete" if r["complete"] else f"{r['weeks']} weeks in"
+    state = "complete" if r["complete"] else f"{r['weeks']} week{'s' if r['weeks'] != 1 else ''} in"
     rk = rank_of_latest(rows)
     avg_best = _avg([x["best"] for x in completed(rows[:-1])])
     best_sub = (f"{_md(r['best_date'])}" if r["best_date"] else "no weeks yet")
@@ -93,8 +93,10 @@ def headline_html(rows: list[dict], measure: str = "net") -> str:
     last_sub = f"{_md(r['last_date'])}" if r["last_date"] else "—"
     if avg_best is not None and r["last"] is not None:
         last_sub += f" · a typical year's best is {avg_best:+.0f}¢"
-    b0_sub = (f"average of the first {r['b0_weeks']} weekly bids, vs Dec" if r["b0"] is not None else "needs the first weeks of October")
-    carry_sub = "Dec → Jul, rolled the last Wednesday before each month" if r["carry"] is not None else "known once the May roll is in"
+    ln = rtc.LETTER_NAME
+    b0_sub = (f"average of the first {r['b0_weeks']} weekly bids, vs {ln[spec.base]}" if r["b0"] is not None else "needs the first weeks of October")
+    carry_sub = (f"{ln[spec.carry_from]} → {ln[spec.carry_to]}, rolled the last Wednesday before each month" if r["carry"] is not None
+                 else "known once the May roll is in")
     gross_note = "" if measure == "net" else " (before interest)"
     head = (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:6px 0 8px">{r["label"]} crop year '
             f'<span style="font-weight:400;color:#64748b">({state}) — {measure_name(measure)}</span></div>')
@@ -148,6 +150,66 @@ def table_html(rows: list[dict], measure: str = "net") -> str:
             f'<tbody>{body}{foot}</tbody></table></div>')
 
 
+# ── the words that explain the method (per commodity) ────────────────────────────────────────────
+def method_caption(spec: rtc.Spec = rtc.CORN) -> str:
+    """The one-paragraph caption under the tracker."""
+    chain = {"corn": "Dec→Mar→May→Jul→Sep", "soy": "Nov→Jan→Mar→May→Jul→Aug→Nov"}[spec.key]
+    end = {"corn": "July 31", "soy": "September 30"}[spec.key]
+    return (f"Same method as the Research Analyst's {'Return to Carry' if spec.key == 'corn' else 'bean carry'} workbooks: buy at the "
+            "harvest basis, hedge, carry. Weekly return = that week's bid − the harvest basis + the futures carry banked rolling the hedge "
+            f"{chain} − interest. Gross = the same without the interest. Weeks run to {end}.")
+
+
+def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
+    """The markdown bullets of the 'How the return is calculated' expander."""
+    soy = spec.key == "soy"
+    base = rtc.LETTER_NAME[spec.base]
+    ship_to = "Aug" if soy else "Jul"
+    shipment = ("- **Shipment by month** (the report's front page" + (", applied to soybeans" if soy else "") + f") — bought at the harvest basis on Oct 20; for each "
+                f"shipment date (the 20th of Nov-{ship_to}) the **basis cost** is the break-even: harvest basis − the futures carry "
+                f"banked rolling to that month's contract + interest on ({base} futures + basis) at the rate × days ÷ 360. "
+                "**Current basis** is the latest posted bid for that month (a package such as JFM or AMJJ counts for each "
+                "month it covers; a bid quoted off another futures month is moved to the column's by that day's spread); "
+                "**return** = bid − basis cost; the best bid and best return are tracked from Oct 20, each return against "
+                "that day's break-even. Before the weekly harvest bids start, the harvest basis is estimated from the "
+                + ("posted October and November bids (weighted 4 : 3, like the weeks the sheets average)." if soy else "posted FH Oct / LH Oct / FH Nov bids."))
+    if soy:
+        harvest = ("- **Harvest basis** — the average of the first 7 weekly bids from the first Wednesday of October (\"Oct / F-H Nov\"), "
+                   "all expressed against Jan: October's bids are quoted off Nov and are moved to Jan by the Nov−Jan spread measured the last "
+                   "Wednesday of October; the first November bids are quoted off Jan. The sheets' own exceptions are kept (2015-16 to 2017-18 "
+                   "left the fifth week out).")
+        weekly = ("- **Weekly bid** — the location's spot bid; when there is none, the nearest forward period. It is quoted off Nov in Oct, "
+                  "Jan Nov-Dec, Mar Jan-Feb, May Mar-Apr, Jul May-Jun, Aug in Jul and the next crop's Nov Aug-Sep; a bid quoted off another "
+                  "contract is moved to that week's by the same day's spread, as the sheets' columns do.")
+        carry = ("- **Futures carry** — each roll spread (Jan−Nov, Mar−Jan, May−Mar, Jul−May, Aug−Jul, next Nov−Aug) is measured the last "
+                 "Wednesday before the month the next contract takes over and counted from the week the bid moves to it (the sheets' own "
+                 "exceptions: the Nov/Jan spread on the first Wednesday of November in 2010-11, the Jan/Mar one on Dec 30 in 2019-20, Mar/May on "
+                 "Mar 1 in 2016-17).")
+        start = "from the fifth weekly bid (about Nov 1; the third in 2005-06 to 2008-09)"
+        data = ("- **Data** — weekly bids from the archive (Wednesdays from Oct 2004; the soybean tracker starts at 2005-06, the first year "
+                "of the analyst's bean sheets); settlements from the futures archive, and for 2005-07 from the workbooks. Reproduces her "
+                "Decatur, Des Moines, Hennepin and St. Louis workbooks to the cent in most weeks (tests/test_return_to_carry_soy.py).")
+    else:
+        harvest = ("- **Harvest basis** — the average of the first 7 weekly bids from the first Wednesday of October "
+                   "(\"Oct / F-H Nov\"), all quoted off Dec; a few years used a different window in the sheets, and those "
+                   "are kept (2009-10 and 2019-20 started later, 2012-13 in September, 1998-2001, 2010 and 2015 used 6 weeks).")
+        weekly = ("- **Weekly bid** — the corridor's Spot bid; since the 2026 rundowns stopped posting Spot, the nearest "
+                  "forward period. It is quoted off Dec in Oct-Nov, Mar Dec-Feb, May Mar-Apr, Jul May-Jun, Sep Jul-Aug.")
+        carry = ("- **Futures carry** — each roll spread (Mar−Dec, May−Mar, Jul−May, Sep−Jul) is measured the last "
+                 "Wednesday before the expiring month and counted from the week the bid moves to the new contract "
+                 "(the sheets' own exceptions: Apr 21 2021, Jul 1-2 in 2025-26).")
+        start = "from the third weekly bid (about Oct 20)"
+        data = ("- **Data** — weekly corridor bids from the archive (true Wednesdays from Oct 2004, so history starts "
+                "2004-05); settlements from the futures archive, and for 2004-07 from the workbooks. Reproduces the "
+                "yearly workbooks to the cent in most weeks (tests/test_return_to_carry.py).")
+    interest = ("- **Interest** — the same rate as the rest of this tab: the effective fed funds rate on each date + 2.25% "
+                "(the Cost of Carry sheet's), moved by whatever the rate box above was edited by. In the weekly history it is "
+                f"charged as the sheets do — that week's rate ÷ 52 on the cash price (futures + basis), {start}; the shipment table "
+                "charges rate × days ÷ 360 on the same price, as the carry calculations above do. The second choice is the bank prime "
+                "rate the analyst's own sheets use, to tie out to their numbers.")
+    return "\n".join([shipment, harvest, weekly, carry, interest, data])
+
+
 # ── the report's page 1: shipment by month ───────────────────────────────────────────────────────
 def _n(v, dec: int = 2, sign: bool = True) -> str:
     return "—" if v is None else (f"{v:+.{dec}f}" if sign else f"{v:.{dec}f}")
@@ -174,6 +236,10 @@ def _ship_notes(tbl, est) -> str:
         src = ""
         if est:
             src = f" ({html.escape(', '.join(est[2]))} posted {_short(est[1])})"
+        if tbl.spec.key == "soy":                        # October's bids are quoted off Nov: they need that spread, measured Oct 28 or so
+            return ("<b>Estimate.</b> The harvest basis is the average of the posted harvest-period bids"
+                    f"{src} until the weekly average can be built — it moves October's bids from Nov to Jan with the spread measured "
+                    "the last Wednesday of October. It becomes the average of the first 7 weekly bids as they post.")
         return ("<b>Estimate.</b> The weekly harvest bids have not started, so the harvest basis is the average of the "
                 f"posted harvest-period bids{src}. It becomes the average of the first 7 weekly bids as they post.")
     if tbl.b0_weeks and tbl.b0_weeks < 7:
@@ -186,48 +252,51 @@ def _cost_tip(tbl, col) -> str:
     """Hover text: how the break-even is built."""
     if tbl.b0 is None or col.cost is None or tbl.levels is None:
         return ""
-    lz = tbl.levels.levels.get("Z")
-    carry = 0.0 if lz is None or col.level is None else col.level - lz
+    lb = tbl.levels.levels.get(tbl.spec.base)                 # the base contract (corn Dec, soybeans Jan)
+    carry = 0.0 if lb is None or col.level is None else col.level - lb
     parts = [f"harvest basis {tbl.b0:+.2f}"]
     if abs(carry) > 1e-9:
         parts.append(f"minus {carry:.2f} futures carry banked rolling to {rtc.LETTER_NAME[col.letter]}")
-    if tbl.measure != "gross" and tbl.rate is not None and lz is not None:
+    if tbl.measure != "gross" and tbl.rate is not None and lb is not None:
         days = (col.ship - tbl.purchase).days
-        parts.append(f"plus interest {(lz + tbl.b0) * tbl.rate / 100 * days / 360:.2f} ({tbl.rate:.2f}% x {days} days on {lz + tbl.b0:.2f})")
+        parts.append(f"plus interest {(lb + tbl.b0) * tbl.rate / 100 * days / 360:.2f} ({tbl.rate:.2f}% x {days} days on {lb + tbl.b0:.2f})")
     return "; ".join(parts) + f" = {col.cost:+.2f}"
 
 
 def shipment_html(tbl, est=None, rate_note: str = "") -> str:
-    """The report's front page: for each shipment month Nov..Jul, the break-even basis, today's bid and what it returns, and
-    the best bid and return since the purchase. `tbl` is return_to_carry.ShipTable (net or gross); `rate_note` says where the
-    interest rate comes from ('fed funds + 2.25%, as in the rest of this tab', 'bank prime')."""
+    """The report's front page: for each shipment month Nov..Jul (soybeans Nov..Aug), the break-even basis, today's bid and what
+    it returns, and the best bid and return since the purchase. `tbl` is return_to_carry.ShipTable (net or gross); `rate_note`
+    says where the interest rate comes from ('fed funds + 2.25%, as in the rest of this tab', 'bank prime')."""
     gross = tbl.measure == "gross"
     best_now = rtc.best_column(tbl, "ret")
     best_ytd = rtc.best_column(tbl, "best_ret")
     head = (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:6px 0 8px">{tbl.label} shipment by month '
             f'<span style="font-weight:400;color:#64748b">— bought {_short(tbl.purchase)} at the harvest basis, {measure_name(tbl.measure)}</span></div>')
     lv = tbl.levels
+    spec = tbl.spec
+    ln = rtc.LETTER_NAME
     sp = []
     if lv is not None:
-        for key, name in (("ZH", "Dec→Mar"), ("HK", "Mar→May"), ("KN", "May→Jul")):
+        for key in spec.carry_pairs:
+            name = f"{ln[key[0]]}→{ln[key[1]]}"
             v = lv.spreads.get(key)
             sp.append(f"{name} {v[0]:+.2f}{'*' if v[2] else ''}" if v else f"{name} —")
     carry_total = None
-    if lv is not None and all(lv.spreads.get(k) for k in ("ZH", "HK", "KN")):
-        carry_total = sum(lv.spreads[k][0] for k in ("ZH", "HK", "KN"))
+    if lv is not None and all(lv.spreads.get(k) for k in spec.carry_pairs):
+        carry_total = sum(lv.spreads[k][0] for k in spec.carry_pairs)
     if tbl.b0 is None:
         b0_sub = "waiting for the first harvest bids"
     elif tbl.b0_est:
         b0_sub = "estimate — average of the posted harvest-period bids"
     else:
-        b0_sub = f"average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''}, vs Dec"
+        b0_sub = f"average of the first {tbl.b0_weeks} weekly bid{'s' if tbl.b0_weeks != 1 else ''}, vs {ln[spec.base]}"
     rate_sub = rate_note if tbl.rate is not None else "no rate"
     if gross:
         rate_val, rate_sub = "—", "not charged in the gross view"
     else:
         rate_val = f"{tbl.rate:.2f}%" if tbl.rate is not None else "—"
     cards = (_card("Harvest basis", _n(tbl.b0, 1) + "¢" if tbl.b0 is not None else "—", b0_sub)
-             + _card("Dec futures", _n(tbl.f_dec, 2, False) if tbl.f_dec is not None else "—", "the price the interest is charged on, with the basis")
+             + _card(f"{ln[spec.base]} futures", _n(tbl.f_base, 2, False) if tbl.f_base is not None else "—", "the price the interest is charged on, with the basis")
              + _card("Interest", rate_val, rate_sub)
              + _card("Futures carry", _n(carry_total, 1) + "¢" if carry_total is not None else "—", " · ".join(sp) if sp else "—"))
     cards = f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">{cards}</div>'
@@ -318,7 +387,7 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
     since = f'<div style="font-size:10px;font-weight:400;color:#94a3b8">since {_short(tbl.purchase)}</div>'
     r_bbid = row("Best basis YTD", [best_bid_cell(c) for c in tbl.cols], extra_label=since, border=True, ytd=True)
     r_bret = row("Best return YTD", [best_ret_cell(c) for c in tbl.cols], extra_label=since, ytd=True)
-    table = (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:760px;width:100%"><thead><tr>{corner}{heads}</tr></thead>'
+    table = (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:{70 + 76 * len(tbl.cols)}px;width:100%"><thead><tr>{corner}{heads}</tr></thead>'
              f'<tbody>{r_month}{r_level}{r_cost}{r_bid}{r_ret}{r_bbid}{r_bret}</tbody></table></div>')
     foot = (f'<div style="font-size:11px;color:#64748b;line-height:1.5;margin:6px 0 20px">'
             f'* Futures spreads measured the last Wednesday before the expiring month are held for the rest of the crop year; the others are today\'s. '
@@ -371,17 +440,22 @@ def best_bar_chart(rows: list[dict], measure: str = "net", height: int = 280) ->
 
 
 # ── chart 2: the path through the crop year ───────────────────────────────────────────────────────
-def _month_ticks(results: list) -> tuple[list[int], list[str]]:
-    """Week indexes (and month names) where each month first appears on the crop-year grid, Oct through Jul."""
-    from datetime import timedelta
+def _month_ticks(results: list, weeks: int = 44, horizon: tuple | None = None) -> tuple[list[int], list[str]]:
+    """Week indexes (and month names) where each month first appears on the crop-year grid, Oct through Jul (soybeans: Sep).
+    `horizon` = (month, day) of the following year where the season ends: a week past it gets no tick (a year that starts
+    Oct 7 would otherwise label its week 43 'Aug', soybeans' week 52 'Oct')."""
+    from datetime import date, timedelta
     from return_to_carry import first_wednesday
     ref = next((cy for cy in reversed(results) if cy.weeks), None)
     if ref is None:
         return [], []
     start = first_wednesday(ref.crop_year)
+    end = date(ref.crop_year + 1, *horizon) if horizon else None
     idx, names, seen = [], [], set()
-    for k in range(0, 44):
+    for k in range(0, weeks):
         d = start + timedelta(days=7 * k)
+        if end is not None and d > end:
+            break
         if (d.year, d.month) not in seen:
             seen.add((d.year, d.month))
             idx.append(k)
@@ -389,7 +463,8 @@ def _month_ticks(results: list) -> tuple[list[int], list[str]]:
     return idx, names
 
 
-def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_uri: str | None = None) -> alt.LayerChart | None:
+def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_uri: str | None = None,
+                   spec: rtc.Spec = rtc.CORN) -> alt.LayerChart | None:
     """Return by week of the crop year. Band = the middle 80% (p10-p90) and 50% (p25-p75) of the completed years,
     dashed line = their median; the latest year is orange, the one before blue. A dot marks the latest year's best."""
     from return_to_carry_data import seasonal_points
@@ -402,14 +477,15 @@ def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_
     hist_labels = [cy.label for cy in results if cy.complete]
     hist = df[df["crop"].isin(hist_labels)]
     layers = []
-    ticks, names = _month_ticks(results)
+    full = 40 if spec.key == "corn" else 51                  # the season's last week (Jul 31 for corn, Sep 30 for soybeans)
+    ticks, names = _month_ticks(results, full + 4, spec.horizon)
     xmax = int(df["week"].max())
-    x_enc = alt.X("week:Q", title=None, scale=alt.Scale(domain=[0, max(xmax, 40) + 0.5]),
+    x_enc = alt.X("week:Q", title=None, scale=alt.Scale(domain=[0, max(xmax, full) + 0.5]),
                   axis=alt.Axis(values=ticks, labelExpr=f"{json.dumps(names)}[indexof({json.dumps(ticks)}, datum.value)]",
                                 labelColor="#1f4e79", labelFontWeight="bold", labelAngle=0, grid=False, ticks=False))
     y_title = "¢/bu"
     if logo_uri:
-        layers.append(alt.Chart(pd.DataFrame({"x": [max(xmax, 40) / 2], "url": [logo_uri]}))
+        layers.append(alt.Chart(pd.DataFrame({"x": [max(xmax, full) / 2], "url": [logo_uri]}))
                       .mark_image(width=int(height * 0.5), height=int(height * 0.5), opacity=0.10, align="center", baseline="middle")
                       .encode(x=alt.X("x:Q"), y=alt.value(alt.expr("height / 2")), url="url:N"))
     if hist["crop"].nunique() >= 5:

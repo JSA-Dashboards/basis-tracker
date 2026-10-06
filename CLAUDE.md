@@ -73,7 +73,7 @@ The 💵 Net Carry tab is a stack of small pure modules (each has a `tests/test_
 | `net_carry.py` | the forward curve: basis vs one reference contract, interest, NC/front, monthly points, top of net carry |
 | `net_carry_chart.py` | the River-style "Cash Fwd Curve" chart |
 | `net_carry_compare.py` | several locations / corridors side by side, same reference + same interest clock |
-| `return_to_carry.py` (+ `_data`, `_view`) | the Research Analyst's **Return to Carry** (return to storage) automated for corn: harvest basis, weekly interest, roll spreads banked, by crop year, net or gross — and the report's front page, the **shipment-by-month table** (break-even basis, current/best bid and return for each shipment month Nov-Jul) |
+| `return_to_carry.py` (+ `_data`, `_view`) | the Research Analyst's **Return to Carry** (return to storage) automated for corn **and soybeans** (one engine, a `Spec` per commodity: chain, base contract, roll months, horizon): harvest basis, weekly interest, roll spreads banked, by crop year, net or gross — and the report's front page, the **shipment-by-month table** (break-even basis, current/best bid and return for each shipment month Nov-Jul; soybeans Nov-Aug) |
 | `carry_rate.py` | the interest rates: fed funds + 2.25% (Cost of Carry) and bank prime (the Return to Carry report), FRED with committed snapshots in `data/` |
 
 `return_to_carry.py` reproduces the analyst's yearly workbooks (`JSA - Documents/Research Analyst/Misc/Return to Carry`); the
@@ -98,7 +98,28 @@ forward periods from Aug 2026 — older years are Spot only) or a location's sna
 quoted off another futures month than its column (JFM is quoted off Mar, the Mar column is in May terms) is moved by that day's
 spread — her sheet types the raw 18 there. Before the weekly harvest bids start (first Wednesday of October) b0 is estimated from
 the posted FH Oct / LH Oct / FH Nov bids and the table says so. Her 6-17-20 PDF types K/N as -8 where her weekly sheet measured -10
-(Apr 29) — a page-1 vs weekly-sheet inconsistency in her files, not the engine.
+(Apr 29) — a page-1 vs weekly-sheet inconsistency in her files, not the engine. `shipment_table` hands the engine only the
+futures up to the as-of date, so a past as-of date cannot use a roll spread measured after it.
+
+**Soybeans** (Kolten 2026-10-05, "yes, do soybeans next"): the same engine run from `return_to_carry.SOY`, validated against the
+analyst's `BeanCarry` workbooks (`Research Analyst/Misc/Return to Carry/BeanCarry/{Decatur,DesMoines,Hennepin,STL}CRY`, 2005-06 to
+2022-23, 61 usable sheets). Chain Nov → Jan → Mar → May → Jul → Aug → next Nov (labels X F H K N Q x — the lower-case `x` is NEXT
+November); the harvest basis is expressed against **Jan** (October's bids are quoted off Nov and moved to Jan by the Nov/Jan spread
+measured the last Wednesday of October, so before Oct 28 there is no weekly average and the table uses the posted-quote estimate,
+Oct and Nov bids weighted 4 : 3); the headline carry is Jan → Jul; weeks run to Sep 30; interest starts at the 5th weekly bid (the 3rd
+in 2005-06 to 2008-09); the page-1 columns are Nov-Aug (Aug is quoted off next Nov, so its break-even carries the new-crop discount).
+The sheets' own per-year departures are `SOY_WINDOW_OVERRIDES` (2015-17 left the 5th week out of the harvest average),
+`SOY_ROLL_OVERRIDES` and `SOY_ACCRUAL_OVERRIDES`. The engine reproduces 75% of the comparable weeks to the hundredth of a cent; the
+rest are rows where her own sheet is inconsistent, listed per sheet as `off` in `tests/test_return_to_carry_soy.py` (fixtures:
+`tests/fixtures/rtc_soy_sheets.json`). Two data traps: the archive's symbol year digits cannot be trusted for soybeans (a January
+bid is written ZSF19 for Jan 2020), so a tag is read by its month letter and the date (`tag_label`) and an off-schedule tag is moved to
+the date's contract by that day's spread (`Spec.normalize_tags`; her sheets keep what was typed); and `futures_prices` has no soybean
+near contracts before 2008 (ZSX07 is missing in Oct 2007), so `data/rtc_futures_soy_2005_2007.csv`, from her sheets, fills 2005 to Oct
+2007 (`load_sheet_futures(root="ZS")`). Weekly-archive gaps drop a year rather than guess it: ADM Hennepin has no Oct 2007 to Aug 2008
+bids (no 2007-08), ADM St. Louis 2023-24 / 2024-25 are sparse, ADM Des Moines 2010-11 is partial. The only soybean rail corridors are
+'CN 105s Beans' and Palmetto "COL, OH Beans 90's" and they hold forward periods only since Aug 2026, so they get the page-1 table and
+not yet the weekly history. **Line endings:** `app.py` is CRLF in the working copy (`.gitattributes` normalises to LF in the repo);
+write it in binary mode or through the Edit tool, never a text-mode Python rewrite.
 
 ### `futures_prices` was backfilled (2026-10-04)
 
