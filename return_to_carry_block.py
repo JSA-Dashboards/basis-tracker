@@ -31,7 +31,7 @@ HEADING = ('<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#
 
 def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_pct: float, load_futures, load_prime,
            load_fed_funds, logo_uri: str | None = None, note: str | None = None, message: str | None = None,
-           history_hint: str | None = None) -> None:
+           history_hint: str | None = None, location: str = "", derived: dict | None = None) -> None:
     """Draw the block.
 
     obs / quotes   the location's weekly nearby bids and posted forward periods (return_to_carry_data's shapes), any dates;
@@ -41,7 +41,11 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
     load_*         zero/one-argument callables the caller caches: futures(root) -> {date: {symbol: cents}}, prime() and fed_funds()
     note           one extra caption under the explanations (where this location's history comes from)
     message        show this in place of the block (e.g. a freight line has no storage return)
-    history_hint   appended to the 'no weekly history' message"""
+    history_hint   appended to the 'no weekly history' message
+    location       the location's name (the derived-history banner says whose basis it is not)
+    derived        when part of `obs` is ESTIMATED from another series (bids flagged 'derived': True, river_derived): that series' description
+                   {fob_location, gap, q1, q3, pairs, own_from, derived_weeks, first}. A banner says so above the history and the years
+                   built from those bids are marked DERIVED / PART DERIVED in the table and drawn lighter in the bars."""
     st.markdown(HEADING, unsafe_allow_html=True)
     spec = rtc.SPECS.get(grain)
     if spec is None:
@@ -53,6 +57,12 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
         return
     obs = [o for o in obs if o["date"] <= asof]
     quotes = [q for q in quotes if q["date"] <= asof]
+    marks = rd.derived_years(obs)                    # {crop year: 'derived' | 'part'}, empty for a location's own history
+    if derived and marks:
+        mixed = next((y for y, v in marks.items() if v == "part"), None)
+        weeks = (sum(1 for o in obs if o.get("derived") and (o["date"].year if o["date"].month >= 10 else o["date"].year - 1) == mixed)
+                 if mixed is not None else 0)
+        st.markdown(vw.derived_banner_html(location, dict(derived, mixed_weeks=weeks)), unsafe_allow_html=True)
     if len(obs) < 12 and not quotes:
         st.info("No weekly spot history for this location to track (the tracker needs a bid every week from "
                 "October through " + ("July" if spec.key == "corn" else "September") + "; most locations only began posting "
@@ -91,10 +101,10 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
     ch = vw.seasonal_chart(res, measure, logo_uri=logo_uri, spec=spec)
     if ch is not None:
         st.altair_chart(ch, **_stretch())
-    bar = vw.best_bar_chart(rows, measure)
+    bar = vw.best_bar_chart(rows, measure, derived=marks)
     if bar is not None:
         st.altair_chart(bar, **_stretch())
-    st.markdown(vw.table_html(rows, measure), unsafe_allow_html=True)
+    st.markdown(vw.table_html(rows, measure, derived=marks), unsafe_allow_html=True)
     if skipped:
         st.caption(f"Not shown: {', '.join(skipped)} — the weekly archive repeats the previous year's bids for it "
                    "(a copy, not that year's market).")

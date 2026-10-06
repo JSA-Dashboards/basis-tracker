@@ -135,12 +135,29 @@ the sheet aside — 2 soybean / 7 corn sheets of 1,119) and the contract year is
 month. The upper-river reaches (Quincy, Burlington, Davenport, Prairie du Chien, Savage) have no freight in winter, so their series
 have gaps; Illinois River, STL, Ohio and the Lower Mississippi are complete. Every one of the 18 sheet locations gets 21 crop years of
 corn and soybean Return to Carry from 2006-07 (soybean average best +33 to +47¢, corn +35 to +53¢ — Hennepin soybeans +38.4, STL corn
-+43.6); wheat gets the Net Carry curve only. **Corn 2007-08 has no best return for any location:** `futures_prices` holds no front
-contract (Dec 2007) that autumn and the corn workbook CSV stops at 2006-07, so the Dec→Mar roll cannot be measured (same gap in the
-tracker's other corn series). The FOB series is the sell side, not an elevator's buy basis — the existing truck series differ from it
++43.6); wheat gets the Net Carry curve only. **Corn 2007-08:** `futures_prices` holds no front contract (Dec 2007) that autumn, so the Dec→Mar roll could not be measured
+(no best return in any corn series until 2026-10-06); the 9 weekly Dec 2007 prices (Oct 3 - Nov 28) now come from the analyst's `07colcry.xlsx`
+into `data/rtc_futures_1996_2006.csv`, and her Mar 2008 prices there equal the stored ZCH08 to the cent. The FOB series is the sell side, not an elevator's buy basis — the existing truck series differ from it
 by a varying amount (the corn Hennepin series sits about 3¢ under FOB, interquartile 2-6¢; the soybean one about 11¢ under, interquartile
 2-22¢), which is why the river history is shown as its own location type rather than merged into the elevator rows. `return_to_carry_block.py` is the whole Return to Carry section as one
 Streamlit block (`render(obs=..., quotes=...)`), shared with the portals, which vendor it next to the `return_to_carry*.py` modules.
+
+**Derived history for river elevators that only began posting in 2026 (Kolten 2026-10-06: "okay to add them, just highlight and note
+that these are derived through the historical FOB river values, not actual basis history").** About 35 locations (ADM Havana, Morris,
+Memphis, Quincy Barge Dock, Evansville, Mt. Vernon, Clinton; Cargill Havana, Beardstown, Meredosia, Cincinnati; CHS Havana/Beardstown,
+Morris, Seneca, Quincy; CGB Joliet, West Memphis; LDC West Memphis; Bunge Cairo) have bids only since June 2026. `river_derived.py`
+(tracker only; `tests/test_river_derived.py`) maps each to the River FOB sheet location whose reach it sits on (`FOB_REACH`) and estimates
+its history as that reach's weekly nearby FOB less a **gap** = the median of (FOB − the location's bid) over every same-day, same-month
+full-month quote pair since June (the FOB moved to the bid's contract by that day's futures spread). Accepted only with 40+ pairs, a
+middle half no wider than 12¢ and a median no larger than 30¢; otherwise the location keeps no history rather than a misleading one
+(left out: CHS Quincy Elevator corn at −61¢ ± 22, CGB Joliet soybeans −19, ADM Clinton soybeans 14 with a 10-25 middle half, Bunge Cairo
+soybeans 10 with 5-18). Observed gaps, corn / soybeans: Havana 3-5 / 9-11¢, Seneca and Morris 0-1 / 7-9, Memphis 18-21 / 17-24,
+Evansville and Mt. Vernon 8-10 / 10-11, Cincinnati 14 / 13-15. Each derived bid carries `'derived': True` and exists only for the weeks
+before the location's own first bid; it is computed on the fly (`_cached_rtc_derived`) and NOTHING is written to the snapshots table, so
+the Bids and Trends tabs never see it. The Return to Carry block marks it three ways: an amber banner (reach, gap, pairs, "derived through
+the historical FOB river values, not actual basis history"), DERIVED / PART DERIVED pills in the by-year table (2025-26 is the mixed year)
+and lighter bars with a legend. A constant gap cancels exactly in the gross return and moves the net return only by the interest on the
+gap (under half a cent); the harvest-basis and summer-basis LEVELS carry the gap.
 
 **Vendored modules (portals).** `sync_carry_modules.py <portal dir> [--river] [--no-return] [--check]` copies the Net Carry modules,
 the Return to Carry modules and their data files (and `river_carry.py` with `--river`) into a portal. The rail portal's

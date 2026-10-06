@@ -23,8 +23,9 @@ import net_carry as nc
 import return_to_carry as rtc
 
 # Weekly futures from the analyst's yearly workbooks for the crop years BEFORE the settlement archive starts
-# (corn 1996-97 .. 2006-07, soybeans 2005-06 .. Oct 2007): date, symbol, price_cents. The database has everything from late
-# 2006 on.
+# (corn 1996-97 .. 2006-07, plus Dec 2007 for Oct 3 - Nov 28 2007 from the 07colcry sheet: a front contract the stored
+# settlements lack that autumn; soybeans 2005-06 .. Oct 2007): date, symbol, price_cents. The database has everything from
+# late 2006 on except those front contracts.
 SHEET_FUTURES_PATH = Path(__file__).parent / "data" / "rtc_futures_1996_2006.csv"
 SHEET_FUTURES_PATHS = {"ZC": SHEET_FUTURES_PATH, "ZS": Path(__file__).parent / "data" / "rtc_futures_soy_2005_2007.csv"}
 
@@ -322,6 +323,21 @@ def crop_years_in(obs: list[dict], spec: rtc.Spec = rtc.CORN) -> list[int]:
         elif d.month <= spec.horizon[0]:
             ys.add(d.year - 1)
     return sorted(ys)
+
+
+def derived_years(obs: list[dict]) -> dict:
+    """{crop year: 'derived' | 'part'} for the crop years whose weekly series holds bids flagged `'derived': True` (history estimated from
+    another series, river_derived): 'derived' when none of the year's bids are the location's own, 'part' when its own bids take over
+    part-way. A crop year runs October to the next September. Empty when nothing is flagged."""
+    tot: dict = {}
+    der: dict = {}
+    for o in obs:
+        d = o["date"]
+        cy = d.year if d.month >= 10 else d.year - 1
+        tot[cy] = tot.get(cy, 0) + 1
+        if o.get("derived"):
+            der[cy] = der.get(cy, 0) + 1
+    return {cy: ("derived" if n == tot[cy] else "part") for cy, n in der.items()}
 
 
 MIN_CROP_YEAR = 2004      # the weekly archive's dates are true Wednesdays from Oct 2004; before that they drift a day a year

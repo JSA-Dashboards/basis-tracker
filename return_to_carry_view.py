@@ -116,10 +116,19 @@ def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.C
 
 
 # ── the by-year table ─────────────────────────────────────────────────────────────────────────────
-def table_html(rows: list[dict], measure: str = "net") -> str:
+def _derived_pill(status: str) -> str:
+    label = "DERIVED" if status == "derived" else "PART DERIVED"
+    tip = ("built from the River FOB sheet's FOB values, not this location's own bids" if status == "derived"
+           else "built partly from the River FOB sheet's FOB values: this location's own bids take over part-way through the year")
+    return (f'<span title="{tip}" style="background:#fff4e5;color:#9a3412;border:1px solid #f28e2b;font-size:9px;font-weight:700;'
+            f'letter-spacing:.05em;padding:1px 6px;border-radius:8px;margin-left:6px;white-space:nowrap">{label}</span>')
+
+
+def table_html(rows: list[dict], measure: str = "net", derived: dict | None = None) -> str:
     """A line per crop year, newest first. Harvest basis = the average of the first weekly bids; futures carry = the
     Dec->Jul roll spreads; summer basis = the best bid quoted off July; best return = the highest weekly return
-    on the chosen measure (and its week); 'end' = the return at the last week to July."""
+    on the chosen measure (and its week); 'end' = the return at the last week to July. `derived` = {crop year: 'derived' | 'part'}
+    (return_to_carry_data.derived_years): those years carry a DERIVED / PART DERIVED pill and a line under the table says what it means."""
     if not rows:
         return ""
     th = ("padding:6px 10px;border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;"
@@ -138,7 +147,8 @@ def table_html(rows: list[dict], measure: str = "net") -> str:
         isbest = r["best"] is not None and top is not None and abs(r["best"] - top) < 1e-9
         bcol = f";color:{GREEN};font-weight:700" if isbest else ";font-weight:600"
         end_col = ("" if r["last"] is None else (f";color:{GREEN}" if r["last"] > 0 else f";color:{RED}"))
-        body += (f'<tr><td style="{td};text-align:left{bg}">{r["label"]}{tag}</td>'
+        dstat = (derived or {}).get(r["crop_year"])
+        body += (f'<tr><td style="{td};text-align:left{bg}">{r["label"]}{tag}{_derived_pill(dstat) if dstat else ""}</td>'
                  f'<td style="{td}{bg}">{_f(r["b0"])}</td><td style="{td}{bg}">{_f(r["carry"])}</td>'
                  f'<td style="{td}{bg}">{_f(r["summer"], 0)}</td><td style="{td}{bcol}{bg}">{_f(r["best"])}</td>'
                  f'<td style="{td};color:#64748b{bg}">{_md(r["best_date"])}</td><td style="{td}{end_col}{bg}">{_f(r["last"])}</td></tr>')
@@ -154,8 +164,28 @@ def table_html(rows: list[dict], measure: str = "net") -> str:
         mean = lambda xs: _f(sum(xs) / len(xs)) if xs else "—"
         med = lambda xs: _f(statistics.median(xs)) if xs else "—"
         foot = stat_row(f"Average of {len(done)} completed years", mean) + stat_row("Median", med)
+    legend = ""
+    if derived:
+        legend = ('<div style="font-size:11px;color:#9a3412;margin-top:4px">DERIVED / PART DERIVED = built from the River FOB sheet\'s FOB '
+                  'values (less the gap in the note above), not this location\'s own basis history.</div>')
     return (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>{head}</tr></thead>'
-            f'<tbody>{body}{foot}</tbody></table></div>')
+            f'<tbody>{body}{foot}</tbody></table></div>{legend}')
+
+
+# ── derived history: the banner that says what it is ────────────────────────────────────────────
+def derived_banner_html(location: str, dv: dict) -> str:
+    """The amber note above a history that is partly ESTIMATED from the River FOB sheet (river_derived.Derivation.as_dict()): which reach, the
+    gap, how it was measured, and that it is not the location's own basis history."""
+    name = html.escape(location or "This location")
+    first_year = rtc.crop_label(dv["own_from"].year if dv["own_from"].month >= 10 else dv["own_from"].year - 1)
+    return ('<div style="background:#fff7ed;border:1px solid #fed7aa;border-left:5px solid #f28e2b;border-radius:8px;padding:10px 14px;'
+            'margin:8px 0 10px;font-size:13px;line-height:1.5;color:#7c2d12">'
+            f'<b>Derived history — not {name}\'s own basis.</b> {name} began posting bids on {dv["own_from"]:%b %d, %Y}. Before that, the weekly '
+            f'history below is the River FOB sheet\'s <b>{html.escape(dv["fob_location"])}</b> FOB barge basis less <b>{dv["gap"]:.1f}¢</b> — the median '
+            f'gap between the two on the {dv["pairs"]:,} same-day bid pairs both posted since then (the middle half ran {dv["q1"]:.1f} to {dv["q3"]:.1f}¢). '
+            'It is derived through the historical FOB river values, not actual basis history, and the gap is only measured over the last few months, '
+            f'so read the earlier returns as an estimate of what storing here would have paid. Years tagged DERIVED are built entirely from it; '
+            f'{first_year} is a mixture ({dv.get("mixed_weeks", dv["derived_weeks"])} derived weeks, then {name}\'s own bids).</div>')
 
 
 # ── the words that explain the method (per commodity) ────────────────────────────────────────────
@@ -416,22 +446,30 @@ def parse_bundle(label) -> bool:
 
 
 # ── chart 1: the best return of each crop year ────────────────────────────────────────────────────
-def best_bar_chart(rows: list[dict], measure: str = "net", height: int = 280) -> alt.Chart | None:
+SOURCE_RANGE = {"own bids": BLUE, "partly derived": "#7fa1cc", "derived": "#bcd0e6"}
+
+
+def best_bar_chart(rows: list[dict], measure: str = "net", height: int = 280, derived: dict | None = None) -> alt.Chart | None:
     """One bar per crop year at its best weekly return; the latest year orange, a dashed line at the average of the
-    completed years. None when no year has a return."""
+    completed years. `derived` = {crop year: 'derived' | 'part'}: those bars are lighter and a legend says why. None when no year has a return."""
     have = [r for r in rows if r["best"] is not None]
     if not have:
         return None
+    src = {"derived": "derived", "part": "partly derived"}
     df = pd.DataFrame([{
         "Crop year": r["label"], "Best": float(r["best"]), "latest": r is rows[-1],
-        "When": _md(r["best_date"]), "Harvest basis": r["b0"], "Futures carry": r["carry"]} for r in have])
+        "When": _md(r["best_date"]), "Harvest basis": r["b0"], "Futures carry": r["carry"],
+        "Source": src.get((derived or {}).get(r["crop_year"]), "own bids")} for r in have])
     order = list(df["Crop year"])
     base = alt.Chart(df).encode(x=alt.X("Crop year:N", sort=order, title=None,
                                        axis=alt.Axis(labelAngle=-90, labelFontSize=10, labelColor="#1f4e79", labelFontWeight="bold")))
     bars = base.mark_bar(cornerRadiusTopLeft=2, cornerRadiusTopRight=2).encode(
         y=alt.Y("Best:Q", title="¢/bu", axis=alt.Axis(format=".0f", titleColor="#64748b", labelColor="#64748b")),
-        color=alt.condition("datum.latest", alt.value(ORANGE), alt.value(BLUE)),
-        tooltip=[alt.Tooltip("Crop year:N"), alt.Tooltip("Best:Q", format="+.1f", title=f"Best return ({measure_name(measure)}) ¢"),
+        color=(alt.condition("datum.latest", alt.value(ORANGE),
+                             alt.Color("Source:N", scale=alt.Scale(domain=list(SOURCE_RANGE), range=list(SOURCE_RANGE.values())),
+                                       legend=alt.Legend(title=None, orient="bottom", labelFontSize=11, symbolType="square")))
+               if derived else alt.condition("datum.latest", alt.value(ORANGE), alt.value(BLUE))),
+        tooltip=[alt.Tooltip("Crop year:N"), alt.Tooltip("Source:N"), alt.Tooltip("Best:Q", format="+.1f", title=f"Best return ({measure_name(measure)}) ¢"),
                  alt.Tooltip("When:N", title="Best week"), alt.Tooltip("Harvest basis:Q", format="+.1f"),
                  alt.Tooltip("Futures carry:Q", format="+.1f")])
     layers = [bars]

@@ -247,6 +247,13 @@ fm = rd.futures_map([{"date": "2026-10-02", "symbol": "ZCZ26", "price_cents": 50
 check("dates as strings or dates, symbols trimmed, prices as numbers; rows with no price, no usable date or symbol are dropped",
       fm == {D(2026, 10, 2): {"ZCZ26": 502.25, "ZCH27": 516.75}} and rd.futures_map(None) == {} and rd.futures_map([]) == {}, fm)
 
+print("sheet futures: the corn year 2007-08 has its Dec 2007 front contract")
+sf = rd.load_sheet_futures()
+check("Dec 2007 corn from the analyst's 07colcry sheet, Oct 3 to Nov 28 (the stored settlements lack that front contract): 9 weeks, 344.5 .. 387.25",
+      sf[D(2007, 10, 3)]["ZCZ07"] == 344.5 and sf[D(2007, 11, 28)]["ZCZ07"] == 387.25 and sum(1 for px in sf.values() if "ZCZ07" in px) == 9)
+sp07 = rtc.roll_spreads(rd.merge_futures(sf, {D(2007, 11, 28): {"ZCH08": 404.5}}), 2007)      # Mar 404.5 is in both her sheet and the stored settlements
+check("...so the Dec/Mar roll of 2007-08 measures: Mar 404.5 - Dec 387.25 = 17.25 on Nov 28", sp07["ZH"] == (17.25, D(2007, 11, 28)), sp07["ZH"])
+
 print("harvest basis before the weekly bids: the posted harvest-period quotes")
 FE = {D(2026, 10, 2): {"ZCZ26": 502.25, "ZCH27": 516.75}}
 rawh = [{"date": D(2026, 10, 2), "label": "FH Oct", "tag": "ZCZ26", "basis": -10.0}, {"date": D(2026, 10, 2), "label": "LH Oct", "tag": "ZCZ26", "basis": -17.0},

@@ -264,6 +264,20 @@ def _cached_rtc_obs_basis(provider: str, location: str, grain: str) -> list:
     import return_to_carry_data as _rd
     return _rd.obs_from_snapshots(_cached_get_snapshots(provider, location), grain, _grain_disp)
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_rtc_derived(provider: str, location: str, grain: str):
+    """(weekly bids, Derivation as a dict | None): a river elevator that only began posting in 2026 gets the River FOB sheet's FOB at its
+    reach, less the gap measured while both posted, in front of its own bids — flagged 'derived' bid by bid (river_derived). Every other
+    location comes back as it is, with None."""
+    import river_derived as _rdv
+    live_obs = _cached_rtc_obs_basis(provider, location, grain)
+    if (provider, location) not in _rdv.FOB_REACH or grain not in _rdv.GRAIN_ROOT or not _rdv.needs_history(live_obs):
+        return live_obs, None
+    obs, dv = _rdv.with_derived(provider, location, grain, live_obs, _cached_rtc_quotes_basis(provider, location, grain),
+                                _cached_river_archive(), _cached_rtc_futures(_rdv.GRAIN_ROOT[grain]))
+    return obs, (dv.as_dict() if dv else None)
+
+
 @st.cache_data(ttl=900, show_spinner=False)
 def _cached_rtc_quotes_rail(market: str, commodity: str) -> list:
     """Every posted period of a corridor with a bid — the forward quotes behind the shipment-by-month table."""
@@ -3138,7 +3152,7 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
     year (return_to_carry; the Research Analyst's yearly workbooks, automated). `ref` = ('basis', provider, location),
     ('rail', corridor) or ('river', location); the block itself is return_to_carry_block (shared with the portals)."""
     import return_to_carry_block as _rcb
-    message = note = None
+    message = note = derived = None
     if ref[0] == "rail":
         if ref[1].endswith("Freight"):
             message = "This line is a freight rate, not an FOB bid, so there is no storage return to track."
@@ -3149,13 +3163,15 @@ def _nc_return_block(ref, asof, grain, measure, tab_rate_pct):
         obs, quotes = _cached_river_obs(ref[1], grain), _cached_river_quotes(ref[1], grain)
         note = ("History: the nearby FOB barge basis of each weekly sheet in the River FOB archive (September 2006 on), quoted against the "
                 "contract the sheet maps that month to — FOB = CIF NOLA less barge freight (tariff x freight % / 2000 x bushel weight). "
-                "The upper-river reaches have no FOB while the river is closed in winter, so their weekly series has gaps; corn's 2007-08 "
-                "year cannot be rolled because the stored futures history lacks the front contract that autumn.")
+                "The upper-river reaches have no FOB while the river is closed in winter, so their weekly series has gaps. Corn's 2007-08 "
+                "Dec/Mar roll uses the Dec 2007 prices from the analyst's 07colcry sheet (the stored futures lack that front contract).")
     else:
-        obs, quotes = _cached_rtc_obs_basis(ref[1], ref[2], grain), _cached_rtc_quotes_basis(ref[1], ref[2], grain)
+        quotes = _cached_rtc_quotes_basis(ref[1], ref[2], grain)
+        obs, derived = _cached_rtc_derived(ref[1], ref[2], grain)       # a river elevator with no history of its own: estimated, and flagged
     _rcb.render(obs=obs, quotes=quotes, asof=asof, grain=grain, measure=measure, tab_rate_pct=tab_rate_pct,
                 load_futures=_cached_rtc_futures, load_prime=_cached_prime, load_fed_funds=_cached_fed_funds,
-                logo_uri=_jsa_watermark_uri() or None, note=note, message=message)
+                logo_uri=_jsa_watermark_uri() or None, note=note, message=message,
+                location=f"{ref[1]} {ref[2]}" if ref[0] == "basis" else "", derived=derived)
 
 
 @st.fragment

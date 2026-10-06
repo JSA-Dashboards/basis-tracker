@@ -90,6 +90,29 @@ ipt = vw.table_html(rd.summary_rows(inprog, "net"), "net")
 check("a year in progress is tagged IN PROGRESS and left out of the average", "IN PROGRESS" in ipt and "Average of 11 completed years" in ipt)
 check("empty -> empty", vw.table_html([], "net") == "")
 
+print("return_to_carry_view: history that is ESTIMATED from another series is marked")
+DV = {"fob_location": "Havana", "gap": 3.04, "q1": 0.9, "q3": 5.4, "pairs": 249, "own_from": date(2026, 6, 12), "derived_weeks": 36, "first": date(2006, 9, 6)}
+bn = vw.derived_banner_html("ADM Havana, IL", DV)
+check("the banner says whose basis it is not, the FOB reach, the gap and how it was measured, and that it is derived, not actual history",
+      "Derived history" in bn and "ADM Havana, IL" in bn and "<b>Havana</b>" in bn and "3.0" in bn and "249" in bn and "0.9 to 5.4" in bn and "Jun 12, 2026" in bn
+      and "derived through the historical FOB river values, not actual basis history" in bn, bn[:300])
+check("it names the year that is a mixture (the own bids start in June 2026: 2025-26, 36 derived weeks)", "2025-26 is a mixture (36 derived weeks" in bn)
+check("the mixed year counts ITS derived weeks (the block passes mixed_weeks), not the whole history's", "2025-26 is a mixture (34 derived weeks" in vw.derived_banner_html("ADM Havana, IL", dict(DV, mixed_weeks=34)))
+check("a name from the database is escaped before it reaches the page", "&lt;b&gt;" in vw.derived_banner_html("<b>x</b>", DV) and "<b>x</b>" not in vw.derived_banner_html("<b>x</b>", DV))
+mk = {2014: "derived", 2015: "derived", 2025: "part"}
+td = vw.table_html(rows, "net", derived=mk)
+check("the by-year table tags the derived years DERIVED, the mixed one PART DERIVED, and explains the tags under the table",
+      td.count(">DERIVED<") == 2 and td.count(">PART DERIVED<") == 1 and "built from the River FOB sheet" in td and td.index("2014-15") > td.index("2015-16"), (td.count(">DERIVED<"), td.count(">PART DERIVED<")))
+check("a location's own history carries no tag and no legend", "DERIVED" not in vw.table_html(rows, "net") and "DERIVED" not in vw.table_html(rows, "net", derived={}))
+bdv = vw.best_bar_chart(rows, "net", derived=mk).to_dict()
+dsd = next(d for d in bdv["datasets"].values() if d and "Crop year" in d[0])
+check("the bars carry their source and a legend, so the derived ones are drawn lighter", {r["Crop year"]: r["Source"] for r in dsd} == dict(
+      [(r["label"], "derived" if r["crop_year"] in (2014, 2015) else "partly derived" if r["crop_year"] == 2025 else "own bids") for r in rows]) and "legend" in json.dumps(bdv["layer"][0]["encoding"]["color"]))
+check("without derived years the bars are the plain blue / orange ones", "Source" not in json.dumps(vw.best_bar_chart(rows, "net").to_dict()["layer"][0]["encoding"]["color"]))
+check("derived_years: 'derived' = every bid of the crop year is flagged, 'part' = some, nothing flagged = nothing",
+      rd.derived_years([{"date": date(2024, 10, 2), "derived": True}, {"date": date(2025, 1, 8), "derived": True}, {"date": date(2025, 10, 1), "derived": True}, {"date": date(2025, 12, 3)}])
+      == {2024: "derived", 2025: "part"} and rd.derived_years([{"date": date(2025, 10, 1)}]) == {} and rd.derived_years([]) == {})
+
 print("return_to_carry_view: helpers")
 check("completed() keeps finished years that have a best return", len(vw.completed(rows)) == 12 and len(vw.completed(rd.summary_rows(inprog, "net"))) == 11)
 check("rank_of_latest: the newest synthetic year climbs the most, so it ranks first of 12", vw.rank_of_latest(rows) == (1, 12), vw.rank_of_latest(rows))
