@@ -81,6 +81,12 @@ it = rc.curve_items(ARCH, "2006-09-07", "Hennepin", "Corn")
 check("the months that have a FOB, with the year spelled out and the sheet's contract (Jan is dropped: closed)",
       [(i["delivery"], i["futures"]) for i in it] == [("Oct 2006", "ZCZ06"), ("Nov 2006", "ZCZ06"), ("Dec 2006", "ZCZ06")]
       and close(it[0]["basis"], want_oct, 1e-3), it)
+ARCH_SPOT = {"calendar": {"2025-10-08": {"Corn": [("Spot", "CZ"), ("Oct", "CZ"), ("Nov", "CZ")]}}, "cif": {"2025-10-08": {"Corn": {"Spot": 0.50, "Oct": 0.52, "Nov": 0.55}}},
+             "freight": {"2025-10-08": {"IL": {"Spot": 5.0, "Oct": 5.0, "Nov": 5.0}}}}
+check("the ladder keeps a sheet's Spot column as its own row beside the month's (the sheet as it is); the series below never quote a month twice",
+      [i["delivery"] for i in rc.curve_items(ARCH_SPOT, "2025-10-08", "Hennepin", "Corn")] == ["Spot Oct 2025", "Oct 2025", "Nov 2025"]
+      and [q["label"] for q in rc.forward_quotes(ARCH_SPOT, "Hennepin", "Corn")] == ["Oct 2025", "Nov 2025"]
+      and len(rc.nearby_obs(ARCH_SPOT, "Hennepin", "Corn")) == 1)
 check("a date the archive does not have, or a commodity it has no calendar for, gives an empty curve", rc.curve_items(ARCH, "2020-01-01", "Hennepin", "Corn") == [] and rc.curve_items(ARCH, "2006-09-07", "Hennepin", "Wheat") == [])
 
 print("river_carry: the weekly nearby FOB and the forward quotes")
@@ -150,6 +156,9 @@ print("river_carry: the archive's locations")
 check("the sheet's current locations, in its order, without discontinued Gulfport",
       rc.CURRENT_LOCATIONS[0] == "Greenville" and "STL" in rc.CURRENT_LOCATIONS and "Hennepin" in rc.CURRENT_LOCATIONS and "Havana" in rc.CURRENT_LOCATIONS and "Gulfport" not in rc.CURRENT_LOCATIONS
       and len(rc.CURRENT_LOCATIONS) == len(set(rc.CURRENT_LOCATIONS)), rc.CURRENT_LOCATIONS)
+check("default peers are the nearest on the reach by tariff factor, topped up from the neighbours (STL is alone on its reach)",
+      rc.reach_peers("Hennepin") == ["Lacon", "Seneca", "Peoria"] and rc.reach_peers("STL") == ["MTV", "Cairo", "Louisville"]
+      and rc.reach_peers("Havana", 2) == ["Peoria", "Hennepin"] and rc.reach_peers("Nowhere") == [], (rc.reach_peers("Hennepin"), rc.reach_peers("STL")))
 check("dates() lists the archive newest first, and with a commodity only the sheets that can be placed for it",
       rc.dates(A2)[0] == "2026-01-14" and rc.dates(A2, "Corn") == ["2026-01-14", "2025-10-15", "2025-10-08"] and "2025-12-03" in rc.dates(A2) and rc.dates(A2, "Soybeans") == [])
 

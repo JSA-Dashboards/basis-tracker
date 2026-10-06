@@ -88,10 +88,11 @@ def delivery_label(ym: tuple, spot: bool = False) -> str:
     return f"{'Spot ' if spot else ''}{_ABBR[ym[1] - 1]} {ym[0]}"
 
 
-def place_columns(commodity: str, as_of: date, calendar_cols) -> list:
+def place_columns(commodity: str, as_of: date, calendar_cols, keep_spot: bool = False) -> list:
     """[(label, (year, month), code, symbol, spot)] for one sheet's columns in order, or [] when the sheet can't be placed
     (stale headers, an unreadable label). `calendar_cols` = [(month label, contract code), ...] as archived (calendar_history).
-    A repeated label keeps its first column; 'Spot' is dropped when the sheet also has that month's own column."""
+    A repeated label keeps its first column. 'Spot' is dropped when the sheet also has that month's own column — unless
+    `keep_spot` (the Net Carry ladder shows the sheet as it is, Spot row and all; a series must not quote a month twice)."""
     cols, seen = [], set()
     for label, code in calendar_cols or []:
         key = str(label or "").strip().lower()
@@ -116,6 +117,8 @@ def place_columns(commodity: str, as_of: date, calendar_cols) -> list:
             ym = (y, m)
             prev = ym
         out.append((label, ym, code, contract_symbol(commodity, code, ym), is_spot(label)))
+    if keep_spot:
+        return out
     own = {ym for _l, ym, _c, _s, spot in out if not spot}
     return [c for c in out if not (c[4] and c[1] in own)]
 
@@ -133,20 +136,20 @@ def fob_cents(archive: dict, as_of_iso: str, location: str, commodity: str, labe
     return None if v is None else v * 100.0
 
 
-def _columns(archive: dict, as_of_iso: str, commodity: str) -> list:
+def _columns(archive: dict, as_of_iso: str, commodity: str, keep_spot: bool = False) -> list:
     cal = ((archive.get("calendar") or {}).get(as_of_iso) or {}).get(commodity)
     try:
         d = date.fromisoformat(as_of_iso[:10])
     except ValueError:
         return []
-    return place_columns(commodity, d, cal) if cal else []
+    return place_columns(commodity, d, cal, keep_spot) if cal else []
 
 
 def curve_items(archive: dict, as_of_iso: str, location: str, commodity: str) -> list[dict]:
     """One sheet's forward curve for a location, in the form net_carry reads: [{'delivery': 'Oct 2026', 'futures': 'ZCZ26',
-    'basis': -40.1}] — cents per bushel, only the months that have a FOB."""
+    'basis': -40.1}] — cents per bushel, only the months that have a FOB. A sheet's 'Spot' column is its own row ('Spot Oct 2025')."""
     out = []
-    for label, ym, _code, sym, spot in _columns(archive, as_of_iso, commodity):
+    for label, ym, _code, sym, spot in _columns(archive, as_of_iso, commodity, keep_spot=True):
         b = fob_cents(archive, as_of_iso, location, commodity, label)
         if b is not None:
             out.append({"delivery": delivery_label(ym, spot), "futures": sym, "basis": round(b, 4)})
@@ -194,11 +197,15 @@ def dates(archive: dict, commodity: str | None = None) -> list[str]:
 
 
 def reach_peers(location: str, n: int = 3) -> list[str]:
-    """The `n` other river locations to compare a location with by default: those on its own reach first (nearest in the sheet's
-    order), then the closest of the rest."""
+    """The `n` other river locations to compare a location with by default: the nearest on its own reach, nearest = the smallest gap
+    in tariff factor (the factor is the $/ton to NOLA, so it says how far down the river a location sits); a reach with fewer than
+    `n` others (STL is alone in its own) is topped up with the closest factors of the neighbouring reaches. Same rule as the River FOB
+    portal's net_carry_data.default_peers."""
     names = list(CURRENT_LOCATIONS)
     if location not in names:
         return []
-    i, reach = names.index(location), LOCATION[location].reach
-    others = sorted((x for x in names if x != location), key=lambda x: (LOCATION[x].reach != reach, abs(names.index(x) - i)))
-    return others[:n]
+    me = LOCATION[location]
+    others = [(abs(LOCATION[x].factor - me.factor), i, x, LOCATION[x].reach) for i, x in enumerate(names) if x != location]
+    same = sorted(o for o in others if o[3] == me.reach)
+    rest = sorted(o for o in others if o[3] != me.reach)
+    return [o[2] for o in (same + rest)[:n]]
