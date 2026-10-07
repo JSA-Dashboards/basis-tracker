@@ -14,7 +14,7 @@ from --file or stdin. Previews by default; --commit writes.
     cat rundown.txt | python post_rail.py --date 2026-10-02 --commit
 
 Flags:
-    --date YYYY-MM-DD   posting date (default: today, UTC)
+    --date YYYY-MM-DD   posting date (default: today, US Central — the droplet clock is UTC, which is already tomorrow after ~7 PM CT)
     --commodity NAME    Corn | Soybeans | Wheat | Sorghum  (default: Corn)
     --file PATH         read the rundown from PATH instead of stdin
     --commit            actually save (default is preview only)
@@ -32,11 +32,11 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import datetime, timezone, date as _date
+from datetime import date as _date
 
 import rail_paste as rp
 import database as db
-from rail_corridors import RAIL_BY_CORRIDOR
+from rail_corridors import RAIL_BY_CORRIDOR, today_ct
 
 # Fallback rail from the corridor's first word, same map the app uses when a
 # corridor isn't in RAIL_BY_CORRIDOR.
@@ -115,7 +115,7 @@ def _delete_markets_day(date_s: str, markets: list[str]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Post a rail rundown + fire the rail update email.")
-    ap.add_argument("--date", default=datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    ap.add_argument("--date", default=today_ct().isoformat())
     ap.add_argument("--commodity", default="Corn")
     ap.add_argument("--file")
     ap.add_argument("--commit", action="store_true")

@@ -2907,10 +2907,16 @@ if tab_railentry is not None:
         import pandas as _pd
         import rail_paste as _rp
         from database import save_rail_fob as _srf
-        from rail_corridors import RAIL_BY_CORRIDOR as _RBC
+        from rail_corridors import RAIL_BY_CORRIDOR as _RBC, today_ct as _today_ct
 
         for _lvl, _txt in (st.session_state.pop("rail_entry_outcome", None) or []):   # what the last Save did (see the save handler)
             getattr(st, _lvl)(_txt)
+        import changes_report as _cr0
+        if not _cr0._graph_configured():                # say it BEFORE a save, not after (2026-10-06: the Cloud Secrets had lost the GRAPH_* keys)
+            st.warning("⚠️ This app can't send email: the Microsoft Graph secrets (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / "
+                       "GRAPH_CLIENT_SECRET / GRAPH_SENDER) aren't set — Settings → Secrets, at the top level above any "
+                       "[section]. Saving still works, but the rail update email will fail until they're added; the "
+                       "droplet's post_rail.py can send it meanwhile.")
         st.caption("Paste one or more corridor rundowns — the parser detects each corridor by "
                    "its name, so you can drop several in at once. Values are stored **exactly as "
                    "posted**; the tag (z/u/h/k/n) only picks the contract, never rolls the number. "
@@ -2919,7 +2925,7 @@ if tab_railentry is not None:
 
         _rc1, _rcC, _rc2 = st.columns([2, 2, 4])
         with _rc1:
-            _redate = st.date_input("Posting date", value=datetime.utcnow().date(),
+            _redate = st.date_input("Posting date", value=_today_ct(),      # Central, not UTC: after ~7 PM CT the UTC date is already tomorrow
                                     key="rail_entry_date")
         with _rcC:
             _recom = st.selectbox("Commodity", ["Corn", "Soybeans", "Wheat", "Sorghum"],
@@ -2990,7 +2996,8 @@ if tab_railentry is not None:
                         "Email the basis corridors' updates after saving", value=True,
                         key="rail_entry_email",
                         help="Sends one rail update email covering every non-freight corridor "
-                             "saved (Outlook locally, SMTP on the Cloud app).")
+                             "saved: To you, BCC the JSA group (Outlook locally, Microsoft Graph on the Cloud "
+                             "app). Re-saving the same rundown sends it again.")
                 if _do_save:
                     def _pn(v):
                         if v is None or (isinstance(v, float) and _pd.isna(v)):

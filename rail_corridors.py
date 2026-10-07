@@ -16,6 +16,19 @@ import datetime as _dt
 import re
 from typing import Optional
 
+
+def today_ct() -> _dt.date:
+    """Today's date in US Central time: the business date of a rundown posted now.
+
+    The Cloud app's clock and the droplet's are UTC, and `datetime.utcnow().date()` is already TOMORROW after ~7 PM Central
+    (6 PM in winter): the Rail Entry tab used it as its default Posting date, so a rundown saved at 20:29 CT on 2026-10-06 was
+    filed under 2026-10-07."""
+    try:
+        from zoneinfo import ZoneInfo
+        return _dt.datetime.now(ZoneInfo("America/Chicago")).date()
+    except Exception:                                   # no tz database (a bare Windows Python): CST, off by an hour in summer only
+        return (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=6)).date()
+
 # Corridor registry (display/sort order) → rail carrier. Names match the stored
 # market names. "* Shuttle" rows are freight ($/car), placed per JSA: the BN
 # shuttle just below BN PNW, the UP shuttle just below UP Group 3.

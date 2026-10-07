@@ -14,7 +14,6 @@ import os
 import sys
 import tempfile
 import time
-from datetime import datetime
 from pathlib import Path
 from unittest import mock
 
@@ -34,7 +33,9 @@ for k in ("USE_SNOWFLAKE", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PAS
           "GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "GRAPH_CLIENT_SECRET", "GRAPH_SENDER", "APP_PASSWORD", "VIEW_ONLY"):
     os.environ[k] = ""
 
+import changes_report    # noqa: E402
 import database          # noqa: E402
+import rail_corridors    # noqa: E402
 import rail_report       # noqa: E402
 import river_fob_data    # noqa: E402
 
@@ -50,13 +51,13 @@ def check(name, cond, detail=""):
         FAILS.append(name)
 
 
-ISO = datetime.utcnow().date().isoformat()
+ISO = rail_corridors.today_ct().isoformat()          # the tab's default Posting date (Central; the UTC date is already tomorrow after ~7 PM CT)
 STAGED = [{"market": "CSX Columbus", "commodity": "Corn", "period": "Dec", "futures": "ZCH27", "bid": 10, "offer": 15, "bid_raw": None, "offer_raw": None},
           {"market": "CSX Freight", "commodity": "Freight", "period": "Return Trip", "futures": None, "bid": 3000, "offer": 3100, "bid_raw": None, "offer_raw": None}]
 
 
-def run_case(label, send_side_effect, staged=STAGED):
-    """Open the admin app with `staged` rundown rows, press Save all; returns (app, saves, sends)."""
+def run_case(label, send_side_effect, staged=STAGED, graph_ok=False):
+    """Open the admin app with `staged` rundown rows, press Save all; returns (app, saves, sends). `graph_ok` = the Graph secrets are 'set'."""
     saves, sends = [], []
 
     def fake_save(date, source, rows):
@@ -71,7 +72,8 @@ def run_case(label, send_side_effect, staged=STAGED):
 
     patches = [mock.patch.object(database, "save_rail_fob", fake_save), mock.patch.object(rail_report, "send_rail_update_email", fake_send),
                mock.patch.object(river_fob_data, "list_dates", lambda: []), mock.patch.object(river_fob_data, "latest_date", lambda: None),
-               mock.patch.object(river_fob_data, "load_archive", lambda: {})]
+               mock.patch.object(river_fob_data, "load_archive", lambda: {}),
+               mock.patch.object(changes_report, "_graph_configured", lambda: graph_ok)]
     for p in patches:
         p.start()
     try:
@@ -102,12 +104,18 @@ check("after the st.rerun() the error is STILL on the page, with the real reason
       any("did NOT send" in e and "Graph auth failed: simulated" in e and "GRAPH_TENANT_ID" in e for e in errs), errs)
 check("and so is the 'Saved 2 corridor(s)' confirmation", any("Saved 2 corridor(s): CSX Columbus, CSX Freight" in s.value for s in at.success), [s.value for s in at.success])
 check("the staged preview is gone and the outcome is shown only once (it was popped)", "rail_entry_outcome" not in at.session_state and "rail_entry_rows" not in at.session_state)
+warns = [w.value for w in at.warning]
+check("with no Graph secrets the tab says so up front (before any save), naming the settings and where they go",
+      any("can't send email" in w and "GRAPH_TENANT_ID" in w and "Settings" in w for w in warns), warns)
+check("the Posting date defaults to today's CENTRAL date (after ~7 PM CT the UTC date is already tomorrow)",
+      at.date_input(key="rail_entry_date").value == rail_corridors.today_ct(), (at.date_input(key="rail_entry_date").value, rail_corridors.today_ct()))
 
 print("the update email SENDS")
-at2, saves2, sends2 = run_case("working send", None)
+at2, saves2, sends2 = run_case("working send", None, graph_ok=True)
 succ2 = [e.value for e in at2.success]
 check("the success lines survive the rerun too: saved + emailed", any("Saved 2 corridor(s)" in s for s in succ2) and any("Emailed update for: CSX Columbus" in s for s in succ2), succ2)
 check("no error", not [e.value for e in at2.error], [e.value for e in at2.error])
+check("and no 'can't send email' banner when the Graph secrets are there", not any("can't send email" in w.value for w in at2.warning), [w.value for w in at2.warning])
 
 print("only freight saved")
 at3, saves3, sends3 = run_case("freight only", None, staged=[STAGED[1]])

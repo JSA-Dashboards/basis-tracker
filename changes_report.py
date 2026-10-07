@@ -824,6 +824,11 @@ def send_email(subject: str, html: str, to_addr: str, cc: str | None = None,
                 return "graph"
             except Exception as e_graph:
                 errors.append(f"Graph: {e_graph}")
+        else:
+            # Say so: this used to be skipped silently, and the only error left was the SMTP one (the interim relay,
+            # long dead), which sent a whole evening chasing a bad SMTP login instead of the missing Graph secrets.
+            errors.append("Graph: NOT CONFIGURED — GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET are missing "
+                          "from this app's environment / secrets (Cloud: Settings → Secrets, top level, above any [section])")
         try:
             send_via_smtp(subject, html, to_addr, cc=cc, inline_images=inline_images, bcc=bcc)
             return "smtp"
