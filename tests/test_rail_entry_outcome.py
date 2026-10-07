@@ -14,6 +14,7 @@ import os
 import sys
 import tempfile
 import time
+from datetime import timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -36,6 +37,7 @@ for k in ("USE_SNOWFLAKE", "SNOWFLAKE_ACCOUNT", "SNOWFLAKE_USER", "SNOWFLAKE_PAS
 import changes_report    # noqa: E402
 import database          # noqa: E402
 import rail_corridors    # noqa: E402
+import rail_email_log    # noqa: E402
 import rail_report       # noqa: E402
 import river_fob_data    # noqa: E402
 
@@ -56,7 +58,7 @@ STAGED = [{"market": "CSX Columbus", "commodity": "Corn", "period": "Dec", "futu
           {"market": "CSX Freight", "commodity": "Freight", "period": "Return Trip", "futures": None, "bid": 3000, "offer": 3100, "bid_raw": None, "offer_raw": None}]
 
 
-def run_case(label, send_side_effect, staged=STAGED, graph_ok=False):
+def run_case(label, send_side_effect, staged=STAGED, graph_ok=False, email_on=True, seed_posting=None):
     """Open the admin app with `staged` rundown rows, press Save all; returns (app, saves, sends). `graph_ok` = the Graph secrets are 'set'."""
     saves, sends = [], []
 
@@ -86,6 +88,13 @@ def run_case(label, send_side_effect, staged=STAGED, graph_ok=False):
         print("  %s: first run %.0fs; exceptions: %s" % (label, time.time() - t0, [str(e.value)[:160] for e in at.exception] or "none"), flush=True)
         btn = next((b for b in at.button if b.key == "rail_entry_save"), None)
         check("the Save all button is there (admin build, rows staged)", btn is not None)
+        if seed_posting:                                      # the rundown the (mocked) save "wrote", so the ledger can see it
+            c = database.get_conn()
+            c.cursor().execute("INSERT INTO rail_fob (date, source, market, commodity, period, bid, captured_at) VALUES (?,?,?,?,?,?,?)", seed_posting)
+            c.commit()
+            c.close()
+        if not email_on:
+            at.checkbox(key="rail_entry_email").uncheck()
         btn.click()
         at.run()
     finally:
@@ -121,6 +130,17 @@ print("only freight saved")
 at3, saves3, sends3 = run_case("freight only", None, staged=[STAGED[1]])
 infos = [e.value for e in at3.info]
 check("nothing was emailed and the page says only freight was saved", sends3 == [] and any("only freight corridors were saved" in i for i in infos), (sends3, infos))
+
+print("the droplet catch-up emailer: what the app tells it")
+hb = rail_email_log.read_ledger(kinds=("heartbeat",))
+check("opening the Rail Entry tab writes a HEARTBEAT (proof for the droplet watcher that this app logs its sends)", len(hb) >= 1, hb)
+_five_s_ago = rail_email_log.iso(rail_email_log.now_utc() - timedelta(seconds=5))
+at5, saves5, sends5 = run_case("email switched off", None, graph_ok=True, email_on=False, seed_posting=(ISO, "manual", "CSX Columbus", "Corn", "Dec", 10, _five_s_ago))
+skipped = rail_email_log.read_ledger(kinds=("skipped",))
+check("saved with the email switch OFF: nothing is emailed and a 'skipped' ledger row says it was on purpose (the watcher leaves it alone)",
+      sends5 == [] and [(r["market"], r["date"]) for r in skipped] == [("CSX Columbus", ISO)], (sends5, skipped))
+check("and the page says so", any("without emailing" in i.value for i in at5.info), [i.value for i in at5.info])
+check("a FAILED email leaves no 'update' row, so the watcher will catch it up", not rail_email_log.read_ledger(kinds=("update", "catchup")))
 
 print("\n" + ("ALL PASS" if not FAILS else "FAILURES: %s" % FAILS))
 sys.exit(1 if FAILS else 0)

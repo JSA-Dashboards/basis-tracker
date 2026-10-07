@@ -177,7 +177,12 @@ def main() -> int:
     print(f"\nsaved {total} rows across {len(corrs)} corridor(s) for {date_s}.")
 
     if args.no_email:
-        print("email skipped (--no-email).")
+        try:                                         # on purpose: tell the droplet catch-up job (rail_email_watch.py) to leave it alone
+            import rail_email_log as _rel
+            _rel.mark_handled(basis, "skipped")
+            print("email skipped (--no-email); logged as intentional so the catch-up job leaves it alone.")
+        except Exception as exc:                     # noqa: BLE001
+            print(f"email skipped (--no-email); could NOT log it as intentional ({exc}) - the catch-up job may email it.")
     elif not email_markets:
         print("email skipped (no basis corridors; pass --email-freight to email freight).")
     else:

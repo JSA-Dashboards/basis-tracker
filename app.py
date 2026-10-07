@@ -2917,6 +2917,13 @@ if tab_railentry is not None:
                        "GRAPH_CLIENT_SECRET / GRAPH_SENDER) aren't set — Settings → Secrets, at the top level above any "
                        "[section]. Saving still works, but the rail update email will fail until they're added; the "
                        "droplet's post_rail.py can send it meanwhile.")
+        if not st.session_state.get("_rail_ledger_hb"):      # once per session: tells the droplet's catch-up emailer this app logs its sends
+            st.session_state["_rail_ledger_hb"] = True
+            try:
+                import rail_email_log as _rel0
+                _rel0.heartbeat()
+            except Exception:                                # the ledger is a safety net: never break the tab
+                pass
         st.caption("Paste one or more corridor rundowns — the parser detects each corridor by "
                    "its name, so you can drop several in at once. Values are stored **exactly as "
                    "posted**; the tag (z/u/h/k/n) only picks the contract, never rolls the number. "
@@ -3075,6 +3082,15 @@ if tab_railentry is not None:
                     elif _email_after:
                         _outcome.append(("info", "No update email: only freight corridors were saved "
                                          "(the update email covers the basis corridors)."))
+                    elif _basis_saved:                       # saved with the email switch OFF: on purpose, so the droplet catch-up must not send it
+                        try:
+                            import rail_email_log as _rel1
+                            _rel1.mark_handled(_basis_saved, "skipped")
+                            _outcome.append(("info", "Saved without emailing (the email switch was off): "
+                                             "the droplet's catch-up job will leave it alone."))
+                        except Exception:
+                            _outcome.append(("warning", "Saved without emailing (the email switch was off), but it could not be "
+                                             "logged as intentional — the droplet's catch-up job may email it."))
                     st.session_state["rail_entry_outcome"] = _outcome
                     for _k in ("rail_entry_rows", "rail_entry_warn", "rail_entry_meta"):
                         st.session_state.pop(_k, None)

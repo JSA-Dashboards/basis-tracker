@@ -8,6 +8,9 @@ basis_tracker.db
 basis_tracker.db-shm
 basis_tracker.db-wal
 
+# ── Droplet job state (rail_email_watch: its state file and kill switch) ──
+state/
+
 # ── Logs ──────────────────────────────────────────────────────────────────
 auto_import.log
 *.log

@@ -463,29 +463,60 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
     return body + signature_html(), imgs
 
 
-def send_rail_update_email(markets: list | None = None, to_addr: str | None = None) -> bool:
+_UNSET = object()
+
+
+def _ledger_snapshot(markets):
+    """What this email is about to show, for the send ledger (rail_email_log). Never blocks the send."""
+    try:
+        import rail_email_log as _rel
+        return _rel.snapshot(markets)
+    except Exception as exc:                                        # noqa: BLE001
+        log.warning("rail email ledger: snapshot failed (%s) — the email still goes out", exc)
+        return None
+
+
+def _ledger_record(snap, kind: str, subject: str) -> None:
+    """Log the send so the droplet watcher (rail_email_watch.py) does not email the same posting again. Never fails the send."""
+    if snap is None:
+        return
+    try:
+        import rail_email_log as _rel
+        log.info("rail email ledger: %d corridor row(s) written (%s)", _rel.record(snap, kind, subject), kind)
+    except Exception as exc:                                        # noqa: BLE001
+        log.warning("rail email ledger: write failed (%s) — the email went out but is not logged", exc)
+
+
+def send_rail_update_email(markets: list | None = None, to_addr: str | None = None, *, bcc=_UNSET,
+                           ledger_kind: str = "update") -> bool:
     """UPDATE email: just the corridors in `markets` (what was posted), each with its
-    spot seasonal chart. `markets=None` falls back to the full board."""
+    spot seasonal chart. `markets=None` falls back to the full board.
+    `bcc`: the default is the JSA group; pass None / "" for a test that goes to `to_addr` only.
+    `ledger_kind`: how the send is logged in rail_email_log ('update'; the droplet watcher passes 'catchup')."""
     if markets is not None and not markets:
         log.info("Rail update email: no corridors to report — skipped.")
         return False
     n = len(markets) if markets else 0
     title = (f"Rail Basis Update · {n} corridor{'s' if n != 1 else ''}") if markets else "Rail Basis Update"
     subj  = (f"JSA Rail Update — {', '.join(markets)}"[:150]) if markets else SUBJECT
+    snap = _ledger_snapshot(markets)                  # BEFORE building: a save that lands meanwhile stays uncovered
     html, imgs = build_rail_html(markets=markets, charts=True, title=title)
-    _bcc = os.getenv("JSA_GROUP_BCC") or JSA_GROUP_BCC
+    _bcc = (os.getenv("JSA_GROUP_BCC") or JSA_GROUP_BCC) if bcc is _UNSET else (bcc or None)
     _via = send_email(subj, html, to_addr or DEFAULT_TO, bcc=_bcc, inline_images=imgs or None)
     log.info("Rail update email (%s) sent via %s to %s",
              ", ".join(markets) if markets else "full", _via, to_addr or DEFAULT_TO)
+    _ledger_record(snap, ledger_kind, subj)
     return True
 
 
 def send_rail_recap_email(to_addr: str | None = None) -> bool:
     """Full weekly RECAP: every active corridor + a spot seasonal chart each."""
+    snap = _ledger_snapshot(None)
     html, imgs = build_rail_html(markets=None, charts=True, title="Rail Basis Weekly Recap")
     _via = send_email("JSA Rail Basis — Weekly Recap", html, to_addr or DEFAULT_TO,
                       bcc=os.getenv("JSA_GROUP_BCC") or JSA_GROUP_BCC, inline_images=imgs or None)
     log.info("Rail weekly recap emailed via %s to %s", _via, to_addr or DEFAULT_TO)
+    _ledger_record(snap, "recap", "JSA Rail Basis — Weekly Recap")
     return True
 
 

@@ -64,6 +64,47 @@ FOB Postgres database, which is **not** yet in Snowflake.
 Also note `MASSIVE_S3_ACCESS_KEY` / `MASSIVE_S3_SECRET_KEY` for the futures
 feed, and `APP_PASSWORD` on the admin build only.
 
+The admin build also needs the four `GRAPH_*` keys (`GRAPH_TENANT_ID`, `GRAPH_CLIENT_ID`,
+`GRAPH_CLIENT_SECRET`, `GRAPH_SENDER`): its email goes out through Microsoft Graph. They must sit at the
+**top level** of the Secrets, above any `[section]` (TOML puts a key under the last header above it).
+Without them `changes_report.send_email` falls through to the dead SMTP relay and fails with a 535 — on
+2026-10-06 a whole evening went into that error before anyone noticed the Graph keys were missing. The Rail
+Entry tab now warns up front when they are, and `send_email` names the missing configuration.
+
+## Rail update email, and its catch-up job
+
+A saved rail rundown is emailed (To kpostin@, BCC the JSA group) by whatever saved it: the admin app's Rail
+Entry → Save all, or `post_rail.py --commit` on the droplet. Both go through
+`rail_report.send_rail_update_email`, which logs every send (and `send_rail_recap_email` its recaps) to the
+`rail_email_log` table (`rail_email_log.py`: one row per corridor — which posting date it showed and when the
+board was read). A save made with the email switched off writes a `skipped` row; opening the Rail Entry tab
+writes a `heartbeat`.
+
+`rail_email_watch.py` is the safety net (droplet cron `*/10 6-22 * * *` Central, `deploy/run_rail_email_watch.sh`,
+wrapped in `cron-alert`): any posting saved more than 15 minutes ago that no row covers is emailed as a normal
+update (logged as `catchup`). A row covers a posting when it is for that corridor, shows that date or a later
+one, and its snapshot was taken after the posting's last capture — so a re-save is uncovered again until it is
+emailed. Because it is a group broadcast it errs towards silence:
+
+- The first run only records a **baseline**; nothing saved before it is ever emailed by the job.
+- It stays **unarmed** (logs what it would send) until the Cloud app has written the ledger after the baseline
+  (the heartbeat, or a logged send) — an app that still runs old code sends without logging, and a catch-up
+  would be a duplicate. After deploying this, **Reboot the admin app and open its Rail Entry tab**.
+- What it sends is also remembered in `state/rail_email_watch.json`, so a failed ledger write cannot make it
+  send twice; `state/rail_email_watch.off` (touch it) is the kill switch; `--dry-run` sends and writes nothing;
+  `--force-armed --to you@... --no-bcc --grace-min 0` is a live test that emails only you.
+- It exits non-zero (a `cron-alert` email) only when the same problem repeats (2nd, 12th, 72nd failing run), so an
+  outage does not alert every 10 minutes. Its single rolling log is `/opt/basis-tracker/logs/rail_email_watch.log`.
+- The warehouse is already busy most of the day (~27 credits/day, hourly), so the poll is effectively free; the
+  job is limited to 06:00–22:50 and its queries are plain literals, so Snowflake's result cache answers them while
+  nothing has changed.
+- The Rail Entry tab's default Posting date is the **Central** date (`rail_corridors.today_ct()`), not UTC (after
+  ~7 PM Central the UTC date is already tomorrow); `post_rail.py --date` defaults the same way.
+
+Tests: `tests/test_rail_email_log.py` (decisions, ledger on a throwaway SQLite, the watcher end to end with a
+simulated clock, the send functions), `tests/test_rail_entry_outcome.py` (the admin app headless),
+`tests/test_send_email_dispatch.py`.
+
 ## Net Carry tab — modules and data
 
 The 💵 Net Carry tab is a stack of small pure modules (each has a `tests/test_*.py`; run them with `python tests/<file>`):

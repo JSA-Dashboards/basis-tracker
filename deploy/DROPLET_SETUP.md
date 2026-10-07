@@ -113,6 +113,22 @@ Two jobs: the daily scrape+email (3:45 PM Central, Mon–Fri) and the weekly JSA
 Rail Basis recap (`run_rail_recap.sh`, 11 AM Central Mondays). (For the daily job
 every day including weekends, use `45 15 * * *`.)
 
+## 5a. Rail email catch-up (every 10 minutes)
+
+`deploy/run_rail_email_watch.sh` runs `rail_email_watch.py`: it emails any rail rundown that was saved but never
+emailed (the Cloud app's send failed). Plain crontab line wrapped in `cron-alert`; it prints one line per run to
+`logs/rail_email_watch.log` and keeps its state in `state/` (see CLAUDE.md, "Rail update email, and its catch-up job"
+for the safety rules).
+
+```bash
+chmod +x deploy/run_rail_email_watch.sh
+( crontab -l 2>/dev/null | grep -v run_rail_email_watch.sh
+  echo '*/10 6-22 * * * /opt/alerting/cron-alert "Rail email catch-up" "/opt/basis-tracker/logs/rail_email_watch.log" /opt/basis-tracker/deploy/run_rail_email_watch.sh' ) | crontab -
+```
+
+First run records a baseline; it stays unarmed until the Cloud admin app has been rebooted and its Rail Entry tab
+opened once. Stop it with `touch /opt/basis-tracker/state/rail_email_watch.off` (delete the file to resume).
+
 ## 5b. Failure alerting (shared by every job on the droplet)
 
 cron here has **no `MAILTO` and the box has no MTA**, so a failing job is
