@@ -2872,13 +2872,14 @@ with tab_railfob:
                          help="Email the whole rail board (every corridor + seasonal charts) to your inbox now"):
                 try:
                     import rail_report as _rr
-                    _rr.send_rail_recap_email()
+                    with st.spinner("Building the full recap (seasonal charts) and sending it…"):
+                        _rr.send_rail_recap_email()
                     st.success("Rail recap emailed.")
                 except Exception as _e:
-                    st.error("Email didn't send. On Cloud this needs the Microsoft Graph secrets "
-                             "(GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
-                             "GRAPH_SENDER — pending from IT); run locally with Outlook open "
-                             f"until then. ({_e})")
+                    st.error(f"The recap did NOT send: {_e}  — On Streamlit Cloud this app needs the Microsoft "
+                             "Graph secrets (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
+                             "GRAPH_SENDER, under Settings → Secrets). The droplet's Monday 11:00 job "
+                             "sends the weekly recap on its own.")
         with _re2:
             if st.button("📧 Email latest update", key="rail_email_update",
                          help="Email just the corridors posted on the selected board date"):
@@ -2887,15 +2888,16 @@ with tab_railfob:
                     from database import get_rail_fob as _grf
                     _d = st.session_state.get("rail_date_man")
                     _mk = sorted({r["market"] for r in _grf("manual", _d)}) if _d else None
-                    if _rr.send_rail_update_email(markets=_mk):
-                        st.success(f"Update emailed ({len(_mk)} corridor(s)).")
+                    with st.spinner("Building the update (seasonal charts) and sending it…"):
+                        _sent = _rr.send_rail_update_email(markets=_mk)
+                    if _sent:
+                        st.success(f"Update emailed ({len(_mk)} corridor(s))." if _mk else "Update emailed (the full board).")
                     else:
                         st.info("No corridors on that date to email.")
                 except Exception as _e:
-                    st.error("Email didn't send. On Cloud this needs the Microsoft Graph secrets "
-                             "(GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
-                             "GRAPH_SENDER — pending from IT); run locally with Outlook open "
-                             f"until then. ({_e})")
+                    st.error(f"The update did NOT send: {_e}  — On Streamlit Cloud this app needs the Microsoft "
+                             "Graph secrets (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
+                             "GRAPH_SENDER, under Settings → Secrets).")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: RAIL ENTRY  (admin: paste one or more rail rundowns → parse → review → save)
@@ -2907,6 +2909,8 @@ if tab_railentry is not None:
         from database import save_rail_fob as _srf
         from rail_corridors import RAIL_BY_CORRIDOR as _RBC
 
+        for _lvl, _txt in (st.session_state.pop("rail_entry_outcome", None) or []):   # what the last Save did (see the save handler)
+            getattr(st, _lvl)(_txt)
         st.caption("Paste one or more corridor rundowns — the parser detects each corridor by "
                    "its name, so you can drop several in at once. Values are stored **exactly as "
                    "posted**; the tag (z/u/h/k/n) only picks the contract, never rolls the number. "
@@ -3040,21 +3044,31 @@ if tab_railentry is not None:
                         _srf(_rediso, "manual", _out)
                         _saved.append(_corr)
 
-                    st.success(f"Saved {len(_saved)} corridor(s): {', '.join(_saved)}.")
+                    # What happened is kept in session_state and drawn at the top of this tab AFTER the
+                    # st.rerun() below: anything drawn now is wiped by the rerun, which used to hide a failed
+                    # email completely (the save looked fine and no email came).
+                    _outcome = [("success", f"Saved {len(_saved)} corridor(s): {', '.join(_saved)}.")]
                     if _dups:
-                        st.warning("Duplicate corridor+period rows were collapsed "
-                                   "(kept the last of each) — check these weren't a "
-                                   "mistake: " + "; ".join(_dups))
+                        _outcome.append(("warning", "Duplicate corridor+period rows were collapsed "
+                                         "(kept the last of each) — check these weren't a "
+                                         "mistake: " + "; ".join(_dups)))
                     _basis_saved = [c for c in _saved
                                     if not (("Freight" in c) or ("Shuttle" in c))]
                     if _email_after and _basis_saved:
                         try:
                             import rail_report as _rr2
-                            _rr2.send_rail_update_email(markets=_basis_saved)
-                            st.success(f"Emailed update for: {', '.join(_basis_saved)}.")
+                            with st.spinner("Building the update email (seasonal charts) and sending it…"):
+                                _rr2.send_rail_update_email(markets=_basis_saved)
+                            _outcome.append(("success", f"Emailed update for: {', '.join(_basis_saved)}."))
                         except Exception as _e:
-                            st.warning(f"Saved, but the email didn't send ({_e}). Needs Outlook "
-                                       "running (local) or SMTP_* secrets (Cloud).")
+                            _outcome.append(("error", f"Saved, but the update email did NOT send: {_e}  — On Streamlit "
+                                             "Cloud this app needs the GRAPH_TENANT_ID / GRAPH_CLIENT_ID / "
+                                             "GRAPH_CLIENT_SECRET / GRAPH_SENDER secrets (Settings → Secrets); "
+                                             "the droplet's post_rail.py can send the update instead."))
+                    elif _email_after:
+                        _outcome.append(("info", "No update email: only freight corridors were saved "
+                                         "(the update email covers the basis corridors)."))
+                    st.session_state["rail_entry_outcome"] = _outcome
                     for _k in ("rail_entry_rows", "rail_entry_warn", "rail_entry_meta"):
                         st.session_state.pop(_k, None)
                     st.rerun()
