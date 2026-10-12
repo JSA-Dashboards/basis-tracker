@@ -749,6 +749,12 @@ st.markdown("""
     table.nc-tbl th { white-space: normal !important; vertical-align: bottom; }
   }
   @media (max-width: 640px) { .nc-toptag { display: none; } }
+  /* Summary detail table: 14 columns with a 900px minimum, so on an iPad (upright, or sideways up to
+     ~1120px) the Monthly/Yearly changes are off-screen. Slimmer padding fits it in; the type sizes are left alone. */
+  @media (max-width: 1120px) {
+    table.jsawm { min-width: 0 !important; }
+    table.jsawm td, table.jsawm th { padding-left: 4px !important; padding-right: 4px !important; }
+  }
   @media (max-width: 1000px) {
     div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stElementContainer"]):not(:has(> div[data-testid="stColumn"]:nth-child(1) div[data-testid="stSelectbox"]):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stSelectbox"])) {
       flex-wrap: wrap; row-gap: 0.5rem !important; }
