@@ -755,6 +755,14 @@ st.markdown("""
     table.jsawm { min-width: 0 !important; }
     table.jsawm td, table.jsawm th { padding-left: 4px !important; padding-right: 4px !important; }
   }
+  /* Rail FOB corridor cards: three across, each an 8-column table 330-375px wide, so below ~1150px
+     (an iPad upright or sideways) each card is narrower than its table and the monthly and yearly
+     changes are cut off. Two across fits every card. Wider windows keep three. */
+  @media (max-width: 1150px) {
+    div[data-testid="stHorizontalBlock"]:has(table.jsawmr) { flex-wrap: wrap; }
+    div[data-testid="stHorizontalBlock"]:has(table.jsawmr) > div[data-testid="stColumn"] {
+      flex: 0 0 50% !important; width: 50% !important; min-width: 50% !important; }
+  }
   @media (max-width: 1000px) {
     div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stElementContainer"]):not(:has(> div[data-testid="stColumn"]:nth-child(1) div[data-testid="stSelectbox"]):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stSelectbox"])) {
       flex-wrap: wrap; row-gap: 0.5rem !important; }
