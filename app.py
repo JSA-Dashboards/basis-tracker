@@ -739,6 +739,15 @@ st.markdown("""
      or chart and squeezes both, so stack it and give each the full width. Phones already
      stack. Only real st.columns rows with exactly two columns match; wider windows and
      rows of three or more are untouched. */
+  /* Net Carry ladder: its 8 columns are 949px wide (long nowrap headers, 12px side padding), so on an
+     iPad (upright, or sideways up to ~1120px) the last ones (Net of Interest, Inverse/Carry) are
+     off-screen. Tighten it to fit. Wider windows keep the original spacing. */
+  @media (max-width: 1120px) {
+    table.nc-tbl { min-width: 0 !important; }
+    table.nc-tbl th, table.nc-tbl td { padding-left: 7px !important; padding-right: 7px !important; }
+    table.nc-tbl th { white-space: normal !important; vertical-align: bottom; }
+  }
+  @media (max-width: 640px) { .nc-toptag { display: none; } }
   @media (max-width: 1000px) {
     div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child) {
       flex-wrap: wrap; row-gap: 0.5rem !important; }
@@ -3469,7 +3478,7 @@ with tab_netcarry:
             return _f(v, 0 if float(v).is_integer() else 1)
 
         _top_row = _top["row"] if _top else None      # the table row holding the top of net carry
-        _TOP_TAG = ('<span style="background:#f28e2b;color:#fff;font-size:9px;font-weight:700;'
+        _TOP_TAG = ('<span class="nc-toptag" style="background:#f28e2b;color:#fff;font-size:9px;font-weight:700;'
                     'letter-spacing:.05em;padding:2px 7px;border-radius:9px;margin-left:8px;'
                     'white-space:nowrap;vertical-align:1px">▲ TOP OF NET CARRY</span>')
         _cells = []
@@ -3514,7 +3523,7 @@ with tab_netcarry:
         st.markdown(
             f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:4px 0 6px">'
             f'{_nc_title}</div>'
-            f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:780px">'
+            f'<div style="overflow-x:auto"><table class="nc-tbl" style="border-collapse:collapse;min-width:780px">'
             f'<thead><tr>{_th}</tr></thead><tbody>{_tr}</tbody></table></div>',
             unsafe_allow_html=True)
 
