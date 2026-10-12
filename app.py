@@ -737,8 +737,9 @@ st.markdown("""
   section[data-testid="stSidebar"] h3 { color: #32373c; }
   /* Tablet and narrow windows (up to 1000px): a two-column row puts controls beside a table
      or chart and squeezes both, so stack it and give each the full width. Phones already
-     stack. Only real st.columns rows with exactly two columns match; wider windows and
-     rows of three or more are untouched. */
+     stack. Only real st.columns rows with exactly two columns match. A row whose second
+     column is an empty spacer (the Bids filters) or whose columns both hold dropdowns stays
+     as it was; wider windows and rows of three or more are untouched. */
   /* Net Carry ladder: its 8 columns are 949px wide (long nowrap headers, 12px side padding), so on an
      iPad (upright, or sideways up to ~1120px) the last ones (Net of Interest, Inverse/Carry) are
      off-screen. Tighten it to fit. Wider windows keep the original spacing. */
@@ -749,9 +750,9 @@ st.markdown("""
   }
   @media (max-width: 640px) { .nc-toptag { display: none; } }
   @media (max-width: 1000px) {
-    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child) {
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stElementContainer"]):not(:has(> div[data-testid="stColumn"]:nth-child(1) div[data-testid="stSelectbox"]):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stSelectbox"])) {
       flex-wrap: wrap; row-gap: 0.5rem !important; }
-    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child)
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stElementContainer"]):not(:has(> div[data-testid="stColumn"]:nth-child(1) div[data-testid="stSelectbox"]):has(> div[data-testid="stColumn"]:nth-child(2) div[data-testid="stSelectbox"]))
       > div[data-testid="stColumn"] { flex: 1 1 100% !important; min-width: 100% !important; }
   }
 </style>
