@@ -6206,12 +6206,22 @@ with tab_spread:
     import pandas as _pd
     import altair as _alt
     import base64 as _b64, pathlib as _pl
+    import rail_spread as _rsp
 
     st.caption("Seasonal **basis spread** between two locations — **Location A − Location B** "
                "(front-month spot basis) across the marketing year (Sep–Aug), against the "
-               "5-year range and average.")
+               "5-year range and average. **Rail corridors** (UP Allen Station, CSX Columbus, "
+               "BN PNW …) are in both lists, after the locations — type *rail* or the "
+               "corridor's name.")
+
+    # Rail corridors (rail_spread): the manual rundowns + the Palmetto beans line, as the Rail FOB tab reads them.
+    _sp_rail = _cached_rail_fob_all("manual") + _cached_rail_fob_all("palmetto")
+    _sp_rail_pick = _rsp.options(_sp_rail)
+    _sp_rail_grains = {_o["market"]: _o["commodities"] for _o in _sp_rail_pick}
 
     def _spread_series(_provider, _location, _grain):
+        if _provider == _rsp.PROVIDER:      # a rail corridor: the Rail FOB tab's Spot series (weekly sheets, then its nearest forward bid)
+            return _rsp.spot_series(_sp_rail, _location, _grain)
         # Front-month bid where available; fall back to the explicit spot row for
         # historical snapshots that predate forward postings (matches the Bids seasonal),
         # so deep-history locations get a full 5-yr band.
@@ -6226,6 +6236,8 @@ with tab_spread:
         return _pts
 
     def _spread_grains(_provider, _location):
+        if _provider == _rsp.PROVIDER:
+            return set(_sp_rail_grains.get(_location, ()))
         _snaps = _cached_get_snapshots(_provider, _location)
         if not _snaps:
             return set()
@@ -6267,10 +6279,45 @@ with tab_spread:
             return _df
         return _df.groupby(["MktYearNum", "MktWeek"], as_index=False)["Basis"].mean()
 
+    def _spread_fwd_side(_pair, _grain):
+        # (date of the newest forward curve, its delivery-month quotes) for one side: a corridor's latest
+        # posting, or a location's latest snapshot.
+        if _pair[0] == _rsp.PROVIDER:
+            return _rsp.forward_quotes(_sp_rail, _pair[1], _grain)
+        _snaps = _cached_get_snapshots(*_pair)
+        if not _snaps:
+            return None, []
+        return (_trend_ts(_snaps[-1].timestamp).date(),
+                _rsp.snapshot_quotes(_snaps[-1].rows, _grain, _grain_disp))
+
+    def _spread_fwd_rail(_a_pair, _b_pair, _grain):
+        # Forward spread when a rail corridor is on a side -> (DataFrame(MktYearNum, MktWeek, Spread), note).
+        # A corridor quotes December off March and an elevator off December, so each month's bids are
+        # taken in CASH (basis + the futures price it is quoted off) before the subtraction (rail_spread).
+        _none = _pd.DataFrame(columns=["MktYearNum", "MktWeek", "Spread"])
+        _dta, _qa = _spread_fwd_side(_a_pair, _grain)
+        _dtb, _qb = _spread_fwd_side(_b_pair, _grain)
+        if not _qa or not _qb:
+            return _none, "No forward points: one side has no forward bids posted."
+        if not _rsp.comparable(_dta, _dtb):
+            return _none, (f"No forward points: the two forward curves are from {_dta:%b %d} and "
+                           f"{_dtb:%b %d}, too far apart to compare.")
+        _cday = max(_dta, _dtb)
+        _pts = _rsp.forward_spread(_qa, _qb, _cached_futures_curve_for(_cday.isoformat()))
+        if not _pts:
+            return _none, "No forward points: no delivery month both sides quote that the futures curve can price."
+        return (_pd.DataFrame(_pts)[["MktYearNum", "MktWeek", "Spread"]],
+                f"Forward points (red) are in cash — each bid plus the futures price it is quoted off on "
+                f"{_cday:%b %d} — so a corridor that quotes December off March lines up with a location "
+                f"that quotes it off December. Forward bids: A {_dta:%b %d} · B {_dtb:%b %d}.")
+
     _sp_pool = _cached_get_bids_filter_data()
     _sp_label = {f'{_l["provider"]} · {_l["location"]}': (_l["provider"], _l["location"])
                  for _l in _sp_pool}
     _sp_names = sorted(_sp_label)
+    for _sp_o in _sp_rail_pick:             # the corridors follow every location, in the Rail FOB tab's order
+        _sp_label[_sp_o["label"]] = (_rsp.PROVIDER, _sp_o["market"])
+        _sp_names.append(_sp_o["label"])
     if len(_sp_names) < 2:
         st.info("Need at least two locations with data to compare.")
     else:
@@ -6323,14 +6370,20 @@ with tab_spread:
                     _cur_lbl = _cur["MktYear"].iloc[0] if not _cur.empty else ""
 
                     # Forward spread (A_fwd − B_fwd) where BOTH locations post a forward curve.
-                    _fwd_a = _spread_fwd_df(*_a_pair, _sg)
-                    _fwd_b = _spread_fwd_df(*_b_pair, _sg)
                     _fwd = _pd.DataFrame(columns=["MktYearNum", "MktWeek", "Spread"])
-                    if not _fwd_a.empty and not _fwd_b.empty:
-                        _fwd = _pd.merge(_fwd_a.rename(columns={"Basis": "A"}),
-                                         _fwd_b.rename(columns={"Basis": "B"}),
-                                         on=["MktYearNum", "MktWeek"])
-                        _fwd["Spread"] = (_fwd["A"] - _fwd["B"]).round(1)
+                    _fwd_note = ""
+                    _has_rail = _rsp.PROVIDER in (_a_pair[0], _b_pair[0])
+                    if _has_rail:
+                        _fwd, _fwd_note = _spread_fwd_rail(_a_pair, _b_pair, _sg)
+                    else:
+                        _fwd_a = _spread_fwd_df(*_a_pair, _sg)
+                        _fwd_b = _spread_fwd_df(*_b_pair, _sg)
+                        if not _fwd_a.empty and not _fwd_b.empty:
+                            _fwd = _pd.merge(_fwd_a.rename(columns={"Basis": "A"}),
+                                             _fwd_b.rename(columns={"Basis": "B"}),
+                                             on=["MktYearNum", "MktWeek"])
+                            _fwd["Spread"] = (_fwd["A"] - _fwd["B"]).round(1)
+                    if not _fwd.empty:
                         _fwd = _fwd[_fwd["MktYearNum"].isin([_max_yr, _max_yr + 1])]
 
                     _latest = _mrg.sort_values("Date").iloc[-1]
@@ -6424,7 +6477,7 @@ with tab_spread:
                                         text=_alt.Text("Spread:Q", format="+.0f")))
 
                     _rng_txt = f"{_byrs[0]}–{_byrs[-1]}" if _byrs else "n/a"
-                    _sp_title = f"{_a_lbl} − {_b_lbl} · {_sg} Basis Spread"
+                    _sp_title = f"{_rsp.plain(_a_lbl)} − {_rsp.plain(_b_lbl)} · {_sg} Basis Spread"
                     _sp_sub = "Seasonal Spread — Marketing Year (Sep–Aug)"
                     st.markdown(
                         '<div style="margin-top:10px;margin-bottom:2px;font-size:14px;color:#1e293b;'
@@ -6452,6 +6505,10 @@ with tab_spread:
                                          _sp_fname, key=f"spread_{_a_lbl}_{_b_lbl}_{_sg}")
                     st.caption(f"{len(_mrg)} overlapping posting dates · 5-yr window {_rng_txt} · "
                                "spread in ¢/bu (front-month spot basis).")
+                    if _has_rail:
+                        st.caption("A rail corridor's line is its posted basis — the weekly Spot sheets through "
+                                   "mid-2026, its nearest forward bid since — against the contract it is quoted "
+                                   "off, as on the Rail FOB tab. " + _fwd_note)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

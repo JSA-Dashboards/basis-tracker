@@ -105,6 +105,29 @@ Tests: `tests/test_rail_email_log.py` (decisions, ledger on a throwaway SQLite, 
 simulated clock, the send functions), `tests/test_rail_entry_outcome.py` (the admin app headless),
 `tests/test_send_email_dispatch.py`.
 
+## Spread tab — rail corridors on either side
+
+The 🔀 Spread tab charts Location A − Location B (the front-month spot basis by marketing week against the 5-year range, with the two
+forward curves' spread as red points). Rail corridors (Kolten 2026-10-12: "show a spread against rail corridors like UP Allen Station")
+are in both pickers, after the locations, labelled `🚂 Rail · UP Allen Station (Dom)` — type "rail" or a name. `rail_spread.py` (pure;
+`tests/test_rail_spread.py`) is everything that is not drawing:
+
+- **Which corridors:** every non-freight market in `rail_fob` (manual + Palmetto) with 2+ posting dates for a commodity, minus what the Rail FOB
+  board hides (`HIDDEN`: BN COBO Buyers, the Palmetto corn markets). Freight lines ($/car) are never offered. Allen Station is the stored market
+  `UP Illinois (Dom)` / `(Mex)`; `DISPLAY` holds the picker names. A rail side is the pair `(rail_spread.PROVIDER, market)`, so the tab's helpers
+  (`_spread_series`, `_spread_grains`, `_spread_fwd_side`) dispatch on the provider; the rest of the chart code is the location-vs-location code.
+- **The line:** `spot_series` = `return_to_carry_data.obs_from_rail` — the weekly 'Spot' row (the SA Master history, through mid-2026), else the nearest
+  forward period with a bid — the Rail FOB tab's Spot series and the Return to Carry tracker's. It merges with the other side on the exact posting date,
+  like any pair: the deep-history locations were backfilled from the same weekly (Wednesday) sheet, so ADM Hennepin vs Allen Station overlaps on 1,141 of
+  1,166 dates (2004 on). It is the basis as posted against the nearby contract — not converted, like every series in the app.
+- **The red forward points are converted to cash first.** A corridor quotes December off March (ZCH, the desk rule) and an elevator off December (ZCZ), so
+  the raw December figures sit on different futures months — 15¢ apart on 2026-10-09. `forward_spread` adds each bid's own futures price (the stored curve of
+  the later of the two posting dates, `_cached_futures_curve_for`) and subtracts; where both quote off one contract that equals the plain basis difference.
+  A corridor's curve is its latest posting mapped to delivery months (`return_to_carry_data.parse_label`): a month's own bids (halves averaged) beat a package
+  ('JFM' for Jan-Mar, the narrowest first); 'R' (respective-option-month) packages and untagged cells are left out; short tags ('CU', 'SX') take rail_paste's
+  roll. No forward points when the two curves are more than 10 days apart or no common month can be priced — the caption under the chart says which.
+- `apps/basis_tracker` in the admin portal is a generated mirror (`bt_` prefix on every sibling module): the sync renames `rail_spread` by itself.
+
 ## Net Carry tab — modules and data
 
 The 💵 Net Carry tab is a stack of small pure modules (each has a `tests/test_*.py`; run them with `python tests/<file>`):
