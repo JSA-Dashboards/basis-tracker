@@ -735,6 +735,16 @@ st.markdown("""
   /* Sidebar — subtle brand tint */
   section[data-testid="stSidebar"] { background: #f6f8fa; border-right: 1px solid #e6eaee; }
   section[data-testid="stSidebar"] h3 { color: #32373c; }
+  /* Tablet and narrow windows (up to 1000px): a two-column row puts controls beside a table
+     or chart and squeezes both, so stack it and give each the full width. Phones already
+     stack. Only real st.columns rows with exactly two columns match; wider windows and
+     rows of three or more are untouched. */
+  @media (max-width: 1000px) {
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child) {
+      flex-wrap: wrap; row-gap: 0.5rem !important; }
+    div[data-testid="stHorizontalBlock"]:has(> div[data-testid="stColumn"]:nth-child(2):last-child)
+      > div[data-testid="stColumn"] { flex: 1 1 100% !important; min-width: 100% !important; }
+  }
 </style>
 """, unsafe_allow_html=True)
 
