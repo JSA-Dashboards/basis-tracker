@@ -5295,11 +5295,12 @@ with tab_summary:
                         and _dp.label(_dp.canonical(r.deliveryMonth, r.futuresSymbol)) == mode), None)
             return (row.basisCents, row.futuresSymbol) if row else (None, None)
 
-        def _prior_trading_day(ref: datetime, n: int = 1) -> datetime:
+        def _prior_trading_day(ref: datetime, n: int = 1, ok=None) -> datetime:
             """Return noon UTC on the nth prior CBOT grain trading day before ref (grain_calendar:
-            Columbus and Veterans Day trade, so the import has a scrape for them)."""
+            Columbus and Veterans Day trade, so the import has a scrape for them). With `ok`, a
+            trading day it rejects (one the import didn't scrape) is skipped too."""
             import grain_calendar as _gcal
-            d = _gcal.prior_trading_day(ref.date(), n)
+            d = _gcal.prior_trading_day(ref.date(), n, ok=ok)
             return datetime(d.year, d.month, d.day, 12, 0, 0)
 
         def _prior_move(snaps, ref_snap, grain, mode):
@@ -5459,15 +5460,22 @@ with tab_summary:
                 _now = _today_noon
 
             # d1_ago / d2_ago: skip back to the 1st / 2nd prior trading day so
-            # weekends and US holidays never produce blank cells.
+            # weekends and grain holidays never produce blank cells — and a trading
+            # day the import missed (Columbus Day 2026-10-12: only the Inco
+            # carry-forward wrote it) is skipped too. A day counts as scraped when
+            # a quarter of the displayed locations have a snapshot on it.
+            _day_locs = _Counter(_d for _snaps in _sdata.values()
+                                 for _d in {_sum_ts(s.timestamp).date() for s in _snaps})
+            _min_locs = max(1, len(_sdata) // 4)
+            _scraped  = lambda day: _day_locs[day] >= _min_locs
             _TARGETS = [
                 ("yr_ago",  _now - timedelta(days=365),  4),   # ±4 days of exact year-ago date
                 ("mo_ago",  _now - timedelta(days=30),   4),   # ±4 days of exact month-ago date
                 ("wk_ago",  _now - timedelta(days=7),    4),   # ±4 days of exact week-ago date
                 # 0.6 = within ~14 hours of target noon; matches same-day midnight
                 # snapshots (12 h away) but not next/prior day midnight (36 h away).
-                ("d2_ago",  _prior_trading_day(_now, 2), 0.6), # 2nd most-recent trading day
-                ("d1_ago",  _prior_trading_day(_now, 1), 0.6), # most-recent trading day
+                ("d2_ago",  _prior_trading_day(_now, 2, _scraped), 0.6), # 2nd most-recent trading day
+                ("d1_ago",  _prior_trading_day(_now, 1, _scraped), 0.6), # most-recent trading day
                 # anchored on the latest scrape date, so this matches that date exactly;
                 # 1.6 still lets locations lagging by a day show their latest bid.
                 ("current", _now,                        1.6),

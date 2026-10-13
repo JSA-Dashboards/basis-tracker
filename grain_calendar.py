@@ -89,12 +89,16 @@ def is_trading_day(d: date) -> bool:
     return d.weekday() < 5 and holiday_name(d) is None
 
 
-def prior_trading_day(d: date, n: int = 1) -> date:
-    """The n-th trading day before `d`."""
-    count = 0
-    while True:
-        d -= timedelta(days=1)
-        if is_trading_day(d):
+def prior_trading_day(d: date, n: int = 1, ok=None, max_days: int = 60) -> date:
+    """The n-th trading day before `d`. With `ok`, only trading days where ok(day) is true count — e.g.
+    days the import actually scraped, so a day it missed (Columbus Day 2026-10-12, skipped by the old
+    federal-holiday guard) is passed over instead of giving an empty column. Looks back at most
+    `max_days` calendar days; if `ok` never holds that far back, returns the plain n-th trading day."""
+    count, cur = 0, d
+    while (d - cur).days < max_days:
+        cur -= timedelta(days=1)
+        if is_trading_day(cur) and (ok is None or ok(cur)):
             count += 1
             if count >= n:
-                return d
+                return cur
+    return prior_trading_day(d, n) if ok is not None else cur

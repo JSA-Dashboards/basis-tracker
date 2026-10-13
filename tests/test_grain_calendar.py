@@ -63,6 +63,20 @@ check("before Mon 2026-11-30 is Fri 11-27 (Thanksgiving skipped on the 2nd step)
 check("before Mon 2026-07-06 is Thu 07-02 (Independence Day observed Fri 07-03)",
       gc.prior_trading_day(D("2026-07-06")) == D("2026-07-02"))
 
+print("prior_trading_day(ok=...): a trading day the import didn't scrape is passed over")
+# Locations with a snapshot per day, from Snowflake on 2026-10-12: Columbus Day has only the Inco carry-forward.
+LOCS = {D("2026-10-07"): 1043, D("2026-10-08"): 1043, D("2026-10-09"): 1133, D("2026-10-12"): 1, D("2026-10-13"): 1100}
+scraped = lambda day: LOCS.get(day, 0) >= 1100 // 4                       # noqa: E731
+check("the Summary tab on 10-13: '1 day ago' = Fri 10-09, not the unscraped Columbus Day",
+      gc.prior_trading_day(D("2026-10-13"), 1, ok=scraped) == D("2026-10-09"))
+check("on 10-14: '2 days ago' = 10-09 ('1 day ago' = 10-13)",
+      gc.prior_trading_day(D("2026-10-14"), 1, ok=scraped) == D("2026-10-13")
+      and gc.prior_trading_day(D("2026-10-14"), 2, ok=scraped) == D("2026-10-09"))
+check("a scraped Veterans Day counts (11-12 -> 11-11)",
+      gc.prior_trading_day(D("2026-11-12"), ok=lambda day: True) == D("2026-11-11"))
+check("if nothing was ever scraped, fall back to the plain trading day",
+      gc.prior_trading_day(D("2026-10-13"), ok=lambda day: False) == D("2026-10-12"))
+
 print("auto_import's guard uses it (the source, not imported: auto_import loads every scraper)")
 src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "auto_import.py"), encoding="utf-8").read()
 guard = src[src.index("def _is_trading_day"):src.index("def run_chs")]
