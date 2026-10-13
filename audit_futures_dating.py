@@ -146,6 +146,8 @@ def main(argv=None) -> int:
             return cap
         if cap.startswith(("massive:", "adm:")):
             return "capture (fixed)"
+        if cap.startswith("repair:"):
+            return "repair (from Massive bars)"
         return "daily capture (old)"
 
     detail = []
