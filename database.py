@@ -1510,14 +1510,22 @@ def grain_counts_by_facility(days: int = 21) -> list[tuple]:
 
 def save_futures_curve(curve: dict, date: str) -> int:
     """Upsert a day's futures curve ({symbol -> cents}) under `date` ('YYYY-MM-DD').
-    Returns the number of symbols written."""
-    if not curve:
-        return 0
+    Returns the number of symbols written. The curve must BE that day's: the daily
+    capture (futures_capture.py) files each session under its own date."""
     from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    return save_futures_rows([(date, sym, px, now) for sym, px in (curve or {}).items()])
+
+
+def save_futures_rows(rows: list) -> int:
+    """Upsert futures_prices rows [(date 'YYYY-MM-DD', symbol, cents, captured_at)], each with its
+    own captured_at (futures_capture.py tags it with where the price came from). Returns rows written."""
+    if not rows:
+        return 0
+    rows = [(d, sym, float(px), cap) for d, sym, px, cap in rows]
     conn = get_conn()
     c    = conn.cursor()
     ph   = _ph()
-    now  = datetime.now(timezone.utc).isoformat()
     sql  = (f"INSERT INTO futures_prices (date, symbol, price_cents, captured_at) "
             f"VALUES ({ph},{ph},{ph},{ph}) "
             f"ON CONFLICT (date, symbol) DO UPDATE "
@@ -1527,16 +1535,32 @@ def save_futures_curve(curve: dict, date: str) -> int:
             _merge_bulk(c, "futures_prices",
                         [("date", "string"), ("symbol", "string"),
                          ("price_cents", "float"), ("captured_at", "string")],
-                        [(date, sym, float(px), now) for sym, px in curve.items()],
-                        ["date", "symbol"], update_cols=["price_cents", "captured_at"])
+                        rows, ["date", "symbol"], update_cols=["price_cents", "captured_at"])
             conn.commit()
-            return len(curve)
-        for sym, px in curve.items():
-            c.execute(sql, (date, sym, float(px), now))
+            return len(rows)
+        for r in rows:
+            c.execute(sql, r)
         conn.commit()
     finally:
         conn.close()
-    return len(curve)
+    return len(rows)
+
+
+def get_futures_rows(date_from: str, date_to: str) -> dict:
+    """Every stored futures_prices row between two ISO dates inclusive, with its provenance:
+    {date 'YYYY-MM-DD': {symbol: (cents, captured_at)}}."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = _ph()
+    try:
+        c.execute(f"SELECT date, symbol, price_cents, captured_at FROM futures_prices "
+                  f"WHERE date >= {ph} AND date <= {ph}", (date_from, date_to))
+        out: dict = {}
+        for r in c.fetchall():
+            out.setdefault(str(r["date"])[:10], {})[r["symbol"]] = (r["price_cents"], r["captured_at"])
+        return out
+    finally:
+        conn.close()
 
 
 def get_futures_curve(date: str) -> dict:

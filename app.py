@@ -5240,7 +5240,6 @@ with tab_summary:
     if tab_summary.open:
         from datetime import timedelta
         from collections import Counter as _Counter
-        import holidays as _hol
 
         # ── Timestamp helpers ─────────────────────────────────────────────────────
         def _sum_ts(ts: str) -> datetime:
@@ -5297,16 +5296,11 @@ with tab_summary:
             return (row.basisCents, row.futuresSymbol) if row else (None, None)
 
         def _prior_trading_day(ref: datetime, n: int = 1) -> datetime:
-            """Return noon UTC on the nth prior US trading day (Mon–Fri, non-US-holiday) before ref."""
-            _us_hol = _hol.US(years=[ref.year, ref.year - 1])
-            d = ref.date() - timedelta(days=1)
-            count = 0
-            while True:
-                if d.weekday() < 5 and d not in _us_hol:
-                    count += 1
-                    if count >= n:
-                        return datetime(d.year, d.month, d.day, 12, 0, 0)
-                d -= timedelta(days=1)
+            """Return noon UTC on the nth prior CBOT grain trading day before ref (grain_calendar:
+            Columbus and Veterans Day trade, so the import has a scrape for them)."""
+            import grain_calendar as _gcal
+            d = _gcal.prior_trading_day(ref.date(), n)
+            return datetime(d.year, d.month, d.day, 12, 0, 0)
 
         def _prior_move(snaps, ref_snap, grain, mode):
             """

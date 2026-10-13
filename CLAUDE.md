@@ -270,6 +270,33 @@ settlements from `JSA.COST_OF_CARRY` into it (rows tagged `captured_at = 'backfi
 `DELETE FROM futures_prices WHERE captured_at LIKE 'backfill:%'`). A past as-of date therefore gets its own day's curve,
 not today's.
 
+### The daily capture was a day late (found 2026-10-12, fixed from 2026-10-13)
+
+The old `run_futures_capture` stored "the latest Massive flat file" under the run's date. Those files land ~9 PM Central,
+so at the 3:45 PM run the latest was **yesterday's** session (the log said so: `session 2026-10-08` ... `stored ... for
+2026-10-09`). `audit_futures_dating.py` (read-only; compares every row with Massive's 1session bar of its date and the two
+before) found every daily row from 2026-08-31 to 2026-10-09 a day late; the ADM-only rows before that (06-22 to 08-27) are
+right except 06-22, 07-17, 08-17 (runs at night / before the open) and three Saturday-dated runs (07-11, 08-29, 09-12) holding
+Friday's settle. The backfill (2021-10 on) is right. Massive's REST bars start 2021-10.
+
+**`futures_capture.py` now:** every bar names its session (`session_end_date`), so a price is only ever filed under its own
+date. A closed session (after 1:20 PM CT) is stored at its settlement (`captured_at` `massive:settle@<UTC>`), else its close
+(`massive:close@`, within ~1¢), and each run re-reads 14 days of sessions, so the next run upgrades a close and fills a
+missed day. It owns only dates it wrote (a date holding any other row is left alone) and never writes before
+`FIRST_DAY` (2026-10-13). ADM's live quote (`adm:last@`) fills only a symbol Massive lacks, today, between the close and
+the 7 PM reopen. `python auto_import.py --futures-only` runs just the capture. Do not use `/snapshot` for this: on
+2026-10-12 its `previous_settlement` skipped Columbus Day, and the 10-12 flat file had no grains at all.
+
+`repair_futures_dating.py` is the one-off rebuild of 2026-06-22 to 10-12 from the bars (dry run by default; `--apply
+--backup <csv>`; `--restore <csv>` undoes it; rows tagged `repair:massive-settle@`). Tests: `tests/test_futures_capture.py`.
+
+### Trading days = CME's grain calendar, not the federal one
+
+`grain_calendar.py` (`tests/test_grain_calendar.py`): grains close on New Year's, MLK, Presidents, Good Friday, Memorial,
+Juneteenth, Independence, Labor, Thanksgiving and Christmas (Sat → Fri, Sun → Mon, New Year's on a Saturday closes
+nothing) and trade on Columbus and Veterans Day. `auto_import`'s guard and the Summary tab's "1 / 2 days ago" use it; the
+federal check had skipped the whole import on Columbus Day 2026-10-12. A one-off closure goes in `EXTRA_CLOSED`.
+
 ## Scrapers
 
 One module per source (`adm_`, `chs_`, `cargill_`, `bunge_`, `scoular_`, …).

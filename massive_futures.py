@@ -25,9 +25,13 @@ Ticker year codes are single-digit (e.g. "ZCZ6" = Dec 2026 corn); converted
 here to Basis Tracker's own 2-digit-year convention ("ZCZ26") to match
 adm_futures.py and the rest of the app.
 
-Files land once per session (after the close), not intraday — this walks
-back up to a week to find the most recently published file, so weekends and
-holidays are transparent to the caller.
+Files land once per session, around 9 PM Central (02:00 UTC), not intraday —
+this walks back up to a week to find the most recently published file, so
+weekends and holidays are transparent to the caller. During the trading day
+and the afternoon that means YESTERDAY's session: fine for a "latest settle"
+curve, wrong for filing a price under a date. The daily capture therefore uses
+`fetch_session_prices` (the REST API's 1session bars, each dated by its own
+session) — see futures_capture.py.
 
 Minneapolis spring wheat (MW) trades on MGEX, which Massive doesn't carry —
 that symbol has to keep coming from adm_futures.py or another source.
@@ -36,9 +40,14 @@ from __future__ import annotations
 
 import gzip
 import logging
-from datetime import datetime, timedelta, timezone
+import os
+import re
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, datetime, timedelta, timezone
 
 import boto3
+import requests
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
@@ -173,6 +182,141 @@ def fetch_futures_curve(max_lookback_days: int = 7) -> dict[str, float]:
 
     log.info("Massive futures curve: %d contracts (session %s)", len(curve), found_date)
     return curve
+
+
+# ── Per-session bars (REST API) ───────────────────────────────────────────────
+# /aggs/<ticker>?resolution=1session returns one bar per session, newest first, each
+# keyed by its own session_end_date (the session that closes at 1:20 PM Central that
+# day). A bar gets its settlement_price some time after the close; before that, and
+# for the session still trading, only the close (last trade) is known. A contract
+# that did not trade has no bar that day (the flat files skip it the same way).
+
+_API_BASE = "https://api.massive.com/futures/v1"
+_OUTRIGHT = re.compile("(%s)([%s])(\\d)" % ("|".join(sorted(_ROOTS)), _MONTHS))
+
+
+def _api_key() -> str:
+    key = ""
+    try:
+        import streamlit as st
+        key = st.secrets.get("MASSIVE_API_KEY", "")
+    except Exception:
+        pass
+    key = key or os.environ.get("MASSIVE_API_KEY", "")
+    if not key:
+        raise RuntimeError("MASSIVE_API_KEY not configured")
+    return key
+
+
+def _api_get(key: str, path: str | None = None, url: str | None = None, **params) -> dict:
+    last: Exception = RuntimeError("Massive %s: no attempt made" % (path or url))
+    for attempt in range(3):
+        try:
+            r = requests.get(url or _API_BASE + path, headers={"Authorization": "Bearer " + key},
+                             params=None if url else params, timeout=60)
+            if r.status_code == 200:
+                return r.json()
+            last = RuntimeError("Massive %s -> HTTP %s: %s" % (path or url, r.status_code, r.text[:200]))
+            if r.status_code < 500 and r.status_code != 429:
+                break                       # a 4xx is not going to heal by retrying
+        except requests.RequestException as exc:
+            last = exc
+        time.sleep(2 * (attempt + 1))
+    raise last
+
+
+def massive_ticker(symbol: str) -> str | None:
+    """'ZCZ26' -> 'ZCZ6' (Massive's outrights carry a one-digit year); None for other symbols."""
+    if (len(symbol) != 5 or symbol[:2] not in _ROOTS or symbol[2] not in _MONTHS
+            or not symbol[3:].isdigit()):
+        return None
+    return symbol[:3] + symbol[4]
+
+
+def symbol_from_contract(rec: dict) -> str | None:
+    """Our 2-digit-year symbol for a /contracts record ('ZCZ6' last trading 2026-12-14 -> 'ZCZ26');
+    None for spreads, other roots, or a record whose dates disagree with its year digit. A CBOT grain
+    contract's last trading day falls in its own delivery month."""
+    m = _OUTRIGHT.fullmatch(str(rec.get("ticker") or ""))
+    if not m:
+        return None
+    root, month, digit = m.groups()
+    try:
+        last = date.fromisoformat(str(rec.get("last_trade_date") or rec.get("settlement_date"))[:10])
+    except ValueError:
+        return None
+    cm = _MONTHS.index(month) + 1
+    year = last.year if last.month >= cm else last.year - 1
+    if year % 10 != int(digit):
+        return None
+    return f"{root}{month}{year % 100:02d}"
+
+
+def list_outrights(on: date, key: str | None = None) -> dict[str, str]:
+    """{Massive ticker -> our symbol} for every outright of the tracked roots listed on `on`."""
+    key = key or _api_key()
+    out: dict[str, str] = {}
+    for root in sorted(_ROOTS):
+        js = _api_get(key, "/contracts", product_code=root, date=on.isoformat(), limit=1000)
+        recs, pages = list(js.get("results", [])), 1
+        while js.get("next_url") and pages < 10:
+            js = _api_get(key, url=js["next_url"])
+            recs += js.get("results", [])
+            pages += 1
+        for rec in recs:
+            sym = symbol_from_contract(rec)
+            if sym:
+                out[rec["ticker"]] = sym
+    return out
+
+
+def fetch_bars(ticker: str, key: str | None = None, limit: int = 50000) -> list[dict]:
+    """The newest `limit` 1session bars of one contract (newest first)."""
+    js = _api_get(key or _api_key(), f"/aggs/{ticker}", resolution="1session", limit=limit)
+    return list(js.get("results", []))
+
+
+def session_prices(bars: list[dict]) -> dict[date, tuple[float, bool]]:
+    """{session_end_date -> (cents, official)} from one contract's bars: the exchange settlement
+    when the bar carries one (official=True), else the session's close (False)."""
+    out: dict[date, tuple[float, bool]] = {}
+    for b in bars:
+        try:
+            d = date.fromisoformat(str(b.get("session_end_date"))[:10])
+        except ValueError:
+            continue
+        settle, close = b.get("settlement_price"), b.get("close")
+        if settle:                          # absent (or 0) until the session settles
+            out[d] = (float(settle), True)
+        elif close is not None:
+            out[d] = (float(close), False)
+    return out
+
+
+def fetch_session_prices(on: date, sessions: int = 8, max_workers: int = 8
+                         ) -> dict[date, dict[str, tuple[float, bool]]]:
+    """The last `sessions` sessions of every tracked outright listed on `on`, each filed under its
+    bar's own session date: {date: {symbol: (cents, official)}}. Raises when the contract list
+    can't be read; a contract whose bars fail is logged and left out."""
+    key = _api_key()
+    tickers = list_outrights(on, key)
+    out: dict[date, dict[str, tuple[float, bool]]] = {}
+    failed = []
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futs = {pool.submit(fetch_bars, t, key, sessions): t for t in tickers}
+        for fut in as_completed(futs):
+            t = futs[fut]
+            try:
+                bars = fut.result()
+            except Exception as exc:
+                failed.append(t)
+                log.warning("Massive bars failed for %s: %s", t, exc)
+                continue
+            for d, v in session_prices(bars).items():
+                out.setdefault(d, {})[tickers[t]] = v
+    log.info("Massive session bars: %d contracts listed, %d failed, sessions %s", len(tickers),
+             len(failed), ", ".join(str(d) for d in sorted(out)[-3:]))
+    return out
 
 
 if __name__ == "__main__":

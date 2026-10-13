@@ -138,7 +138,6 @@ from agrex_scraper import fetch_agrex_bids
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
-import holidays as _holidays
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_FILE = Path(__file__).parent / "auto_import.log"
@@ -164,16 +163,16 @@ log = logging.getLogger(__name__)
 
 def _is_trading_day(dt: datetime = None) -> bool:
     """
-    Return True if dt (today by default) is a US federal trading day:
-      - Monday through Friday
-      - Not a US federal holiday
+    Return True if dt (today in Central time by default) is a CBOT grain trading day:
+    Monday through Friday and not on CME's grain holiday calendar (grain_calendar.py).
+    NOT the US federal calendar: grains trade on Columbus Day and Veterans Day, and the
+    federal check skipped the whole import on Columbus Day 2026-10-12.
     """
+    import grain_calendar
     if dt is None:
-        dt = datetime.now()
-    if dt.weekday() >= 5:  # Saturday=5, Sunday=6
-        return False
-    us_fed = _holidays.US(years=dt.year)
-    return dt.date() not in us_fed
+        from zoneinfo import ZoneInfo
+        dt = datetime.now(ZoneInfo("America/Chicago"))
+    return grain_calendar.is_trading_day(dt.date())
 
 
 def run_chs() -> int:
@@ -1925,20 +1924,12 @@ def run_prune() -> None:
 
 
 def run_futures_capture() -> int:
-    """Harvest the current futures curve from ADM's feed and store it under today's
-    date, so historical forward-basis curves can later anchor on each day's actual
-    futures (instead of always today's). Best-effort — never blocks the scrape."""
+    """Store each CBOT session's settlement under that session's own date (futures_capture.py),
+    so historical forward-basis curves anchor on each day's actual futures. Best-effort —
+    never blocks the scrape."""
     try:
-        import futures_curve
-        from database import save_futures_curve
-        curve = futures_curve.fetch_futures_curve()
-        if not curve:
-            log.warning("Futures capture: empty curve — skipped")
-            return 0
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        n = save_futures_curve(curve, today)
-        log.info("Futures capture: stored %d contracts for %s", n, today)
-        return n
+        import futures_capture
+        return futures_capture.run()
     except Exception as exc:
         log.warning("Futures capture failed (scrape unaffected): %s", exc)
         return 0
@@ -2503,7 +2494,12 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--force", dest="force", action="store_true",
-        help="Run even if today is a weekend or federal holiday (bypasses trading-day guard)",
+        help="Run even if today is a weekend or CBOT grain holiday (bypasses trading-day guard)",
+    )
+    parser.add_argument(
+        "--futures-only", dest="futures_only", action="store_true",
+        help="Run only the futures capture (each closed session's settlement under its own date; "
+             "fills a missed day or a close still waiting for its settlement)",
     )
 
     parser.add_argument(
@@ -2521,12 +2517,15 @@ if __name__ == "__main__":
     if not args.force and not getattr(args, "prune_only", False):
         if not _is_trading_day():
             log.info(
-                "Not a trading day (weekend or US federal holiday) — skipping. "
+                "Not a trading day (weekend or CBOT grain holiday) — skipping. "
                 "Use --force to override."
             )
             sys.exit(0)
 
-    if args.prune_only:
+    if args.futures_only:
+        init_db()
+        run_futures_capture()
+    elif args.prune_only:
         init_db()
         run_prune()
     elif args.poet_only:
