@@ -59,16 +59,17 @@ for i, y in enumerate(range(2018, 2026)):
         futs[d] = dict(futs.get(d, {}), **{rtc.contract_symbol(c, y): px for c, px in SYMS.items()})
 st.session_state.setdefault("scope", "loc-A")
 st.session_state.setdefault("measure", "net")
+st.session_state.setdefault("message", None)
 blk.render(obs=obs, quotes=[], asof=ASOF, grain="Corn", measure=st.session_state["measure"], tab_rate_pct=cr.rate_for(ASOF, None).rate_pct,
            load_futures=lambda root: futs, load_prime=lambda: None, load_fed_funds=lambda: None,
-           scope=st.session_state["scope"], location="Test Elevator")
+           scope=st.session_state["scope"], location="Test Elevator", message=st.session_state["message"])
 '''.replace("__ROOT__", ROOT.replace("\\", "/"))
 
 ASOF = date(2026, 2, 4)
 CROP = 2025
 
 
-def build_expected(overrides=None, measure="net"):
+def build_expected(overrides=None, measure="net", ship_by=None):
     """The same series, run directly through the engine (what the page should show)."""
     syms = {"Z": 400.0, "H": 410.0, "K": 414.0, "N": 416.0, "U": 410.0}
     obs, futs = [], {}
@@ -83,7 +84,7 @@ def build_expected(overrides=None, measure="net"):
     obs = [o for o in obs if o["date"] <= ASOF]
     rate = lambda d: cr.rate_for(d, None).rate_pct
     res = rd.run_history(obs, futs, rate, spec=rtc.CORN, b0_overrides=overrides)
-    return rd.summary_rows(res, measure), obs
+    return rd.summary_rows(rd.limit_history(res, ship_by), measure), obs
 
 
 def strip(s):
@@ -202,6 +203,90 @@ rb2 = next(r for r in at.radio if r.label == "Harvest basis")
 rows, html = history_rows(at)
 check("another location starts on the calculated method again (the widget keys carry the location)",
       rb2.key == key("mode", "loc-B") and rb2.value.startswith("Calculated") and not at.number_input and ">OWN<" not in html)
+
+print("block: the Ship by box — no limit by default, or the study stops at the end of a month")
+SB = "nc_rtc_ship_by_corn"
+MONTHS_OPT = ["End of " + m for m in ("November", "December", "January", "February", "March", "April", "May", "June")]
+at = fresh()
+sb = next((s for s in at.selectbox if s.label == "Ship by"), None)
+check("a Ship by box sits in the block, on 'No limit' (the best week of the whole season) by default, with November to June after it",
+      sb is not None and sb.key == SB and sb.value.startswith("No limit") and "through July" in sb.value and sb.options[1:] == MONTHS_OPT, getattr(sb, "options", None))
+rows0, html0 = history_rows(at)
+ship0 = ship_html(at)
+check("with no limit the page is the whole-season one: seven columns including the summer basis, and nothing about a study end anywhere",
+      html0.count("<th ") == 7 and "Best summer basis" in html0 and "Study ends" not in html0 and "shipping by" not in ship0 and "Shipments through" not in ship0
+      and not any("shipped by" in m.value for m in at.markdown) and not [c for c in at.caption if "Only shipments through" in c.value or "ship-by limit" in c.value])
+
+at.selectbox(key=SB).set_value("End of March").run()
+check("choosing End of March: no exception", not at.exception, [str(e.value)[:200] for e in at.exception])
+lim_rows, _ = build_expected(ship_by=3)
+rows3, html3 = history_rows(at)
+check("the by-year table says the study ends at the end of March and loses the summer-basis column (no week by March is quoted off July)",
+      "Study ends at the end of March" in html3 and html3.count("<th ") == 6 and "Best summer basis" not in html3, html3.count("<th "))
+check("every crop year's carry, best return, best week and return at the end are the engine's for a March study",
+      len(rows3) == len(lim_rows) == 8 and all(close(num(r[2]), e["carry"], 0.06) and close(num(r[3]), e["best"], 0.06)
+                                               and r[4] == "%s %d" % (e["best_date"].strftime("%b"), e["best_date"].day) and close(num(r[5]), e["last"], 0.06)
+                                               for r, e in zip(rows3, reversed(lim_rows))), (rows3[1], lim_rows[-2]))
+check("...and no year's best is higher, or later, than the whole season's, and some years' are lower (stopping early costs something)",
+      all(e["best"] <= f["best"] + 1e-9 and e["best_date"] <= f["best_date"] for e, f in zip(lim_rows, exp_rows))
+      and any(e["best"] < f["best"] - 1.0 for e, f in zip(lim_rows, exp_rows)), [(round(e["best"], 1), round(f["best"], 1)) for e, f in zip(lim_rows, exp_rows)])
+check("the tracked year (in progress on Feb 4, before the limit) reads exactly as it did: the same best, 'IN PROGRESS'", close(num(rows3[0][3]), num(rows0[0][4]), 0.06)
+      and "IN PROGRESS" in html3)
+check("the headline says the year is shipped by Mar 31 and is 'Best so far, by Mar 31' (it has not reached March)",
+      any("shipped by Mar 31" in m.value and "Best so far, by Mar 31" in m.value and "Futures carry" in m.value for m in at.markdown))
+sh3 = ship_html(at)
+check("the shipment table is cut to Nov 20 .. Mar 20 and says so", "shipping by Mar 31" in sh3 and "Shipments through Mar 31 only" in sh3 and "Mar 20" in sh3
+      and not any(("%s 20" % m) in sh3 for m in ("Apr", "May", "Jun", "Jul")), sh3[:200])
+caps = [c.value for c in at.caption]
+check("the box says what the limit does, and the method caption says where the weeks stop",
+      any("Only shipments through the end of March count" in c for c in caps) and any("Weeks run to March 31 (the ship-by limit; the season runs to July 31)" in c for c in caps), caps[-4:])
+at.selectbox(key=SB).set_value(at.selectbox(key=SB).options[0]).run()
+rows_b, html_b = history_rows(at)
+check("choosing No limit again gives back the whole-season page byte for byte (the by-year table and the shipment table)", html_b == html0 and ship_html(at) == ship0)
+
+print("block: the Ship by choice is the user's constraint, so it follows them from one location to the next")
+at.selectbox(key=SB).set_value("End of March").run()
+at.session_state["scope"] = "loc-B"
+at.run()
+check("on another location the box still says End of March and the table is the March study",
+      at.selectbox(key=SB).value == "End of March" and "Study ends at the end of March" in history_rows(at)[1], at.selectbox(key=SB).value)
+at.session_state["message"] = "This line is a freight rate, not an FOB bid, so there is no storage return to track."
+at.run()
+check("a location the block cannot draw (a message in its place) shows no box", not [s for s in at.selectbox if s.key == SB] and any("freight rate" in i.value for i in at.info))
+at.session_state["message"] = None
+at.run()
+check("...and the choice is still End of March when the block is drawn again (the widget's own state was dropped meanwhile)",
+      at.selectbox(key=SB).value == "End of March" and "Study ends at the end of March" in history_rows(at)[1], at.selectbox(key=SB).value)
+at.session_state["measure"] = "gross"
+at.run()
+g_lim, _ = build_expected(ship_by=3, measure="gross")
+rows_g, html_g = history_rows(at)
+check("the gross view reads the same limit (its best returns are the gross best of a March study)",
+      "Study ends at the end of March" in html_g and all(close(num(r[3]), e["best"], 0.06) for r, e in zip(rows_g, reversed(g_lim))), rows_g[1])
+at.session_state["measure"] = "net"
+at.selectbox(key=SB).set_value("End of June").run()
+rows6, html6 = history_rows(at)
+l6, _ = build_expected(ship_by=6)
+check("End of June keeps the summer-basis column (the study reaches July's contract) and reads the June study's best returns",
+      html6.count("<th ") == 7 and "Study ends at the end of June" in html6 and all(close(num(r[4]), e["best"], 0.06) for r, e in zip(rows6, reversed(l6))), html6.count("<th "))
+check("a longer study never reads lower than a shorter one, year by year (June >= March)", all(num(a[4]) >= num(b[3]) - 0.06 for a, b in zip(rows6, rows3)))
+
+SOY_SCRIPT = '''
+import sys
+sys.path.insert(0, "__ROOT__")
+import streamlit as st
+import return_to_carry as rtc
+import return_to_carry_block as blk
+st.session_state["picked"] = blk._ship_by_choice(rtc.SOY)
+'''.replace("__ROOT__", ROOT.replace("\\", "/"))
+at_s = AppTest.from_string(SOY_SCRIPT, default_timeout=60)
+at_s.run()
+sbs = at_s.selectbox[0]
+check("soybeans: no limit runs through September; the months to choose from are November to August, and no limit is None",
+      sbs.key == "nc_rtc_ship_by_soy" and sbs.options[0].startswith("No limit") and "through September" in sbs.options[0] and sbs.options[-1] == "End of August"
+      and len(sbs.options) == 11 and at_s.session_state["picked"] is None, (sbs.key, sbs.options[:2], sbs.options[-1]))
+at_s.selectbox[0].set_value("End of August").run()
+check("...and a month comes back as its number (8), the corn and soybean boxes being separate", at_s.session_state["picked"] == 8 and at_s.selectbox[0].key != SB)
 
 print("\n" + ("ALL PASS" if not FAILS else "FAILURES: %s" % FAILS))
 sys.exit(1 if FAILS else 0)

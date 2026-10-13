@@ -354,5 +354,35 @@ hq = vw.shipment_html(rtc.build_shipment_table(2026, D(2026, 12, 8), 10.0, [], F
 check("a break-even with no bids says no forward bids were posted", "No forward bids were posted" in hq and "BEST NOW" not in hq)
 check("the break-even cell explains itself on hover: harvest basis, carry, interest", "harvest basis +10.00" in h and "futures carry banked rolling to Mar" in h and "interest" in h)
 
+print("shipment table: ship by — only the months a study that stops early can use")
+Q2 = Q + [{"date": D(2026, 12, 8), "month": 3, "basis": 60.0, "tag": "ZCK27", "label": "Mar"}]       # a strong March bid: March is the best month today
+tb2 = rtc.build_shipment_table(2026, D(2026, 12, 8), 10.0, Q2, FS, RATE, "net", b0_weeks=7)
+check("with a strong March bid, March is the best month on today's bids", rtc.best_column(tb2, "ret").month == 3 and rtc.best_column(tb2, "best_ret").month == 3,
+      (rtc.best_column(tb2, "ret").month, rtc.best_column(tb2, "best_ret").month))
+t_dec = rtc.limit_shipment_table(tb2, 12)
+check("shipping by the end of December keeps Nov 20 and Dec 20 and says where it stops", [c.month for c in t_dec.cols] == [11, 12] and t_dec.ship_by == D(2026, 12, 31),
+      ([c.month for c in t_dec.cols], t_dec.ship_by))
+check("the best month is then picked among them, today and year to date (December)", rtc.best_column(t_dec, "ret").month == 12 and rtc.best_column(t_dec, "best_ret").month == 12)
+t_mar = rtc.limit_shipment_table(tb2, 3)
+check("by the end of March: Nov .. Mar (five columns), and March is the best again", [c.month for c in t_mar.cols] == [11, 12, 1, 2, 3] and rtc.best_column(t_mar, "ret").month == 3)
+check("the columns themselves are untouched (the same objects), the full table is as it was, and the rest of the table carries over",
+      all(a is b for a, b in zip(t_mar.cols, tb2.cols[:5])) and len(tb2.cols) == 9 and tb2.ship_by is None
+      and (t_mar.crop_year, t_mar.b0, t_mar.rate, t_mar.measure, t_mar.asof, t_mar.purchase) == (tb2.crop_year, tb2.b0, tb2.rate, tb2.measure, tb2.asof, tb2.purchase))
+check("no limit: the very same table", rtc.limit_shipment_table(tb2, None) is tb2)
+check("by the end of November only the Nov 20 column is left", [c.month for c in rtc.limit_shipment_table(tb2, 11).cols] == [11])
+check("a limit past the last column keeps them all, flagged with where the study stops", [c.month for c in rtc.limit_shipment_table(tb2, 6).cols] == [11, 12, 1, 2, 3, 4, 5, 6]
+      and rtc.limit_shipment_table(tb2, 6).ship_by == D(2027, 6, 30))
+hl = vw.shipment_html(t_mar, None, "x")
+check("the page titles the table with where it stops, says the later months are left out, and shows only the five columns",
+      "shipping by Mar 31" in hl and "Shipments through Mar 31 only" in hl and all(("%s 20" % m) in hl for m in ("Nov", "Dec", "Jan", "Feb", "Mar"))
+      and not any(("%s 20" % m) in hl for m in ("Apr", "May", "Jun", "Jul")), hl[:300])
+check("...and 'best now' is among them (March), and the markup is still balanced", hl.count("BEST NOW") == 1 and "ship Mar 20" in hl
+      and hl.count("<td") == hl.count("</td>") and hl.count("<th ") == hl.count("</th>") and hl.count("<div") == hl.count("</div>"))
+check("a table with no limit says nothing of it", "Shipments through" not in h and "shipping by" not in h)
+lv_m = t_mar.levels.spreads
+check("the futures-carry card counts only the spreads up to the last column shown (Dec->Mar and Mar->May for a March study; all three, to Jul, in the full table)",
+      "Mar→May" in hl and "May→Jul" not in hl and ("%+.1f¢" % (lv_m["ZH"][0] + lv_m["HK"][0])) in hl and "May→Jul" in h, hl[max(0, hl.find("Futures carry")):][:260])
+check("a study that ends before the first roll says there is no roll spread yet", "no roll spread before then" in vw.shipment_html(rtc.limit_shipment_table(tb2, 11), None, "x"))
+
 print("\n" + ("ALL PASS" if not FAILS else "FAILURES: %s" % FAILS))
 sys.exit(1 if FAILS else 0)

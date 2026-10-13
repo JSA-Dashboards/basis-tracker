@@ -9,6 +9,7 @@
   parse_label / shipment_quotes        which months a period covers ('JFM', 'FH Dec', 'Dec 1-20') -> one bid per shipment month
   shipment_table(...)                  the report's page-1 table (break-even, current and best bids by shipment month)
   own_b0_map / b0_override(s)          the user's OWN harvest basis in place of the calculated average (shipment_table, run_history)
+  limit_history(results, month)        every crop year read only up to the END of a month ("ship by"): best return, carry banked, summary rows
 
 Pure functions over plain data (database access stays in the app): see return_to_carry for the method.
 """
@@ -401,6 +402,13 @@ def run_history(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_y
     return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec, b0_overrides)[0]
 
 
+def limit_history(results: list, month: int | None) -> list:
+    """Every crop year of a history as it reads when the study ends at the END of `month` (rtc.limit_crop_year): the best return, the
+    carry banked and the table rows then cover only the weeks up to it — 'what is the best storing has paid for a pile that has to be
+    gone by March'. `month` None = the whole season: the results themselves, untouched."""
+    return [rtc.limit_crop_year(cy, month) for cy in results] if month is not None else results
+
+
 def _value(w, measure: str):
     return w.net if measure == "net" else w.gross
 
@@ -421,6 +429,7 @@ def summary_rows(results: list, measure: str = "net") -> list[dict]:
             "best_date": None if best is None else best.date, "best_tag": None if best is None else best.tag,
             "last": None if last is None else _value(last, measure),
             "last_date": None if last is None else last.date,
+            "ship_by": cy.window_end, "carry_tag": cy.carry_tag,       # set only when the study was limited (limit_history)
         })
     return rows
 

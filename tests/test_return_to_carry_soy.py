@@ -297,6 +297,26 @@ check("the explanation: Nov-Aug shipment months on Jan futures, October's bids m
       "Nov-Aug" in hw and "Jan futures" in hw and "moved to Jan by the Nov" in hw and "fifth weekly bid" in hw and "2015-16 to 2017-18" in hw and "weighted 4 : 3" in hw
       and "Nov-Jul" in vw.how_it_works() and "Dec futures" in vw.how_it_works() and "third weekly bid" in vw.how_it_works())
 
+print("soybeans: ship by — a study that stops at the end of a month (the synthetic futures again: Jan->Mar 8, Mar->May 6, May->Jul 4; bids climbing 1.5c a week)")
+s0 = rtc.first_wednesday(2026)
+SP = {"ZSX26": 1000.0, "ZSF27": 1010.0, "ZSH27": 1018.0, "ZSK27": 1024.0, "ZSN27": 1028.0, "ZSQ27": 1025.0, "ZSX27": 1005.0}
+sf = {s0 + timedelta(days=7 * k): dict(SP) for k in range(-1, 53)}
+for d in rtc.roll_dates(2026, SOY).values():
+    sf.setdefault(d, dict(SP)).update(SP)
+syn_s = rtc.build_crop_year([{"date": s0 + timedelta(days=7 * k), "basis": -20.0 + 1.5 * k} for k in range(0, 52)], sf, 2026, lambda d: 6.0, SOY)
+lim_s = rtc.limit_crop_year(syn_s, 3)
+check("by the end of March the soybean study stops on Wednesday Mar 31 2027, its best is picked from those weeks, no week is quoted off July (no summer basis)",
+      lim_s.window_end == date(2027, 3, 31) and lim_s.weeks[-1].date == date(2027, 3, 31) and lim_s.summer is None and syn_s.summer is not None
+      and lim_s.best["net"] is max([w for w in syn_s.weeks if w.date <= date(2027, 3, 31) and w.net is not None], key=lambda w: (w.net, -w.idx))
+      and lim_s.best["net"].net < syn_s.best["net"].net and lim_s.complete)
+check("the carry banked is Jan->Mar 8 + Mar->May 6 = 14, quoted off May (the headline Jan->Jul is 18)",
+      close(lim_s.season_carry, 14.0) and lim_s.carry_tag == "K" and close(syn_s.season_carry, 18.0))
+hs = vw.headline_html(rd.summary_rows([lim_s], "net"), "net", SOY)
+check("the soybean headline reads Jan -> May banked by Mar 31, shipped by Mar 31", "Jan → May, banked by Mar 31" in hs and "shipped by Mar 31" in hs and "Best return by Mar 31" in hs, hs[-400:])
+check("an August study keeps the summer basis (it reaches the July contract) and the end of August is where it stops",
+      rtc.limit_crop_year(syn_s, 8).summer is not None and rtc.limit_crop_year(syn_s, 8).window_end == date(2027, 8, 31) and rtc.limit_crop_year(syn_s, 8).weeks[-1].date <= date(2027, 8, 31))
+check("the weekly returns are the full season's, week for week", all(a is b for a, b in zip(lim_s.weeks, syn_s.weeks)))
+
 print("soybeans: corn is untouched by the generalisation")
 check("corn year still runs to Jul 31 on Dec as the base and 'ZH' keys",
       rtc.CORN.base == "Z" and rtc.CORN.horizon == (7, 31) and rtc.roll_dates(2019)["ZH"] == D("2019-11-27") and set(rtc.roll_spreads({}, 2019)) == {"ZH", "HK", "KN", "NU"})

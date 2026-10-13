@@ -165,6 +165,57 @@ check("no calculated number to compare with -> the card just says it is yours", 
 hw = vw.how_it_works()
 check("the 'how it is calculated' text tells the user about the switch", "Harvest basis switch above can use your own number" in hw and "what-if" in hw)
 
+print("return_to_carry_view: ship by — a study that stops at the end of March")
+import re  # noqa: E402
+lim_res = rd.limit_history(results, 3)
+lim_rows = rd.summary_rows(lim_res, "net")
+hl = vw.headline_html(lim_rows, "net")
+check("the headline says where the study ends and the best-return card is 'Best return by Mar 31' (the year is complete)",
+      "shipped by Mar 31" in hl and "Best return by Mar 31" in hl and "Best return so far" not in hl and "complete" in hl, hl[:300])
+check("its best return is the March study's (lower than the season's), printed signed with the week it happened",
+      ("%+.1f¢" % lim_rows[-1]["best"]) in hl and lim_rows[-1]["best"] < rows[-1]["best"] and lim_rows[-1]["best_date"] <= date(2026, 3, 31))
+check("the futures-carry card says what was banked by the last week and to which contract (14 = Dec->Mar 10 + Mar->May 4, quoted off May)",
+      "+14.0¢" in hl and "Dec → May, banked by Mar 25" in hl and "Dec → Jul" not in hl, hl[-500:])
+check("the full-season headline is as it was", "Best return so far" in h and "shipped by" not in h and "Dec → Jul, rolled the last Wednesday before each month" in h)
+hl_in = vw.headline_html(rd.summary_rows(rd.limit_history(inprog, 3), "net"), "net")
+check("a year still in progress reads 'Best so far, by Mar 31'", "Best so far, by Mar 31" in hl_in and "9 weeks in" in hl_in, hl_in[:260])
+hl11 = vw.headline_html(rd.summary_rows(rd.limit_history(results, 11), "net"), "net")
+check("a study that ends before the first roll says nothing has rolled yet", "none yet — still quoted off Dec" in hl11, hl11[-400:])
+tl = vw.table_html(lim_rows, "net")
+body_rows = re.findall(r"<tr>(.*?)</tr>", tl.split("<tbody>")[1], flags=re.S)
+check("the by-year table says where the study ends and drops the 'Best summer basis' column (no week by March is quoted off July)",
+      "Study ends at the end of March" in tl and "Best summer basis" not in tl and tl.count("<th ") == 6 and "Best summer basis" in t and t.count("<th ") == 7, tl.count("<th "))
+check("every line, average and median included, has the six cells of the narrower table", body_rows and all(r.count("<td") == 6 for r in body_rows) and len(body_rows) == 14, [r.count("<td") for r in body_rows])
+tl6 = vw.table_html(rd.summary_rows(rd.limit_history(results, 6), "net"), "net")
+check("a June study reaches July's contract, so the summer column stays; the note names June", "Best summer basis" in tl6 and "Study ends at the end of June" in tl6 and tl6.count("<th ") == 7)
+check("the full-season table has no such note", "Study ends" not in t)
+bl = vw.best_bar_chart(lim_rows, "net").to_dict()
+check("the bar chart's title says where the study ends, the bars are the limited best returns", "shipped by end of March" in bl["title"]["text"]
+      and all(close(r["Best"], x["best"]) for r, x in zip(next(d for d in bl["datasets"].values() if d and "Crop year" in d[0]), lim_rows)))
+check("the full-season bar chart's title is as it was", vw.best_bar_chart(rows, "net").to_dict()["title"]["text"] == "Best return by crop year — net of interest")
+sl = vw.seasonal_chart(lim_res, "net").to_dict()
+xl = next(l["encoding"]["x"] for l in sl["layer"] if "scale" in l.get("encoding", {}).get("x", {}))
+xfull = next(l["encoding"]["x"] for l in vw.seasonal_chart(results, "net").to_dict()["layer"] if "scale" in l.get("encoding", {}).get("x", {}))
+tk_l, nm_l = vw._month_ticks(lim_res, 30, rtc.CORN.horizon, 3)
+check("the season chart stops at the end of March: a shorter week axis (to week ~26, not 40+), month ticks Oct .. Mar, the title says so",
+      xl["scale"]["domain"][1] <= 27 and xl["scale"]["domain"][1] < xfull["scale"]["domain"][1] and nm_l[0] == "Oct" and nm_l[-1] == "Mar"
+      and "weeks through the end of March" in json.dumps(sl["title"]["subtitle"]), (xl["scale"]["domain"], nm_l))
+check("...and plots no week after it", max(r["week"] for d in sl["datasets"].values() for r in d if d and "week" in d[0] and "crop" in d[0]) <= 26)
+check("the full-season chart's subtitle is unchanged (two lines)", len(vw.seasonal_chart(results, "net").to_dict()["title"]["subtitle"]) == 2)
+check("a November study's month ticks end in Nov (the stop is in the starting year, not the next)", vw._month_ticks(lim_res, 12, rtc.CORN.horizon, 11)[1][-1] == "Nov")
+try:
+    import vl_convert as _vlc
+    check("the limited seasonal and bar charts compile to Vega", isinstance(_vlc.vegalite_to_vega(vw.seasonal_chart(lim_res, "net").to_json()), dict)
+          and isinstance(_vlc.vegalite_to_vega(vw.best_bar_chart(lim_rows, "net").to_json()), dict))
+except ImportError:
+    print("  [SKIP] vl_convert is not installed")
+check("the method caption says where the weeks stop (and that the season runs on); unchanged without a limit",
+      "Weeks run to March 31 (the ship-by limit; the season runs to July 31)." in vw.method_caption(rtc.CORN, stop=date(2026, 3, 31))
+      and vw.method_caption(rtc.CORN).endswith("Weeks run to July 31.") and vw.method_caption(rtc.SOY).endswith("Weeks run to September 30."))
+check("the how-it-works text explains the Ship by box, with the default (no limit) and what is re-picked",
+      "**Ship by**" in vw.how_it_works() and "no limit" in vw.how_it_works() and "through July" in vw.how_it_works() and "through September" in vw.how_it_works(rtc.SOY)
+      and "picked again from those weeks" in vw.how_it_works())
+
 print("return_to_carry_view: helpers")
 check("completed() keeps finished years that have a best return", len(vw.completed(rows)) == 12 and len(vw.completed(rd.summary_rows(inprog, "net"))) == 11)
 check("rank_of_latest: the newest synthetic year climbs the most, so it ranks first of 12", vw.rank_of_latest(rows) == (1, 12), vw.rank_of_latest(rows))

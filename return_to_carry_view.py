@@ -27,6 +27,7 @@ BLUE, ORANGE, DARK_ORANGE, TITLE_RED = "#4e79a7", "#f28e2b", "#9a3412", "#c00000
 AMBER_BG = "#fff4e5"
 GREEN, RED = "#0a7f3f", "#c0392b"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
 
 def _f(v, dec: int = 1, sign: bool = True) -> str:
@@ -107,10 +108,19 @@ def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.C
         b0_sub = f"average of the first {n0} weekly bids so far, vs {ln[spec.base]}"
     carry_sub = (f"{ln[spec.carry_from]} → {ln[spec.carry_to]}, rolled the last Wednesday before each month" if r["carry"] is not None
                  else "known once the May roll is in")
+    ship_by = r.get("ship_by")                           # set when the study was told to stop early (return_to_carry.limit_crop_year)
+    best_label = "Best return so far"
+    if ship_by:
+        tag = r.get("carry_tag")
+        carry_sub = ("no roll spread measured yet" if r["carry"] is None
+                     else f"none yet — still quoted off {ln[spec.base]} on {_md(r['last_date'])}" if tag in (None, spec.base)
+                     else f"{ln[spec.base]} → {ln[tag]}, banked by {_md(r['last_date'])}")
+        best_label = f"Best return by {_md(ship_by)}" if r["complete"] else f"Best so far, by {_md(ship_by)}"
     gross_note = "" if measure == "net" else " (before interest)"
     head = (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:6px 0 8px">{r["label"]} crop year '
-            f'<span style="font-weight:400;color:#64748b">({state}) — {measure_name(measure)}</span></div>')
-    cards = (_card(f"Best return so far{gross_note}", _f(r["best"]) + "¢" if r["best"] is not None else "—", best_sub, DARK_ORANGE)
+            f'<span style="font-weight:400;color:#64748b">({state}) — {measure_name(measure)}'
+            + (f", shipped by {_md(ship_by)}" if ship_by else "") + '</span></div>')
+    cards = (_card(f"{best_label}{gross_note}", _f(r["best"]) + "¢" if r["best"] is not None else "—", best_sub, DARK_ORANGE)
              + _card("Latest", _f(r["last"]) + "¢" if r["last"] is not None else "—", last_sub)
              + _card("Harvest basis", _f(r["b0"]) + "¢" if r["b0"] is not None else "—", b0_sub)
              + _card("Futures carry", _f(r["carry"]) + "¢" if r["carry"] is not None else "—", carry_sub))
@@ -142,7 +152,10 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
         return ""
     th = ("padding:6px 10px;border-bottom:2px solid #cbd5e1;font-size:11px;color:#475569;text-transform:uppercase;"
           "letter-spacing:.03em;white-space:nowrap;text-align:right")
-    heads = ["Crop year", "Harvest basis", "Futures carry", "Best summer basis", "Best return", "Best week", "Return at end"]
+    limited = rows[-1].get("ship_by")                    # the study was told to stop early (limit_history): the months it stops at
+    show_summer = (not limited) or any(r["summer"] is not None for r in rows)       # a study that ends before the summer contract has no such basis
+    heads = (["Crop year", "Harvest basis", "Futures carry"] + (["Best summer basis"] if show_summer else [])
+             + ["Best return", "Best week", "Return at end"])
     head = "".join(f'<th style="{th}{";text-align:left" if i == 0 else ""}">{h}</th>' for i, h in enumerate(heads))
     bests = [r["best"] for r in rows if r["best"] is not None]
     top = max(bests) if bests else None
@@ -159,13 +172,14 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
         dstat = (derived or {}).get(r["crop_year"])
         body += (f'<tr><td style="{td};text-align:left{bg}">{r["label"]}{tag}{_derived_pill(dstat) if dstat else ""}</td>'
                  f'<td style="{td}{bg}">{_f(r["b0"])}{_own_pill() if r.get("b0_own") else ""}</td><td style="{td}{bg}">{_f(r["carry"])}</td>'
-                 f'<td style="{td}{bg}">{_f(r["summer"], 0)}</td><td style="{td}{bcol}{bg}">{_f(r["best"])}</td>'
+                 + (f'<td style="{td}{bg}">{_f(r["summer"], 0)}</td>' if show_summer else "")
+                 + f'<td style="{td}{bcol}{bg}">{_f(r["best"])}</td>'
                  f'<td style="{td};color:#64748b{bg}">{_md(r["best_date"])}</td><td style="{td}{end_col}{bg}">{_f(r["last"])}</td></tr>')
     done = completed(rows)
     foot = ""
     if len(done) >= 3:
         def stat_row(name, fn):
-            ks = ("b0", "carry", "summer", "best")
+            ks = ("b0", "carry", "summer", "best") if show_summer else ("b0", "carry", "best")
             cells = [fn([r[k] for r in done if r[k] is not None]) for k in ks] + [""] + [fn([r["last"] for r in done if r["last"] is not None])]
             edge = "border-top:2px solid #cbd5e1"
             return (f'<tr><td style="{td};text-align:left;font-weight:700;color:#475569;{edge}">{name}</td>'
@@ -180,7 +194,11 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
     if any(r.get("b0_own") for r in rows):
         legend += ('<div style="font-size:11px;color:#1f4e79;margin-top:4px">OWN = measured from the harvest basis you entered, in place of the '
                    'calculated average of the first weekly bids.</div>')
-    return (f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:640px"><thead><tr>{head}</tr></thead>'
+    lead = ""
+    if limited:
+        lead = (f'<div style="font-size:11px;color:#1f4e79;margin:2px 0 6px">Study ends at the end of {MONTH_FULL[limited.month - 1]}: each year\'s '
+                'best return, best week and return at end count only the weeks up to then, and the futures carry is what was banked by then.</div>')
+    return (lead + f'<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:{640 if show_summer else 560}px"><thead><tr>{head}</tr></thead>'
             f'<tbody>{body}{foot}</tbody></table></div>{legend}')
 
 
@@ -223,13 +241,14 @@ def own_basis_note_html(value: float, calc: float | None, label: str, spec: rtc.
 
 
 # ── the words that explain the method (per commodity) ────────────────────────────────────────────
-def method_caption(spec: rtc.Spec = rtc.CORN) -> str:
-    """The one-paragraph caption under the tracker."""
+def method_caption(spec: rtc.Spec = rtc.CORN, stop=None) -> str:
+    """The one-paragraph caption under the tracker. `stop` = the day a study told to ship by the end of a month stops (else the season's end)."""
     chain = {"corn": "Dec→Mar→May→Jul→Sep", "soy": "Nov→Jan→Mar→May→Jul→Aug→Nov"}[spec.key]
     end = {"corn": "July 31", "soy": "September 30"}[spec.key]
+    tail = f"Weeks run to {end}." if stop is None else f"Weeks run to {MONTH_FULL[stop.month - 1]} {stop.day} (the ship-by limit; the season runs to {end})."
     return (f"Same method as the Research Analyst's {'Return to Carry' if spec.key == 'corn' else 'bean carry'} workbooks: buy at the "
             "harvest basis, hedge, carry. Weekly return = that week's bid − the harvest basis + the futures carry banked rolling the hedge "
-            f"{chain} − interest. Gross = the same without the interest. Weeks run to {end}.")
+            f"{chain} − interest. Gross = the same without the interest. {tail}")
 
 
 def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
@@ -283,7 +302,13 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
                 f"charged as the sheets do — that week's rate ÷ 52 on the cash price (futures + basis), {start}; the shipment table "
                 "charges rate × days ÷ 360 on the same price, as the carry calculations above do. The second choice is the bank prime "
                 "rate the analyst's own sheets use, to tie out to their numbers.")
-    return "\n".join([shipment, harvest, weekly, carry, interest, data])
+    ship_by = ("- **Ship by** — the Ship by box limits how late the study goes (the default is no limit: the best week of the whole season, "
+               f"through {'September' if soy else 'July'}). Pick a month and every crop year is read only up to the END of it — a pile that has to be gone by "
+               "March sees the best storing ever paid by then, not the best of a season that runs on into summer. The best return, the best week, the "
+               "return at the end and the futures carry banked (the roll spreads measured by then) are picked again from those weeks; the weekly "
+               "returns themselves do not change, because no week's return depends on a later one. The shipment table keeps only the months up "
+               "to it, so 'best' means the best of those.")
+    return "\n".join([shipment, harvest, weekly, carry, interest, ship_by, data])
 
 
 # ── the report's page 1: shipment by month ───────────────────────────────────────────────────────
@@ -349,20 +374,27 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
     gross = tbl.measure == "gross"
     best_now = rtc.best_column(tbl, "ret")
     best_ytd = rtc.best_column(tbl, "best_ret")
+    ship_by = getattr(tbl, "ship_by", None)                    # the table was cut to the months a study that stops early can use
     head = (f'<div style="font-size:12px;font-weight:700;color:#32373c;margin:6px 0 8px">{tbl.label} shipment by month '
-            f'<span style="font-weight:400;color:#64748b">— bought {_short(tbl.purchase)} at the harvest basis, {measure_name(tbl.measure)}</span></div>')
+            f'<span style="font-weight:400;color:#64748b">— bought {_short(tbl.purchase)} at the harvest basis, {measure_name(tbl.measure)}'
+            + (f", shipping by {_short(ship_by)}" if ship_by else "") + '</span></div>')
     lv = tbl.levels
     spec = tbl.spec
     ln = rtc.LETTER_NAME
     sp = []
+    pairs = spec.carry_pairs
+    if ship_by and tbl.cols and tbl.cols[-1].letter in spec.chain:     # a study that stops early banks only the spreads up to its last column's contract
+        i = spec.chain.index(spec.carry_from)
+        j = min(spec.chain.index(spec.carry_to), spec.chain.index(tbl.cols[-1].letter))
+        pairs = tuple(spec.pair_key(a, b) for a, b in spec.pairs[i:j]) if j > i else ()
     if lv is not None:
-        for key in spec.carry_pairs:
+        for key in pairs:
             name = f"{ln[key[0]]}→{ln[key[1]]}"
             v = lv.spreads.get(key)
             sp.append(f"{name} {v[0]:+.2f}{'*' if v[2] else ''}" if v else f"{name} —")
     carry_total = None
-    if lv is not None and all(lv.spreads.get(k) for k in spec.carry_pairs):
-        carry_total = sum(lv.spreads[k][0] for k in spec.carry_pairs)
+    if lv is not None and pairs and all(lv.spreads.get(k) for k in pairs):
+        carry_total = sum(lv.spreads[k][0] for k in pairs)
     if tbl.b0 is not None and getattr(tbl, "b0_own", False):
         b0_sub = f"your own, vs {ln[spec.base]}" + (f" · calculated {_n(tbl.b0_calc, 1)}" if tbl.b0_calc is not None else "")
     elif tbl.b0 is None:
@@ -382,10 +414,14 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
     cards = (_card("Harvest basis", _n(tbl.b0, 1) + "¢" if tbl.b0 is not None else "—", b0_sub)
              + _card(f"{ln[spec.base]} futures", _n(tbl.f_base, 2, False) if tbl.f_base is not None else "—", "the price the interest is charged on, with the basis")
              + _card("Interest", rate_val, rate_sub)
-             + _card("Futures carry", _n(carry_total, 1) + "¢" if carry_total is not None else "—", " · ".join(sp) if sp else "—"))
+             + _card("Futures carry", _n(carry_total, 1) + "¢" if carry_total is not None else "—",
+                     " · ".join(sp) if sp else ("no roll spread before then" if ship_by else "—")))
     cards = f'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">{cards}</div>'
     note = _ship_notes(tbl, est)
     note = f'<div style="font-size:11px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:6px 10px;margin-bottom:8px">{note}</div>' if note else ""
+    if ship_by:
+        note += ('<div style="font-size:11px;color:#1f4e79;background:#eef5fc;border:1px solid #c5daf1;border-radius:8px;padding:6px 10px;margin-bottom:8px">'
+                 f'Shipments through {_short(ship_by)} only — your ship-by limit. The later months are left out, so "best" means the best of these.</div>')
 
     callout = ""
     if best_now is not None:
@@ -525,24 +561,27 @@ def best_bar_chart(rows: list[dict], measure: str = "net", height: int = 280, de
         layers += [rule, lab]
     zero = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="#94a3b8", strokeWidth=1).encode(y="y:Q")
     layers.append(zero)
+    limited = rows[-1].get("ship_by")                      # the study was told to stop early: say where, in the title
+    title = f"Best return by crop year — {measure_short(measure)}" + (f", shipped by end of {MONTH_FULL[limited.month - 1]}" if limited else "")
     return (alt.layer(*layers).properties(height=height, background="transparent", padding={"left": 6, "right": 14, "top": 4, "bottom": 4},
-                                          title=alt.TitleParams(f"Best return by crop year — {measure_short(measure)}", color=TITLE_RED,
+                                          title=alt.TitleParams(title, color=TITLE_RED,
                                                                 fontSize=alt.expr(f"{_NARROW} ? 12 : 15"), fontWeight="bold", anchor="middle"))
             .configure_view(strokeWidth=0, fill=None).configure_axis(grid=True, gridColor="#e6e6e6", domainColor="#cccccc"))
 
 
 # ── chart 2: the path through the crop year ───────────────────────────────────────────────────────
-def _month_ticks(results: list, weeks: int = 44, horizon: tuple | None = None) -> tuple[list[int], list[str]]:
+def _month_ticks(results: list, weeks: int = 44, horizon: tuple | None = None, end_month: int | None = None) -> tuple[list[int], list[str]]:
     """Week indexes (and month names) where each month first appears on the crop-year grid, Oct through Jul (soybeans: Sep).
     `horizon` = (month, day) of the following year where the season ends: a week past it gets no tick (a year that starts
-    Oct 7 would otherwise label its week 43 'Aug', soybeans' week 52 'Oct')."""
+    Oct 7 would otherwise label its week 43 'Aug', soybeans' week 52 'Oct'). `end_month` = a study told to stop at the end of
+    that month (Nov-Aug): the ticks stop there instead."""
     from datetime import date, timedelta
     from return_to_carry import first_wednesday
     ref = next((cy for cy in reversed(results) if cy.weeks), None)
     if ref is None:
         return [], []
     start = first_wednesday(ref.crop_year)
-    end = date(ref.crop_year + 1, *horizon) if horizon else None
+    end = rtc.study_end(ref.crop_year, end_month) if end_month else (date(ref.crop_year + 1, *horizon) if horizon else None)
     idx, names, seen = [], [], set()
     for k in range(0, weeks):
         d = start + timedelta(days=7 * k)
@@ -570,7 +609,10 @@ def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_
     hist = df[df["crop"].isin(hist_labels)]
     layers = []
     full = 40 if spec.key == "corn" else 51                  # the season's last week (Jul 31 for corn, Sep 30 for soybeans)
-    ticks, names = _month_ticks(results, full + 4, spec.horizon)
+    stop = results[-1].window_end                            # a study told to ship by the end of a month (limit_history) stops there
+    if stop is not None:
+        full = max(1, (stop - rtc.first_wednesday(results[-1].crop_year)).days // 7)
+    ticks, names = _month_ticks(results, full + 4, spec.horizon, stop.month if stop is not None else None)
     xmax = int(df["week"].max())
     x_enc = alt.X("week:Q", title=None, scale=alt.Scale(domain=[0, max(xmax, full) + 0.5]),
                   axis=alt.Axis(values=ticks, labelExpr=f"{json.dumps(names)}[indexof({json.dumps(ticks)}, datum.value)]",
@@ -616,9 +658,13 @@ def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_
     layers.append(zero)
     n_hist = hist["crop"].nunique()
     tkw = dict(color=TITLE_RED, fontSize=alt.expr(f"{_NARROW} ? 12 : 15"), fontWeight="bold", anchor="middle")
+    sub = []
     if n_hist >= 5:
-        tkw.update(subtitle=[f"shaded = the middle 50% and 80% of {n_hist} completed years", "dashed = their median"],
-                   subtitleColor="#64748b", subtitleFontSize=alt.expr(f"{_NARROW} ? 10 : 11"))
+        sub += [f"shaded = the middle 50% and 80% of {n_hist} completed years", "dashed = their median"]
+    if stop is not None:
+        sub.append(f"weeks through the end of {MONTH_FULL[stop.month - 1]} — the ship-by limit")
+    if sub:
+        tkw.update(subtitle=sub, subtitleColor="#64748b", subtitleFontSize=alt.expr(f"{_NARROW} ? 10 : 11"))
     return (alt.layer(*layers).resolve_scale(y="shared")
             .properties(height=height, background="transparent", padding={"left": 6, "right": 24, "top": 6, "bottom": 6},
                         title=alt.TitleParams(f"Return through the crop year — {measure_short(measure)}", **tkw))

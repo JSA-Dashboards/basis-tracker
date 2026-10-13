@@ -180,6 +180,25 @@ shipment table's net break-even moves by (own - calculated) x (1 + rate x days /
 / `river|<location>`), so a number typed for one location never follows the user to another. `tests/test_return_to_carry_block.py` drives the
 block headless (AppTest) over a synthetic series.
 
+**Ship by — a study that stops before the season does** (Kolten 2026-10-12: "limit how late the study goes ... someone with a ground pile that
+at the latest has to ship by March ... default to best with no limits"). A **Ship by** box under the Harvest basis switch
+(`_ship_by_choice` in `return_to_carry_block`): *No limit (through July / September)* — the default, the whole-season page byte for byte —
+or the END of a month, November to June for corn and to August for soybeans (`rtc.ship_by_months`; the season's last month is the no-limit
+choice). It is a pure trim of the finished history, not a second engine: `rtc.limit_crop_year(cy, month)` keeps the weeks up to
+`rtc.study_end(crop_year, month)` — the SAME `Week` rows, because no week's return depends on a later one — and picks again from them the best
+net / gross (the earliest wins a tie; the best can only fall or stay, and never moves later), the best summer basis (None when no week reaches
+the July contract, so the by-year table drops that column), the carry banked (`season_carry` = the last week's cumulative carry, `carry_tag` =
+the contract it is quoted off: 'Dec → May, banked by Mar 25' instead of the season's Dec → Jul) and `complete` (the last week within a week of
+the end). `rd.limit_history` maps it over the history; `summary_rows` carries `ship_by` / `carry_tag`. The shipment table is cut with
+`rtc.limit_shipment_table(tbl, month)`: the columns whose shipment date (the 20th) is on or before the end, 'best' picked among them, and its
+futures-carry card counting only the spreads up to the last column's contract. The headline ('Best return by Mar 31' / 'Best so far, by
+Mar 31'), the by-year table (a note above it), both charts (the season chart's axis and month ticks stop at the end, with a subtitle line), the
+method caption and the how-it-works text all say where the study ends. The choice is the user's constraint, not the location's, so its key is
+per grain only (`nc_rtc_ship_by_<corn|soy>`) and it follows them from location to location, mirrored in `..._kept` while the box is not drawn
+(a freight line, a location with no history). Tests: `tests/test_return_to_carry.py` (the trim, on a synthetic year and on the analyst's
+sheets), `_ship` (the table), `_soy`, `_view`, `_block` (the page, headless). Allen Station corn, 2026-10: the average best net return of
+its 21 completed years is +39.5¢ with no limit, +20.5¢ when it has to ship by the end of March, +34.3¢ by the end of June.
+
 **Soybeans** (Kolten 2026-10-05, "yes, do soybeans next"): the same engine run from `return_to_carry.SOY`, validated against the
 analyst's `BeanCarry` workbooks (`Research Analyst/Misc/Return to Carry/BeanCarry/{Decatur,DesMoines,Hennepin,STL}CRY`, 2005-06 to
 2022-23, 61 usable sheets). Chain Nov → Jan → Mar → May → Jul → Aug → next Nov (labels X F H K N Q x — the lower-case `x` is NEXT

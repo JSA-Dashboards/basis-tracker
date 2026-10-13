@@ -197,6 +197,67 @@ check("the weekly return is bid - the harvest basis + the banked carry, for any 
 soy_off = rtc.build_crop_year([{"date": date(2025, 10, 1) + timedelta(days=7 * k), "basis": -30.0, "tag": "F"} for k in range(0, 12)], {}, 2025, rate, rtc.SOY, b0_override=-10.0)
 check("soybeans take the same override (vs Jan)", soy_off.b0_own and close(soy_off.b0, -10.0) and close(soy_off.b0_calc, -30.0), (soy_off.b0, soy_off.b0_calc))
 
+print("return_to_carry: ship by — a study that stops at the end of a month (synthetic year: flat +10 bids, carry Dec->Mar 10, Mar->May 4, May->Jul 2)")
+check("the months a study can end in: November through the month before the season's last (corn: Jun, soybeans: Aug) — the last month is the 'no limit' choice",
+      rtc.ship_by_months(rtc.CORN) == (11, 12, 1, 2, 3, 4, 5, 6) and rtc.ship_by_months(rtc.SOY) == (11, 12, 1, 2, 3, 4, 5, 6, 7, 8))
+check("study_end = the last day of that month in the crop year (Nov/Dec in the starting year, Jan on in the next; February knows leap years)",
+      rtc.study_end(2025, 11) == date(2025, 11, 30) and rtc.study_end(2025, 12) == date(2025, 12, 31) and rtc.study_end(2025, 3) == date(2026, 3, 31)
+      and rtc.study_end(2025, 2) == date(2026, 2, 28) and rtc.study_end(2027, 2) == date(2028, 2, 29) and rtc.study_end(2025, 6) == date(2026, 6, 30))
+check("no limit: the very same object comes back (nothing is rebuilt, so nothing can change)", rtc.limit_crop_year(syn, None) is syn and rd.limit_history([syn], None)[0] is syn)
+end3 = date(2026, 3, 31)
+before = (len(syn.weeks), dict(syn.best), syn.summer, syn.season_carry, syn.complete)
+lim3 = rtc.limit_crop_year(syn, 3)
+kept = [w for w in syn.weeks if w.date <= end3]
+check("by the end of March keeps exactly the weeks up to Mar 31 — the very same weekly rows (a week's return never depended on a later week)",
+      lim3.window_end == end3 and len(lim3.weeks) == len(kept) < len(syn.weeks) and all(a is b for a, b in zip(lim3.weeks, kept)) and lim3.weeks[-1].date == date(2026, 3, 25))
+check("the full-season year is left as it was: a copy was trimmed, not the original",
+      syn.window_end is None and (len(syn.weeks), syn.best, syn.summer, syn.season_carry, syn.complete) == before and len(syn.weeks) > len(lim3.weeks))
+have = [w for w in kept if w.net is not None]
+up = rtc.build_crop_year([{"date": START + timedelta(days=7 * k), "basis": 10.0 + 0.5 * k} for k in range(0, 43)], FUT, 2025, rate)     # a market that keeps climbing
+up3 = rtc.limit_crop_year(up, 3)
+check("a market that keeps climbing: the season's best comes after March, so a March study's best is lower and earlier (what stopping early costs)",
+      up.best["net"].date > end3 and up3.best["net"].date <= end3 and up3.best["net"].net < up.best["net"].net - 1.0, (up.best["net"].date, up.best["net"].net, up3.best["net"].date, up3.best["net"].net))
+check("its best return is picked again from those weeks (the earliest wins a tie): it can fall or stay, and never moves later",
+      lim3.best["net"] is max(have, key=lambda w: (w.net, -w.idx)) and lim3.best["net"].net <= syn.best["net"].net + 1e-12 and lim3.best["net"].date <= syn.best["net"].date)
+check("the gross best is picked again too", lim3.best["gross"] is max([w for w in kept if w.gross is not None], key=lambda w: (w.gross, -w.idx)))
+check("no week by March is quoted off July, so there is no 'best summer basis' (the full season has one)", lim3.summer is None and syn.summer is not None)
+check("the futures carry is what was banked by the last week: Dec->Mar 10 + Mar->May 4 = 14, quoted off May — not the season's Dec->Jul 16",
+      close(lim3.season_carry, 14.0) and lim3.carry_tag == "K" and close(syn.season_carry, 16.0) and syn.carry_tag is None)
+check("a year with weeks to within a week of the end is complete", lim3.complete is True)
+lim6 = rtc.limit_crop_year(syn, 6)
+check("by June the study reaches the July contract: a summer basis, 16 banked, quoted off July", lim6.summer is not None and lim6.summer.tag == "N" and close(lim6.season_carry, 16.0) and lim6.carry_tag == "N")
+lim11 = rtc.limit_crop_year(syn, 11)
+check("by the end of November nothing has rolled yet: 0 banked, still quoted off Dec", close(lim11.season_carry, 0.0) and lim11.carry_tag == "Z" and lim11.weeks[-1].date == date(2025, 11, 26))
+part = rtc.build_crop_year(OBS[:20], FUT, 2025, rate)                                # in progress: the bids stop in mid-February
+limp = rtc.limit_crop_year(part, 3)
+check("a year still in progress is not complete for the study (its weeks stop before March) and keeps every week it has",
+      limp.complete is False and len(limp.weeks) == len(part.weeks) and limp.best["net"] is part.best["net"])
+early = rtc.limit_crop_year(rtc.build_crop_year(OBS[:2], FUT, 2025, rate), 11)       # two October bids: no return yet
+check("a year with no return yet comes out empty, not broken", early.best == {} and early.summer is None and early.complete is False and len(early.weeks) == 2)
+none_wk = rtc.limit_crop_year(rtc.CropYear(2025, "2025-25"), 3)
+check("a crop year with no weeks at all stays empty", none_wk.weeks == [] and none_wk.best == {} and none_wk.season_carry is None and none_wk.complete is False)
+check("the weekly returns themselves do not change: each retained week equals the full season's on every figure",
+      all((a.net, a.gross, a.interest, a.carry, a.cash) == (b.net, b.gross, b.interest, b.carry, b.cash) for a, b in zip(lim3.weeks, syn.weeks)))
+for name, res_s in (("2019-20", res19), ("2015-16", res15), ("2020-21", res20)):
+    ok, detail = True, ""
+    for m in rtc.ship_by_months(rtc.CORN):
+        lim = rtc.limit_crop_year(res_s, m)
+        end = rtc.study_end(res_s.crop_year, m)
+        want = [w for w in res_s.weeks if w.date <= end]
+        got = [w for w in want if w.net is not None]
+        good = (lim.weeks == want and all(a is b for a, b in zip(lim.weeks, want))
+                and (("net" not in lim.best) if not got else (lim.best["net"] is max(got, key=lambda w: (w.net, -w.idx))
+                                                              and lim.best["net"].net <= res_s.best["net"].net + 1e-12 and lim.best["net"].date <= res_s.best["net"].date)))
+        if not good:
+            ok, detail = False, "month %d" % m
+    check("%s (the analyst's sheet): for every ship-by month the weeks are the full year's up to it and the best is the best of them — never above the season's, never later" % name, ok, detail)
+check("2019-20: the report's best (+9.09 on Dec 4) is still the best when the study ends in December or later, and is not available when it ends in November",
+      all(rtc.limit_crop_year(res19, m).best["net"].date == date(2019, 12, 4) for m in (12, 1, 2, 3, 4, 5, 6))
+      and rtc.limit_crop_year(res19, 11).best["net"].date <= date(2019, 11, 30) and rtc.limit_crop_year(res19, 11).best["net"].net < 9.09)
+check("the study end only ever shortens: more months can only raise the best return (a ladder, 2020-21)",
+      all((rtc.limit_crop_year(res20, a).best.get("net") is None or rtc.limit_crop_year(res20, b).best["net"].net >= rtc.limit_crop_year(res20, a).best["net"].net - 1e-12)
+          for a, b in zip(rtc.ship_by_months(rtc.CORN), rtc.ship_by_months(rtc.CORN)[1:])))
+
 print("return_to_carry: the analyst's per-year choices are honoured")
 syn19 = rtc.build_crop_year([{"date": START.replace(year=2019, month=10, day=2) + timedelta(days=7 * k), "basis": float(k)} for k in range(0, 43)],
                             {}, 2019, rate)
@@ -240,6 +301,12 @@ gross_rows = rd.summary_rows(hist, "gross")
 check("the gross measure never reads lower than net", gross_rows[0]["best"] >= rows[0]["best"])
 pts = rd.seasonal_points(hist, "net")
 check("seasonal_points: one per week that has a return", len(pts) == len([w for c in hist for w in c.weeks if w.net is not None]) and set(p["crop"] for p in pts) == {"2025-26"})
+lim_rows = rd.summary_rows(rd.limit_history(hist, 3), "net")
+check("summary_rows of a study that stops at the end of March: its end and the contract the carry was banked to (14, off May); the full-season rows carry neither",
+      rows[0]["ship_by"] is None and rows[0]["carry_tag"] is None and lim_rows[0]["ship_by"] == date(2026, 3, 31) and lim_rows[1]["ship_by"] == date(2027, 3, 31)
+      and lim_rows[0]["carry_tag"] == "K" and close(lim_rows[0]["carry"], 14.0) and lim_rows[0]["weeks"] < rows[0]["weeks"] and lim_rows[0]["complete"] is True
+      and lim_rows[0]["best"] <= rows[0]["best"] + 1e-12 and lim_rows[0]["best_date"] <= rows[0]["best_date"] and lim_rows[1]["complete"] is False, lim_rows[0])
+check("limit_history keeps every crop year and their order", [c.crop_year for c in rd.limit_history(hist, 3)] == [c.crop_year for c in hist] and rd.limit_history(hist, None) is hist)
 
 print("return_to_carry_data: a year that merely repeats the one before is dropped (the archive's 2007-08 = 2006-07)")
 import random

@@ -27,6 +27,8 @@ the workbooks — see tests/test_return_to_carry.py and tests/test_return_to_car
                      own rate (effective fed funds + 2.25%).
   Gross return       the same without the interest term (what the market paid before the cost of money).
   Best return        the highest weekly R of the crop year, and the week it happened.
+  Ship by            optionally, the study stops at the END of a month ("a pile that has to be gone by March"): only the weeks up to
+                     it count for the best return, the carry banked and the 'summer' basis (limit_crop_year). The default is no limit.
 
 Everything here is a pure function of plain lists/dicts — no database, no Streamlit — so it can be
 unit-tested; return_to_carry_data.py turns the app's tables into those inputs. `Spec` holds everything that
@@ -34,7 +36,8 @@ differs between the grains (CORN, SOY); every function defaults to corn.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import calendar
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 # ── the commodity specs ───────────────────────────────────────────────────────────────────────
@@ -309,6 +312,8 @@ class CropYear:
     summer: Week | None = None               # best basis quoted vs Jul futures (the report's blue triangle)
     complete: bool = False                   # the last week is in the closing months of the crop year
     spec: Spec = CORN
+    window_end: date | None = None           # limit_crop_year(): the day the study was told to stop (None = the whole season)
+    carry_tag: str | None = None             # limit_crop_year(): the contract the last week is quoted off, where `season_carry` was banked to
 
     @property
     def dec_jul_carry(self) -> float | None:
@@ -448,6 +453,55 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
         cy.summer = max(sm, key=lambda w: (w.basis, -w.idx))
     cy.complete = cy.weeks[-1].date >= date(crop_year + 1, *spec.complete_from) if cy.weeks else False
     return cy
+
+
+# ── "ship by": a study that stops before the season does ─────────────────────────────────────────
+def ship_by_months(spec: Spec = CORN) -> tuple:
+    """The months a study can be told to end in, in time order: November up to the month BEFORE the season's last (corn: Nov-Jun, soybeans:
+    Nov-Aug). The last month (July / September) is the whole season — the 'no limit' choice — so it is not offered twice."""
+    last, m, out = spec.horizon[0], 11, []
+    while m != last:
+        out.append(m)
+        m = m % 12 + 1
+    return tuple(out)
+
+
+def study_end(crop_year: int, month: int) -> date:
+    """The last day of `month` in a crop year (Oct-Dec belong to the year it starts in, Jan-Sep to the next): where a study told to
+    'ship by the end of March' stops."""
+    y = crop_year if month >= 10 else crop_year + 1
+    return date(y, month, calendar.monthrange(y, month)[1])
+
+
+def limit_crop_year(cy: CropYear, month: int | None) -> CropYear:
+    """`cy` as it reads when every shipment has to be made by the END of `month` (someone with a pile that has to be gone by March): only the weeks
+    up to that day are kept, and everything that was picked out of the whole season is picked again from them —
+
+      best         the highest weekly return among them (the best week can only move earlier, and the best return only fall)
+      summer       the best basis quoted off the summer contract, None when no week reaches it
+      season_carry the futures carry banked by the last week (its roll spreads are the ones measured by then), `carry_tag` the contract
+                   that week is quoted off — the full season's Dec -> Jul figure would count spreads that are not yet rolled
+      complete     the last week is within a week of the end
+
+    The weekly returns themselves do not change: each week's return never depended on a later week (the interest runs on the weeks so far,
+    the carry on the spreads measured so far), so cutting the year short only removes weeks. `month` None = no limit: `cy` itself."""
+    if month is None:
+        return cy
+    end = study_end(cy.crop_year, month)
+    weeks = [w for w in cy.weeks if w.date <= end]
+    out = replace(cy, weeks=weeks, best={}, summer=None, season_carry=None, carry_tag=None, window_end=end)
+    for kind in ("net", "gross"):
+        have = [w for w in weeks if getattr(w, kind) is not None]
+        if have:
+            out.best[kind] = max(have, key=lambda w: (getattr(w, kind), -w.idx))      # earliest week wins a tie, as in the full season
+    sm = [w for w in weeks if w.tag == cy.spec.summer]
+    if sm:
+        out.summer = max(sm, key=lambda w: (w.basis, -w.idx))
+    banked = next((w for w in reversed(weeks) if w.carry is not None), None)
+    if banked is not None:
+        out.season_carry, out.carry_tag = banked.carry, banked.tag
+    out.complete = bool(weeks) and weeks[-1].date >= end - timedelta(days=7)
+    return out
 
 
 # ══ the report's page 1: what each shipment month would return ═══════════════════════════════════
@@ -611,6 +665,7 @@ class ShipTable:
     spec: Spec = CORN
     b0_own: bool = False                # `b0` is the user's own harvest basis, not the calculated average / estimate
     b0_calc: float | None = None        # what the calculated method gives (the average so far, or the estimate before the weekly bids)
+    ship_by: date | None = None         # limit_shipment_table(): the day the study was told to stop (None = every month)
 
     @property
     def f_dec(self) -> float | None:
@@ -683,3 +738,13 @@ def best_column(tbl: ShipTable, field_name: str = "ret"):
     """The column with the highest `ret` (today) or `best_ret` (year to date); the earliest month wins a tie. None if no column has one."""
     have = [c for c in tbl.cols if getattr(c, field_name) is not None]
     return max(have, key=lambda c: getattr(c, field_name)) if have else None
+
+
+def limit_shipment_table(tbl: ShipTable, month: int | None) -> ShipTable:
+    """The table with only the shipment months that fall by the END of `month` (a pile that has to be gone by March keeps Nov 20 .. Mar 20): the
+    later columns are dropped, so the 'best' picks — best on today's bids, best so far — are made among the months that can still be used.
+    The columns themselves are unchanged. `month` None = every month: `tbl` itself."""
+    if month is None:
+        return tbl
+    end = study_end(tbl.crop_year, month)
+    return replace(tbl, cols=[c for c in tbl.cols if c.ship <= end], ship_by=end)
