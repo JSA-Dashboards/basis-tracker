@@ -9,6 +9,7 @@
   parse_label / shipment_quotes        which months a period covers ('JFM', 'FH Dec', 'Dec 1-20') -> one bid per shipment month
   shipment_table(...)                  the report's page-1 table (break-even, current and best bids by shipment month)
   own_b0_map / b0_override(s)          the user's OWN harvest basis in place of the calculated average (shipment_table, run_history)
+  harvest_window                       the user's weeks for the calculated average (shipment_table, run_history): Start week / Number of weeks
   limit_history(results, month)        every crop year read only up to the END of a month ("ship by"): best return, carry banked, summary rows
 
 Pure functions over plain data (database access stays in the app): see return_to_carry for the method.
@@ -300,18 +301,21 @@ def harvest_estimate(raw: list[dict], crop_year: int, asof: date, futs: dict, ma
 
 
 def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: date, measure: str = "net",
-                   spec: rtc.Spec = rtc.CORN, b0_override: float | None = None):
+                   spec: rtc.Spec = rtc.CORN, b0_override: float | None = None, harvest_window: tuple | None = None):
     """The report's page-1 table on `asof` for the crop year that is live: (ShipTable, estimate) — `estimate` is the
     (value, date, labels) the harvest basis was taken from while the weekly bids are not in yet, else None.
 
     b0_override  the user's OWN harvest basis (cents vs the spec's base contract) in place of the calculated one: the break-even,
                  the returns and the interest all use it, `tbl.b0_own` is True and `tbl.b0_calc` keeps what the calculated method
-                 gives (the average so far, or the estimate before the weekly bids) to show beside it; no estimate is returned then."""
+                 gives (the average so far, or the estimate before the weekly bids) to show beside it; no estimate is returned then.
+    harvest_window the user's window for the calculated harvest basis, (first week index, number of weeks) — see build_crop_year. The average is then
+                 taken over THOSE weeks' bids as they post (`tbl.b0_window` says so), and there is no estimate from the forward quotes before they do: the
+                 estimate is of the report's window, not theirs."""
     crop_year = rtc.shipment_crop_year(asof)
     known = {d: px for d, px in futs.items() if d <= asof}      # a past as-of date must not see a roll spread measured after it
-    cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], known, crop_year, rate_on, spec)
+    cy = rtc.build_crop_year([o for o in obs if o["date"] <= asof], known, crop_year, rate_on, spec, harvest_window=harvest_window)
     b0, est = cy.b0, None
-    if b0 is None:
+    if b0 is None and harvest_window is None:
         est = harvest_estimate(raw, crop_year, asof, futs, spec=spec)
         b0 = est[0] if est else None
     calc = b0                                                   # what the calculated method gives: the average so far, else the estimate
@@ -321,6 +325,7 @@ def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: 
     tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year, spec), futs, rate_on, measure,
                                    b0_weeks=cy.b0_weeks if (cy.b0 is not None and not own) else 0, b0_est=est is not None, spec=spec,
                                    b0_own=own, b0_calc=calc)
+    tbl.b0_window = cy.b0_window
     return tbl, est
 
 
@@ -379,17 +384,18 @@ def repeated_years(results: list) -> set:
 
 
 def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
-                      spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None) -> tuple:
+                      spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None, harvest_window: tuple | None = None) -> tuple:
     """(results, skipped): every crop year the series covers from `min_year` (default: the spec's first) on, oldest first,
     without the years that only repeat the previous one (`skipped` = their labels). A year needs some weeks to say anything,
     so one with fewer than `min_weeks` of bids is left out unless it is the newest (the one in progress).
     `b0_overrides` = {crop year: the user's own harvest basis} (see own_b0_map()): those years are measured from it, the rest
-    from their calculated average."""
+    from their calculated average. `harvest_window` = the user's (first week index, number of weeks) for that calculated average, the same
+    weeks in EVERY crop year (instead of the report's first 7 and its year-specific windows); None = the report's."""
     min_year = spec.min_crop_year if min_year is None else min_year
     ys = [y for y in crop_years_in(obs, spec) if y >= min_year]
     out = []
     for y in ys:
-        cy = rtc.build_crop_year(obs, futs, y, rate_on, spec, b0_override=(b0_overrides or {}).get(y))
+        cy = rtc.build_crop_year(obs, futs, y, rate_on, spec, b0_override=(b0_overrides or {}).get(y), harvest_window=harvest_window)
         if len(cy.weeks) >= min_weeks or (y == ys[-1] and cy.weeks):
             out.append(cy)
     bad = repeated_years(out)
@@ -397,9 +403,9 @@ def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12,
 
 
 def run_history(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12, min_year: int | None = None,
-                spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None) -> list:
+                spec: rtc.Spec = rtc.CORN, b0_overrides: dict | None = None, harvest_window: tuple | None = None) -> list:
     """run_history_noted without the note."""
-    return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec, b0_overrides)[0]
+    return run_history_noted(obs, futs, rate_on, min_weeks, min_year, spec, b0_overrides, harvest_window)[0]
 
 
 def limit_history(results: list, month: int | None) -> list:
@@ -430,6 +436,7 @@ def summary_rows(results: list, measure: str = "net") -> list[dict]:
             "last": None if last is None else _value(last, measure),
             "last_date": None if last is None else last.date,
             "ship_by": cy.window_end, "carry_tag": cy.carry_tag,       # set only when the study was limited (limit_history)
+            "b0_window": cy.b0_window,                                 # set only when the user chose the weeks of the harvest-basis average
         })
     return rows
 

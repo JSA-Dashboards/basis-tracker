@@ -69,7 +69,7 @@ ASOF = date(2026, 2, 4)
 CROP = 2025
 
 
-def build_expected(overrides=None, measure="net", ship_by=None):
+def build_expected(overrides=None, measure="net", ship_by=None, window=None):
     """The same series, run directly through the engine (what the page should show)."""
     syms = {"Z": 400.0, "H": 410.0, "K": 414.0, "N": 416.0, "U": 410.0}
     obs, futs = [], {}
@@ -83,7 +83,7 @@ def build_expected(overrides=None, measure="net", ship_by=None):
             futs[d] = dict(futs.get(d, {}), **{rtc.contract_symbol(c, y): px for c, px in syms.items()})
     obs = [o for o in obs if o["date"] <= ASOF]
     rate = lambda d: cr.rate_for(d, None).rate_pct
-    res = rd.run_history(obs, futs, rate, spec=rtc.CORN, b0_overrides=overrides)
+    res = rd.run_history(obs, futs, rate, spec=rtc.CORN, b0_overrides=overrides, harvest_window=window)
     return rd.summary_rows(rd.limit_history(res, ship_by), measure), obs
 
 
@@ -104,6 +104,11 @@ def history_rows(at):
 def num(s):
     m = re.search(r"[+-]?\d+(?:\.\d+)?", s.replace("−", "-"))
     return float(m.group()) if m else None
+
+
+def own_boxes(at):
+    """The Harvest basis number box (the window's Start week / Number of weeks boxes are number inputs too)."""
+    return [n for n in at.number_input if "Your harvest basis" in n.label]
 
 
 def ship_html(at):
@@ -129,9 +134,9 @@ at = fresh()
 check("the page renders without an exception", not at.exception, [str(e.value)[:200] for e in at.exception])
 rb = next((r for r in at.radio if r.label == "Harvest basis"), None)
 check("a Harvest basis switch sits in the block, on 'Calculated' (the report's method) by default, with My own as the other choice",
-      rb is not None and rb.value.startswith("Calculated") and "first 7 weekly bids" in rb.value and rb.options[-1] == "My own" and rb.key == key("mode"), getattr(rb, "value", None))
+      rb is not None and rb.value.startswith("Calculated") and "the report uses the first 7" in rb.value and rb.options[-1] == "My own" and rb.key == key("mode"), getattr(rb, "value", None))
 check("...the Interest switch is still there beside it", any(r.key == "nc_rtc_rate2" for r in at.radio))
-check("no number box and no what-if box until My own is chosen", not at.number_input and not [c for c in at.checkbox if "what-if" in c.label])
+check("no number box and no what-if box until My own is chosen", not own_boxes(at) and not [c for c in at.checkbox if "what-if" in c.label])
 rows, html = history_rows(at)
 check("the by-year table is the calculated history: the tracked year's harvest basis = the average of its first 7 bids, no OWN pill",
       rows is not None and rows[0][0].startswith("2025-26") and close(num(rows[0][1]), calc_b0, 0.06) and ">OWN<" not in html, (rows or [None])[0])
@@ -192,7 +197,7 @@ at.session_state["measure"] = "net"
 at.radio(key=key("mode")).set_value(at.radio(key=key("mode")).options[0]).run()
 rows, html = history_rows(at)
 check("choosing Calculated again drops the number box, every pill and the note — the history is the calculated one again",
-      not at.number_input and ">OWN<" not in html and close(num(rows[0][4]), calc_best, 0.06) and not any("Your own harvest basis" in m.value for m in at.markdown))
+      not own_boxes(at) and ">OWN<" not in html and close(num(rows[0][4]), calc_best, 0.06) and not any("Your own harvest basis" in m.value for m in at.markdown))
 at.radio(key=key("mode")).set_value("My own").run()
 check("...and the number the user typed is still there if they come back to My own (same location)", close(at.number_input(key=key("val")).value, -20.0))
 
@@ -202,7 +207,7 @@ at.run()
 rb2 = next(r for r in at.radio if r.label == "Harvest basis")
 rows, html = history_rows(at)
 check("another location starts on the calculated method again (the widget keys carry the location)",
-      rb2.key == key("mode", "loc-B") and rb2.value.startswith("Calculated") and not at.number_input and ">OWN<" not in html)
+      rb2.key == key("mode", "loc-B") and rb2.value.startswith("Calculated") and not own_boxes(at) and ">OWN<" not in html)
 
 print("block: the Ship by box — no limit by default, or the study stops at the end of a month")
 SB = "nc_rtc_ship_by_corn"
@@ -270,6 +275,146 @@ l6, _ = build_expected(ship_by=6)
 check("End of June keeps the summer-basis column (the study reaches July's contract) and reads the June study's best returns",
       html6.count("<th ") == 7 and "Study ends at the end of June" in html6 and all(close(num(r[4]), e["best"], 0.06) for r, e in zip(rows6, reversed(l6))), html6.count("<th "))
 check("a longer study never reads lower than a shorter one, year by year (June >= March)", all(num(a[4]) >= num(b[3]) - 0.06 for a, b in zip(rows6, rows3)))
+
+print("block: the harvest window — Start week / Number of weeks, the report's 1 and 7 by default")
+WS, WN, WK = "nc_rtc_win_corn_start", "nc_rtc_win_corn_n", "nc_rtc_win_corn_kept"
+
+
+def set_window(at, start, n):
+    at.number_input(key=WS).set_value(start)
+    at.number_input(key=WN).set_value(n)
+    at.run()
+
+
+at = fresh()
+bs = next((b for b in at.number_input if b.label == "Start week"), None)
+bn = next((b for b in at.number_input if b.label == "Number of weeks"), None)
+check("two boxes sit under the Harvest basis switch, Start week 1 and Number of weeks 7: the report's window",
+      bs is not None and bn is not None and (bs.key, bn.key) == (WS, WN) and (bs.value, bn.value) == (1, 7) and bs.min == -3, (getattr(bs, "value", None), getattr(bn, "value", None)))
+caps = [c.value for c in at.caption]
+check("the caption beside them names the default window with the tracked year's dates", any("Weeks 1 to 7 (Oct 1 – Nov 12) for 2025-26 — the report's window" in c for c in caps), caps[:3])
+rows_d, html_d = history_rows(at)
+check("at the default the whole history is the report's, every year with its own sheet's window: harvest basis and best return match the engine",
+      len(rows_d) == len(exp_rows) and all(close(num(r[1]), e["b0"], 0.06) and close(num(r[4]), e["best"], 0.06) for r, e in zip(rows_d, reversed(exp_rows))) and "your window" not in html_d)
+check("...and nothing on the page mentions a window of the user's", not any("your window" in m.value for m in at.markdown) and not any("Interest still starts" in c for c in caps))
+
+set_window(at, 3, 4)
+check("weeks 3 to 6: no exception", not at.exception, [str(e.value)[:200] for e in at.exception])
+win_rows, _ = build_expected(window=(2, 4))
+rows_w, html_w = history_rows(at)
+check("weeks 3 to 6 are averaged in EVERY crop year (2019-20's own exception included): each year's harvest basis and best return are the engine's for that window",
+      len(rows_w) == len(win_rows) and all(close(num(r[1]), e["b0"], 0.06) and close(num(r[4]), e["best"], 0.06) for r, e in zip(rows_w, reversed(win_rows))), (rows_w[0], win_rows[-1]["b0"]))
+check("...so the numbers really moved from the report's (every year's harvest basis changed), while the best weeks stayed where they were: only the average moved",
+      all(abs(num(a[1]) - num(b[1])) > 0.1 for a, b in zip(rows_w, rows_d)) and all(a[5] == b[5] for a, b in zip(rows_w, rows_d)), [(a[1], b[1], a[5], b[5]) for a, b in zip(rows_w, rows_d)][:3])
+check("the by-year table explains the window under it", "Harvest basis = the average of your window, weeks 3 to 6 (Oct 15 – Nov 5, the tracked year's dates)" in html_w)
+sh_w = ship_html(at)
+check("the shipment table's card and note say the same, and it is not an estimate",
+      "average of weeks 3 to 6 (Oct 15 – Nov 5), vs Dec" in sh_w and "not the report's first 7 weekly bids" in sh_w and "average of the first" not in sh_w and "Estimate." not in sh_w, sh_w[:120])
+check("the headline's harvest-basis card says it too", any("Best return so far" in m.value and "average of weeks 3 to 6 (Oct 15 – Nov 5), vs Dec" in m.value for m in at.markdown))
+caps = [c.value for c in at.caption]
+check("the caption names the window, says it applies to every crop year and replaces the report's, and (the window opens before the interest does) says nothing of the interest",
+      any(c.startswith("Weeks 3 to 6 (Oct 15 – Nov 5) for 2025-26: the same weeks in every crop year, in place of the report's first 7 and its year-specific windows.") for c in caps)
+      and not any("Interest still starts" in c for c in caps), caps[:3])
+check("the Calculated choice is still selected, and nothing is flagged OWN",
+      next(r for r in at.radio if r.label == "Harvest basis").value.startswith("Calculated") and ">OWN<" not in html_w and not own_boxes(at))
+
+set_window(at, 5, 3)
+caps = [c.value for c in at.caption]
+check("a window that opens after the interest starts says when the interest does start (the report's third weekly bid, Oct 15), so it is clear the clock is not moved",
+      any("Interest still starts at the report's third weekly bid (Oct 15), before this window opens." in c for c in caps), caps[:3])
+
+set_window(at, 3, 4)
+at.selectbox(key=SB).set_value("End of March").run()
+lim_w, _ = build_expected(window=(2, 4), ship_by=3)
+rows_lw, html_lw = history_rows(at)
+check("the window and Ship by work together: a March study of the window's harvest basis",
+      len(rows_lw) == len(lim_w) and "Study ends at the end of March" in html_lw
+      and all(close(num(r[1]), e["b0"], 0.06) and close(num(r[3]), e["best"], 0.06) for r, e in zip(rows_lw, reversed(lim_w))), rows_lw[0])
+at.selectbox(key=SB).set_value(at.selectbox(key=SB).options[0]).run()
+
+print("block: the window beside My own — the number box starts at the window's average, and earlier years keep using the window")
+at.radio(key=key("mode")).set_value("My own").run()
+check("My own with a window: no exception", not at.exception, [str(e.value)[:200] for e in at.exception])
+nbw = at.number_input(key=key("val"))
+check("the window boxes stay (the earlier years still use them), and the number box starts at the WINDOW's average for the tracked year",
+      [b.key for b in at.number_input if b.key in (WS, WN)] == [WS, WN] and close(nbw.value, round(win_rows[-1]["b0"], 2)), (nbw.value, win_rows[-1]["b0"]))
+at.number_input(key=key("val")).set_value(-20.0).run()
+own_w, _ = build_expected({CROP: -20.0}, window=(2, 4))
+rows_ow, html_ow = history_rows(at)
+check("the tracked year is measured from -20 (OWN); every earlier year from the window's average",
+      close(num(rows_ow[0][1]), -20.0) and html_ow.count(">OWN<") == 1 and all(close(num(r[1]), e["b0"], 0.06) and close(num(r[4]), e["best"], 0.06) for r, e in zip(rows_ow, reversed(own_w))), rows_ow[:2])
+check("the shipment table shows -20 as the user's own, with the window's average beside it as the calculated number",
+      "your own, vs Dec · calculated %+.1f" % win_rows[-1]["b0"] in ship_html(at))
+at.radio(key=key("mode")).set_value(at.radio(key=key("mode")).options[0]).run()
+check("back to Calculated: the number box and the OWN pills go, the window stays", not own_boxes(at) and ">OWN<" not in history_rows(at)[1] and (at.number_input(key=WS).value, at.number_input(key=WN).value) == (3, 4))
+
+print("block: the window is the user's way of establishing a basis, so it follows them from one location to the next")
+at.session_state["scope"] = "loc-B"
+at.run()
+check("on another location the boxes still read 3 and 4 and the table is the window's",
+      (at.number_input(key=WS).value, at.number_input(key=WN).value) == (3, 4) and "average of weeks 3 to 6 (Oct 15 – Nov 5)" in ship_html(at))
+at.session_state["message"] = "This line is a freight rate, not an FOB bid, so there is no storage return to track."
+at.run()
+check("a location the block cannot draw (a message in its place) shows no boxes", not [b for b in at.number_input if b.key in (WS, WN)] and any("freight rate" in i.value for i in at.info))
+at.session_state["message"] = None
+at.run()
+check("...and the window is still 3 and 4 when the block is drawn again (the boxes' own state was dropped meanwhile)",
+      (at.number_input(key=WS).value, at.number_input(key=WN).value) == (3, 4) and at.session_state[WK] == (3, 4))
+set_window(at, 1, 7)
+rows_b2, html_b2 = history_rows(at)
+check("back at Start week 1 and 7 weeks the page is the report's again, byte for byte (the by-year table and the shipment table)", html_b2 == html0 and ship_html(at) == ship0)
+
+print("block: a window that starts in September — bids quoted off CU are rolled to Dec at the Dec - Sep spread of the last day before first notice")
+SCRIPT_SEP = SCRIPT.replace('st.session_state.setdefault("scope", "loc-A")', '''futs[date(2025, 8, 28)] = {"ZCU25": 450.0, "ZCZ25": 470.0}
+for k, (b, t) in zip((-3, -2, -1), ((30.0, "ZCU25"), (28.0, "ZCU25"), (26.0, "ZCZ25"))):
+    obs.append({"date": rtc.first_wednesday(2025) + timedelta(days=7 * k), "basis": b, "tag": t})
+st.session_state.setdefault("scope", "loc-A")''')
+assert SCRIPT_SEP != SCRIPT
+at_s = AppTest.from_string(SCRIPT_SEP, default_timeout=120)
+at_s.run()
+rows_s0, _ = history_rows(at_s)
+at_s.number_input(key=WS).set_value(-2)
+at_s.number_input(key=WN).set_value(5)
+at_s.run()
+check("a September start: no exception", not at_s.exception, [str(e.value)[:200] for e in at_s.exception])
+rows_s, html_s = history_rows(at_s)
+want_sep = (30.0 - 20 + 28.0 - 20 + 26.0 + (-5.0 + 3 * 7) + (-5.0 + 3 * 7 + 0.75)) / 5
+check("the tracked year's harvest basis = the five bids Sep 10 .. Oct 8 with the two CU-quoted ones rolled by the +20 spread and the CZ one left alone: (10 + 8 + 26 + 16 + 16.75) / 5 = %.2f" % want_sep,
+      close(num(rows_s[0][1]), want_sep, 0.06) and rows_s[0][0].startswith("2025-26"), (rows_s[0], want_sep))
+check("...and the report's own window is not moved by September bids (the default page's harvest basis for the year is the same as without them)", close(num(rows_s0[0][1]), num(rows_d[0][1]), 0.06), (rows_s0[0], rows_d[0]))
+caps_s = [c.value for c in at_s.caption]
+check("the caption names the September weeks, and a note under it says how CU bids are moved, from which day, and the level (+20.00 -> a +10 vs Sep bid reads -10.00 vs Dec)",
+      any(c.startswith("Weeks -2 to 2 (Sep 10 – Oct 8) for 2025-26: the same weeks in every crop year") for c in caps_s)
+      and any("moved to Dec by the Dec − Sep spread of the last trading day before the contract's first notice day (Aug 28)" in c and "2025-26: Dec − Sep = +20.00¢, so a basis of +10 vs Sep reads -10.00 vs Dec." in c
+              and "bids already quoted off Dec" in c for c in caps_s), caps_s[:4])
+at_n = fresh()
+at_n.number_input(key=WS).set_value(-2)
+at_n.number_input(key=WN).set_value(5)
+at_n.run()
+caps_n = [c.value for c in at_n.caption]
+check("with no Aug 28 price in the futures history the note says the CU-quoted bids are left out (no guess), and the page still draws",
+      not at_n.exception and any("That spread is not in the futures history for 2025-26, so its CU-quoted September bids are left out of the average." in c for c in caps_n), caps_n[:4])
+set_window(at_n, 1, 7)
+check("a window that stays in October carries no September note", not any("September (CU) futures" in c.value for c in at_n.caption))
+
+SOYWIN_SCRIPT = '''
+import sys
+sys.path.insert(0, "__ROOT__")
+import streamlit as st
+import return_to_carry as rtc
+import return_to_carry_block as blk
+st.session_state["picked"] = blk._harvest_window_choice(rtc.SOY, 2026)
+'''.replace("__ROOT__", ROOT.replace("\\", "/"))
+at_w = AppTest.from_string(SOYWIN_SCRIPT, default_timeout=60)
+at_w.run()
+check("soybeans: their own pair of boxes (a separate key from corn's), 1 and 7, and the report's window comes back as None",
+      [b.key for b in at_w.number_input] == ["nc_rtc_win_soy_start", "nc_rtc_win_soy_n"] and [b.value for b in at_w.number_input] == [1, 7] and at_w.session_state["picked"] is None)
+at_w.number_input(key="nc_rtc_win_soy_start").set_value(7)
+at_w.number_input(key="nc_rtc_win_soy_n").set_value(3)
+at_w.run()
+check("...a window of weeks 7 to 9 comes back as (6, 3) — Start week less one, then the count — and the caption names the bean interest clock (the fifth weekly bid, Nov 4)",
+      tuple(at_w.session_state["picked"]) == (6, 3)
+      and any("Interest still starts at the report's fifth weekly bid (Nov 4), before this window opens." in c.value for c in at_w.caption), [c.value for c in at_w.caption])
 
 SOY_SCRIPT = '''
 import sys

@@ -199,6 +199,38 @@ per grain only (`nc_rtc_ship_by_<corn|soy>`) and it follows them from location t
 sheets), `_ship` (the table), `_soy`, `_view`, `_block` (the page, headless). Allen Station corn, 2026-10: the average best net return of
 its 21 completed years is +39.5¢ with no limit, +20.5¢ when it has to ship by the end of March, +34.3¢ by the end of June.
 
+**Harvest window — which weeks the calculated basis averages** (Kolten 2026-10-12: "we default to establishing corn basis as of Oct and for 7
+weeks or how is the logic? ... yes, add start week and number of weeks"). Two number boxes under the Harvest basis switch,
+**Start week** and **Number of weeks** (`_harvest_window_choice` in `return_to_carry_block`), choose the weekly bids the CALCULATED harvest basis
+averages. Week 1 = the first Wednesday of October (engine index 0; the box shows index + 1), week 0 = the last Wednesday of September, -1, -2, -3
+back into early September (the engine loads bids from Sep 1). The default, 1 and 7, is the report's window and keeps its year-specific exceptions
+(`WINDOW_OVERRIDES`: six weeks in 1998-2001, 2010 and 2015, later starts in 2009 and 2019, September in 2012); any other pair is the SAME weeks in
+every crop year and replaces those exceptions — `build_crop_year(harvest_window=(first index, n))` (-> `cy.b0_window`), threaded through
+`rd.shipment_table` / `run_history(_noted)` (`tbl.b0_window`, `summary_rows` `b0_window`); the block hands the engine None at the default. It changes
+only WHICH BIDS are averaged: interest still starts at the report's third (soybean: fifth) weekly bid and the roll spreads are the same, so every
+weekly return moves by (report's average - window's) and the best WEEK does not move; a window that opens after the interest clock says so under the
+boxes. The posted-quote estimate before the weekly bids belongs to the report's window, so a window of the user's has none ("waiting for the bids of
+weeks N to M"); for soybeans October's bids need the Nov-Jan spread (measured Oct 28), so a custom bean window has no basis until then (the table
+says why). The boxes stay when My own is chosen: the window still sets the calculated number the box starts from and every earlier year's basis. The
+choice is the user's way of establishing a basis, so it follows them from location to location (`nc_rtc_win_<corn|soy>_{start,n,kept}`).
+
+**September bids quoted off CU (corn).** A window that reaches back into September can hold bids quoted off SEPTEMBER futures — the expiring old-crop
+contract — while the base is Dec (Kolten 2026-10-12: "for months that start in September some will have this month basis the CU and we will need
+to roll this accordingly. Use the last day prior to first notice day to establish the spread level to roll at"; "for several locations the all fall
+bid or NC or New Crop bid is already basis the CZ. Its only for areas really on lower Mississippi river and the south ... Greenville is an
+example on river fob"). So the roll is TAG-DRIVEN: a bid tagged the September contract of its own year, dated in the crop year's first calendar
+year (raw tag 'CU', or 'ZCU' + the crop year's digits), is moved to Dec by `basis - (Dec - Sep)`, the spread being ZCZ - ZCU on `sept_roll_day(Y)` =
+the weekday before the September contract's first notice day (the last business day of August: 2026 -> Fri Aug 28, 2025 -> Thu Aug 28) via
+`sept_to_dec_spread`, stepping back over a gap like every futures lookup and frozen for all of that year's September bids. A bid already quoted off
+Dec — untagged (`infer_tag` reads Sep-Nov as Dec) or tagged CZ, which is what the elevator series and every rail corridor post — is left alone;
+'ZCU' of a later year (the chain's own September, a year out) is not rolled; and when the spread cannot be measured (no end-of-August prices:
+2005-2007) the CU bid is left OUT of the average, never guessed. The block's caption shows the level in use ("2026-27: Dec - Sep = +24.50¢, so a
+basis of +10 vs Sep reads -14.50 vs Dec"). In the River FOB archive the sheet whose first column is Sep tags that September's first sheet(s) U for
+every location — one sheet in 2008, two in 2009, one each in 2013, 2021 and 2026 (checked 2026-10-12 on Cairo, Greenville, Havana, Hennepin, Memphis
+and Peoria) — so those are the bids a September-start window rolls; the default window never reaches September, so the report's numbers do not change.
+Soybeans have no September contract and no roll. Tests: `tests/test_return_to_carry.py` (roll day 1996-2040, the spread, rolled vs left alone,
+the window vs the report), `_ship` (the table), `_soy`, `_view` (the words), `_block` (the page, headless; the +20 September case).
+
 **Soybeans** (Kolten 2026-10-05, "yes, do soybeans next"): the same engine run from `return_to_carry.SOY`, validated against the
 analyst's `BeanCarry` workbooks (`Research Analyst/Misc/Return to Carry/BeanCarry/{Decatur,DesMoines,Hennepin,STL}CRY`, 2005-06 to
 2022-23, 61 usable sheets). Chain Nov → Jan → Mar → May → Jul → Aug → next Nov (labels X F H K N Q x — the lower-case `x` is NEXT

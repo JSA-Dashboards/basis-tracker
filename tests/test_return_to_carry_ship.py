@@ -317,6 +317,66 @@ check("with no data at all the own number still stands (no break-even yet: there
 t_zero, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", b0_override=0.0)
 check("an own harvest basis of 0 is a number, not 'unset'", t_zero.b0_own is True and t_zero.b0 == 0.0)
 
+print("shipment_table(): the user's own WINDOW for the calculated harvest basis")
+t_w0, e_w0 = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", harvest_window=(0, 7))
+check("a window of weeks 1 to 7 is the report's: the same harvest basis (-12 from the 3 bids so far), the same break-evens; it is recorded as the user's window",
+      t_w0.b0_window == (0, 7) and close(t_w0.b0, t_c.b0) and t_w0.b0_weeks == t_c.b0_weeks == 3 and e_w0 is None and all(close(a.cost, b.cost) for a, b in zip(t_w0.cols, t_c.cols)))
+check("...and the default call records no window", t_c.b0_window is None and t_obs.b0_window is None and t_est.b0_window is None)
+t_w1, e_w1 = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", harvest_window=(1, 2))
+check("weeks 2 and 3 average their two bids (-12, -14 = -13), complete (2 of 2), not an estimate, not the user's own number",
+      close(t_w1.b0, -13.0) and t_w1.b0_weeks == 2 and t_w1.b0_window == (1, 2) and not t_w1.b0_est and not t_w1.b0_own and close(t_w1.b0_calc, -13.0) and e_w1 is None)
+check("the break-evens move with the average (net: by (-13 - -12) x (1 + rate x days / 360), as for an own number)",
+      all(close(w.cost - c.cost, (-13.0 - -12.0) * (1 + 0.06 * (c.ship - t_c.purchase).days / 360)) for w, c in zip(t_w1.cols, t_c.cols)))
+t_w2, _ = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", harvest_window=(2, 3))
+check("a window that has only begun is the average so far: week 3 alone posted (-14), 1 of its 3 bids", close(t_w2.b0, -14.0) and t_w2.b0_weeks == 1 and t_w2.b0_window == (2, 3))
+t_w3, e_w3 = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", harvest_window=(5, 3))
+check("a window that has not begun has no harvest basis yet, and no break-even to show", t_w3.b0 is None and t_w3.b0_weeks == 0 and t_w3.b0_window == (5, 3) and all(c.cost is None for c in t_w3.cols) and e_w3 is None)
+t_e0, e_e0 = rd.shipment_table([], rawh, FE, lambda d: 6.0, D(2026, 10, 4), "net", harvest_window=(0, 7))
+check("before the weekly bids the posted-quote ESTIMATE is of the report's window only: a window of the user's gets none (it is None, not -14.67)",
+      t_e0.b0 is None and e_e0 is None and not t_e0.b0_est and t_e0.b0_window == (0, 7) and t_est.b0_est is True)
+t_wo, e_wo = rd.shipment_table(obs3, rawh, FW, lambda d: 6.0, asof_o, "net", b0_override=-20.0, harvest_window=(1, 2))
+check("the user's own number still wins over a window; the window's average is what 'calculated' shows beside it",
+      t_wo.b0_own and close(t_wo.b0, -20.0) and close(t_wo.b0_calc, -13.0) and t_wo.b0_weeks == 0 and e_wo is None and t_wo.b0_window == (1, 2))
+FWS = dict(FW)
+FWS[D(2026, 8, 28)] = {"ZCU26": 450.0, "ZCZ26": 470.0}                                     # the last trading day before September's first notice day: Dec - Sep = +20
+obs_sep = [{"date": start + timedelta(days=7 * k), "basis": b, "tag": g} for k, b, g in
+           ((-4, 30.0, "ZCU26"), (-3, 28.0, "ZCU26"), (-2, 8.0, "ZCZ26"), (-1, 6.0, None), (0, 4.0, "ZCZ26"))]
+t_sep, _ = rd.shipment_table(obs_sep, [], FWS, lambda d: 6.0, start, "net", harvest_window=(-4, 5))
+check("a September-start window reaches back before October: the CU-quoted bids are rolled to Dec at +20 first ((10 + 8 + 8 + 6 + 4) / 5 = 7.2, all 5 posted)",
+      close(t_sep.b0, 7.2) and t_sep.b0_weeks == 5 and t_sep.b0_window == (-4, 5), (t_sep.b0, t_sep.b0_weeks))
+t_sep_n, _ = rd.shipment_table(obs_sep, [], FW, lambda d: 6.0, start, "net", harvest_window=(-4, 5))
+check("...and with no Aug 28 price in the futures they are left out rather than guessed: (8 + 6 + 4) / 3 = 6", close(t_sep_n.b0, 6.0) and t_sep_n.b0_weeks == 3)
+t_sep_d, _ = rd.shipment_table(obs_sep, [], FWS, lambda d: 6.0, start, "net")
+check("the report's own window never reaches September, so the same bids give it the Oct 7 bid alone (+4)", close(t_sep_d.b0, 4.0) and t_sep_d.b0_weeks == 1)
+t_past, _ = rd.shipment_table(obs_sep, [], FWS, lambda d: 6.0, D(2026, 9, 24), "net", harvest_window=(-4, 5))
+check("a past as-of date sees only the bids posted by then (Sep 9 to Sep 23 here: (10 + 8 + 8) / 3)", close(t_past.b0, 26 / 3.0) and t_past.b0_weeks == 3, (t_past.b0, t_past.b0_weeks))
+
+print("shipment view: the user's window says so, with the weeks and the tracked year's dates")
+check("window_text: the user's numbering with the crop year's own dates (week 1 = Wed Oct 7, 2026); one week reads 'week N (date)'",
+      vw.window_text(2026, (1, 2)) == "weeks 2 to 3 (Oct 14 – Oct 21)" and vw.window_text(2026, (-4, 5)) == "weeks -3 to 1 (Sep 9 – Oct 7)"
+      and vw.window_text(2026, (4, 1)) == "week 5 (Nov 4)" and vw.window_text(2025, (0, 7)) == "weeks 1 to 7 (Oct 1 – Nov 12)"
+      and vw.window_text(2026, (1, 2), ", the tracked year's dates") == "weeks 2 to 3 (Oct 14 – Oct 21, the tracked year's dates)")
+hw1 = vw.shipment_html(t_w1, None, "x")
+check("a finished window: the harvest-basis card names its weeks and dates, the note says it is not the report's first 7, and nothing calls it an estimate",
+      "average of weeks 2 to 3 (Oct 14 – Oct 21), vs Dec" in hw1 and "the average of your window, weeks 2 to 3 (Oct 14 – Oct 21), not the report's first 7 weekly bids" in hw1
+      and "Estimate." not in hw1 and "-13.0¢" in hw1 and "weekly bids so far" not in hw1, hw1[hw1.find("Harvest basis") - 50:][:500])
+hw2 = vw.shipment_html(t_w2, None, "x")
+check("a window still filling says how many of its bids are in, and that it can still move",
+      "average of weeks 3 to 5 (Oct 21 – Nov 4) so far (1 of 3 bids), vs Dec" in hw2 and "the 1 of 3 bids posted so far in your window, weeks 3 to 5 (Oct 21 – Nov 4); it can still move" in hw2, hw2[hw2.find("Harvest basis") - 50:][:600])
+hw3 = vw.shipment_html(t_w3, None, "x")
+check("a window that has not begun: waiting for its bids, and no estimate is offered for a window of the user's",
+      "waiting for the bids of weeks 6 to 8 (Nov 11 – Nov 25)" in hw3 and "no usable bid has posted in your window, weeks 6 to 8 (Nov 11 – Nov 25), and there is no estimate for a window of your own" in hw3
+      and "Estimate." not in hw3 and "BEST NOW" not in hw3 and "None" not in hw3)
+hwo = vw.shipment_html(t_wo, None, "x")
+check("an own number beside a window: the card says it is the user's own and what the calculated one was — it does not call it the window's",
+      "your own, vs Dec · calculated -13.0" in hwo and "Your own harvest basis</b> is in use" in hwo and "your window" not in hwo)
+ts_soy = rtc.build_shipment_table(2026, D(2026, 10, 14), None, [], {}, lambda d: 6.0, "net", spec=rtc.SOY)
+ts_soy.b0_window = (1, 3)
+check("soybeans: a window that has no usable bid yet says why October is slow (the Nov-Jan spread is measured the last Wednesday of October); corn does not say it",
+      "quoted off Nov and are moved to Jan by the Nov−Jan spread" in vw.shipment_html(ts_soy, None, "") and "weeks 2 to 4 (Oct 14 – Oct 28)" in vw.shipment_html(ts_soy, None, "")
+      and "Nov−Jan spread" not in hw3)
+check("the markup stays balanced", all(x.count("<div") == x.count("</div>") and x.count("<td") == x.count("</td>") for x in (hw1, hw2, hw3, hwo)))
+
 print("shipment view: the table as the user sees it")
 tv = rtc.build_shipment_table(2026, D(2026, 12, 8), 10.0, Q, FS, RATE, "net", b0_weeks=7)
 h = vw.shipment_html(tv, None, "fed funds + 2.25%, as in the rest of this tab")

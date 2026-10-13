@@ -317,6 +317,28 @@ check("an August study keeps the summer basis (it reaches the July contract) and
       rtc.limit_crop_year(syn_s, 8).summer is not None and rtc.limit_crop_year(syn_s, 8).window_end == date(2027, 8, 31) and rtc.limit_crop_year(syn_s, 8).weeks[-1].date <= date(2027, 8, 31))
 check("the weekly returns are the full season's, week for week", all(a is b for a, b in zip(lim_s.weeks, syn_s.weeks)))
 
+print("soybeans: the user's own window for the harvest basis (the same synthetic year: October's bids are quoted off Nov and moved to Jan by -10)")
+w_same = rtc.build_crop_year(obs, futs, 2026, lambda d: 6.0, SOY, harvest_window=(0, 7))
+check("weeks 1 to 7 reproduce the report's average and every week's return",
+      close(w_same.b0, res.b0) and w_same.b0_window == (0, 7) and [(w.net, w.gross) for w in w_same.weeks] == [(w.net, w.gross) for w in res.weeks])
+w_nov = rtc.build_crop_year(obs, futs, 2026, lambda d: 6.0, SOY, harvest_window=(4, 3))
+check("a window of the three November weeks averages bids already quoted off Jan, nothing to move: (-18 - 17.5 - 17) / 3 = -17.5", close(w_nov.b0, -17.5) and w_nov.b0_weeks == 3, w_nov.b0)
+w_oct = rtc.build_crop_year(obs, futs, 2026, lambda d: 6.0, SOY, harvest_window=(0, 2))
+check("a window of October's first two weeks moves each bid Nov -> Jan by the -10 spread: (-30 - 29.5) / 2 = -29.75", close(w_oct.b0, -29.75) and w_oct.b0_weeks == 2, w_oct.b0)
+obs_sep_s = [{"date": start + timedelta(days=7 * k), "basis": -20.0 + 0.5 * k} for k in range(-3, 52)]
+w_sep = rtc.build_crop_year(obs_sep_s, futs, 2026, lambda d: 6.0, SOY, harvest_window=(-2, 4))
+check("a September start is allowed for soybeans too, with no September roll (the bean chain has no September contract): the four bids all move Nov -> Jan, (-21 - 20.5 - 20 - 19.5) / 4 - 10 = -30.25",
+      close(w_sep.b0, -30.25) and w_sep.b0_weeks == 4, (w_sep.b0, w_sep.b0_weeks))
+check("...and a bean bid tagged 'ZSU26' (no such contract in the chain) is read as the date's contract, not rolled",
+      close(rtc.build_crop_year([dict(o, tag="ZSU26") if o["date"] == start - timedelta(days=14) else o for o in obs_sep_s], futs, 2026, lambda d: 6.0, SOY, harvest_window=(-2, 4)).b0, w_sep.b0))
+tw_early, e_early = rd.shipment_table(obs, [], futs, lambda d: 6.0, start + timedelta(days=14), "net", SOY, harvest_window=(0, 3))
+check("before the Nov-Jan spread is measured (the last Wednesday of October) the October bids cannot be moved to Jan: no harvest basis yet, and no estimate for a window of the user's",
+      tw_early.b0 is None and e_early is None and tw_early.b0_window == (0, 3))
+tw_late, _ = rd.shipment_table(obs, [], futs, lambda d: 6.0, start + timedelta(days=21), "net", SOY, harvest_window=(0, 3))
+check("on Oct 28, when it is, the three weeks average -29.5", close(tw_late.b0, -29.5) and tw_late.b0_weeks == 3 and tw_late.b0_window == (0, 3), (tw_late.b0, tw_late.b0_weeks))
+hwn_s = vw.headline_html(rd.summary_rows([w_nov], "net"), "net", SOY)
+check("the soybean headline names the window's weeks and says vs Jan", "average of weeks 5 to 7 (Nov 4 – Nov 18), vs Jan" in hwn_s, hwn_s[-500:])
+
 print("soybeans: corn is untouched by the generalisation")
 check("corn year still runs to Jul 31 on Dec as the base and 'ZH' keys",
       rtc.CORN.base == "Z" and rtc.CORN.horizon == (7, 31) and rtc.roll_dates(2019)["ZH"] == D("2019-11-27") and set(rtc.roll_spreads({}, 2019)) == {"ZH", "HK", "KN", "NU"})

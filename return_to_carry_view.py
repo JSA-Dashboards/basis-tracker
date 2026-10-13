@@ -17,6 +17,7 @@ from __future__ import annotations
 import html
 import json
 import statistics
+from datetime import timedelta
 
 import altair as alt
 import pandas as pd
@@ -28,6 +29,17 @@ AMBER_BG = "#fff4e5"
 GREEN, RED = "#0a7f3f", "#c0392b"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+
+def window_text(crop_year: int, window: tuple, dates_note: str = "") -> str:
+    """The weeks of a user-chosen harvest-basis window, in the user's numbering (week 1 = the first Wednesday of October, week 0 = the last Wednesday of
+    September) with the tracked crop year's dates: 'weeks 3 to 6 (Oct 21 – Nov 11)'; `dates_note` goes inside the brackets after the dates."""
+    w0, wn = window
+    first = rtc.first_wednesday(crop_year)
+    a, b = first + timedelta(days=7 * w0), first + timedelta(days=7 * (w0 + wn - 1))
+    if wn == 1:
+        return f"week {w0 + 1} ({a.strftime('%b')} {a.day}{dates_note})"
+    return f"weeks {w0 + 1} to {w0 + wn} ({a.strftime('%b')} {a.day} – {b.strftime('%b')} {b.day}{dates_note})"
 
 
 def _f(v, dec: int = 1, sign: bool = True) -> str:
@@ -98,6 +110,10 @@ def headline_html(rows: list[dict], measure: str = "net", spec: rtc.Spec = rtc.C
     n0 = r["b0_weeks"]
     if r.get("b0_own"):
         b0_sub = f"your own, vs {ln[spec.base]}" + (f" · calculated {_f(r['b0_calc'])}" if r.get("b0_calc") is not None else "")
+    elif r.get("b0_window"):                              # the user chose the weeks of the average
+        wt, wn = window_text(r["crop_year"], r["b0_window"]), r["b0_window"][1]
+        b0_sub = (f"needs the bids of {wt}" if r["b0"] is None else f"average of {wt}, vs {ln[spec.base]}" if n0 >= wn
+                  else f"average of {wt} so far ({n0} of {wn} bids), vs {ln[spec.base]}")
     elif r["b0"] is None:
         b0_sub = "needs the first weeks of October"
     elif n0 >= 7:
@@ -194,6 +210,10 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
     if any(r.get("b0_own") for r in rows):
         legend += ('<div style="font-size:11px;color:#1f4e79;margin-top:4px">OWN = measured from the harvest basis you entered, in place of the '
                    'calculated average of the first weekly bids.</div>')
+    if rows[-1].get("b0_window"):
+        legend += ('<div style="font-size:11px;color:#1f4e79;margin-top:4px">Harvest basis = the average of your window, '
+                   + window_text(rows[-1]["crop_year"], rows[-1]["b0_window"], ", the tracked year's dates")
+                   + ": the same weeks in every crop year, in place of the report's first 7 weekly bids and its year-specific windows.</div>")
     lead = ""
     if limited:
         lead = (f'<div style="font-size:11px;color:#1f4e79;margin:2px 0 6px">Study ends at the end of {MONTH_FULL[limited.month - 1]}: each year\'s '
@@ -297,6 +317,12 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
                 "crop year being tracked, or, as a what-if, every crop year. In the weekly history the interest is charged on each week's cash price, "
                 "not on the harvest basis, so a different harvest basis moves every week's return by the same amount; the shipment table's "
                 "break-even does charge interest on it (futures + harvest basis).")
+    harvest += (" The **Start week** and **Number of weeks** boxes change which weekly bids the calculated average takes (week 1 is the first Wednesday of "
+                "October; week 0, -1 ... are the September Wednesdays before it): a window you set is the same weeks in every crop year and replaces the "
+                "report's own year-specific windows, and the interest still starts at the report's " + ("fifth" if soy else "third") + " weekly bid whatever "
+                "the window." + ("" if soy else " A September bid quoted off September (CU) futures is rolled to Dec at the Dec - Sep spread on the last "
+                                 "trading day before that contract's first notice day (the last business day of August); a bid already quoted off Dec — "
+                                 "every bid with no tag, and most locations' fall and new-crop bids — is left as it is."))
     interest = ("- **Interest** — the same rate as the rest of this tab: the effective fed funds rate on each date + 2.25% "
                 "(the Cost of Carry sheet's), moved by whatever the rate box above was edited by. In the weekly history it is "
                 f"charged as the sheets do — that week's rate ÷ 52 on the cash price (futures + basis), {start}; the shipment table "
@@ -333,6 +359,17 @@ def _ship_notes(tbl, est) -> str:
     if tbl.b0 is not None and getattr(tbl, "b0_own", False):
         return ("<b>Your own harvest basis</b> is in use: the break-even, the returns and the interest (charged on the futures plus the harvest basis) "
                 "are all measured from it.")
+    w = getattr(tbl, "b0_window", None)
+    if w:                                              # the user chose the weeks of the average
+        wt = window_text(tbl.crop_year, w)
+        if tbl.b0 is None:
+            soy = (" October's soybean bids are quoted off Nov and are moved to Jan by the Nov−Jan spread, measured the last Wednesday of October."
+                   if tbl.spec.key == "soy" else "")
+            return (f"The harvest basis is not known yet — no usable bid has posted in your window, {wt}, and there is no estimate for a window of "
+                    f"your own.{soy}")
+        if tbl.b0_weeks < w[1]:
+            return (f"The harvest basis is the average of the {tbl.b0_weeks} of {w[1]} bids posted so far in your window, {wt}; it can still move.")
+        return f"The harvest basis is the average of your window, {wt}, not the report's first 7 weekly bids."
     if tbl.b0 is None:
         return ("The harvest basis is not known yet — the first weekly bid posts the first Wednesday of October, and "
                 "until a harvest-period bid is posted there is nothing to measure the break-even from.")
@@ -397,6 +434,10 @@ def shipment_html(tbl, est=None, rate_note: str = "") -> str:
         carry_total = sum(lv.spreads[k][0] for k in pairs)
     if tbl.b0 is not None and getattr(tbl, "b0_own", False):
         b0_sub = f"your own, vs {ln[spec.base]}" + (f" · calculated {_n(tbl.b0_calc, 1)}" if tbl.b0_calc is not None else "")
+    elif getattr(tbl, "b0_window", None):
+        wt, wn = window_text(tbl.crop_year, tbl.b0_window), tbl.b0_window[1]
+        b0_sub = (f"waiting for the bids of {wt}" if tbl.b0 is None else f"average of {wt}, vs {ln[spec.base]}" if tbl.b0_weeks >= wn
+                  else f"average of {wt} so far ({tbl.b0_weeks} of {wn} bids), vs {ln[spec.base]}")
     elif tbl.b0 is None:
         b0_sub = "waiting for the first harvest bids"
     elif tbl.b0_est:

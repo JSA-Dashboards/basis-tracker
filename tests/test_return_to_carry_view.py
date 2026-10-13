@@ -216,6 +216,58 @@ check("the how-it-works text explains the Ship by box, with the default (no limi
       "**Ship by**" in vw.how_it_works() and "no limit" in vw.how_it_works() and "through July" in vw.how_it_works() and "through September" in vw.how_it_works(rtc.SOY)
       and "picked again from those weeks" in vw.how_it_works())
 
+print("return_to_carry_view: the user's WINDOW for the harvest basis is used in every year and marked wherever it shows")
+res_win = rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, harvest_window=(2, 4))
+rows_win = rd.summary_rows(res_win, "net")
+yi = {y: i for i, y in enumerate(YEARS)}
+check("every crop year's harvest basis is the average of weeks 3 to 6 (base + 3.5 x the weekly climb): the same weeks in every year, the analyst's 2015 and 2019 windows included",
+      len(rows_win) == 12 and all(r["b0_window"] == (2, 4) and r["b0_weeks"] == 4 and not r["b0_own"]
+                                  and close(r["b0"], -5 + 3 * yi[r["crop_year"]] + 3.5 * (0.4 + 0.05 * yi[r["crop_year"]])) for r in rows_win), [(r["crop_year"], r["b0"]) for r in rows_win][:3])
+check("the report's own rows record no window", all(r["b0_window"] is None for r in rows))
+rows_d7 = rd.summary_rows(rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, harvest_window=(0, 7)), "net")
+same = [(a, b) for a, b in zip(rows_d7, rows) if a["crop_year"] not in (2015, 2019)]
+check("weeks 1 to 7 are the report's window in every year the sheets did not change: the same harvest basis, best return, best week and carry",
+      len(same) == 10 and all(close(a["b0"], b["b0"]) and close(a["best"], b["best"]) and a["best_date"] == b["best_date"] and close(a["carry"], b["carry"]) for a, b in same))
+diff = {a["crop_year"]: (a["b0"], b["b0"]) for a, b in zip(rows_d7, rows) if a["crop_year"] in (2015, 2019)}
+check("...while 2015-16 and 2019-20, whose sheets used another window, read differently (the user's window replaces theirs)", len(diff) == 2 and all(not close(a, b) for a, b in diff.values()), diff)
+check("a window moves each year's best return by exactly (the report's average - the window's) and leaves the best week where it was",
+      all(close(w["best"] - r["best"], r["b0"] - w["b0"]) and w["best_date"] == r["best_date"] and close(w["carry"], r["carry"]) for w, r in zip(rows_win, rows)))
+hwn = vw.headline_html(rows_win, "net")
+check("the headline's harvest-basis card names the window's weeks and the tracked year's dates, never 'the first 7 weekly bids'",
+      "average of weeks 3 to 6 (Oct 15 – Nov 5), vs Dec" in hwn and "average of the first 7 weekly bids" not in hwn and ("%+.1f¢" % rows_win[-1]["b0"]) in hwn, hwn[-650:])
+
+
+def win_rows(last_weeks, w=(2, 4)):
+    _, o_, f_ = build(YEARS, last_weeks=last_weeks)
+    return rd.summary_rows(rd.run_history(o_, f_, lambda d: 5.0, min_year=2000, harvest_window=w), "net")
+
+
+r4 = win_rows(4)
+check("a year part-way through its window says so ('2 of 4 bids') and the card still carries the average so far",
+      r4[-1]["b0_weeks"] == 2 and "average of weeks 3 to 6 (Oct 15 – Nov 5) so far (2 of 4 bids), vs Dec" in vw.headline_html(r4, "net"), vw.headline_html(r4, "net")[-500:])
+r2 = win_rows(2)
+h2 = vw.headline_html(r2, "net")
+check("a year whose window has not opened yet needs its bids: no harvest basis, no best return, no crash",
+      r2[-1]["b0"] is None and r2[-1]["best"] is None and "needs the bids of weeks 3 to 6 (Oct 15 – Nov 5)" in h2 and "2025-26 crop year" in h2, h2[-500:])
+r1 = win_rows(9, (4, 1))
+check("a one-week window is that week's bid ('week 5 (Oct 29)'), and its average is the bid itself (base + 4 x the climb)",
+      r1[-1]["b0_weeks"] == 1 and close(r1[-1]["b0"], -5 + 3 * 11 + 4 * (0.4 + 0.05 * 11)) and "average of week 5 (Oct 29), vs Dec" in vw.headline_html(r1, "net"), vw.headline_html(r1, "net")[-400:])
+twn = vw.table_html(rows_win, "net")
+check("the by-year table explains the window under it: the weeks, the tracked year's dates, the same weeks in every year, in place of the report's 7 and its year-specific windows",
+      "Harvest basis = the average of your window, weeks 3 to 6 (Oct 15 – Nov 5, the tracked year's dates): the same weeks in every crop year" in twn
+      and "its year-specific windows" in twn and twn.count("<th ") == 7, twn[-420:])
+check("...and the report's own table says nothing of a window", "your window" not in t and "your window" not in vw.table_html(rows_own, "net"))
+check("the window and an own number can sit on one page (the own pill and its legend are still drawn)",
+      ">OWN<" in vw.table_html(rd.summary_rows(rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, b0_overrides={2025: -20.0}, harvest_window=(2, 4)), "net"), "net"))
+hw_corn, hw_soy = vw.how_it_works(), vw.how_it_works(rtc.SOY)
+check("the how-it-works text explains Start week / Number of weeks: week 1 = the first Wednesday of October, a September start, the same weeks in every year",
+      "**Start week**" in hw_corn and "**Number of weeks**" in hw_corn and "first Wednesday of October" in hw_corn and "September Wednesdays" in hw_corn
+      and "the same weeks in every crop year" in hw_corn and "**Start week**" in hw_soy)
+check("...that the interest still starts at the report's third (corn) / fifth (soybeans) weekly bid whatever the window",
+      "interest still starts at the report's third weekly bid" in hw_corn and "interest still starts at the report's fifth weekly bid" in hw_soy)
+check("...and, for corn only, the September roll: bids quoted off CU move to Dec at the Dec - Sep spread of the last day before first notice; bids already off Dec stay",
+      "(CU) futures is rolled to Dec" in hw_corn and "last trading day before that contract's first notice day" in hw_corn and "left as it is" in hw_corn and "(CU)" not in hw_soy)
+
 print("return_to_carry_view: helpers")
 check("completed() keeps finished years that have a best return", len(vw.completed(rows)) == 12 and len(vw.completed(rd.summary_rows(inprog, "net"))) == 11)
 check("rank_of_latest: the newest synthetic year climbs the most, so it ranks first of 12", vw.rank_of_latest(rows) == (1, 12), vw.rank_of_latest(rows))

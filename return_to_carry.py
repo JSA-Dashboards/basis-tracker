@@ -279,6 +279,32 @@ def roll_spreads(futs: dict, crop_year: int, spec: Spec = CORN) -> dict:
     return out
 
 
+def _last_business_day(year: int, month: int) -> date:
+    """The last weekday of a month (the exchange's holidays are not in August or September)."""
+    d = date(year, month, calendar.monthrange(year, month)[1])
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+def sept_roll_day(year: int) -> date:
+    """The day a September corn bid quoted off September (CU) futures is rolled to Dec at: the last trading day BEFORE the September contract's first
+    notice day. First notice day is the last business day of August (Mon Aug 31 2026), so the roll day is the weekday before it (Fri Aug 28)."""
+    d = _last_business_day(year, 8) - timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
+
+
+def sept_to_dec_spread(futs: dict, year: int, root: str = ROOT):
+    """(Dec - Sep in cents, the day it was measured) — the frozen level a September bid quoted off CU is rolled to Dec at: the settlements of that
+    year's Sep (CU) and Dec (CZ) contracts on `sept_roll_day`, stepping back over a gap as `price_on` does. None when either has no price."""
+    d = sept_roll_day(year)
+    pu, _ = price_on(futs, d, f"{root}U{year % 100:02d}")
+    pz, _ = price_on(futs, d, f"{root}Z{year % 100:02d}")
+    return None if pu is None or pz is None else (round(pz - pu, 6), d)
+
+
 # ── the crop year ─────────────────────────────────────────────────────────────────────────────
 @dataclass
 class Week:
@@ -314,6 +340,7 @@ class CropYear:
     spec: Spec = CORN
     window_end: date | None = None           # limit_crop_year(): the day the study was told to stop (None = the whole season)
     carry_tag: str | None = None             # limit_crop_year(): the contract the last week is quoted off, where `season_carry` was banked to
+    b0_window: tuple | None = None           # build_crop_year(harvest_window=...): the user's (first week index, number of weeks) of the average; None = the report's
 
     @property
     def dec_jul_carry(self) -> float | None:
@@ -322,7 +349,7 @@ class CropYear:
 
 
 def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: Spec = CORN,
-                    window_start: int = 0, b0_override: float | None = None) -> CropYear:
+                    window_start: int = 0, b0_override: float | None = None, harvest_window: tuple | None = None) -> CropYear:
     """Run the weekly return for one crop year.
 
     obs      [{'date', 'basis', 'tag'?}] — the nearby bid, about one per week (any order, any years); `tag`
@@ -337,6 +364,12 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
              return is measured from it (`cy.b0`, `cy.b0_own`); the calculated average is kept in `cy.b0_calc`. None = the calculated one.
              The interest does not depend on it (it runs on the week's cash price), so an override shifts every gross and net return, and
              the best return, by the same amount (calculated - own) and leaves the best WEEK where it was.
+    harvest_window  the user's OWN window for the calculated harvest basis: (first week index, number of weeks), index 0 = the first Wednesday of
+             October (negative = the September Wednesdays before it). It replaces the report's window AND any year-specific one, so the average
+             is taken over the same weeks in every crop year. None = the report's (the first 7 weeks, with the analyst's per-year exceptions).
+             Only which bids are averaged changes: the weekly returns, the interest clock (from the spec's accrual start) and the carry are the
+             same, so the window moves every gross and net return by the same amount, as an own harvest basis does. A September bid quoted
+             off September (CU) futures is rolled to Dec at the spread on the last day before first notice (`sept_to_dec_spread`).
 
     Like the sheets, time runs on a WEEKLY GRID from the first Wednesday of October: interest accrues for
     every week from the spec's accrual start on, whether or not a bid was posted that week (a week with no bid just
@@ -348,6 +381,11 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
     if window_start:
         window = tuple(range(window_start, window_start + len(window)))
     lowest = window[0]
+    if harvest_window is not None:                         # the user's window: the same weeks in every year, and no week before October is lost
+        w0, wn = int(harvest_window[0]), max(1, int(harvest_window[1]))
+        window = tuple(range(w0, w0 + wn))
+        lowest = min(w0, 0)
+        cy.b0_window = (w0, wn)
     accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
     n_idx = {lab: i for i, lab in enumerate(spec.chain)}
     byweek: dict = {}
@@ -355,18 +393,29 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
         k = week_index(o["date"], crop_year)
         if k >= lowest:                                    # a September bid only matters to a window that reaches back to it
             byweek[k] = o                                  # the later bid of a week wins
-    if not any(k >= 0 for k in byweek):
+    if not byweek or (harvest_window is None and not any(k >= 0 for k in byweek)):    # a window of the user's may be September bids only (no weekly row yet)
         return cy
     last_k = max(byweek)
 
+    sept = []                                              # the Dec - Sep spread, measured once if a bid needs it
+
     def resolve(o, k: int):
         """(contract label, basis) of a bid: its own tag, else the date's contract. Soybeans move a bid quoted off another
-        contract to the date's by that day's spread, as the sheets' columns do (a November bid quoted vs Nov is a Jan bid)."""
+        contract to the date's by that day's spread, as the sheets' columns do (a November bid quoted vs Nov is a Jan bid).
+        Corn: a September-to-December bid quoted off SEPTEMBER futures (CU of its own year — the expiring old-crop contract, not the chain's Sep a
+        year on) is rolled to Dec at the frozen Dec - Sep spread of the last day before first notice (`sept_to_dec_spread`); one already quoted off
+        Dec (or with no tag, which is taken as Dec) is left alone. None when that spread cannot be measured: the bid is not used."""
         basis = float(o["basis"])
         sched = infer_tag(o["date"], spec, crop_year)
         t = tag_label(o.get("tag"), o["date"], crop_year, spec)
         if t is None:
             return sched, basis
+        if spec.key == "corn" and t == "U" and o["date"].year == crop_year:
+            raw = str(o.get("tag") or "").strip().upper()
+            if len(raw) < 5 or not raw[3:5].isdigit() or int(raw[3:5]) == crop_year % 100:       # 'CU' or 'ZCU26' for a 2026 bid, not 'ZCU27'
+                if not sept:
+                    sept.append(sept_to_dec_spread(futs, crop_year, spec.root))
+                return None if sept[0] is None else (spec.base, basis - sept[0][0])
         if spec.normalize_tags and t != sched:
             wd = start + timedelta(days=7 * k)
             pa, _ = price_on(futs, wd, contract_symbol(t, crop_year, spec.root))
@@ -406,7 +455,10 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
         o = byweek.get(k)
         if o is None:
             continue
-        t, v = resolve(o, k)
+        r = resolve(o, k)
+        if r is None:
+            continue
+        t, v = r
         if t != spec.base:                              # quoted off another month: re-base to the base contract
             c = cum_carry(t)
             if c is None:
@@ -432,7 +484,10 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
             run += prime                                # every week counts, bid or no bid
         if o is None:
             continue
-        tag, basis = resolve(o, k)
+        r = resolve(o, k)
+        if r is None:
+            continue
+        tag, basis = r
         f, _ = price_on(futs, wd, contract_symbol(tag, crop_year, spec.root))     # that week's Wednesday settlement
         cash = f + basis if f is not None else None
         carry = cum_carry(tag)
@@ -666,6 +721,7 @@ class ShipTable:
     b0_own: bool = False                # `b0` is the user's own harvest basis, not the calculated average / estimate
     b0_calc: float | None = None        # what the calculated method gives (the average so far, or the estimate before the weekly bids)
     ship_by: date | None = None         # limit_shipment_table(): the day the study was told to stop (None = every month)
+    b0_window: tuple | None = None      # the user's (first week index, number of weeks) of the harvest-basis average (None = the report's)
 
     @property
     def f_dec(self) -> float | None:
