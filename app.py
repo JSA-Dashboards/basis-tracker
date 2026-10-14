@@ -430,11 +430,19 @@ def short_sym(s):
         return f"{MONTH_CODES.get(s[2], s[2])} '{s[3:]}"
     return s or ""
 
-def fmt_basis(c, is_meal=False):
+def _basis_unit(grain) -> str:
+    """The unit printed beside a basis in the charts and captions. Canola is quoted in Canadian dollars per tonne and comes back from the database
+    as quoted (grain_units.scale_basis, applied where the rows are read), so it says 'C$/t'; every other grain stays '¢' — soybean meal's x100
+    values keep their older '$/t' handling in the Bids table and the Summary tab."""
+    return "C$/t" if grain == "Canola" else "¢"
+
+def fmt_basis(c, is_meal=False, unit="¢"):
     if c is None: return "—"
     sign = "+" if c >= 0 else "−"
     if is_meal:
         return f"{sign}${abs(c)/100:.2f}/t"
+    if unit != "¢":                       # canola: whole C$/t as quoted ("−C$45/t")
+        return f"{sign}C${abs(c)}/t"
     return f"{sign}{abs(c)}¢"
 
 _FROZEN_SPREAD_MEMO: dict = {}
@@ -610,7 +618,7 @@ def compute_changes(snapshots):
 
     return {"rows": row_changes, "spots": spot_changes, "derived_spots": derived_spot_changes}
 
-def delta_html(d, is_meal=False):
+def delta_html(d, is_meal=False, unit="¢"):
     if not d:
         return '<span style="color:#94a3b8">—</span>'
     if d.get("unknown"):
@@ -619,18 +627,18 @@ def delta_html(d, is_meal=False):
     if val is None:
         return '<span style="color:#94a3b8">—</span>'
     if val == 0:
-        zero_str = "±$0.00/t" if is_meal else "±0¢"
+        zero_str = "±$0.00/t" if is_meal else ("±C$0/t" if unit != "¢" else "±0¢")
         return f'<span style="color:#94a3b8;font-weight:600">{zero_str}</span>'
     color  = "#16a34a" if val > 0 else "#dc2626"
     arrow  = "▲" if val > 0 else "▼"
     sign   = "+" if val > 0 else "−"
     adj    = ' <span style="font-size:9px;color:#94a3b8">adj</span>' if d.get("rolled") else ""
-    amount = f"${abs(val)/100:.2f}/t" if is_meal else f"{abs(val)}¢"
+    amount = f"${abs(val)/100:.2f}/t" if is_meal else (f"C${abs(val)}/t" if unit != "¢" else f"{abs(val)}¢")
     return (f'<span style="color:{color};font-weight:700">'
             f'<span style="font-size:9px">{arrow}</span>'
             f'{sign}{amount}{adj}</span>')
 
-def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label, is_meal=False):
+def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label, is_meal=False, unit="¢"):
     th = ("background:#f1f5f9;color:#64748b;font-size:9px;text-transform:uppercase;"
           "letter-spacing:.12em;padding:5px 12px;text-align:left;border-bottom:1px solid #e2e8f0;"
           "font-weight:700;white-space:pre;line-height:1.3;font-family:inherit")
@@ -665,11 +673,11 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'{spot_row.futuresSymbol}</span></td>'
             f'<td style="{td_base};color:#0693e3;font-size:11px">{short_sym(spot_row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{color};font-weight:800;font-size:16px;'
-            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal)}</span></td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromPrev"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromWeek"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromMonth"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chgs.get("fromYear"), is_meal)}</td>'
+            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal, unit)}</span></td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromPrev"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromWeek"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromMonth"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chgs.get("fromYear"), is_meal, unit)}</td>'
             f'</tr>'
         )
         html += (f'<tr><td colspan="8" style="padding:2px 0">'
@@ -692,11 +700,11 @@ def render_table(body_rows, spot_row, changes, spot_chg, loc_color, year_ago_lab
             f'{row.futuresSymbol}</span></td>'
             f'<td style="{td_base};color:#64748b;font-size:11px">{short_sym(row.futuresSymbol)}</td>'
             f'<td style="{td_base}"><span style="color:{bc_color};font-weight:800;font-size:15px;'
-            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal)}</span></td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromPrev"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromWeek"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromMonth"), is_meal)}</td>'
-            f'<td style="{td_base}">{delta_html(chg.get("fromYear"), is_meal)}</td>'
+            f'font-variant-numeric:tabular-nums">{fmt_basis(bc, is_meal, unit)}</span></td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromPrev"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromWeek"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromMonth"), is_meal, unit)}</td>'
+            f'<td style="{td_base}">{delta_html(chg.get("fromYear"), is_meal, unit)}</td>'
             f'</tr>'
         )
 
@@ -4536,7 +4544,7 @@ with tab_bids:
 
             table_html = render_table(
                 body_rows, spot_row, changes, spot_chg, loc_color, year_ago_label,
-                is_meal=(grain == "Soybean Meal"),
+                is_meal=(grain == "Soybean Meal"), unit=_basis_unit(grain),
             )
             st.markdown(table_html, unsafe_allow_html=True)
 
@@ -4648,7 +4656,7 @@ with tab_bids:
                     .encode(
                         x=_alt.X("Delivery:N", sort=_fwd_order, title=None,
                                  axis=_alt.Axis(labelAngle=-30, labelFontSize=10)),
-                        y=_alt.Y("Basis:Q", title="Basis (¢)", scale=_alt.Scale(zero=False),
+                        y=_alt.Y("Basis:Q", title=f"Basis ({_basis_unit(grain)})", scale=_alt.Scale(zero=False),
                                  axis=_alt.Axis(labelFontSize=10)),
                         color=_alt.Color("Series:N",
                                          scale=_alt.Scale(domain=_dom, range=_rng),
@@ -4657,8 +4665,8 @@ with tab_bids:
                         tooltip=[
                             _alt.Tooltip("Series:N",   title="Date"),
                             _alt.Tooltip("Delivery:N", title="Delivery"),
-                            _alt.Tooltip("Basis:Q",    title="Basis (¢)"),
-                            _alt.Tooltip("Raw:Q",      title="Raw basis (¢)"),
+                            _alt.Tooltip("Basis:Q",    title=f"Basis ({_basis_unit(grain)})"),
+                            _alt.Tooltip("Raw:Q",      title=f"Raw basis ({_basis_unit(grain)})"),
                             _alt.Tooltip("Futures:N",  title="Futures"),
                         ],
                     )
@@ -4718,12 +4726,12 @@ with tab_bids:
                     .encode(
                         x=_alt.X("Date:T", title=None,
                                   axis=_alt.Axis(format="%b %d '%y", labelAngle=-30, labelFontSize=10)),
-                        y=_alt.Y("Basis:Q", title="Spot Basis (¢)",
+                        y=_alt.Y("Basis:Q", title=f"Spot Basis ({_basis_unit(grain)})",
                                  scale=_alt.Scale(zero=False),
                                  axis=_alt.Axis(labelFontSize=10)),
                         tooltip=[
                             _alt.Tooltip("Date:T",     format="%b %d, %Y", title="Date"),
-                            _alt.Tooltip("Basis:Q",    title="Basis (¢)"),
+                            _alt.Tooltip("Basis:Q",    title=f"Basis ({_basis_unit(grain)})"),
                             _alt.Tooltip("Contract:N", title="Futures"),
                             _alt.Tooltip("Delivery:N", title="Delivery"),
                         ],
@@ -4856,12 +4864,12 @@ with tab_bids:
                     if not _df_fwdc.empty:
                         _yvals += list(_df_fwdc["Basis"])
                     _y_scale = _yfit_scale(_yvals, _bfit)
-                    _y_s = _alt.Y("Basis:Q", title="Basis (¢)", scale=_y_scale,
+                    _y_s = _alt.Y("Basis:Q", title=f"Basis ({_basis_unit(grain)})", scale=_y_scale,
                                   axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
                     _tip_s = [
                         _alt.Tooltip("MktYear:N", title="Mkt Year"),
                         _alt.Tooltip("MktWeek:Q", title="Week"),
-                        _alt.Tooltip("Basis:Q",   title="Basis (¢)"),
+                        _alt.Tooltip("Basis:Q",   title=f"Basis ({_basis_unit(grain)})"),
                     ]
 
                     _SEAS_H = 560
@@ -4915,7 +4923,7 @@ with tab_bids:
                     if not _band.empty:
                         _s_layers.append(
                             _alt.Chart(_band).mark_area(color="#9ca3af", opacity=0.22)
-                            .encode(x=_x_s, y=_alt.Y("lo:Q", title="Basis (¢)",
+                            .encode(x=_x_s, y=_alt.Y("lo:Q", title=f"Basis ({_basis_unit(grain)})",
                                                      scale=_y_scale), y2="hi:Q"))
                     # Older marketing years — faded thin context lines behind the heroes.
                     if not _hist_old.empty:
@@ -4957,7 +4965,7 @@ with tab_bids:
                             _cur_fwd = _pd.concat([_anch, _cur_fwd]).sort_values("MktWeek")
                         _nxt_fwd = _df_fwdc[_df_fwdc["MktYearNum"] == _max_yr + 1][["MktWeek", "Basis"]]
                         _fwd_tip = [_alt.Tooltip("MktWeek:Q", title="Week"),
-                                    _alt.Tooltip("Basis:Q", title="Fwd basis (¢)", format=".0f")]
+                                    _alt.Tooltip("Basis:Q", title=f"Fwd basis ({_basis_unit(grain)})", format=".0f")]
                         for _seg in (_cur_fwd, _nxt_fwd):
                             if _seg is not None and not _seg.empty:
                                 _s_layers += [
@@ -5175,7 +5183,9 @@ with tab_map:
                         if any(_map_base_commodity(b["grain"]) == sel_commodity for b in r["bids"])]
 
             def _fmt_basis(cents):
-                return "—" if cents is None else f"{'+' if cents >= 0 else ''}{cents}c"
+                if cents is None:
+                    return "—"
+                return f"{'+' if cents >= 0 else ''}{cents}" + (" C$/t" if sel_commodity == "Canola" else "c")      # canola: as quoted, C$/t
 
             def _tooltip_text(row):
                 bid = _map_loc_bid(row)
@@ -5400,7 +5410,7 @@ with tab_summary:
         # $/ton; corn/soy/wheat stay as cents/bushel.
         _is_meal = (_sgrain == "Soybean Meal")
         _mdiv    = 100.0 if _is_meal else 1.0
-        _unit    = "$/t" if _is_meal else "¢"
+        _unit    = "$/t" if _is_meal else _basis_unit(_sgrain)          # canola: C$/t, read back as quoted (grain_units)
 
         # ── Apply filters ─────────────────────────────────────────────────────────
         _sfilt = [
@@ -6403,10 +6413,11 @@ with tab_spread:
                         _latest = _mrg.sort_values("Date").iloc[-1]
                         _a_short = _a_lbl.split(" · ")[-1]
                         _b_short = _b_lbl.split(" · ")[-1]
+                        _spu = "¢" if _basis_unit(_sg) == "¢" else " " + _basis_unit(_sg)       # canola: "−5 C$/t"
                         st.markdown(
                             f'<div style="font-size:13px;color:#1e293b;margin:2px 0 6px">Latest spread '
                             f'(<b>{_latest["Date"]:%b %d, %Y}</b>): '
-                            f'<b style="font-size:16px">{_latest["Spread"]:+.0f}¢</b> '
+                            f'<b style="font-size:16px">{_latest["Spread"]:+.0f}{_spu}</b> '
                             f'<span style="color:#64748b">({_a_short} {_latest["A"]:+.0f} − '
                             f'{_b_short} {_latest["B"]:+.0f})</span></div>', unsafe_allow_html=True)
 
@@ -6421,7 +6432,7 @@ with tab_spread:
                         if not _fwd.empty:
                             _yvals += list(_fwd["Spread"])
                         _yscale = _yfit_scale(_yvals, _spfit, pad_frac=0.10)
-                        _y_s = _alt.Y("Spread:Q", title="Spread (¢)", scale=_yscale,
+                        _y_s = _alt.Y("Spread:Q", title=f"Spread ({_basis_unit(_sg)})", scale=_yscale,
                                       axis=_alt.Axis(labelFontSize=10, grid=True, gridColor="#eef2f6"))
 
                         _SEAS_H = 520
@@ -6443,7 +6454,7 @@ with tab_spread:
                         if not _band.empty:
                             _layers.append(
                                 _alt.Chart(_band).mark_area(color="#c4d7bd", opacity=0.55)
-                                .encode(x=_x_s, y=_alt.Y("lo:Q", title="Spread (¢)", scale=_yscale),
+                                .encode(x=_x_s, y=_alt.Y("lo:Q", title=f"Spread ({_basis_unit(_sg)})", scale=_yscale),
                                         y2="hi:Q"))
                             _layers.append(
                                 _alt.Chart(_band).mark_line(color="#4b6a4b", strokeDash=[8, 4],
@@ -6460,7 +6471,7 @@ with tab_spread:
                         if not _cur.empty:
                             _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
                                     _alt.Tooltip("MktWeek:Q", title="Week"),
-                                    _alt.Tooltip("Spread:Q", title="Spread (¢)")]
+                                    _alt.Tooltip("Spread:Q", title=f"Spread ({_basis_unit(_sg)})")]
                             _layers.append(
                                 _alt.Chart(_cur).mark_line(strokeWidth=4, color="#111827")
                                 .encode(x=_x_s, y=_y_s, tooltip=_tip))
@@ -6518,7 +6529,7 @@ with tab_spread:
                         _chart_download_copy(_chart_png(_sp_export, width=1100, height=_SEAS_H),
                                              _sp_fname, key=f"spread_{_a_lbl}_{_b_lbl}_{_sg}")
                         st.caption(f"{len(_mrg)} overlapping posting dates · 5-yr window {_rng_txt} · "
-                                   "spread in ¢/bu (front-month spot basis).")
+                                   f"spread in {'C$/t' if _sg == 'Canola' else '¢/bu'} (front-month spot basis).")
                         if _has_rail:
                             st.caption("A rail corridor's line is its posted basis — the weekly Spot sheets through "
                                        "mid-2026, its nearest forward bid since — against the contract it is quoted "
@@ -6638,7 +6649,7 @@ if not _view_only():
                                  if (lbl, sub) in _df.columns]
                         _df = _df[_cols]
                         st.caption(f"{len(_df)} dates × {len(_sel_lbls)} location(s) · grain "
-                                   f"**{_xgrain}** · delivery **{_deliv_choice}** · basis in ¢/bu.")
+                                   f"**{_xgrain}** · delivery **{_deliv_choice}** · basis in {'C$/t' if _xgrain == 'Canola' else '¢/bu'}.")
                         st.dataframe(_df, use_container_width=True, height=340)
                         if _view_only():
                             st.caption("🔒 Downloads are disabled in this read-only view.")

@@ -372,6 +372,52 @@ site to an already-cracked platform is usually one config row, not new code.
   is not available on Streamlit Cloud, so that scraper never runs in the
   deployed app.
 
+### Canola — units, and the Northern Canola (NCGA) table (2026-10-14)
+
+Canola basis is quoted in **Canadian dollars per metric tonne against ICE canola futures** (RSF27 = Jan 2027 ...), not cents per bushel. Every scraper
+stores `basis_cents = round(float(basis) * 100)` whatever the crop, so ADM Velva's -45 is stored -4500 (the same x100 rule as soybean meal's $/ton) and
+used to show as "-4500¢". `grain_units.py` puts it right **where rows are read**: `database.get_snapshots / get_snapshots_bulk / get_snapshots_asof /
+get_map_data` hand canola back as the quoted whole number (`scale_basis`; raw grains 'Canola', 'Canola (Us)', 'Canola Usd/Cwt', 'Canola (Canadian)';
+canola MEAL is a $/ton product and is left alone). The database is NOT migrated and nothing writes a value read this way back (every write comes from a
+parser); a Snowpark copy of database.py without the helper just returns the stored values. The app says "C$/t" (`_basis_unit` in `app.py`: the Bids table
+as "-C$45/t", the Bids charts, the Summary tab, the Spread tab, the Export caption); soybean meal keeps its older `is_meal` handling. Tests:
+`tests/test_grain_units.py`, `tests/test_canola_units.py`. There is no ICE canola price in `futures_prices` (Massive does not carry it), so nothing
+converts basis to flat price and the Bids tab's "vs prev / wk / mo" columns show "⚠ roll" whenever a canola row's contract changes.
+
+**Canola bids we hold:** ADM Velva and Enderlin (adm_scraper), the CHS ND / MN sites incl. Hallock Drayton, NG and Devils Lake (chs_scraper), Cargill West
+Fargo and Bunge Altona via `ncga_scraper.py` below. ADM's Canadian locations (Carberry, Lloydminster, Watson) are captured but hidden (`grain_map`:
+'Canola (Canadian)' is inactive).
+
+**`ncga_scraper.py`** (`run_ncga` in `auto_import.py`, flags `--ncga-only` / `--no-ncga`, runs after Bunge; parser `parsers/ncga_parser.py`; saved page
+`tests/fixtures/ncga_home_2026-10-13.html`; `tests/test_ncga_scraper.py`). https://northerncanola.com/ (the Northern Canola Growers Association) publishes a
+"Daily Cash Prices" table: five buyers x Oct-Feb arrival months, price (US$/cwt), change and basis (C$/t). We take only the two buyers with no usable feed:
+
+- **Bunge Altona** (Manitoba crush plant; bungeag.com has no Altona location) -> provider Bunge, location "Altona, MB" (`location_meta`: MB, Oilseed
+  Processing, 49.1 / -97.567).
+- **Cargill West Fargo** — Cargill's Barchart WebSol feed (id 5891, root RS) posts canola as a FLAT PRICE only (futuresymbol "n.a.", basis "0.0000"), so
+  its own feed has no basis; NCGA derives one from the flat price, in steps of 5 — an estimate, not a posted basis. `parsers/cargill_parser.py` now
+  skips canola bids with no futures month (they were stored as a zero basis with the junk symbol 'ZN.2a'; so does `parsers/bunge_parser.py` for Cairo's
+  '@RS' barge canola); flaxseed and hi-oleic sunflower at that location are flat-priced the same way and are still stored as zeros.
+
+The other three on the page (ADM Velva, ADM Enderlin, CHS Hallock) are read from their own sites and agreed with it on 2026-10-13 (one month differs: ADM
+Enderlin's November, -10 ours vs -8 on the page). **Filing:** rows go in under the **fetch date**, like every other scraper (NCGA updates during the
+business day, so a morning import meets yesterday's table, and filing that under yesterday would leave Cargill West Fargo's newest snapshot without
+canola); NCGA's own date is kept in the snapshot's `email_subject` / `email_date` ("NCGA cash table of 2026-10-13"); source 'ncga'; row ids
+`NCGA_BG_yyyymm` / `NCGA_CG_yyyymm`; basis stored x100. A second run the same day adds nothing (same row ids, ON CONFLICT DO NOTHING). The futures month of
+each delivery month is INFERRED (the CHS / Altona pattern: Oct-Nov vs Nov, Dec-Jan vs Jan, Feb-Mar vs Mar, Apr-May vs May, Jun-Jul vs Jul, Aug-Sep vs
+the new-crop Nov; `ice_canola_symbol`) — the page does not say, and Cargill's numbers do not step like one contract, so read its basis as +-5 to 10.
+**Nothing is filed** (the run reports 'empty' and the operator alert email goes out) when the page cannot be fetched (3 tries), has no table or no 'Last
+Updated' date, no longer says "Canadian dollars per metric ton", or its table is more than 5 days old. Terms read 2026-10-13: the disclaimer is
+informational / as-is with no reuse clause and robots.txt allows everything.
+
+**The zero rows, cleaned up (2026-10-14, Kolten: "yes delete the zero rows").** Two feeds had been storing flat-priced canola as a basis of 0: Cargill West
+Fargo ('ZN.2a', from "n.a.") and Bunge Cairo's winter canola at its barge points (symbol '@RS', basis 0.00; Lower Miss / Mid Miss / Ohio River).
+`parsers/cargill_parser.py` and `parsers/bunge_parser.py` now skip canola with no futures month, and the 815 existing placeholder rows (Cargill West
+Fargo 671 over 49 snapshots, Bunge Cairo 144 over 48; 2026-06-11 to 10-13; all basis 0) were deleted from `snapshot_rows` after a backup — every column,
+same ids — in `Claude Code\_backups\canola_zero_rows_2026-10-14.csv`. `Claude Code\_backups\canola_zero_rows.py` is the one-off that did it (dry run by
+default, refuses unless every candidate is a zero-basis non-spot non-NCGA row and no snapshot would end up empty); `--restore <csv>` puts rows back. Cargill
+West Fargo's flaxseed (147 rows) and hi-oleic sunflower (588) are flat-priced the same way and are still stored as zeros.
+
 ### Known-unbuilt
 
 - **Ray-Carroll** (`ray-carroll.com`) is the same aghost family but a

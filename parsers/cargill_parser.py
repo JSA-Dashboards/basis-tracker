@@ -125,6 +125,11 @@ def _basis_to_cents(basis_str: str) -> Optional[int]:
         return None
 
 
+def _flat_price_only(barchart_sym: str) -> bool:
+    """A bid with no futures month ('n.a.') is posted as a flat price: its basis field is a placeholder 0.0000, not a basis of zero."""
+    return (barchart_sym or "").strip().lower() in ("", "n.a.", "n/a", "na", "-", "--")
+
+
 def parse_cargill_location(loc: dict) -> Optional[NewSnapshotRequest]:
     """
     Convert one Cargill location dict (from cargill_scraper.fetch_cargill_bids)
@@ -149,6 +154,12 @@ def parse_cargill_location(loc: dict) -> Optional[NewSnapshotRequest]:
         del_start    = bid.get("delivery_start", "") or ""
 
         if basis_str is None:
+            continue
+
+        # West Fargo posts canola as a FLAT PRICE only (futuresymbol "n.a.", basis "0.0000"): storing that as a basis of 0 with a junk symbol
+        # ("ZN.2a") put a zero basis in every canola view. Its basis comes from the NCGA table instead (ncga_scraper.py). Flaxseed and hi-oleic
+        # sunflower at the same location are flat-priced the same way and are left as they were.
+        if grain == "Canola" and _flat_price_only(barchart_sym):
             continue
 
         basis_cents = _basis_to_cents(basis_str)

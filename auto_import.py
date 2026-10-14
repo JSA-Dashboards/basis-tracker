@@ -86,6 +86,8 @@ from andersons_scraper import fetch_andersons_bids
 from parsers.andersons_parser import parse_andersons_location
 from bunge_scraper import fetch_bunge_bids
 from parsers.bunge_parser import parse_bunge_location
+from ncga_scraper import fetch_ncga_bids
+from parsers.ncga_parser import parse_ncga_location
 from scoular_scraper import fetch_scoular_bids
 from parsers.scoular_parser import parse_scoular_location
 from agp_scraper import fetch_agp_bids
@@ -1421,6 +1423,53 @@ def run_bunge() -> int:
     return total_rows
 
 
+def run_ncga() -> int:
+    """
+    File Bunge Altona and Cargill West Fargo canola bids from the Northern Canola Growers Association's cash table (ncga_scraper.py) — the two
+    buyers with no usable feed of their own (the other three on that page are scraped directly). The rows go in under NCGA's own 'Last Updated'
+    date, so a page that has not been updated repeats an existing snapshot and adds nothing. Returns the number of bid rows read.
+    """
+    log.info("=" * 60)
+    log.info("NCGA (Northern Canola) scrape starting…")
+    log.info("=" * 60)
+    try:
+        locs = fetch_ncga_bids()
+    except Exception as exc:
+        log.error("NCGA scrape failed: %s", exc)
+        return 0
+    if not locs:
+        log.warning("NCGA returned no bids.")
+        return 0
+
+    _snaps, _metas, total_rows, errors = [], {}, 0, 0
+    for loc in locs:
+        try:
+            snap_req = parse_ncga_location(loc)
+            if snap_req is None:
+                continue
+            _snaps.append(snap_req)
+            _metas.setdefault(snap_req.provider, []).append({"location": snap_req.location, **(loc.get("meta") or {})})
+            total_rows += len(snap_req.rows)
+            log.info("  ✓  %-8s %-24s  as of %s  %d row(s)", snap_req.provider, snap_req.location, snap_req.timestamp[:10], len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  NCGA %s: %s", loc.get("location", "?"), exc)
+
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("NCGA bulk snapshot upsert failed: %s", exc)
+    for _prov, _items in _metas.items():
+        try:
+            upsert_location_metas(_prov, _items)
+        except Exception as exc:
+            log.error("NCGA %s location-meta failed: %s", _prov, exc)
+
+    log.info("-" * 60)
+    log.info("NCGA done: %d location(s)  |  %d row(s)  |  %d error(s)  (bulk upsert)", len(_snaps), total_rows, errors)
+    return total_rows
+
+
 def run_scoular() -> int:
     """
     Scrape Scoular (Bushel-powered cashbidssingle pages) for all ~66 US locations
@@ -2063,6 +2112,7 @@ def run(
     run_gpre_scrape: bool = True,
     run_andersons_scrape: bool = True,
     run_bunge_scrape: bool = True,
+    run_ncga_scrape: bool = True,
     run_scoular_scrape: bool = True,
     run_agp_scrape: bool = True,
     run_ldc_scrape: bool = True,
@@ -2130,6 +2180,8 @@ def run(
         total += _run_guarded(run_andersons, "Andersons")
     if run_bunge_scrape:
         total += _run_guarded(run_bunge, "Bunge")
+    if run_ncga_scrape:                                 # after Cargill and Bunge: it adds Altona and Cargill West Fargo's canola basis
+        total += _run_guarded(run_ncga, "NCGA", 180)
     if run_scoular_scrape:
         total += _run_guarded(run_scoular, "Scoular")
     if run_agp_scrape:
@@ -2331,6 +2383,15 @@ if __name__ == "__main__":
         help="Run Bunge scrape only — skip everything else",
     )
 
+    ncga_group = parser.add_mutually_exclusive_group()
+    ncga_group.add_argument(
+        "--no-ncga", dest="no_ncga", action="store_true",
+        help="Skip the Northern Canola Growers Association table (Bunge Altona + Cargill West Fargo canola)",
+    )
+    ncga_group.add_argument(
+        "--ncga-only", dest="ncga_only", action="store_true",
+        help="Run the Northern Canola Growers Association table only (Bunge Altona + Cargill West Fargo canola)",
+    )
     scoular_group = parser.add_mutually_exclusive_group()
     scoular_group.add_argument(
         "--no-scoular", dest="no_scoular", action="store_true",
@@ -2561,6 +2622,9 @@ if __name__ == "__main__":
     elif args.bunge_only:
         init_db()
         run_bunge()
+    elif args.ncga_only:
+        init_db()
+        run_ncga()
     elif args.scoular_only:
         init_db()
         run_scoular()
@@ -2684,6 +2748,7 @@ if __name__ == "__main__":
             run_gpre_scrape=not args.no_gpre,
             run_andersons_scrape=not args.no_andersons,
             run_bunge_scrape=not args.no_bunge,
+            run_ncga_scrape=not args.no_ncga,
             run_scoular_scrape=not args.no_scoular,
             run_agp_scrape=not args.no_agp,
             run_ldc_scrape=not args.no_ldc,

@@ -136,6 +136,11 @@ def _basis_to_cents(basis_str: str) -> Optional[int]:
         return None
 
 
+def _has_contract_month(sym: str) -> bool:
+    """'@SX26' / '@RSX26' name a futures contract (root + month letter + 2-digit year); a bare '@RS' does not."""
+    return bool(re.fullmatch(r"@?[A-Za-z]{1,3}[FGHJKMNQUVXZ]\d{2}", (sym or "").strip()))
+
+
 # ── Main parser ────────────────────────────────────────────────────────────────
 
 def parse_bunge_location(loc: dict) -> Optional[NewSnapshotRequest]:
@@ -170,6 +175,10 @@ def parse_bunge_location(loc: dict) -> Optional[NewSnapshotRequest]:
             continue
 
         grain     = _norm_grain(commodity)
+        # Winter canola at the river terminals (Cairo) is posted per barge point as a FLAT PRICE: symbol '@RS' with no contract month and a placeholder
+        # basis of 0.00 — not a basis of zero. Skipped (those zero rows used to fill the canola views; see CLAUDE.md, "Canola").
+        if grain == "Canola" and not _has_contract_month(symbol_raw):
+            continue
         cme_sym   = _convert_symbol(symbol_raw)
         del_key   = _delivery_key(delivery)
         pfx       = _GRAIN_PFX.get(grain, grain[:2].upper() if grain else "XX")

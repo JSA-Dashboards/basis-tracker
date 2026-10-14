@@ -20,6 +20,11 @@ import threading
 import time
 from pathlib import Path
 from models import Snapshot, SnapshotRow
+try:                                           # canola is stored x100 (C$/t) and read back as quoted; see grain_units.py
+    from grain_units import scale_basis as _scale_basis
+except Exception:                              # noqa: BLE001 — a packaged copy without the helper (e.g. a Snowpark proc): rows come back as stored
+    def _scale_basis(grain, basis_cents):
+        return basis_cents
 
 DB_PATH = Path(__file__).parent / "basis_tracker.db"
 
@@ -1179,7 +1184,7 @@ def get_snapshots(provider: str, location: str) -> list[Snapshot]:
             grain         = row["grain"],
             deliveryMonth = row["delivery_month"],
             futuresSymbol = row["futures_symbol"],
-            basisCents    = row["basis_cents"],
+            basisCents    = _scale_basis(row["grain"], row["basis_cents"]),
             isSpot        = bool(row["is_spot"]),
             spotGrain     = row["spot_grain"],
         ))
@@ -1434,7 +1439,7 @@ def get_map_data() -> list[dict]:
                     "grain":          canon,
                     "delivery_month": row["delivery_month"] or "",
                     "futures_symbol": row["futures_symbol"] or "",
-                    "basis":          row["basis_cents"],
+                    "basis":          _scale_basis(row["grain"], row["basis_cents"]),     # canola: the quoted C$/t, not x100
                 })
 
     return list(locs.values())
@@ -1771,7 +1776,7 @@ def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> d
             grain         = row["grain"],
             deliveryMonth = row["delivery_month"],
             futuresSymbol = row["futures_symbol"],
-            basisCents    = row["basis_cents"],
+            basisCents    = _scale_basis(row["grain"], row["basis_cents"]),
             isSpot        = bool(row["is_spot"]),
             spotGrain     = row["spot_grain"],
         ))
@@ -1828,7 +1833,7 @@ def get_snapshots_asof(pairs: list[tuple[str, str]], asof_iso: str, max_age_days
                 location=row["location"], source=row["source"], rows=[])
         snap.rows.append(SnapshotRow(
             id=row["row_id"], grain=row["grain"], deliveryMonth=row["delivery_month"],
-            futuresSymbol=row["futures_symbol"], basisCents=row["basis_cents"],
+            futuresSymbol=row["futures_symbol"], basisCents=_scale_basis(row["grain"], row["basis_cents"]),
             isSpot=bool(row["is_spot"]), spotGrain=row["spot_grain"]))
     return result
 
