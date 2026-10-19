@@ -240,6 +240,27 @@ def week_index(d: date, crop_year: int) -> int:
     return round((d - first_wednesday(crop_year)).days / 7)
 
 
+def first_september_wednesday(crop_year: int) -> date:
+    """The first Wednesday on or after Sep 1: WEEK 0 of a harvest window of the user's (Kolten 2026-10-19: "start with week zero as Sep 1")."""
+    d = date(crop_year, 9, 1)
+    while d.weekday() != 2:
+        d += timedelta(days=1)
+    return d
+
+
+def report_start_week(crop_year: int) -> int:
+    """The week, counted from week 0 = the first Wednesday of September, of the first Wednesday of October, where the report's window starts:
+    5 when September has five Wednesdays (2026: Sep 2 ... Sep 30, Oct 7), else 4 (2025: Sep 3 ... Sep 24, Oct 1)."""
+    return (first_wednesday(crop_year) - first_september_wednesday(crop_year)).days // 7
+
+
+def window_index(harvest_window: tuple, crop_year: int) -> int:
+    """The weekly-row index (0 = the first Wednesday of October, negative = September) of a harvest window's first week, which is counted
+    from week 0 = the first Wednesday of September: the same weeks from September in every crop year, so a different row in a year whose
+    September has five Wednesdays than in one with four."""
+    return int(harvest_window[0]) - report_start_week(crop_year)
+
+
 def basis_cost(b0: float, f_base: float, rate_pct: float, purchase: date, ship: date, spread_cum: float) -> float:
     """The break-even basis for a shipment on `ship` — the "Basis Cost" row of the report's table: what the harvest
     purchase has to be bid back to for the storage to wash.
@@ -340,7 +361,7 @@ class CropYear:
     spec: Spec = CORN
     window_end: date | None = None           # limit_crop_year(): the day the study was told to stop (None = the whole season)
     carry_tag: str | None = None             # limit_crop_year(): the contract the last week is quoted off, where `season_carry` was banked to
-    b0_window: tuple | None = None           # build_crop_year(harvest_window=...): the user's (first week index, number of weeks) of the average; None = the report's
+    b0_window: tuple | None = None           # build_crop_year(harvest_window=...): the user's (first week, number of weeks) of the average, week 0 = the first Wednesday of September; None = the report's
 
     @property
     def dec_jul_carry(self) -> float | None:
@@ -364,9 +385,10 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
              return is measured from it (`cy.b0`, `cy.b0_own`); the calculated average is kept in `cy.b0_calc`. None = the calculated one.
              The interest does not depend on it (it runs on the week's cash price), so an override shifts every gross and net return, and
              the best return, by the same amount (calculated - own) and leaves the best WEEK where it was.
-    harvest_window  the user's OWN window for the calculated harvest basis: (first week index, number of weeks), index 0 = the first Wednesday of
-             October (negative = the September Wednesdays before it). It replaces the report's window AND any year-specific one, so the average
-             is taken over the same weeks in every crop year. None = the report's (the first 7 weeks, with the analyst's per-year exceptions).
+    harvest_window  the user's OWN window for the calculated harvest basis: (first week, number of weeks), week 0 = the first Wednesday of
+             SEPTEMBER (first_september_wednesday; the first Wednesday of October is week 4 or 5, report_start_week). It replaces the report's
+             window AND any year-specific one, so the average is taken over the same weeks, counted from September, in every crop year. None = the
+             report's (the first 7 weeks from the first Wednesday of October, with the analyst's per-year exceptions).
              Only which bids are averaged changes: the weekly returns, the interest clock (from the spec's accrual start) and the carry are the
              same, so the window moves every gross and net return by the same amount, as an own harvest basis does. A September bid quoted
              off September (CU) futures is rolled to Dec at the spread on the last day before first notice (`sept_to_dec_spread`).
@@ -381,11 +403,11 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
     if window_start:
         window = tuple(range(window_start, window_start + len(window)))
     lowest = window[0]
-    if harvest_window is not None:                         # the user's window: the same weeks in every year, and no week before October is lost
-        w0, wn = int(harvest_window[0]), max(1, int(harvest_window[1]))
+    if harvest_window is not None:                         # the user's window: the same weeks from September in every year, and no week before October is lost
+        w0, wn = window_index(harvest_window, crop_year), max(1, int(harvest_window[1]))
         window = tuple(range(w0, w0 + wn))
         lowest = min(w0, 0)
-        cy.b0_window = (w0, wn)
+        cy.b0_window = (int(harvest_window[0]), wn)
     accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
     n_idx = {lab: i for i, lab in enumerate(spec.chain)}
     byweek: dict = {}
@@ -721,7 +743,7 @@ class ShipTable:
     b0_own: bool = False                # `b0` is the user's own harvest basis, not the calculated average / estimate
     b0_calc: float | None = None        # what the calculated method gives (the average so far, or the estimate before the weekly bids)
     ship_by: date | None = None         # limit_shipment_table(): the day the study was told to stop (None = every month)
-    b0_window: tuple | None = None      # the user's (first week index, number of weeks) of the harvest-basis average (None = the report's)
+    b0_window: tuple | None = None      # the user's (first week, number of weeks) of the harvest-basis average, week 0 = the first Wednesday of September (None = the report's)
 
     @property
     def f_dec(self) -> float | None:

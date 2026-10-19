@@ -202,10 +202,15 @@ its 21 completed years is +39.5¢ with no limit, +20.5¢ when it has to ship by 
 **Harvest window — which weeks the calculated basis averages** (Kolten 2026-10-12: "we default to establishing corn basis as of Oct and for 7
 weeks or how is the logic? ... yes, add start week and number of weeks"). Two number boxes under the Harvest basis switch,
 **Start week** and **Number of weeks** (`_harvest_window_choice` in `return_to_carry_block`), choose the weekly bids the CALCULATED harvest basis
-averages. Week 1 = the first Wednesday of October (engine index 0; the box shows index + 1), week 0 = the last Wednesday of September, -1, -2, -3
-back into early September (the engine loads bids from Sep 1). The default, 1 and 7, is the report's window and keeps its year-specific exceptions
-(`WINDOW_OVERRIDES`: six weeks in 1998-2001, 2010 and 2015, later starts in 2009 and 2019, September in 2012); any other pair is the SAME weeks in
-every crop year and replaces those exceptions — `build_crop_year(harvest_window=(first index, n))` (-> `cy.b0_window`), threaded through
+averages. **Week 0 = the first Wednesday on or after Sep 1** (Kolten 2026-10-19: "start with week zero as Sep 1 rather than Oct 1";
+`rtc.first_september_wednesday`; until then week 1 was the first Wednesday of October and September counted back 0, -1, -2, -3). The engine's
+weekly rows still start at the first Wednesday of October (index 0), which is week 4, or week 5 when September has five Wednesdays
+(`rtc.report_start_week`: 5 in 2015, 2020, 2021, 2026; 4 in 2022-2025); `rtc.window_index` turns a window's first week into that year's row.
+The default, (that week, 7), is the report's window and keeps its year-specific exceptions (`WINDOW_OVERRIDES`: six weeks in 1998-2001, 2010
+and 2015, later starts in 2009 and 2019, September in 2012); any other pair is the SAME weeks, counted from September, in every crop year (so a
+row earlier after a five-Wednesday September) and replaces those exceptions. No single pair is the report's window in every year any more, so
+the block's default follows the tracked crop year (`window_default`) and its `_kept` mirror holds None while the boxes are at it —
+`build_crop_year(harvest_window=(first week, n))` (-> `cy.b0_window`, the pair as typed), threaded through
 `rd.shipment_table` / `run_history(_noted)` (`tbl.b0_window`, `summary_rows` `b0_window`); the block hands the engine None at the default. It changes
 only WHICH BIDS are averaged: interest still starts at the report's third (soybean: fifth) weekly bid and the roll spreads are the same, so every
 weekly return moves by (report's average - window's) and the best WEEK does not move; a window that opens after the interest clock says so under the

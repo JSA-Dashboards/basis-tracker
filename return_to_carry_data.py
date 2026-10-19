@@ -308,7 +308,8 @@ def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: 
     b0_override  the user's OWN harvest basis (cents vs the spec's base contract) in place of the calculated one: the break-even,
                  the returns and the interest all use it, `tbl.b0_own` is True and `tbl.b0_calc` keeps what the calculated method
                  gives (the average so far, or the estimate before the weekly bids) to show beside it; no estimate is returned then.
-    harvest_window the user's window for the calculated harvest basis, (first week index, number of weeks) — see build_crop_year. The average is then
+    harvest_window the user's window for the calculated harvest basis, (first week, number of weeks), week 0 = the first Wednesday of September — see
+                 build_crop_year. The average is then
                  taken over THOSE weeks' bids as they post (`tbl.b0_window` says so), and there is no estimate from the forward quotes before they do: the
                  estimate is of the report's window, not theirs."""
     crop_year = rtc.shipment_crop_year(asof)
@@ -389,8 +390,9 @@ def run_history_noted(obs: list[dict], futs: dict, rate_on, min_weeks: int = 12,
     without the years that only repeat the previous one (`skipped` = their labels). A year needs some weeks to say anything,
     so one with fewer than `min_weeks` of bids is left out unless it is the newest (the one in progress).
     `b0_overrides` = {crop year: the user's own harvest basis} (see own_b0_map()): those years are measured from it, the rest
-    from their calculated average. `harvest_window` = the user's (first week index, number of weeks) for that calculated average, the same
-    weeks in EVERY crop year (instead of the report's first 7 and its year-specific windows); None = the report's."""
+    from their calculated average. `harvest_window` = the user's (first week, number of weeks) for that calculated average, week 0 = the first
+    Wednesday of September: the same weeks, counted from September, in EVERY crop year (instead of the report's first 7 and its year-specific
+    windows); None = the report's."""
     min_year = spec.min_crop_year if min_year is None else min_year
     ys = [y for y in crop_years_in(obs, spec) if y >= min_year]
     out = []

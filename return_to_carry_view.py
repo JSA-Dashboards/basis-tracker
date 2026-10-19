@@ -32,14 +32,14 @@ MONTH_FULL = ["January", "February", "March", "April", "May", "June", "July", "A
 
 
 def window_text(crop_year: int, window: tuple, dates_note: str = "") -> str:
-    """The weeks of a user-chosen harvest-basis window, in the user's numbering (week 1 = the first Wednesday of October, week 0 = the last Wednesday of
-    September) with the tracked crop year's dates: 'weeks 3 to 6 (Oct 21 – Nov 11)'; `dates_note` goes inside the brackets after the dates."""
+    """The weeks of a user-chosen harvest-basis window, in the user's numbering (week 0 = the first Wednesday of September) with the tracked crop
+    year's dates: 'weeks 7 to 10 (Oct 21 – Nov 11)'; `dates_note` goes inside the brackets after the dates."""
     w0, wn = window
-    first = rtc.first_wednesday(crop_year)
+    first = rtc.first_september_wednesday(crop_year)
     a, b = first + timedelta(days=7 * w0), first + timedelta(days=7 * (w0 + wn - 1))
     if wn == 1:
-        return f"week {w0 + 1} ({a.strftime('%b')} {a.day}{dates_note})"
-    return f"weeks {w0 + 1} to {w0 + wn} ({a.strftime('%b')} {a.day} – {b.strftime('%b')} {b.day}{dates_note})"
+        return f"week {w0} ({a.strftime('%b')} {a.day}{dates_note})"
+    return f"weeks {w0} to {w0 + wn - 1} ({a.strftime('%b')} {a.day} – {b.strftime('%b')} {b.day}{dates_note})"
 
 
 def _f(v, dec: int = 1, sign: bool = True) -> str:
@@ -213,7 +213,8 @@ def table_html(rows: list[dict], measure: str = "net", derived: dict | None = No
     if rows[-1].get("b0_window"):
         legend += ('<div style="font-size:11px;color:#1f4e79;margin-top:4px">Harvest basis = the average of your window, '
                    + window_text(rows[-1]["crop_year"], rows[-1]["b0_window"], ", the tracked year's dates")
-                   + ": the same weeks in every crop year, in place of the report's first 7 weekly bids and its year-specific windows.</div>")
+                   + ": the same weeks, counted from the first Wednesday of September, in every crop year, in place of the report's first 7 weekly "
+                     "bids and its year-specific windows.</div>")
     lead = ""
     if limited:
         lead = (f'<div style="font-size:11px;color:#1f4e79;margin:2px 0 6px">Study ends at the end of {MONTH_FULL[limited.month - 1]}: each year\'s '
@@ -317,8 +318,9 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
                 "crop year being tracked, or, as a what-if, every crop year. In the weekly history the interest is charged on each week's cash price, "
                 "not on the harvest basis, so a different harvest basis moves every week's return by the same amount; the shipment table's "
                 "break-even does charge interest on it (futures + harvest basis).")
-    harvest += (" The **Start week** and **Number of weeks** boxes change which weekly bids the calculated average takes (week 1 is the first Wednesday of "
-                "October; week 0, -1 ... are the September Wednesdays before it): a window you set is the same weeks in every crop year and replaces the "
+    harvest += (" The **Start week** and **Number of weeks** boxes change which weekly bids the calculated average takes (week 0 is the first Wednesday of "
+                "September, week 1 the next; the report starts at the first Wednesday of October, week 4, or week 5 when September has five Wednesdays): "
+                "a window you set is the same weeks, counted from September, in every crop year and replaces the "
                 "report's own year-specific windows, and the interest still starts at the report's " + ("fifth" if soy else "third") + " weekly bid whatever "
                 "the window." + ("" if soy else " A September bid quoted off September (CU) futures is rolled to Dec at the Dec - Sep spread on the last "
                                  "trading day before that contract's first notice day (the last business day of August); a bid already quoted off Dec — "

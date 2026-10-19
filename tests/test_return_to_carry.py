@@ -197,16 +197,27 @@ check("the weekly return is bid - the harvest basis + the banked carry, for any 
 soy_off = rtc.build_crop_year([{"date": date(2025, 10, 1) + timedelta(days=7 * k), "basis": -30.0, "tag": "F"} for k in range(0, 12)], {}, 2025, rate, rtc.SOY, b0_override=-10.0)
 check("soybeans take the same override (vs Jan)", soy_off.b0_own and close(soy_off.b0, -10.0) and close(soy_off.b0_calc, -30.0), (soy_off.b0, soy_off.b0_calc))
 
-print("return_to_carry: the user's own window for the calculated harvest basis (synthetic year: the bid climbs 0.5 cents a week, so week k reads 10 + 0.5 k)")
+print("return_to_carry: week 0 of a window of the user's = the first Wednesday of September (Kolten 2026-10-19)")
+check("week 0 is the first Wednesday on or after Sep 1: 2026 Sep 2, 2025 Sep 3, 2021 Sep 1 (a Wednesday), 2022 Sep 7",
+      rtc.first_september_wednesday(2026) == date(2026, 9, 2) and rtc.first_september_wednesday(2025) == date(2025, 9, 3)
+      and rtc.first_september_wednesday(2021) == date(2021, 9, 1) and rtc.first_september_wednesday(2022) == date(2022, 9, 7))
+check("the first Wednesday of October (the report's start) is week 5 when September has five Wednesdays (2026, 2021, 2020), else week 4 (2025, 2022, 2019)",
+      [rtc.report_start_week(y) for y in (2026, 2021, 2020, 2025, 2022, 2019)] == [5, 5, 5, 4, 4, 4])
+check("...always 4 or 5, 1996 to 2040", all(rtc.report_start_week(y) in (4, 5) for y in range(1996, 2041)))
+check("a window's first week -> the weekly row (0 = the first Wednesday of October): week 5 is row 0 in 2026 and row 1 in 2025; week 0 is row -5 / -4",
+      rtc.window_index((5, 7), 2026) == 0 and rtc.window_index((5, 7), 2025) == 1 and rtc.window_index((0, 3), 2026) == -5 and rtc.window_index((0, 3), 2025) == -4)
+
+print("return_to_carry: the user's own window for the calculated harvest basis (synthetic year 2025-26, Oct 1 = week 4: the bid climbs 0.5 cents a week, "
+      "so row k reads 10 + 0.5 k)")
 climb = [{"date": START + timedelta(days=7 * k), "basis": 10.0 + 0.5 * k} for k in range(0, 43)]
 c_def = rtc.build_crop_year(climb, FUT, 2025, rate)
 check("the report's window: the first 7 weeks, 10 + 0.5 x 3 = 11.5; no window of the user's recorded", close(c_def.b0, 11.5) and c_def.b0_weeks == 7 and c_def.b0_window is None)
-c_same = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(0, 7))
-check("a window of weeks 1 to 7 reproduces the report's exactly: the same average and every week's return, interest and carry",
-      close(c_same.b0, c_def.b0) and c_same.b0_window == (0, 7) and [(w.net, w.gross, w.interest, w.carry) for w in c_same.weeks] == [(w.net, w.gross, w.interest, w.carry) for w in c_def.weeks])
-c_w = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(3, 4))
-check("weeks 4 to 7 average those four bids ((11.5 + 12 + 12.5 + 13) / 4 = 12.25); recorded as the window, not flagged own, and 'calculated' is that average",
-      close(c_w.b0, 12.25) and c_w.b0_window == (3, 4) and c_w.b0_weeks == 4 and not c_w.b0_own and close(c_w.b0_calc, 12.25)
+c_same = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(4, 7))
+check("a window of weeks 4 to 10 (Oct 1 - Nov 12) reproduces the report's exactly: the same average and every week's return, interest and carry",
+      close(c_same.b0, c_def.b0) and c_same.b0_window == (4, 7) and [(w.net, w.gross, w.interest, w.carry) for w in c_same.weeks] == [(w.net, w.gross, w.interest, w.carry) for w in c_def.weeks])
+c_w = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(7, 4))
+check("weeks 7 to 10 average those four bids ((11.5 + 12 + 12.5 + 13) / 4 = 12.25); recorded as the window, as typed, not flagged own, and 'calculated' is that average",
+      close(c_w.b0, 12.25) and c_w.b0_window == (7, 4) and c_w.b0_weeks == 4 and not c_w.b0_own and close(c_w.b0_calc, 12.25)
       and c_w.b0_dates == (START + timedelta(days=21), START + timedelta(days=42)), (c_w.b0, c_w.b0_dates))
 paired = [(a, b) for a, b in zip(c_w.weeks, c_def.weeks) if b.net is not None]
 check("only the average moved: the interest, the carry and the weeks are the same, every return shifts by the same amount (11.5 - 12.25), the best week is the same week",
@@ -214,18 +225,23 @@ check("only the average moved: the interest, the carry and the weeks are the sam
       and c_w.best["net"].idx == c_def.best["net"].idx, len(paired))
 check("a window that starts after the interest does keeps the returns of the weeks before it (they are measured from the window's average, as the report's are from its own)",
       [w.net for w in c_w.weeks[:2]] == [None, None] and c_w.weeks[2].net is not None and c_w.weeks[2].idx == 2)
-c_one = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(4, 1))
-check("a single week is that week's bid (week 5 reads 12.0)", close(c_one.b0, 12.0) and c_one.b0_weeks == 1 and c_one.b0_dates[0] == c_one.b0_dates[1])
-part_w = rtc.build_crop_year(climb[:5], FUT, 2025, rate, harvest_window=(2, 5))              # bids to week 5 only; window = weeks 3 to 7
-check("a window that has not finished is the average so far (3 of its 5 bids: weeks 3, 4, 5 = 11.0, 11.5, 12.0)", part_w.b0_weeks == 3 and close(part_w.b0, 11.5) and part_w.b0_window == (2, 5))
-none_w = rtc.build_crop_year(climb[:3], FUT, 2025, rate, harvest_window=(5, 3))
-check("no bid in the window yet: no harvest basis, no returns and no crash", none_w.b0 is None and all(w.net is None for w in none_w.weeks) and none_w.b0_window == (5, 3))
+c_one = rtc.build_crop_year(climb, FUT, 2025, rate, harvest_window=(8, 1))
+check("a single week is that week's bid (week 8, row 4, reads 12.0)", close(c_one.b0, 12.0) and c_one.b0_weeks == 1 and c_one.b0_dates[0] == c_one.b0_dates[1])
+part_w = rtc.build_crop_year(climb[:5], FUT, 2025, rate, harvest_window=(6, 5))              # bids to row 4 only; window = weeks 6 to 10 (rows 2 to 6)
+check("a window that has not finished is the average so far (3 of its 5 bids: rows 2, 3, 4 = 11.0, 11.5, 12.0)", part_w.b0_weeks == 3 and close(part_w.b0, 11.5) and part_w.b0_window == (6, 5))
+none_w = rtc.build_crop_year(climb[:3], FUT, 2025, rate, harvest_window=(9, 3))
+check("no bid in the window yet: no harvest basis, no returns and no crash", none_w.b0 is None and all(w.net is None for w in none_w.weeks) and none_w.b0_window == (9, 3))
 y19 = [{"date": rtc.first_wednesday(2019) + timedelta(days=7 * k), "basis": float(k)} for k in range(0, 43)]
-check("a window of the user's replaces the analyst's year-specific one: 2019-20's sheet averaged weeks 3-9 (bids 2..8 = 5.0); the user's weeks 1-7 are bids 0..6 = 3.0",
-      close(rtc.build_crop_year(y19, {}, 2019, rate).b0, 5.0) and close(rtc.build_crop_year(y19, {}, 2019, rate, harvest_window=(0, 7)).b0, 3.0))
-c_wo = rtc.build_crop_year(climb, FUT, 2025, rate, b0_override=4.0, harvest_window=(3, 4))
+check("a window of the user's replaces the analyst's year-specific one: 2019-20's sheet averaged rows 2-8 (bids 2..8 = 5.0); the user's weeks 4-10 "
+      "(2019-20's September has four Wednesdays) are bids 0..6 = 3.0",
+      close(rtc.build_crop_year(y19, {}, 2019, rate).b0, 5.0) and close(rtc.build_crop_year(y19, {}, 2019, rate, harvest_window=(4, 7)).b0, 3.0))
+y20 = [{"date": rtc.first_wednesday(2020) + timedelta(days=7 * k), "basis": float(k)} for k in range(0, 43)]
+check("the same weeks are counted from September in every year: weeks 4-10 in 2020-21 (five September Wednesdays) start a row EARLIER, at Sep 30, "
+      "which has no bid here, so they average bids 0..5 = 2.5 from 6 bids",
+      close(rtc.build_crop_year(y20, {}, 2020, rate, harvest_window=(4, 7)).b0, 2.5) and rtc.build_crop_year(y20, {}, 2020, rate, harvest_window=(4, 7)).b0_weeks == 6)
+c_wo = rtc.build_crop_year(climb, FUT, 2025, rate, b0_override=4.0, harvest_window=(7, 4))
 check("an own harvest basis still wins; the window's average is what 'calculated' means beside it", close(c_wo.b0, 4.0) and c_wo.b0_own and close(c_wo.b0_calc, 12.25))
-check("the window is kept when the study is limited (Ship by)", rtc.limit_crop_year(c_w, 3).b0_window == (3, 4))
+check("the window is kept when the study is limited (Ship by)", rtc.limit_crop_year(c_w, 3).b0_window == (7, 4))
 
 print("return_to_carry: a September bid quoted off September futures is rolled to Dec at the spread of the last day before first notice (corn)")
 check("the roll day: the weekday before first notice (the last business day of August) — 2026 Fri Aug 28 (notice Mon Aug 31), 2025 Thu Aug 28 (notice Fri Aug 29), 2027 Mon Aug 30, 2020 Fri Aug 28",
@@ -237,21 +253,21 @@ check("the spread is Dec - Sep on that day (+20), with the day", rtc.sept_to_dec
 check("it steps back over a gap, as every futures lookup does (only Aug 27 has prices)", rtc.sept_to_dec_spread({date(2026, 8, 27): {"ZCU26": 450.0, "ZCZ26": 462.5}}, 2026)[0] == 12.5)
 check("no price for one of the two contracts: no spread", rtc.sept_to_dec_spread({date(2026, 8, 28): {"ZCZ26": 470.0}}, 2026) is None and rtc.sept_to_dec_spread({}, 2026) is None)
 check("an inverted market gives a negative spread (Sep over Dec)", rtc.sept_to_dec_spread({date(2026, 8, 28): {"ZCU26": 500.0, "ZCZ26": 484.25}}, 2026)[0] == -15.75)
-S0 = rtc.first_wednesday(2026)                                                   # Oct 7 2026: week index -4 = Sep 9, -3 = Sep 16, -2 = Sep 23, -1 = Sep 30
+S0 = rtc.first_wednesday(2026)                                                   # Oct 7 2026 = week 5: row -4 = Sep 9 (week 1), -3 = Sep 16, -2 = Sep 23, -1 = Sep 30
 tags = {-4: "ZCU26", -3: "ZCU26", -2: "ZCZ26", -1: None, 0: "ZCZ26"}
 bases = {-4: 30.0, -3: 28.0, -2: 8.0, -1: 6.0, 0: 4.0}
 obs_s = [{"date": S0 + timedelta(days=7 * k), "basis": b, "tag": tags[k]} for k, b in bases.items()]
-cy_s = rtc.build_crop_year(obs_s, FS26, 2026, rate, harvest_window=(-4, 5))
-check("a September-start window: the two bids quoted off CU are rolled (30 - 20 = 10, 28 - 20 = 8); the CZ bid and the untagged one are left alone: (10 + 8 + 8 + 6 + 4) / 5 = 7.2",
-      close(cy_s.b0, 7.2) and cy_s.b0_weeks == 5 and cy_s.b0_dates == (S0 - timedelta(days=28), S0) and cy_s.b0_window == (-4, 5), (cy_s.b0, cy_s.b0_weeks))
-cy_n = rtc.build_crop_year(obs_s, {}, 2026, rate, harvest_window=(-4, 5))
+cy_s = rtc.build_crop_year(obs_s, FS26, 2026, rate, harvest_window=(1, 5))
+check("a September-start window (weeks 1 to 5, Sep 9 - Oct 7): the two bids quoted off CU are rolled (30 - 20 = 10, 28 - 20 = 8); the CZ bid and the untagged one are left alone: (10 + 8 + 8 + 6 + 4) / 5 = 7.2",
+      close(cy_s.b0, 7.2) and cy_s.b0_weeks == 5 and cy_s.b0_dates == (S0 - timedelta(days=28), S0) and cy_s.b0_window == (1, 5), (cy_s.b0, cy_s.b0_weeks))
+cy_n = rtc.build_crop_year(obs_s, {}, 2026, rate, harvest_window=(1, 5))
 check("when the spread cannot be measured the CU bids are left out, not guessed: (8 + 6 + 4) / 3 = 6.0 from 3 bids", close(cy_n.b0, 6.0) and cy_n.b0_weeks == 3, (cy_n.b0, cy_n.b0_weeks))
-cy_z = rtc.build_crop_year([dict(o, tag=None) for o in obs_s], FS26, 2026, rate, harvest_window=(-4, 5))
+cy_z = rtc.build_crop_year([dict(o, tag=None) for o in obs_s], FS26, 2026, rate, harvest_window=(1, 5))
 check("a bid with no tag is taken as quoted off Dec (every untagged fall bid, and the many locations that quote their fall and new-crop bids off CZ): no roll",
       close(cy_z.b0, (30 + 28 + 8 + 6 + 4) / 5.0) and cy_z.b0_weeks == 5)
 check("the report's default window never reaches September, so a CU-tagged September bid cannot change it", close(rtc.build_crop_year(obs_s, FS26, 2026, rate).b0, 4.0))
 check("a CU-quoted bid dated Oct of the same year is rolled the same way (the old-crop Sep contract is gone either way)",
-      close(rtc.build_crop_year([{"date": S0, "basis": 30.0, "tag": "ZCU26"}], FS26, 2026, rate, harvest_window=(0, 1)).b0, 10.0))
+      close(rtc.build_crop_year([{"date": S0, "basis": 30.0, "tag": "ZCU26"}], FS26, 2026, rate, harvest_window=(5, 1)).b0, 10.0))
 obs_u = [dict(o) for o in OBS]
 july = next(o for o in obs_u if o["date"] == date(2026, 7, 1))
 july["tag"] = "ZCU26"
@@ -260,17 +276,19 @@ check("a Sep tag on a bid of the NEXT summer is the chain's own September (ZCU26
       w_u.tag == "U" and close(w_u.basis, 10.0) and close(w_u.carry, 10.0), (w_u.tag, w_u.basis, w_u.carry))
 check("a full symbol whose year is not the bid's (ZCU27 on a Sep 2026 bid) is a September a year out, not the expiring contract: not rolled",
       rtc.build_crop_year([{"date": S0 - timedelta(days=21), "basis": 30.0, "tag": "ZCU27"}, {"date": S0, "basis": 4.0, "tag": "ZCZ26"}], FS26, 2026, rate,
-                          harvest_window=(-3, 4)).b0_weeks in (1, 2))
+                          harvest_window=(2, 4)).b0_weeks in (1, 2))
 check("soybeans have no September contract: a 'U' tag is not rolled there",
-      rtc.build_crop_year([{"date": S0 + timedelta(days=7 * k), "basis": -20.0 + k, "tag": "ZSX26"} for k in range(0, 12)], {}, 2026, rate, rtc.SOY, harvest_window=(0, 3)).b0_weeks in (0, 3))
+      rtc.build_crop_year([{"date": S0 + timedelta(days=7 * k), "basis": -20.0 + k, "tag": "ZSX26"} for k in range(0, 12)], {}, 2026, rate, rtc.SOY, harvest_window=(5, 3)).b0_weeks in (0, 3))
+w0_bid = rtc.build_crop_year([{"date": date(2026, 9, 2), "basis": 40.0, "tag": "ZCZ26"}, {"date": S0, "basis": 4.0, "tag": "ZCZ26"}], FS26, 2026, rate, harvest_window=(0, 1))
+check("week 0 itself is the first Wednesday of September (Sep 2, 2026): a window of week 0 alone is that bid", close(w0_bid.b0, 40.0) and w0_bid.b0_weeks == 1, (w0_bid.b0, w0_bid.b0_weeks))
 
 sep_only = [o for o in obs_s if o["date"] < S0]                                  # Sep 9, 16, 23, 30 posted; the first October Wednesday has not come
-cy_so = rtc.build_crop_year(sep_only, FS26, 2026, rate, harvest_window=(-4, 5))
+cy_so = rtc.build_crop_year(sep_only, FS26, 2026, rate, harvest_window=(1, 5))
 check("a September window before October's first Wednesday: the average so far (4 of 5 bids: 10, 8, 8, 6 = 8.0), no weekly rows and no crash",
       close(cy_so.b0, 8.0) and cy_so.b0_weeks == 4 and cy_so.weeks == [] and cy_so.best == {} and cy_so.complete is False, (cy_so.b0, cy_so.b0_weeks, len(cy_so.weeks)))
 cy_sd = rtc.build_crop_year(sep_only, FS26, 2026, rate)
 check("the report's window is unchanged by that: September bids alone are still no crop year (empty)", cy_sd.b0 is None and cy_sd.weeks == [] and cy_sd.b0_weeks == 0)
-check("no bids at all with a window of the user's: empty, not an error", rtc.build_crop_year([], FS26, 2026, rate, harvest_window=(-4, 5)).b0 is None)
+check("no bids at all with a window of the user's: empty, not an error", rtc.build_crop_year([], FS26, 2026, rate, harvest_window=(1, 5)).b0 is None)
 
 print("return_to_carry: ship by — a study that stops at the end of a month (synthetic year: flat +10 bids, carry Dec->Mar 10, Mar->May 4, May->Jul 2)")
 check("the months a study can end in: November through the month before the season's last (corn: Jun, soybeans: Aug) — the last month is the 'no limit' choice",

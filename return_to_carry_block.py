@@ -71,52 +71,59 @@ def _harvest_basis_choice(spec, key: str, calc: float | None, label: str):
     return float(value), bool(every)
 
 
-WINDOW_DEFAULT = (1, rtc.WINDOW_WEEKS)                       # the report's window: 7 weeks from week 1, the first Wednesday of October
+def window_default(crop_year: int) -> tuple:
+    """The report's window in the boxes' numbering (week 0 = the first Wednesday of September): 7 weeks from the first Wednesday of October, which
+    is week 5 when September has five Wednesdays (2026-27) and week 4 when it has four (2025-26)."""
+    return (rtc.report_start_week(crop_year), rtc.WINDOW_WEEKS)
 
 
 def _harvest_window_choice(spec, crop_year: int):
-    """The Start week / Number of weeks boxes under the Harvest basis switch: which weekly bids the CALCULATED harvest basis averages. Week 1 is the first
-    Wednesday of October, week 0 the last Wednesday of September and so on back (a September start is allowed); the default, 1 and 7, is the report's own
-    window and keeps its year-specific exceptions. A window set here is the same weeks in every crop year. Returns None for the report's window, else
-    (first week INDEX (week - 1), number of weeks) as build_crop_year(harvest_window=) takes it. Kept per grain across locations: it is how the user
-    establishes their basis, not a fact about a location (and mirrored in `..._kept` while the boxes are not drawn)."""
+    """The Start week / Number of weeks boxes under the Harvest basis switch: which weekly bids the CALCULATED harvest basis averages. Week 0 is the first
+    Wednesday of September (Kolten 2026-10-19: "start with week zero as Sep 1 rather than Oct 1"), so the first Wednesday of October is week 4 or 5; the
+    default, that week and 7, is the report's own window and keeps its year-specific exceptions. A window set here is the same weeks, counted from
+    September, in every crop year. Returns None for the report's window, else (first week, number of weeks) as build_crop_year(harvest_window=) takes it.
+    Kept per grain across locations: it is how the user establishes their basis, not a fact about a location (and mirrored in `..._kept` while the boxes
+    are not drawn; None there = the report's window, so it follows the tracked crop year's start week)."""
     key = f"nc_rtc_win_{spec.key}"
-    kept = st.session_state.get(f"{key}_kept", WINDOW_DEFAULT)
+    default = window_default(crop_year)
+    kept = st.session_state.get(f"{key}_kept") or default
     try:
         c1, c2, c3 = st.columns([1, 1, 3], vertical_alignment="bottom")
     except TypeError:                                        # an older Streamlit has no vertical_alignment
         c1, c2, c3 = st.columns([1, 1, 3])
     with c1:
-        start = st.number_input("Start week", min_value=-3, max_value=30, step=1, value=int(kept[0]), key=f"{key}_start",
-                                help="The first weekly bid of the calculated harvest basis. Week 1 is the first Wednesday of October (the report's start); "
-                                     "week 0 is the last Wednesday of September, -1 the one before it, back to -3 (early September).")
+        start = st.number_input("Start week", min_value=0, max_value=34, step=1, value=int(kept[0]), key=f"{key}_start",
+                                help="The first weekly bid of the calculated harvest basis. Week 0 is the first Wednesday of September, week 1 the next "
+                                     f"and so on; the report starts at the first Wednesday of October, week {default[0]} in {rtc.crop_label(crop_year)} "
+                                     "(week 4 in a year whose September has four Wednesdays, 5 when it has five).")
     with c2:
         n = st.number_input("Number of weeks", min_value=1, max_value=26, step=1, value=int(kept[1]), key=f"{key}_n",
                             help=f"How many weekly bids are averaged. The report averages {rtc.WINDOW_WEEKS}.")
     start, n = int(start), int(n)
-    st.session_state[f"{key}_kept"] = (start, n)
-    custom = (start, n) != WINDOW_DEFAULT
-    wt = vw.window_text(crop_year, (start - 1, n))
+    custom = (start, n) != default
+    st.session_state[f"{key}_kept"] = (start, n) if custom else None
+    wt = vw.window_text(crop_year, (start, n))
     wt = wt[0].upper() + wt[1:]
     if custom:
-        text = (f"{wt} for {rtc.crop_label(crop_year)}: the same weeks in every crop year, in place of the report's first {rtc.WINDOW_WEEKS} "
-                "and its year-specific windows.")
+        text = (f"{wt} for {rtc.crop_label(crop_year)}: the same weeks, counted from the first Wednesday of September, in every crop year, in place of "
+                f"the report's first {rtc.WINDOW_WEEKS} and its year-specific windows.")
     else:
-        text = f"{wt} for {rtc.crop_label(crop_year)} — the report's window (week 1 is the first Wednesday of October)."
+        text = (f"{wt} for {rtc.crop_label(crop_year)} — the report's window (week 0 is the first Wednesday of September; the report starts at the "
+                "first Wednesday of October).")
     accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
-    if custom and start - 1 > accr:                          # the interest clock is the report's, whatever the window
+    if custom and rtc.window_index((start, n), crop_year) > accr:     # the interest clock is the report's, whatever the window
         d = rtc.first_wednesday(crop_year) + timedelta(days=7 * accr)
         which = "third" if spec.key == "corn" else "fifth"
         text += f" Interest still starts at the report's {which} weekly bid ({d.strftime('%b')} {d.day}), before this window opens."
     with c3:
         st.caption(text)
-    return (start - 1, n) if custom else None
+    return (start, n) if custom else None
 
 
 def _september_roll_note(spec, win, futs: dict, crop_year: int) -> None:
     """When the user's window reaches back into September (corn), say how a bid quoted off September (CU) futures is moved to Dec and at what level —
     the Dec - Sep spread of the last trading day before first notice — and that a bid already quoted off Dec is not touched."""
-    if spec.key != "corn" or win is None or win[0] >= 0:
+    if spec.key != "corn" or win is None or rtc.window_index(win, crop_year) >= 0:
         return
     sp = rtc.sept_to_dec_spread(futs, crop_year, spec.root)
     day = rtc.sept_roll_day(crop_year)
