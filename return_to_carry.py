@@ -362,6 +362,8 @@ class CropYear:
     window_end: date | None = None           # limit_crop_year(): the day the study was told to stop (None = the whole season)
     carry_tag: str | None = None             # limit_crop_year(): the contract the last week is quoted off, where `season_carry` was banked to
     b0_window: tuple | None = None           # build_crop_year(harvest_window=...): the user's (first week, number of weeks) of the average, week 0 = the first Wednesday of September; None = the report's
+    purchase: date | None = None             # set only when a window of the user's opened before the report's and moved the purchase with it: the
+                                             # Wednesday of the first week that earns interest and has a return (else the report's, ~Oct 20)
 
     @property
     def dec_jul_carry(self) -> float | None:
@@ -389,13 +391,16 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
              SEPTEMBER (first_september_wednesday; the first Wednesday of October is week 4 or 5, report_start_week). It replaces the report's
              window AND any year-specific one, so the average is taken over the same weeks, counted from September, in every crop year. None = the
              report's (the first 7 weeks from the first Wednesday of October, with the analyst's per-year exceptions).
-             Only which bids are averaged changes: the weekly returns, the interest clock (from the spec's accrual start) and the carry are the
-             same, so the window moves every gross and net return by the same amount, as an own harvest basis does. A September bid quoted
-             off September (CU) futures is rolled to Dec at the spread on the last day before first notice (`sept_to_dec_spread`).
+             A window that opens no earlier than the report's changes only which bids are averaged: the weekly returns, the interest clock (from
+             the spec's accrual start) and the carry are the same, so it moves every gross and net return by the same amount, as an own harvest
+             basis does. A window that opens EARLIER (in September) moves the PURCHASE with it (Kolten 2026-10-19, "purchase moves with
+             window"): the interest and the returns start at the window's own 3rd weekly bid for corn, 5th for soybeans — where the report's
+             start inside its own window — so the weekly rows begin in September (`cy.purchase`). A September bid quoted off September (CU)
+             futures is rolled to Dec at the spread on the last day before first notice (`sept_to_dec_spread`).
 
-    Like the sheets, time runs on a WEEKLY GRID from the first Wednesday of October: interest accrues for
-    every week from the spec's accrual start on, whether or not a bid was posted that week (a week with no bid just
-    has no return)."""
+    Like the sheets, time runs on a WEEKLY GRID from the first Wednesday of October (row 0; a moved purchase adds the September rows
+    before it as negative rows): interest accrues for every week from the accrual start on, whether or not a bid was posted that week
+    (a week with no bid just has no return)."""
     cy = CropYear(crop_year, crop_label(crop_year), spec=spec)
     lo, hi = date(crop_year, 9, 1), date(crop_year + 1, *spec.horizon)       # (Sep only feeds a harvest window)
     start = first_wednesday(crop_year)
@@ -403,12 +408,16 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
     if window_start:
         window = tuple(range(window_start, window_start + len(window)))
     lowest = window[0]
+    accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
     if harvest_window is not None:                         # the user's window: the same weeks from September in every year, and no week before October is lost
         w0, wn = window_index(harvest_window, crop_year), max(1, int(harvest_window[1]))
         window = tuple(range(w0, w0 + wn))
         lowest = min(w0, 0)
         cy.b0_window = (int(harvest_window[0]), wn)
-    accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
+        moved = w0 + spec.accrual_start - spec.window[0]   # the purchase at the same place in this window as the report's is in its own
+        if moved < accr:                                   # a window that opens before the report's takes the purchase with it
+            accr = moved
+            cy.purchase = start + timedelta(days=7 * accr)
     n_idx = {lab: i for i, lab in enumerate(spec.chain)}
     byweek: dict = {}
     for o in sorted((o for o in obs if lo <= o["date"] <= hi and o.get("basis") is not None), key=lambda o: o["date"]):
@@ -497,7 +506,7 @@ def build_crop_year(obs: list[dict], futs: dict, crop_year: int, rate_on, spec: 
         cy.b0, cy.b0_own = float(b0_override), True
 
     run = 0.0                                           # running sum of the weekly rate, percent
-    for k in range(0, last_k + 1):
+    for k in range(min(0, accr), last_k + 1):           # a purchase moved into September starts the rows there
         wd = start + timedelta(days=7 * k)
         o = byweek.get(k)
         prime = rate_on(wd) if rate_on else None
@@ -753,8 +762,11 @@ class ShipTable:
 
 def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], futs: dict, rate_on, measure: str = "net",
                          b0_weeks: int = 0, b0_est: bool = False, spec: Spec = CORN, max_age_days: int = 10,
-                         b0_own: bool = False, b0_calc: float | None = None) -> ShipTable:
+                         b0_own: bool = False, b0_calc: float | None = None, purchase: date | None = None) -> ShipTable:
     """The page-1 table on `asof`.
+
+    purchase  the purchase date, where the interest and the best-so-far start: the report's Oct 20 by default; a harvest window of the
+              user's that opens in September moves it (`CropYear.purchase`).
 
     b0       the harvest basis (cents vs the base contract): the average of the first weekly bids so far, or an estimate before they post —
              or the user's own (then `b0_own` is True and `b0_calc` is what the calculated method gives, to show beside it).
@@ -762,7 +774,7 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
              (return_to_carry_data.shipment_quotes) picks them from a corridor's forward periods.
     rate_on  date -> annual percent (the bank prime in the report; the app's default is the tab's fed funds + 2.25%).
     A bid counts as current when it is at most `max_age_days` old. Best-YTD starts at the purchase date (Oct 20)."""
-    purchase = purchase_date(crop_year)
+    purchase = purchase or purchase_date(crop_year)
     lv = chain_levels(futs, crop_year, asof, spec)
     rate_now = rate_on(asof) if rate_on else None
     tbl = ShipTable(crop_year, crop_label(crop_year), asof, measure, purchase, b0, b0_weeks, b0_est,

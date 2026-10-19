@@ -132,11 +132,14 @@ calc_best = exp_rows[-1]["best"]
 print("block: the Harvest basis switch starts on the calculated method")
 at = fresh()
 check("the page renders without an exception", not at.exception, [str(e.value)[:200] for e in at.exception])
-rb = next((r for r in at.radio if r.label == "Harvest basis"), None)
-check("a Harvest basis switch sits in the block, on 'Calculated' (the report's method) by default, with My own as the other choice",
-      rb is not None and rb.value.startswith("Calculated") and "the report uses the first 7" in rb.value and rb.options[-1] == "My own" and rb.key == key("mode"), getattr(rb, "value", None))
+RB_LABEL = "This year's harvest basis (2025-26)"
+rb = next((r for r in at.radio if r.label == RB_LABEL), None)
+check("a 'This year's harvest basis (2025-26)' switch sits in the block, on 'Calculated' (the average of the harvest window) by default, with My own as the other choice",
+      rb is not None and rb.value.startswith("Calculated") and "harvest window below" in rb.value and rb.options[-1] == "My own" and rb.key == key("mode"), getattr(rb, "value", None))
 check("...the Interest switch is still there beside it", any(r.key == "nc_rtc_rate2" for r in at.radio))
-check("no number box and no what-if box until My own is chosen", not own_boxes(at) and not [c for c in at.checkbox if "what-if" in c.label])
+check("the window boxes sit under their own heading: the history's window, every other crop year and this one when Calculated",
+      any("Harvest window for the history — every other crop year, and 2025-26 when Calculated" in m.value for m in at.markdown))
+check("no number box until My own is chosen, and no checkbox at all (the every-year what-if is gone)", not own_boxes(at) and not list(at.checkbox))
 rows, html = history_rows(at)
 check("the by-year table is the calculated history: the tracked year's harvest basis = the average of its first 7 bids, no OWN pill",
       rows is not None and rows[0][0].startswith("2025-26") and close(num(rows[0][1]), calc_b0, 0.06) and ">OWN<" not in html, (rows or [None])[0])
@@ -150,13 +153,13 @@ check("no exception", not at.exception, [str(e.value)[:200] for e in at.exceptio
 nb = at.number_input(key=key("val"))
 check("a number box appears, in cents vs Dec, starting at the CALCULATED harvest basis (so the user edits from it)",
       "Your harvest basis" in nb.label and "vs Dec" in nb.label and close(nb.value, round(calc_b0, 2)), (nb.label, nb.value, calc_b0))
-ck = at.checkbox(key=key("all"))
-check("and a what-if box, off", "every crop year" in ck.label and ck.value is False)
+check("beside it a caption says it is this year only, and there is still no what-if box",
+      not list(at.checkbox) and any(c.value == "Only 2025-26. Every other crop year keeps its calculated basis from the harvest window below." for c in at.caption))
 rows, html = history_rows(at)
 check("with the number untouched the tracked year reads the same harvest basis, now flagged OWN (and the best return is unchanged)",
       html.count(">OWN<") == 1 and close(num(rows[0][1]), round(calc_b0, 2), 0.06) and close(num(rows[0][4]), calc_best, 0.06), rows[0])
-check("the own-basis note names it and says earlier years keep theirs",
-      any("Your own harvest basis" in m.value and "Earlier years keep their calculated harvest basis" in m.value for m in at.markdown))
+check("the own-basis note names it, says it measures 2025-26 only and every other year keeps the window's calculated basis",
+      any("Your own harvest basis" in m.value and "measures 2025-26 only" in m.value and "Every other crop year keeps its calculated harvest basis" in m.value for m in at.markdown))
 
 print("block: typing the user's own harvest basis (-20)")
 at.number_input(key=key("val")).set_value(-20.0).run()
@@ -175,17 +178,6 @@ check("the shipment table is measured from -20 and says it is yours, with the ca
 check("the headline's harvest-basis card says the same", any("your own, vs Dec" in m.value and "Harvest basis" in m.value and "Best return so far" in m.value for m in at.markdown))
 check("the table's legend explains OWN", "OWN = measured from the harvest basis you entered" in html)
 
-print("block: the what-if (every crop year)")
-at.checkbox(key=key("all")).check().run()
-check("no exception", not at.exception, [str(e.value)[:200] for e in at.exception])
-all_rows, _ = build_expected({y: -20.0 for y in range(2018, 2026)})
-rows, html = history_rows(at)
-check("every crop year is measured from -20 and flagged OWN; each best return is what the engine gives for that basis",
-      html.count(">OWN<") == len(rows) == len(all_rows) and all(close(num(r[1]), -20.0) and close(num(r[4]), e["best"], 0.06) for r, e in zip(rows, reversed(all_rows))), (len(rows), html.count(">OWN<")))
-check("the note says it is a what-if, not the analyst's computation", any("What-if" in m.value and "not what the analyst" in m.value for m in at.markdown))
-at.checkbox(key=key("all")).uncheck().run()
-rows, html = history_rows(at)
-check("unticking it puts the earlier years back on their calculated harvest basis", html.count(">OWN<") == 1 and close(num(rows[1][1]), exp_rows[-2]["b0"], 0.06))
 
 print("block: gross view, and back to calculated")
 at.session_state["measure"] = "gross"
@@ -204,7 +196,7 @@ check("...and the number the user typed is still there if they come back to My o
 print("block: a number typed for one location does not follow the user to another")
 at.session_state["scope"] = "loc-B"
 at.run()
-rb2 = next(r for r in at.radio if r.label == "Harvest basis")
+rb2 = next(r for r in at.radio if r.label == RB_LABEL)
 rows, html = history_rows(at)
 check("another location starts on the calculated method again (the widget keys carry the location)",
       rb2.key == key("mode", "loc-B") and rb2.value.startswith("Calculated") and not own_boxes(at) and ">OWN<" not in html)
@@ -320,7 +312,7 @@ check("the caption names the window, says it applies to every crop year (counted
                        "in place of the report's first 7 and its year-specific windows.") for c in caps)
       and not any("Interest still starts" in c for c in caps), caps[:3])
 check("the Calculated choice is still selected, and nothing is flagged OWN",
-      next(r for r in at.radio if r.label == "Harvest basis").value.startswith("Calculated") and ">OWN<" not in html_w and not own_boxes(at))
+      next(r for r in at.radio if r.label == RB_LABEL).value.startswith("Calculated") and ">OWN<" not in html_w and not own_boxes(at))
 
 set_window(at, 8, 3)
 caps = [c.value for c in at.caption]
@@ -392,6 +384,9 @@ check("the caption names the September weeks, and a note under it says how CU bi
       any(c.startswith("Weeks 1 to 5 (Sep 10 – Oct 8) for 2025-26: the same weeks, counted from the first Wednesday of September, in every crop year") for c in caps_s)
       and any("moved to Dec by the Dec − Sep spread of the last trading day before the contract's first notice day (Aug 28)" in c and "2025-26: Dec − Sep = +20.00¢, so a basis of +10 vs Sep reads -10.00 vs Dec." in c
               and "bids already quoted off Dec" in c for c in caps_s), caps_s[:4])
+check("...and the caption says the purchase moved with the window: interest and returns from its third weekly bid, Sep 24 in 2025-26, in every year",
+      any("The purchase moves with it: interest and the weekly returns start at this window's third weekly bid (Sep 24 in 2025-26), in every crop year." in c
+          for c in caps_s), caps_s[:3])
 at_n = fresh()
 at_n.number_input(key=WS).set_value(1)
 at_n.number_input(key=WN).set_value(5)

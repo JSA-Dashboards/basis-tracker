@@ -172,11 +172,14 @@ if the user flips back and forth (`nc_rtc_b0_kept_*`). It measures the crop year
 shipment table (`shipment_table(b0_override=)`: break-even, returns and the interest on futures + harvest basis; `tbl.b0_own`,
 `tbl.b0_calc`) and, when that year has weekly bids, the history (`build_crop_year(b0_override=)` -> `cy.b0`, `cy.b0_own`, `cy.b0_calc`;
 `run_history_noted(b0_overrides={year: value})`, built by `own_b0_map`): the headline card, the orange line, the bar and the year's row
-(an OWN pill + legend). Earlier years keep their calculated basis, so the comparison with history is still the analyst's method. A
-what-if box applies the number to EVERY crop year. In the weekly history the interest runs on each week's cash price, not on b0, so an
+(an OWN pill + legend). Every other year keeps its calculated basis from the harvest window, so the comparison with history is unchanged.
+**Own = this year ONLY (Kolten 2026-10-19: "just change the current year's calculations ... it's just this year's basis")**: the every-year
+what-if box was removed (`own_b0_map` maps only the tracked year), and the controls read as two parts — the radio "This year's harvest basis
+(2026-27)" (Calculated / My own) and, under a "Harvest window for the history — every other crop year, and 2026-27 when Calculated" heading, the
+Start week / Number of weeks boxes, which stay while My own is in use so the user can set both at once. In the weekly history the interest runs on each week's cash price, not on b0, so an
 override shifts every gross and net return by (calculated - own) and the best WEEK does not move (`tests/test_return_to_carry.py`); the
 shipment table's net break-even moves by (own - calculated) x (1 + rate x days / 360). Widget keys are
-`nc_rtc_b0_{mode,val,all,kept}_<scope>|<grain>|<crop year>` — callers pass `scope=` (the tracker: the `ref` tuple; the portals: the corridor key
+`nc_rtc_b0_{mode,val,kept}_<scope>|<grain>|<crop year>` — callers pass `scope=` (the tracker: the `ref` tuple; the portals: the corridor key
 / `river|<location>`), so a number typed for one location never follows the user to another. `tests/test_return_to_carry_block.py` drives the
 block headless (AppTest) over a synthetic series.
 
@@ -211,10 +214,18 @@ and 2015, later starts in 2009 and 2019, September in 2012); any other pair is t
 row earlier after a five-Wednesday September) and replaces those exceptions. No single pair is the report's window in every year any more, so
 the block's default follows the tracked crop year (`window_default`) and its `_kept` mirror holds None while the boxes are at it —
 `build_crop_year(harvest_window=(first week, n))` (-> `cy.b0_window`, the pair as typed), threaded through
-`rd.shipment_table` / `run_history(_noted)` (`tbl.b0_window`, `summary_rows` `b0_window`); the block hands the engine None at the default. It changes
-only WHICH BIDS are averaged: interest still starts at the report's third (soybean: fifth) weekly bid and the roll spreads are the same, so every
-weekly return moves by (report's average - window's) and the best WEEK does not move; a window that opens after the interest clock says so under the
-boxes. The posted-quote estimate before the weekly bids belongs to the report's window, so a window of the user's has none ("waiting for the bids of
+`rd.shipment_table` / `run_history(_noted)` (`tbl.b0_window`, `summary_rows` `b0_window`); the block hands the engine None at the default. A window
+that opens at or after the report's changes only WHICH BIDS are averaged: interest still starts at the report's third (soybean: fifth) weekly bid and
+the roll spreads are the same, so every weekly return moves by (report's average - window's) and the best WEEK does not move; a window that opens
+after the interest clock says so under the boxes. **A window that opens EARLIER moves the purchase with it** (Kolten 2026-10-19, chose "purchase moves
+with window" when asked to "start this chart in Sep"): the interest and the returns start at the window's own 3rd (soybean 5th) weekly bid — where the
+report's sits in its own window — so the weekly rows begin there, in September, as negative row indexes (`cy.purchase` = that Wednesday; the
+shipment table's purchase date too, `build_shipment_table(purchase=)`; "bought Sep 23"). It applies to every crop year, so a September window
+changes each year's returns and best, not just the average; the default and later windows keep the report's Oct 20. **The season chart starts in
+September**: `seasonal_points` / `_month_ticks` count weeks from the first Wednesday of September (row + `report_start_week`), so the axis runs Sep
+→ Jul (soybeans Sep → Sep) for every window, empty until the first return. Checked 2026-10-19 on River FOB's default location (local `?view=1`
+run): weeks 1-5 -> purchase Sep 23, the 2026-27 line from late September; My own -5 moved only 2026-27 (+30.6 -> +18.6), the other years untouched;
+moving the window with My own on moved only the other years. The posted-quote estimate before the weekly bids belongs to the report's window, so a window of the user's has none ("waiting for the bids of
 weeks N to M"); for soybeans October's bids need the Nov-Jan spread (measured Oct 28), so a custom bean window has no basis until then (the table
 says why). The boxes stay when My own is chosen: the window still sets the calculated number the box starts from and every earlier year's basis. The
 choice is the user's way of establishing a basis, so it follows them from location to location (`nc_rtc_win_<corn|soy>_{start,n,kept}`).

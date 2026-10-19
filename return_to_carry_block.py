@@ -34,18 +34,23 @@ HEADING = ('<div style="margin-top:28px;margin-bottom:2px;font-size:10px;color:#
            'text-transform:uppercase;letter-spacing:.1em">Return to carry — what storing from harvest has paid</div>')
 
 
+SECTION = ('<div style="margin-top:10px;margin-bottom:-6px;font-size:11px;color:#1f4e79;font-weight:700;text-transform:uppercase;'
+           'letter-spacing:.06em">{}</div>')
+
+
 def _harvest_basis_choice(spec, key: str, calc: float | None, label: str):
-    """The Harvest basis switch under the Interest one: the calculated average (the report's method) by default, or the user's own number.
-    Returns (value, every_year) when it is their own, else None. `key` carries the location, grain and crop year, so a number typed for one
-    location is never carried over to another; `calc` = what the calculated method gives now (the number box starts there)."""
+    """This year's harvest basis, under the Interest switch: the calculated average (the report's method, over the harvest window below) by
+    default, or the user's own number — which measures ONLY the crop year being tracked (Kolten 2026-10-19: "just change the current year's
+    calculations ... it's just this year's basis"; the what-if that applied it to every year is gone). Returns the number when it is their
+    own, else None. `key` carries the location, grain and crop year, so a number typed for one location is never carried over to another;
+    `calc` = what the calculated method gives now (the number box starts there)."""
     base = rtc.LETTER_NAME[spec.base]
-    mode = st.radio("Harvest basis", [f"Calculated (average of the weeks below; the report uses the first {rtc.WINDOW_WEEKS})", "My own"],
+    mode = st.radio(f"This year's harvest basis ({label})", ["Calculated (the average of the harvest window below)", "My own"],
                     horizontal=True, key=f"nc_rtc_b0_mode_{key}",
-                    help=(f"By default every crop year is measured from the harvest basis the Research Analyst's report calculates: the average of the "
-                          f"first {rtc.WINDOW_WEEKS} weekly bids, against {base} futures (change the Start week and Number of weeks below to average other "
-                          f"weeks). Choose My own to enter the basis you actually bought at (cents per "
-                          f"bushel against {base}, negative when under): the shipment table, the headline numbers and the crop year being tracked are then "
-                          "measured from it. Earlier years keep their calculated basis unless you also tick the what-if box."))
+                    help=(f"Calculated: {label} is measured from the average of the weekly bids in the harvest window below, against {base} futures "
+                          f"(by default the report's first {rtc.WINDOW_WEEKS}). My own: enter the basis you actually bought at (cents per bushel against "
+                          f"{base}, negative when under); the shipment table, the headline numbers and {label}'s line and row are measured from it. "
+                          "Every other crop year keeps the harvest window's average either way."))
     if not mode.startswith("My own"):
         return None
     try:
@@ -65,10 +70,8 @@ def _harvest_basis_choice(spec, key: str, calc: float | None, label: str):
     else:
         st.session_state.pop(kept, None)                     # not typed over: it follows the calculated number again next time
     with c2:
-        every = st.checkbox(f"Use it for every crop year too (a what-if), not only {label}", key=f"nc_rtc_b0_all_{key}",
-                            help="Measure every crop year in the history from this one harvest basis instead of its own calculated one — what storing "
-                                 "would have paid had the grain always been bought at that basis.")
-    return float(value), bool(every)
+        st.caption(f"Only {label}. Every other crop year keeps its calculated basis from the harvest window below.")
+    return float(value)
 
 
 def window_default(crop_year: int) -> tuple:
@@ -87,6 +90,8 @@ def _harvest_window_choice(spec, crop_year: int):
     key = f"nc_rtc_win_{spec.key}"
     default = window_default(crop_year)
     kept = st.session_state.get(f"{key}_kept") or default
+    label = rtc.crop_label(crop_year)
+    st.markdown(SECTION.format(f"Harvest window for the history — every other crop year, and {label} when Calculated"), unsafe_allow_html=True)
     try:
         c1, c2, c3 = st.columns([1, 1, 3], vertical_alignment="bottom")
     except TypeError:                                        # an older Streamlit has no vertical_alignment
@@ -111,9 +116,14 @@ def _harvest_window_choice(spec, crop_year: int):
         text = (f"{wt} for {rtc.crop_label(crop_year)} — the report's window (week 0 is the first Wednesday of September; the report starts at the "
                 "first Wednesday of October).")
     accr = spec.accrual_overrides.get(crop_year, spec.accrual_start)
-    if custom and rtc.window_index((start, n), crop_year) > accr:     # the interest clock is the report's, whatever the window
+    which = "third" if spec.key == "corn" else "fifth"
+    moved = rtc.window_index((start, n), crop_year) + spec.accrual_start - spec.window[0]
+    if custom and moved < accr:                              # a window that opens before the report's takes the purchase with it (build_crop_year)
+        d = rtc.first_wednesday(crop_year) + timedelta(days=7 * moved)
+        text += (f" The purchase moves with it: interest and the weekly returns start at this window's {which} weekly bid "
+                 f"({d.strftime('%b')} {d.day} in {label}), in every crop year.")
+    elif custom and rtc.window_index((start, n), crop_year) > accr:     # a later window: the interest clock stays the report's
         d = rtc.first_wednesday(crop_year) + timedelta(days=7 * accr)
-        which = "third" if spec.key == "corn" else "fifth"
         text += f" Interest still starts at the report's {which} weekly bid ({d.strftime('%b')} {d.day}), before this window opens."
     with c3:
         st.caption(text)
@@ -185,7 +195,8 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
                    keys carry it (with the grain and crop year) so a number typed for one location is not kept for the next. Defaults to `location`.
 
     The Harvest basis switch (Calculated by default) lets the user measure the crop year being tracked — the shipment table, the headline,
-    the orange line, the latest row — from their OWN harvest basis, or, as a what-if, every crop year; see return_to_carry_data.own_b0_map."""
+    the orange line, the latest row — from their OWN harvest basis; every other crop year keeps the harvest window's calculated average, and
+    the window boxes stay (and still move that history) while their own number is in use."""
     st.markdown(HEADING, unsafe_allow_html=True)
     spec = rtc.SPECS.get(grain)
     if spec is None:
@@ -241,16 +252,16 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
         own = _harvest_basis_choice(spec, f"{scope or location}|{grain}|{crop_year}", tbl.b0, rtc.crop_label(crop_year))   # None = calculated
     ship_month = _ship_by_choice(spec)                       # None = no limit: the whole season, as before
     try:
-        if own is not None:                                  # the user's own harvest basis: the table and the history are measured from it
-            tbl, est = rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec, b0_override=own[0], harvest_window=win)
+        if own is not None:                                  # the user's own harvest basis: this year's table and line are measured from it
+            tbl, est = rd.shipment_table(obs, quotes, futs, rate_on, asof, measure, spec, b0_override=own, harvest_window=win)
         res, skipped = (rd.run_history_noted(obs, futs, rate_on, spec=spec, harvest_window=win,
-                                             b0_overrides=rd.own_b0_map(own[0] if own else None, crop_year, obs, spec, every_year=bool(own and own[1])))
+                                             b0_overrides=rd.own_b0_map(own, crop_year, obs, spec))       # the tracked year only
                         if len(obs) >= 12 else ([], []))
     except Exception as e:                                   # noqa: BLE001
         st.warning(f"Couldn't build the Return to Carry history right now ({type(e).__name__}: {e}).")
         return
     if own is not None:
-        st.markdown(vw.own_basis_note_html(own[0], tbl.b0_calc, rtc.crop_label(crop_year), spec, every_year=own[1],
+        st.markdown(vw.own_basis_note_html(own, tbl.b0_calc, rtc.crop_label(crop_year), spec,
                                            in_history=any(cy.crop_year == crop_year for cy in res)), unsafe_allow_html=True)
     if tbl is not None and (tbl.b0 is not None or any(c.bid is not None for c in tbl.cols)):
         st.markdown(vw.shipment_html(rtc.limit_shipment_table(tbl, ship_month), est, rate_note), unsafe_allow_html=True)

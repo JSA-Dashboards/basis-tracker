@@ -258,9 +258,10 @@ for i, y in enumerate(range(2019, 2027)):                          # 2026-27 sta
     for d, px in f.items():
         futs_26.setdefault(d, {}).update(px)
 hist26 = rd.run_history(obs_26, futs_26, lambda d: 5.0, min_year=2005, spec=SOY)
-tk26, nm26 = vw._month_ticks(hist26, 55, SOY.horizon)
-check("the soybean season's month ticks run Oct .. Sep and stop there (no stray 'Oct' past Sep 30 when the year starts Oct 7)",
-      hist26[-1].crop_year == 2026 and nm26[0] == "Oct" and nm26[-1] == "Sep" and max(tk26) <= 51 and "Oct" in vw._month_ticks(hist26, 55)[1][1:], (tk26, nm26))
+tk26, nm26 = vw._month_ticks(hist26, 60, SOY.horizon)
+check("the soybean season's month ticks run from September (week 0 = Sep 2, 2026) to the next September and stop there (no stray 'Oct' past Sep 30, 2027)",
+      hist26[-1].crop_year == 2026 and nm26[0] == "Sep" and nm26[-1] == "Sep" and nm26.count("Oct") == 1 and max(tk26) <= 56
+      and vw._month_ticks(hist26, 60)[1].count("Oct") == 2, (tk26, nm26))
 check("history starts at the spec's first crop year (2005), not corn's 2004", rd.run_history(obs_all, futs_all, lambda d: 5.0, spec=SOY)[0].crop_year == 2014
       and rtc.SOY.min_crop_year == 2005 and rtc.CORN.min_crop_year == 2004)
 
@@ -286,9 +287,11 @@ check("headline: harvest basis vs Jan (the first 7 weekly bids), the carry Jan -
 check("...and corn's headline still says Dec -> Jul", "vs Dec" in vw.headline_html(rows_s, "net") and "Dec → Jul" in vw.headline_html(rows_s, "net"))
 sc = vw.seasonal_chart(hist, "net", logo_uri="data:image/png;base64,iVBORw0KGgo=", spec=SOY).to_dict()
 xe = sc["layer"][1]["encoding"]["x"]
-check("the season chart runs to week 51 (Sep 30) and every month tick lies on it, Oct first and Sep last",
-      xe["scale"]["domain"] == [0, 51.5] and max(xe["axis"]["values"]) <= 51 and xe["axis"]["values"][0] == 0 and '"Oct"' in xe["axis"]["labelExpr"]
-      and '"Sep"' in xe["axis"]["labelExpr"], (xe["scale"]["domain"], xe["axis"]["values"]))
+off_s = max(rtc.report_start_week(cy.crop_year) for cy in hist)
+check("the season chart runs from September to Sep 30 — row 51 is week 51 + 5 in a year whose September has five Wednesdays (2015-16 here), the "
+      "longest — and every month tick lies on it, Sep first and Sep last",
+      off_s == 5 and xe["scale"]["domain"] == [0, 51.5 + off_s] and max(xe["axis"]["values"]) <= 51 + off_s and xe["axis"]["values"][0] == 0
+      and xe["axis"]["labelExpr"].startswith('["Sep", "Oct"') and '"Sep"]' in xe["axis"]["labelExpr"], (xe["scale"]["domain"], xe["axis"]["values"]))
 check("the caption names the bean chain and Sep 30; corn's is unchanged",
       "Nov→Jan→Mar→May→Jul→Aug→Nov" in vw.method_caption(SOY) and "September 30" in vw.method_caption(SOY) and "bean carry workbooks" in vw.method_caption(SOY)
       and "Dec→Mar→May→Jul→Sep" in vw.method_caption() and "July 31" in vw.method_caption() and "Return to Carry workbooks" in vw.method_caption())

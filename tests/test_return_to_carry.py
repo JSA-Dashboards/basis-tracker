@@ -282,10 +282,26 @@ check("soybeans have no September contract: a 'U' tag is not rolled there",
 w0_bid = rtc.build_crop_year([{"date": date(2026, 9, 2), "basis": 40.0, "tag": "ZCZ26"}, {"date": S0, "basis": 4.0, "tag": "ZCZ26"}], FS26, 2026, rate, harvest_window=(0, 1))
 check("week 0 itself is the first Wednesday of September (Sep 2, 2026): a window of week 0 alone is that bid", close(w0_bid.b0, 40.0) and w0_bid.b0_weeks == 1, (w0_bid.b0, w0_bid.b0_weeks))
 
+print("return_to_carry: a window that opens before the report's moves the PURCHASE with it (Kolten 2026-10-19: 'purchase moves with window')")
+check("weeks 1-5 (Sep 9 - Oct 7, 2026): the purchase is the window's own 3rd weekly bid, Sep 23 (row -2), and the weekly rows start there",
+      cy_s.purchase == date(2026, 9, 23) and cy_s.weeks[0].date == date(2026, 9, 23) and cy_s.weeks[0].idx == -2, (cy_s.purchase, [w.date for w in cy_s.weeks][:3]))
+check("...each of those weeks has a return from the window's average (gross = bid - 7.2 + no carry yet: Sep 23 reads 8 - 7.2 = +0.8)",
+      close(cy_s.weeks[0].gross, 0.8) and close(cy_s.weeks[1].gross, 6.0 - 7.2) and close(cy_s.weeks[2].gross, 4.0 - 7.2), [w.gross for w in cy_s.weeks])
+check("the report's window keeps the report's purchase: no moved date, the rows start at the first Wednesday of October",
+      rtc.build_crop_year(obs_s, FS26, 2026, rate).purchase is None and rtc.build_crop_year(obs_s, FS26, 2026, rate).weeks[0].idx == 0)
+check("a window that opens at or after the report's leaves the purchase alone (weeks 7 to 10 in 2025-26: interest still from row 2)",
+      c_w.purchase is None and c_same.purchase is None)
+check("week 0 (Sep 2) moves it furthest: the 3rd bid of a window from Sep 2 is Sep 16",
+      rtc.build_crop_year(obs_s, FS26, 2026, rate, harvest_window=(0, 7)).purchase == date(2026, 9, 16))
+check("soybeans move it to the window's 5th bid (where the report's bean purchase sits in its own window): weeks 1-5 -> Oct 7",
+      rtc.build_crop_year([{"date": S0 + timedelta(days=7 * k), "basis": -20.0, "tag": "ZSX26"} for k in range(-4, 3)], {}, 2026, rate, rtc.SOY,
+                          harvest_window=(1, 5)).purchase == date(2026, 10, 7))
 sep_only = [o for o in obs_s if o["date"] < S0]                                  # Sep 9, 16, 23, 30 posted; the first October Wednesday has not come
 cy_so = rtc.build_crop_year(sep_only, FS26, 2026, rate, harvest_window=(1, 5))
-check("a September window before October's first Wednesday: the average so far (4 of 5 bids: 10, 8, 8, 6 = 8.0), no weekly rows and no crash",
-      close(cy_so.b0, 8.0) and cy_so.b0_weeks == 4 and cy_so.weeks == [] and cy_so.best == {} and cy_so.complete is False, (cy_so.b0, cy_so.b0_weeks, len(cy_so.weeks)))
+check("a September window before October's first Wednesday: the average so far (4 of 5 bids: 10, 8, 8, 6 = 8.0), and the moved purchase already "
+      "gives weekly rows (Sep 23 and Sep 30), no crash",
+      close(cy_so.b0, 8.0) and cy_so.b0_weeks == 4 and [w.date for w in cy_so.weeks] == [date(2026, 9, 23), date(2026, 9, 30)]
+      and close(cy_so.weeks[0].gross, 0.0) and cy_so.complete is False, (cy_so.b0, cy_so.b0_weeks, len(cy_so.weeks)))
 cy_sd = rtc.build_crop_year(sep_only, FS26, 2026, rate)
 check("the report's window is unchanged by that: September bids alone are still no crop year (empty)", cy_sd.b0 is None and cy_sd.weeks == [] and cy_sd.b0_weeks == 0)
 check("no bids at all with a window of the user's: empty, not an error", rtc.build_crop_year([], FS26, 2026, rate, harvest_window=(1, 5)).b0 is None)
@@ -394,6 +410,9 @@ gross_rows = rd.summary_rows(hist, "gross")
 check("the gross measure never reads lower than net", gross_rows[0]["best"] >= rows[0]["best"])
 pts = rd.seasonal_points(hist, "net")
 check("seasonal_points: one per week that has a return", len(pts) == len([w for c in hist for w in c.weeks if w.net is not None]) and set(p["crop"] for p in pts) == {"2025-26"})
+first_ret = next(w for w in hist[0].weeks if w.net is not None)
+check("...and its weeks count from week 0 = the first Wednesday of September (2025-26: Oct 1 is week 4, so a row's week is its index + 4)",
+      pts[0]["week"] == first_ret.idx + 4 and pts[0]["date"] == first_ret.date and rtc.report_start_week(2025) == 4, (pts[0], first_ret.idx))
 lim_rows = rd.summary_rows(rd.limit_history(hist, 3), "net")
 check("summary_rows of a study that stops at the end of March: its end and the contract the carry was banked to (14, off May); the full-season rows carry neither",
       rows[0]["ship_by"] is None and rows[0]["carry_tag"] is None and lim_rows[0]["ship_by"] == date(2026, 3, 31) and lim_rows[1]["ship_by"] == date(2027, 3, 31)
@@ -423,10 +442,10 @@ check("summary_rows say which year is measured from the user's own number, and w
       [r["b0_own"] for r in r_own] == [False, True, False] and close(r_own[1]["b0"], -15.0) and close(r_own[1]["b0_calc"], r_calc[1]["b0"])
       and all(r["b0_own"] is False and close(r["b0_calc"], r["b0"]) for r in r_calc))
 ob_years = [{"date": date(2024, 10, 2)}, {"date": date(2025, 10, 1)}, {"date": date(2026, 10, 7)}]
-check("own_b0_map: nothing -> {} (the calculated method everywhere); a number -> the tracked crop year only; the what-if -> every crop year the series covers",
+check("own_b0_map: nothing -> {} (the calculated method everywhere); a number -> the tracked crop year ONLY, however many years the series covers "
+      "(the every-year what-if is gone)",
       rd.own_b0_map(None, 2026, ob_years) == {} and rd.own_b0_map(-15, 2026, ob_years) == {2026: -15.0}
-      and rd.own_b0_map(-15, 2026, ob_years, every_year=True) == {2024: -15.0, 2025: -15.0, 2026: -15.0}
-      and rd.own_b0_map(-15, 2026, [], every_year=True) == {2026: -15.0} and rd.own_b0_map(0, 2026, ob_years) == {2026: 0.0})
+      and rd.own_b0_map(-15, 2026) == {2026: -15.0} and rd.own_b0_map(0, 2026, ob_years) == {2026: 0.0})
 check("a year that only partly matches (a handful of equal weeks) is kept", rd.repeated_years(rd.run_history_noted(
     yr_obs(2005, real) + yr_obs(2006, real[:5] + [round(rng.uniform(40, 80)) for _ in range(39)]), {}, rate)[0]) == set())
 

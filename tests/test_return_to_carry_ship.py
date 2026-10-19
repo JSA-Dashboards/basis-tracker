@@ -344,6 +344,15 @@ obs_sep = [{"date": start + timedelta(days=7 * k), "basis": b, "tag": g} for k, 
 t_sep, _ = rd.shipment_table(obs_sep, [], FWS, lambda d: 6.0, start, "net", harvest_window=(1, 5))
 check("a September-start window reaches back before October: the CU-quoted bids are rolled to Dec at +20 first ((10 + 8 + 8 + 6 + 4) / 5 = 7.2, all 5 posted)",
       close(t_sep.b0, 7.2) and t_sep.b0_weeks == 5 and t_sep.b0_window == (1, 5), (t_sep.b0, t_sep.b0_weeks))
+check("the September window moves the table's purchase with it, to the window's 3rd weekly bid (Sep 23): the interest days and the best-so-far start there",
+      t_sep.purchase == D(2026, 9, 23), t_sep.purchase)
+check("...while the report's window and a later window of the user's keep the report's Oct 20",
+      t_c.purchase == D(2026, 10, 20) and t_w1.purchase == D(2026, 10, 20) and t_w3.purchase == D(2026, 10, 20))
+t_sep_o = rtc.build_shipment_table(2026, start, 7.2, [], FWS, lambda d: 6.0, "net")
+t_sep_m = rtc.build_shipment_table(2026, start, 7.2, [], FWS, lambda d: 6.0, "net", purchase=D(2026, 9, 23))
+check("an earlier purchase charges more days of interest on the same harvest basis: every net break-even is higher by (F + b0) x rate x 27 / 360",
+      all(m.cost is None or (o.cost is not None and m.cost > o.cost) for m, o in zip(t_sep_m.cols, t_sep_o.cols))
+      and any(m.cost is not None for m in t_sep_m.cols), [(m.cost, o.cost) for m, o in zip(t_sep_m.cols, t_sep_o.cols)][:2])
 t_sep_n, _ = rd.shipment_table(obs_sep, [], FW, lambda d: 6.0, start, "net", harvest_window=(1, 5))
 check("...and with no Aug 28 price in the futures they are left out rather than guessed: (8 + 6 + 4) / 3 = 6", close(t_sep_n.b0, 6.0) and t_sep_n.b0_weeks == 3)
 t_sep_d, _ = rd.shipment_table(obs_sep, [], FWS, lambda d: 6.0, start, "net")

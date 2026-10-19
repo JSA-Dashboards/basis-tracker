@@ -325,19 +325,16 @@ def shipment_table(obs: list[dict], raw: list[dict], futs: dict, rate_on, asof: 
         b0, est = float(b0_override), None
     tbl = rtc.build_shipment_table(crop_year, asof, b0, shipment_quotes(raw, crop_year, spec), futs, rate_on, measure,
                                    b0_weeks=cy.b0_weeks if (cy.b0 is not None and not own) else 0, b0_est=est is not None, spec=spec,
-                                   b0_own=own, b0_calc=calc)
+                                   b0_own=own, b0_calc=calc, purchase=cy.purchase)     # a September window moves the purchase
     tbl.b0_window = cy.b0_window
     return tbl, est
 
 
-def own_b0_map(value: float | None, crop_year: int, obs: list[dict], spec: rtc.Spec = rtc.CORN, every_year: bool = False) -> dict:
-    """{crop year: harvest basis} to hand run_history_noted: the user's own harvest basis for the crop year being tracked — or, as a what-if
-    ('what would storing have paid had I always bought at -15'), for every crop year the series covers (and the tracked one). {} when
-    `value` is None, i.e. the calculated method everywhere."""
-    if value is None:
-        return {}
-    years = (set(crop_years_in(obs, spec)) | {crop_year}) if every_year else {crop_year}
-    return {y: float(value) for y in years}
+def own_b0_map(value: float | None, crop_year: int, obs: list[dict] | None = None, spec: rtc.Spec = rtc.CORN) -> dict:
+    """{crop year: harvest basis} to hand run_history_noted: the user's own harvest basis for the crop year being tracked ONLY — every other
+    year keeps its calculated one (Kolten 2026-10-19: "it's just this year's basis"; the every-year what-if was removed). {} when `value`
+    is None, i.e. the calculated method everywhere. `obs` / `spec` are unused, kept so existing callers need no change."""
+    return {} if value is None else {crop_year: float(value)}
 
 
 def crop_years_in(obs: list[dict], spec: rtc.Spec = rtc.CORN) -> list[int]:
@@ -444,11 +441,14 @@ def summary_rows(results: list, measure: str = "net") -> list[dict]:
 
 
 def seasonal_points(results: list, measure: str = "net") -> list[dict]:
-    """Every weekly return as {crop, week (0 = first Wednesday of October), date, value} for the overlay chart."""
+    """Every weekly return as {crop, week, date, value} for the overlay chart. `week` counts from week 0 = the first Wednesday of SEPTEMBER
+    of each crop year (Kolten 2026-10-19: "start this chart in Sep as well"), the harvest window's numbering: the report's first weekly row
+    (the first Wednesday of October) is week 4 or 5."""
     pts = []
     for cy in results:
+        off = rtc.report_start_week(cy.crop_year)
         for w in cy.weeks:
             v = _value(w, measure)
             if v is not None:
-                pts.append({"crop": cy.label, "week": w.idx, "date": w.date, "value": float(v)})
+                pts.append({"crop": cy.label, "week": w.idx + off, "date": w.date, "value": float(v)})
     return pts

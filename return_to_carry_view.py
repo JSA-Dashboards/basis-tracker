@@ -240,23 +240,16 @@ def derived_banner_html(location: str, dv: dict) -> str:
 
 
 # ── the user's own harvest basis: the note that says where it is used ────────────────────────────
-def own_basis_note_html(value: float, calc: float | None, label: str, spec: rtc.Spec = rtc.CORN, every_year: bool = False,
-                        in_history: bool = True) -> str:
-    """The blue note under the Harvest basis switch when the user's OWN number is in use: which crop year(s) it measures, what it replaces.
-    value / calc = their number and what the calculated method gives (None = not known yet); label = the tracked crop year ('2026-27');
-    every_year = the what-if that applies it to every crop year; in_history = the tracked year has weekly bids to draw (else the shipment table only)."""
+def own_basis_note_html(value: float, calc: float | None, label: str, spec: rtc.Spec = rtc.CORN, in_history: bool = True) -> str:
+    """The blue note under the harvest-basis controls when the user's OWN number is in use: the crop year it measures (only the tracked one),
+    what it replaces. value / calc = their number and what the calculated method gives (None = not known yet); label = the tracked crop year
+    ('2026-27'); in_history = the tracked year has weekly bids to draw (else the shipment table only)."""
     base = rtc.LETTER_NAME[spec.base]
-    if every_year:
-        body = (f"<b>What-if:</b> every crop year below is measured from your harvest basis of <b>{value:+.1f}¢</b> vs {base} instead of its own "
-                "calculated one (the average of its first weekly bids). Each year's returns move by the difference, the same for all its weeks, so the best "
-                "week stays where it was — this is what storing would have paid had the grain always been bought at that basis, not what the analyst's "
-                "workbooks computed.")
-    else:
-        where = ("the shipment table, the headline numbers, the orange line and bar, and the latest row of the table below" if in_history
-                 else "the shipment table (that year has no weekly bids to draw yet)")
-        calc_txt = "" if calc is None else f", in place of the calculated {calc:+.1f}¢"
-        body = (f"<b>Your own harvest basis, {value:+.1f}¢ vs {base}</b>{calc_txt}, measures {label}: {where}. Earlier years keep their calculated "
-                "harvest basis, so the comparison with history is still the analyst's method.")
+    where = ("the shipment table, the headline numbers, the orange line and bar, and the latest row of the table below" if in_history
+             else "the shipment table (that year has no weekly bids to draw yet)")
+    calc_txt = "" if calc is None else f", in place of the calculated {calc:+.1f}¢"
+    body = (f"<b>Your own harvest basis, {value:+.1f}¢ vs {base}</b>{calc_txt}, measures {label} only: {where}. Every other crop year keeps "
+            "its calculated harvest basis (the average of the harvest window above), so the comparison with history is unchanged.")
     return ('<div style="font-size:12px;color:#1f4e79;background:#eef5fc;border:1px solid #c5daf1;border-left:4px solid #4e79a7;border-radius:8px;'
             f'padding:8px 12px;margin:6px 0 10px;line-height:1.5">{body}</div>')
 
@@ -314,15 +307,17 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
         data = ("- **Data** — weekly corridor bids from the archive (true Wednesdays from Oct 2004, so history starts "
                 "2004-05); settlements from the futures archive, and for 2004-07 from the workbooks. Reproduces the "
                 "yearly workbooks to the cent in most weeks (tests/test_return_to_carry.py).")
-    harvest += (" The Harvest basis switch above can use your own number instead (the calculated average is the default): it measures the "
-                "crop year being tracked, or, as a what-if, every crop year. In the weekly history the interest is charged on each week's cash price, "
-                "not on the harvest basis, so a different harvest basis moves every week's return by the same amount; the shipment table's "
-                "break-even does charge interest on it (futures + harvest basis).")
+    harvest += (" The switch for this year's harvest basis above can use your own number instead (the calculated average is the default): it "
+                "measures only the crop year being tracked; every other year keeps its calculated basis. In the weekly history the interest is charged "
+                "on each week's cash price, not on the harvest basis, so a different harvest basis moves every week's return by the same amount; the "
+                "shipment table's break-even does charge interest on it (futures + harvest basis).")
+    nth = "fifth" if soy else "third"
     harvest += (" The **Start week** and **Number of weeks** boxes change which weekly bids the calculated average takes (week 0 is the first Wednesday of "
                 "September, week 1 the next; the report starts at the first Wednesday of October, week 4, or week 5 when September has five Wednesdays): "
                 "a window you set is the same weeks, counted from September, in every crop year and replaces the "
-                "report's own year-specific windows, and the interest still starts at the report's " + ("fifth" if soy else "third") + " weekly bid whatever "
-                "the window." + ("" if soy else " A September bid quoted off September (CU) futures is rolled to Dec at the Dec - Sep spread on the last "
+                "report's own year-specific windows. A window that opens before the report's moves the purchase with it: the interest and the weekly "
+                "returns start at its own " + nth + " weekly bid, so the chart's lines can begin in September. A later window leaves the purchase "
+                "alone: the interest still starts at the report's " + nth + " weekly bid." + ("" if soy else " A September bid quoted off September (CU) futures is rolled to Dec at the Dec - Sep spread on the last "
                                  "trading day before that contract's first notice day (the last business day of August); a bid already quoted off Dec — "
                                  "every bid with no tag, and most locations' fall and new-crop bids — is left as it is."))
     interest = ("- **Interest** — the same rate as the rest of this tab: the effective fed funds rate on each date + 2.25% "
@@ -614,16 +609,15 @@ def best_bar_chart(rows: list[dict], measure: str = "net", height: int = 280, de
 
 # ── chart 2: the path through the crop year ───────────────────────────────────────────────────────
 def _month_ticks(results: list, weeks: int = 44, horizon: tuple | None = None, end_month: int | None = None) -> tuple[list[int], list[str]]:
-    """Week indexes (and month names) where each month first appears on the crop-year grid, Oct through Jul (soybeans: Sep).
-    `horizon` = (month, day) of the following year where the season ends: a week past it gets no tick (a year that starts
-    Oct 7 would otherwise label its week 43 'Aug', soybeans' week 52 'Oct'). `end_month` = a study told to stop at the end of
-    that month (Nov-Aug): the ticks stop there instead."""
+    """Weeks (and month names) where each month first appears on the chart's grid, Sep through Jul (soybeans: Sep): week 0 = the first
+    Wednesday of September, as in seasonal_points. `horizon` = (month, day) of the following year where the season ends: a week past it
+    gets no tick (it would otherwise label a week 'Aug', soybeans' 'Oct'). `end_month` = a study told to stop at the end of that month
+    (Nov-Aug): the ticks stop there instead."""
     from datetime import date, timedelta
-    from return_to_carry import first_wednesday
     ref = next((cy for cy in reversed(results) if cy.weeks), None)
     if ref is None:
         return [], []
-    start = first_wednesday(ref.crop_year)
+    start = rtc.first_september_wednesday(ref.crop_year)
     end = rtc.study_end(ref.crop_year, end_month) if end_month else (date(ref.crop_year + 1, *horizon) if horizon else None)
     idx, names, seen = [], [], set()
     for k in range(0, weeks):
@@ -651,10 +645,11 @@ def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_
     hist_labels = [cy.label for cy in results if cy.complete]
     hist = df[df["crop"].isin(hist_labels)]
     layers = []
-    full = 40 if spec.key == "corn" else 51                  # the season's last week (Jul 31 for corn, Sep 30 for soybeans)
+    off = rtc.report_start_week(results[-1].crop_year)       # the x axis starts at week 0 = the first Wednesday of September (seasonal_points)
+    full = (40 if spec.key == "corn" else 51) + off          # the season's last week (Jul 31 for corn, Sep 30 for soybeans)
     stop = results[-1].window_end                            # a study told to ship by the end of a month (limit_history) stops there
     if stop is not None:
-        full = max(1, (stop - rtc.first_wednesday(results[-1].crop_year)).days // 7)
+        full = max(1, (stop - rtc.first_september_wednesday(results[-1].crop_year)).days // 7)
     ticks, names = _month_ticks(results, full + 4, spec.horizon, stop.month if stop is not None else None)
     xmax = int(df["week"].max())
     x_enc = alt.X("week:Q", title=None, scale=alt.Scale(domain=[0, max(xmax, full) + 0.5]),
@@ -690,7 +685,7 @@ def seasonal_chart(results: list, measure: str = "net", height: int = 340, logo_
     best = results[-1].best.get(measure)
     if best is not None:
         v = best.net if measure == "net" else best.gross
-        pk = pd.DataFrame([{"week": best.idx, "value": float(v), "label": f"Best {v:+.1f}¢ · {_md(best.date)}"}])
+        pk = pd.DataFrame([{"week": best.idx + off, "value": float(v), "label": f"Best {v:+.1f}¢ · {_md(best.date)}"}])
         layers.append(alt.Chart(pk).mark_point(shape="circle", filled=True, size=220, color=ORANGE, opacity=1, stroke=DARK_ORANGE, strokeWidth=2.5)
                       .encode(x="week:Q", y="value:Q"))
         layers.append(alt.Chart(pk).mark_text(baseline="bottom", dy=-14, fontSize=12, fontWeight="bold", color="white", stroke="white",

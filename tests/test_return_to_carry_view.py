@@ -129,22 +129,18 @@ to = vw.table_html(rows_own, "net")
 check("the by-year table marks the own year with an OWN pill and says what it means under the table",
       to.count(">OWN<") == 1 and "OWN = measured from the harvest basis you entered" in to and to.index(">OWN<") < to.index("2024-25"), to.count(">OWN<"))
 check("no pill and no legend when every year is calculated", ">OWN<" not in t and "OWN =" not in t)
-res_all = rd.run_history(obs_all, futs_all, lambda d: 5.0, min_year=2000, b0_overrides=rd.own_b0_map(-20.0, 2025, obs_all, every_year=True))
-ta = vw.table_html(rd.summary_rows(res_all, "net"), "net")
-check("the what-if marks every year, and every year's harvest basis reads the user's number", ta.count(">OWN<") == 12
-      and all(close(r["b0"], -20.0) for r in rd.summary_rows(res_all, "net")) and ta.count("-20.0") >= 12)
 tdo = vw.table_html(rows_own, "net", derived={2014: "derived"})
 check("it sits beside the derived tags when both apply (own pill + legend, derived pill + legend)", ">OWN<" in tdo and ">DERIVED<" in tdo and "OWN =" in tdo and "DERIVED / PART DERIVED =" in tdo)
 bo = vw.best_bar_chart(rows_own, "net").to_dict()
 dso = next(d for d in bo["datasets"].values() if d and "Crop year" in d[0])
 check("the bars read the own year's best return and show its harvest basis in the tooltip", close(dso[-1]["Best"], rows_own[-1]["best"]) and close(dso[-1]["Harvest basis"], -20.0))
 n1 = vw.own_basis_note_html(-20.0, -12.5, "2025-26")
-check("the note under the switch names the number, what it replaces, the crop year and where it is used, and says earlier years keep theirs",
-      "Your own harvest basis, -20.0¢ vs Dec" in n1 and "in place of the calculated -12.5¢" in n1 and "measures 2025-26" in n1 and "shipment table" in n1
-      and "latest row" in n1 and "Earlier years keep their calculated harvest basis" in n1)
-n2 = vw.own_basis_note_html(-20.0, -12.5, "2025-26", every_year=True)
-check("the what-if note says so: every year, a what-if, not what the analyst's workbooks computed, the best week stays",
-      "What-if" in n2 and "every crop year" in n2 and "-20.0¢</b> vs Dec" in n2 and "not what the analyst" in n2 and "stays where it was" in n2 and "Earlier years" not in n2)
+check("the note under the switch names the number, what it replaces, the crop year (only) and where it is used, and says every other year keeps its "
+      "calculated basis from the harvest window",
+      "Your own harvest basis, -20.0¢ vs Dec" in n1 and "in place of the calculated -12.5¢" in n1 and "measures 2025-26 only" in n1 and "shipment table" in n1
+      and "latest row" in n1 and "Every other crop year keeps its calculated harvest basis (the average of the harvest window above)" in n1 and "What-if" not in n1)
+n2 = vw.own_basis_note_html(-20.0, -12.5, "2025-26", rtc.CORN, False)
+check("...a positional call (spec, in_history) still works now that the every-year what-if is gone", "shipment table (that year has no weekly bids" in n2)
 n3 = vw.own_basis_note_html(-20.0, None, "2026-27", in_history=False)
 check("a tracked year with no weekly bids yet: the number serves the shipment table only, and there is no 'calculated' to compare with",
       "shipment table (that year has no weekly bids to draw yet)" in n3 and "calculated" not in n3.replace("calculated harvest basis", "") and "headline" not in n3)
@@ -163,7 +159,10 @@ check("...and the calculated table is unchanged", "your own" not in hc and "Your
 hs0 = vw.shipment_html(rtc.build_shipment_table(2026, date(2026, 10, 21), -5.0, [], {}, lambda d: 6.0, "net", b0_own=True, b0_calc=None), None, "")
 check("no calculated number to compare with -> the card just says it is yours", "your own, vs Dec" in hs0 and "· calculated" not in hs0 and "in place of the calculated" not in hs0)
 hw = vw.how_it_works()
-check("the 'how it is calculated' text tells the user about the switch", "Harvest basis switch above can use your own number" in hw and "what-if" in hw)
+check("the 'how it is calculated' text tells the user about the switch: this year only, every other year calculated, no what-if",
+      "switch for this year's harvest basis above can use your own number" in hw and "measures only the crop year being tracked" in hw and "what-if" not in hw)
+check("...and that a window opening before the report's moves the purchase (lines can begin in September), a later one does not",
+      "moves the purchase with it" in hw and "can begin in September" in hw and "interest still starts at the report's third weekly bid" in hw)
 
 print("return_to_carry_view: ship by — a study that stops at the end of March")
 import re  # noqa: E402
@@ -197,10 +196,11 @@ sl = vw.seasonal_chart(lim_res, "net").to_dict()
 xl = next(l["encoding"]["x"] for l in sl["layer"] if "scale" in l.get("encoding", {}).get("x", {}))
 xfull = next(l["encoding"]["x"] for l in vw.seasonal_chart(results, "net").to_dict()["layer"] if "scale" in l.get("encoding", {}).get("x", {}))
 tk_l, nm_l = vw._month_ticks(lim_res, 30, rtc.CORN.horizon, 3)
-check("the season chart stops at the end of March: a shorter week axis (to week ~26, not 40+), month ticks Oct .. Mar, the title says so",
-      xl["scale"]["domain"][1] <= 27 and xl["scale"]["domain"][1] < xfull["scale"]["domain"][1] and nm_l[0] == "Oct" and nm_l[-1] == "Mar"
+check("the season chart stops at the end of March: a shorter week axis (to week ~30 from the first Wednesday of September, not 44+), month ticks "
+      "Sep .. Mar, the title says so",
+      xl["scale"]["domain"][1] <= 31 and xl["scale"]["domain"][1] < xfull["scale"]["domain"][1] and nm_l[0] == "Sep" and nm_l[-1] == "Mar"
       and "weeks through the end of March" in json.dumps(sl["title"]["subtitle"]), (xl["scale"]["domain"], nm_l))
-check("...and plots no week after it", max(r["week"] for d in sl["datasets"].values() for r in d if d and "week" in d[0] and "crop" in d[0]) <= 26)
+check("...and plots no week after it", max(r["week"] for d in sl["datasets"].values() for r in d if d and "week" in d[0] and "crop" in d[0]) <= 30)
 check("the full-season chart's subtitle is unchanged (two lines)", len(vw.seasonal_chart(results, "net").to_dict()["title"]["subtitle"]) == 2)
 check("a November study's month ticks end in Nov (the stop is in the starting year, not the next)", vw._month_ticks(lim_res, 12, rtc.CORN.horizon, 11)[1][-1] == "Nov")
 try:
@@ -313,13 +313,17 @@ check("the band is the completed years' middle 50% and 80% by week, only where 5
       all(r["n"] >= 5 for r in bands) and all(r["p10"] <= r["p25"] <= r["p50"] <= r["p75"] <= r["p90"] for r in bands))
 check("subtitle (two short lines, for a phone) says how many years the shading is", "12 completed years" in json.dumps(ss["title"]) and len(ss["title"]["subtitle"]) == 2)
 check("the best week is labelled 'Best +x.x¢ · Mon d'", any(str(r.get("label", "")).startswith("Best +") for d in dsets for r in d))
-check("month names along the bottom start at Oct", "Oct" in json.dumps(ss["layer"][1]["encoding"]["x"]["axis"]["labelExpr"]))
+check("month names along the bottom start at Sep (Kolten 2026-10-19: 'start this chart in Sep'), then Oct",
+      ss["layer"][1]["encoding"]["x"]["axis"]["labelExpr"].startswith('["Sep", "Oct"') and ss["layer"][1]["encoding"]["x"]["axis"]["values"][0] == 0)
+best_pt = next(r for d in dsets for r in d if str(r.get("label", "")).startswith("Best +"))
+check("the best dot sits on its week counted from September (row + 4 in 2025-26), on the latest year's line",
+      best_pt["week"] == results[-1].best["net"].idx + 4 and any(r["crop"] == "2025-26" and r["week"] == best_pt["week"] for r in lines), best_pt)
 xe = ss["layer"][1]["encoding"]["x"]
 check("every month tick lies inside the chart's weeks", max(xe["axis"]["values"]) <= xe["scale"]["domain"][1])
 res26, _, _ = build(list(range(2019, 2027)))                       # 2026-27 starts Wednesday Oct 7: its week 43 is already August
-tk26, nm26 = vw._month_ticks(res26, 44, rtc.CORN.horizon)
-check("the month ticks stop with the season, July for corn, even when the latest year starts Oct 7 (no stray 'Aug' at week 43)",
-      nm26[0] == "Oct" and nm26[-1] == "Jul" and max(tk26) <= 42 and "Aug" in vw._month_ticks(res26, 44)[1], (tk26, nm26))
+tk26, nm26 = vw._month_ticks(res26, 49, rtc.CORN.horizon)
+check("the month ticks start in September (week 0 = Sep 2, 2026) and stop with the season, July for corn (no stray 'Aug' when the year runs past Jul 31)",
+      nm26[0] == "Sep" and tk26[0] == 0 and nm26[-1] == "Jul" and max(tk26) <= 47 and "Aug" in vw._month_ticks(res26, 49)[1], (tk26, nm26))
 few5 = vw.seasonal_chart(results[-3:], "net").to_dict()
 kinds5 = [(l["mark"] if isinstance(l["mark"], str) else l["mark"]["type"]) for l in few5["layer"]]
 check("with fewer than 5 completed years there is no band, just the lines", "area" not in kinds5 and "line" in kinds5, kinds5)
