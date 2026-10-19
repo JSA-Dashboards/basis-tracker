@@ -360,7 +360,8 @@ def how_it_works(spec: rtc.Spec = rtc.CORN) -> str:
             "weekly nearby bid's return (the report's own measure: sell for prompt shipment that week) and (b) any forward month sold ahead "
             "on any day — that day's forward bid less that day's break-even (the harvest basis, less the futures spread from the base contract "
             "to the month's contract, which the hedge is rolled into at that day's spread, plus the interest to the 20th of the shipment month). "
-            "Forward sales count from the first bid of the harvest window. The headline, the by-year table and the bars say which it was "
+            "Forward sales count from the first bid of the harvest window, and only while they are deferred — made before the shipment month "
+            "begins (a July bid sold in July is that week's nearby sale, already in (a)). The headline, the by-year table and the bars say which it was "
             "('Oct 19 · Jan ship' = sold Oct 19 for January shipment). Forward bids are in the River FOB archive since 2006; elevators and rail "
             "corridors only archived them from 2026, so their earlier years are the nearby bid's best. The season chart's open dots are this "
             "year's forward curve: what each shipment month can lock today.")

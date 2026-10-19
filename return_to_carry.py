@@ -690,14 +690,26 @@ def tag_symbol(tag: str | None, crop_year: int, spec: Spec = CORN, d: date | Non
     return None
 
 
-def rebase(basis: float, tag: str | None, col_letter: str, crop_year: int, futs: dict, t: date, spec: Spec = CORN):
+def rebase(basis: float, tag: str | None, col_letter: str, crop_year: int, futs: dict, t: date, spec: Spec = CORN,
+           levels: dict | None = None):
     """A bid in the terms of the table's column: (value, converted) — the bid is moved from the contract it was quoted off
     to the column's by that day's spread, `basis + F(quoted) - F(column)` (nothing to move when they are the same, or
-    the quote names no contract). None when the move needs a price that is missing."""
+    the quote names no contract). None when the move needs a price that is missing.
+
+    `levels` = the table's chain levels that day (chain_levels(...).levels). When both contracts are in the chain, the move uses
+    THEM, the same levels the column's break-even uses: a rolled contract hangs from the next by its frozen roll spread. The raw
+    settlements disagree once a contract has rolled — on Jul 15 2026 Greenville's July bid, quoted off Sep, was moved by the EXPIRED
+    July's last price (Sep - Jul 9.75) while the break-even used the frozen 1.75, and the July sale showed ~8c of return that was not
+    there (found 2026-10-19). For live contracts the two are the same number."""
     col_sym = contract_symbol(col_letter, crop_year, spec.root)
     sym = tag_symbol(tag, crop_year, spec, t)
     if sym is None or sym == col_sym:
         return float(basis), False
+    if levels:
+        by_sym = {contract_symbol(lab, crop_year, spec.root): lab for lab in spec.chain}
+        a, b = by_sym.get(sym), by_sym.get(col_sym)
+        if a is not None and b is not None and levels.get(a) is not None and levels.get(b) is not None:
+            return float(basis) + levels[a] - levels[b], True
     pq, _ = price_on(futs, t, sym)
     pc, _ = price_on(futs, t, col_sym)
     if pq is None or pc is None:
@@ -763,7 +775,7 @@ class ShipTable:
 def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], futs: dict, rate_on, measure: str = "net",
                          b0_weeks: int = 0, b0_est: bool = False, spec: Spec = CORN, max_age_days: int = 10,
                          b0_own: bool = False, b0_calc: float | None = None, purchase: date | None = None,
-                         best_from: date | None = None) -> ShipTable:
+                         best_from: date | None = None, deferred_only: bool = False) -> ShipTable:
     """The page-1 table on `asof`.
 
     purchase  the purchase date, where the interest and the best-so-far start: the report's Oct 20 by default; a harvest window of the
@@ -771,6 +783,9 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
     best_from where the best-so-far starts instead of the purchase (return_to_carry_data.forward_best counts every forward sale from the
               first bid of the harvest window, so a sale locked before Oct 20 counts in every year alike). The interest still runs from
               the purchase.
+    deferred_only  the best-so-far counts only sales made BEFORE the column's shipment month begins — a true forward sale (forward_best:
+              a July bid sold in July is the nearby sale, which the weekly history already prices; comparing the two would only compare the
+              report's two interest conventions). Any bid counts toward a month's best only on or before its shipment date (the 20th).
 
     b0       the harvest basis (cents vs the base contract): the average of the first weekly bids so far, or an estimate before they post —
              or the user's own (then `b0_own` is True and `b0_calc` is what the calculated method gives, to show beside it).
@@ -805,15 +820,16 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
         rate_t = rate_now if t == asof else (rate_on(t) if rate_on else None)
         for q in by_date[t]:
             col = cols[q["month"]]
-            moved = rebase(q["basis"], q.get("tag"), col.letter, crop_year, futs, t, spec)
+            moved = rebase(q["basis"], q.get("tag"), col.letter, crop_year, futs, t, spec, levels=lvl_t.levels)
             if moved is None:
                 continue
             bid, converted = moved
             if (asof - t).days <= max_age_days and (col.bid_date is None or t >= col.bid_date):
                 col.bid, col.bid_date, col.bid_label = bid, t, q.get("label")
                 col.bid_posted = float(q["basis"]) if converted else None
-            if t < since:
-                continue                                    # the position starts at the purchase (or `best_from`)
+            if t < since or t > (col.ship.replace(day=1) - timedelta(days=1) if deferred_only else col.ship):
+                continue                                    # the position starts at the purchase (or `best_from`), and a bid posted after
+                                                            # the month's shipment date (a 'Jul' bid on Jul 22 for Jul 20) is no sale for it
             if col.best_bid is None or bid > col.best_bid + 1e-9:
                 col.best_bid, col.best_bid_date = bid, t
             c = cost_on(lvl_t, rate_t, col)
@@ -824,7 +840,9 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
     for col in tbl.cols:
         if col.bid is not None and col.cost is not None:
             col.ret = col.bid - col.cost
-            if col.bid_date is not None and col.bid_date >= since and (col.best_ret is None or col.ret > col.best_ret + 1e-9):
+            last_day = col.ship.replace(day=1) - timedelta(days=1) if deferred_only else col.ship
+            if (col.bid_date is not None and since <= col.bid_date <= last_day
+                    and (col.best_ret is None or col.ret > col.best_ret + 1e-9)):
                 col.best_ret, col.best_ret_date = col.ret, col.bid_date     # today's break-even can differ from the quote day's
     return tbl
 

@@ -120,6 +120,12 @@ check("Mar quote in the Mar -> May column: 16 + 396 - 402 = 10", rtc.rebase(16, 
 check("a package (tag R), a blank and a junk tag are taken as the column's own month",
       all(rtc.rebase(7, tg, "K", 2026, FS, D(2026, 12, 8)) == (7.0, False) for tg in ("R", "", None, "ZSX26", "??")))
 check("a single chain letter names this crop year's contract ('h' -> ZCH27)", rtc.rebase(16, "h", "K", 2026, FS, D(2026, 12, 8)) == (10.0, True))
+check("with the table's chain levels, a bid off a ROLLED contract moves by the chain's level (Dec 8: Dec hangs 396 - 12 = 384 from Mar), the "
+      "same level the break-even uses — not the expired contract's own (stale or missing) price",
+      rtc.rebase(10, "ZCZ26", "H", 2026, FS, D(2026, 12, 8), levels=c2.levels) == (10.0 + 384.0 - 396.0, True)
+      and rtc.rebase(10, "ZCZ26", "H", 2026, FS, D(2026, 12, 8)) is None)
+check("...and for live contracts the chain levels are the settlements, so nothing changes (16 + 396 - 402 = 10)",
+      rtc.rebase(16, "ZCH27", "K", 2026, FS, D(2026, 12, 8), levels=c2.levels) == (10.0, True))
 check("a gap of a few days is stepped over (Dec 12 uses Dec 8's settlements); a contract with no price in 5 days, or none at all, gives no answer — not a guess",
       rtc.rebase(16, "ZCH27", "K", 2026, FS, D(2026, 12, 12)) == (10.0, True) and rtc.rebase(16, "ZCH27", "K", 2026, FS, D(2026, 12, 20)) is None
       and rtc.rebase(16, "ZCH27", "K", 2026, {D(2026, 12, 8): {"ZCH27": 396.0}}, D(2026, 12, 8)) is None)
@@ -477,6 +483,11 @@ check("...Oct 8 is before the report's Oct 20 purchase but after the window's fi
       rd.forward_best(res_l[0], jan(30.0), FL, None, END, "gross")["date"] == D(2025, 10, 8))
 check("a forward bid posted before the window's first bid (Sep 17) does not count",
       rd.forward_best(res_l[0], jan(50.0, D(2025, 9, 17)), FL, None, END, "gross") is None)
+check("only a DEFERRED sale counts as forward: a January bid posted in January (Jan 8, +40) is the nearby sale, not a forward one",
+      rd.forward_best(res_l[0], jan(40.0, D(2026, 1, 8)), FL, None, END, "gross") is None
+      and rd.forward_best(res_l[0], jan(40.0, D(2025, 12, 31)), FL, None, END, "gross")["date"] == D(2025, 12, 31))
+check("a bid posted after its shipment date never counts toward that month's best in the table either (Jan 25 for Jan 20)",
+      rtc.build_shipment_table(YL, END, 10.0, rd.shipment_quotes(jan(40.0, D(2026, 1, 25)), YL), FL, None, "gross").cols[2].best_ret is None)
 lk2 = rd.lockable_bests(res_l, jan(12.0), FL, None, END, "gross")[YL]
 check("a lower forward sale (+12) leaves the nearby's +16 as the best, and still records what the forward best was",
       lk2["kind"] == "nearby" and close(lk2["value"], 16.0) and close(lk2["forward"], 12.0))

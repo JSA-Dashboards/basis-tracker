@@ -431,7 +431,10 @@ def forward_best(cy, quotes: list[dict], futs: dict, rate_on, asof: date, measur
     The return of each (day, month) is the shipment table's: bid - that day's break-even (harvest basis - the futures spread from the base
     contract to the month's + the interest from the purchase to the shipment date, on the measure). Sales count from the first bid of the
     harvest window (or the purchase, if earlier) — the same rule in every year, so the tracked year's sale TODAY counts even before the
-    report's Oct 20 purchase date. `b0` = the harvest basis to use instead of `cy.b0` (the page's table may hold the posted-quote estimate)."""
+    report's Oct 20 purchase date — and only while they are DEFERRED: made before the shipment month begins (a July bid sold in July is
+    the nearby sale, which the weekly history prices; comparing the two only compares the report's two interest conventions — on Greenville
+    corn that alone made July 'forward' sales look 2-4c better than the same week's nearby). `b0` = the harvest basis to use instead of
+    `cy.b0` (the page's table may hold the posted-quote estimate)."""
     b0 = cy.b0 if b0 is None else b0
     if b0 is None:
         return None
@@ -444,7 +447,7 @@ def forward_best(cy, quotes: list[dict], futs: dict, rate_on, asof: date, measur
     since = min(cy.b0_dates[0], purchase) if cy.b0_dates else purchase
     known = {d: px for d, px in futs.items() if d <= t}             # a past day must not see a spread measured after it
     table = rtc.limit_shipment_table(rtc.build_shipment_table(cy.crop_year, t, b0, q, known, rate_on, measure, spec=spec, purchase=purchase,
-                                                              best_from=since), ship_month)
+                                                              best_from=since, deferred_only=True), ship_month)
     col = rtc.best_column(table, "best_ret")                         # the earliest month wins a tie
     if col is None:
         return None

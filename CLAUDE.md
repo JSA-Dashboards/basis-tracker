@@ -250,6 +250,17 @@ corn 10-19, report window: nearby +4.3 vs January forward +16.9; past years spli
 2019-20 nearby +34.6 vs forward +27.2, the July spot rally came after the forward months ran out). Tests: `tests/test_return_to_carry_ship.py`
 (the lockable section: synthetic year, the window-start rule, ship-by, tie, the chart points and dot).
 
+**Two fixes the same day (Kolten: "these two charts don't seem to align"; his 2025-26 bar sat ~9c above its line's peak).** (1) `rebase` moved a
+bid to the column's contract with RAW settlements while the column's break-even uses `chain_levels`, where a rolled contract hangs from the next
+by its frozen spread: on Jul 15 2026 Greenville's July bid (quoted off Sep) was moved by the expired July's last price (Sep − Jul 9.75) against a
+frozen 1.75, ~8c of return that was not there. `build_shipment_table` now passes the day's levels (`rebase(levels=)`); live contracts are
+unchanged, so the current year's table is the same. (2) A bid counts toward a month's best only on or before its shipment date, and
+`forward_best` counts only DEFERRED sales (`build_shipment_table(deferred_only=True)`: before the shipment month begins) — a July bid sold in July
+is the nearby sale, and comparing the two only compared the report's two interest conventions (weekly rate/52 on today's cash price vs rate ×
+days/360 on the purchase cost: 2-4c by July). After both, River FOB corn/soy at Greenville, STL, Hennepin, Memphis: the forward wins 3-9 of 21
+years, mostly by 0.5-5c (2007-08 Jan->Jun up to +12), and the median year's forward best is 1.5-6.5c under the nearby; the bars equal the lines'
+peaks except where a deferred sale really paid more. 2026-27 (mid-October, weak spot) forward wins by 12-30c.
+
 **September bids quoted off CU (corn).** A window that reaches back into September can hold bids quoted off SEPTEMBER futures — the expiring old-crop
 contract — while the base is Dec (Kolten 2026-10-12: "for months that start in September some will have this month basis the CU and we will need
 to roll this accordingly. Use the last day prior to first notice day to establish the spread level to roll at"; "for several locations the all fall
