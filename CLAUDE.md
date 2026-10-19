@@ -230,6 +230,26 @@ weeks N to M"); for soybeans October's bids need the Nov-Jan spread (measured Oc
 says why). The boxes stay when My own is chosen: the window still sets the calculated number the box starts from and every earlier year's basis. The
 choice is the user's way of establishing a basis, so it follows them from location to location (`nc_rtc_win_<corn|soy>_{start,n,kept}`).
 
+**Best return = the best LOCKABLE return, nearby or forward** (Kolten 2026-10-19: Greenville corn's headline showed the nearby bid's best while
+the shipment table's January was higher — "best return on the second chart should be the most active best return that can be locked in at any
+time ... you can sell to lock in this value, not have to be able to ship it to execute"; he chose "best lockable, any sale" + "today's forward
+curve" on the chart). The weekly history (the report's measure) prices only the NEARBY bid each week. A forward month is lockable the same day —
+sell the forward bid, roll the hedge to its contract at that day's spread, carry the interest to its shipment date — which is exactly the
+shipment table's return (bid − that day's break-even). `rd.forward_best(cy, quotes, ...)` rebuilds a crop year's shipment table at its end (or
+the as-of date / Ship by end) with `build_shipment_table(best_from=)` = the first bid of the harvest window (or the purchase if earlier), so a sale
+locked before the report's Oct 20 purchase counts the same way in every year (the tracked year's sale TODAY included); `b0=` lets the tracked
+year use the page's harvest basis (it can be the posted-quote estimate). `rd.lockable_bests` takes the higher of that and `cy.best` (a tie goes to
+the nearby) per year; `summary_rows(lockable=)` puts it in `best` / `best_date` with `best_kind` ('nearby' | 'forward'), `best_ship`,
+`best_nearby`, `best_forward`. The headline ("January shipment sold ahead, locked Oct 19"), the by-year table (`vw.best_when`: "Oct 19 · Jan
+ship", plus a legend line and a count of years with no forward bids), the bars' tooltip, ranks and averages all read it. The season chart takes
+`forward=` (today's 'return today' by shipment month, open orange dots on a dashed line at each shipment date) and `best=` (the dot sits on the
+forward month's shipment date). Displayed shipment table unchanged (its 'best YTD since Oct 20' rows still start at the purchase). Forward bids
+exist in the River FOB archive since 2006; elevators (snapshot rows) and rail corridors only from 2026, so their earlier years are the nearby's
+best. Interest conventions differ slightly between the two (weekly rate/52 on the cash price vs rate × days/360 on futures + basis). Greenville
+corn 10-19, report window: nearby +4.3 vs January forward +16.9; past years split both ways (2025-26 Jul forward +41.1 vs nearby +32.0;
+2019-20 nearby +34.6 vs forward +27.2, the July spot rally came after the forward months ran out). Tests: `tests/test_return_to_carry_ship.py`
+(the lockable section: synthetic year, the window-start rule, ship-by, tie, the chart points and dot).
+
 **September bids quoted off CU (corn).** A window that reaches back into September can hold bids quoted off SEPTEMBER futures — the expiring old-crop
 contract — while the base is Dec (Kolten 2026-10-12: "for months that start in September some will have this month basis the CU and we will need
 to roll this accordingly. Use the last day prior to first notice day to establish the spread level to roll at"; "for several locations the all fall

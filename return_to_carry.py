@@ -762,11 +762,15 @@ class ShipTable:
 
 def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], futs: dict, rate_on, measure: str = "net",
                          b0_weeks: int = 0, b0_est: bool = False, spec: Spec = CORN, max_age_days: int = 10,
-                         b0_own: bool = False, b0_calc: float | None = None, purchase: date | None = None) -> ShipTable:
+                         b0_own: bool = False, b0_calc: float | None = None, purchase: date | None = None,
+                         best_from: date | None = None) -> ShipTable:
     """The page-1 table on `asof`.
 
     purchase  the purchase date, where the interest and the best-so-far start: the report's Oct 20 by default; a harvest window of the
               user's that opens in September moves it (`CropYear.purchase`).
+    best_from where the best-so-far starts instead of the purchase (return_to_carry_data.forward_best counts every forward sale from the
+              first bid of the harvest window, so a sale locked before Oct 20 counts in every year alike). The interest still runs from
+              the purchase.
 
     b0       the harvest basis (cents vs the base contract): the average of the first weekly bids so far, or an estimate before they post —
              or the user's own (then `b0_own` is True and `b0_calc` is what the calculated method gives, to show beside it).
@@ -775,6 +779,7 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
     rate_on  date -> annual percent (the bank prime in the report; the app's default is the tab's fed funds + 2.25%).
     A bid counts as current when it is at most `max_age_days` old. Best-YTD starts at the purchase date (Oct 20)."""
     purchase = purchase or purchase_date(crop_year)
+    since = best_from or purchase                           # where the best-so-far starts
     lv = chain_levels(futs, crop_year, asof, spec)
     rate_now = rate_on(asof) if rate_on else None
     tbl = ShipTable(crop_year, crop_label(crop_year), asof, measure, purchase, b0, b0_weeks, b0_est,
@@ -807,8 +812,8 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
             if (asof - t).days <= max_age_days and (col.bid_date is None or t >= col.bid_date):
                 col.bid, col.bid_date, col.bid_label = bid, t, q.get("label")
                 col.bid_posted = float(q["basis"]) if converted else None
-            if t < purchase:
-                continue                                    # the position starts at the purchase
+            if t < since:
+                continue                                    # the position starts at the purchase (or `best_from`)
             if col.best_bid is None or bid > col.best_bid + 1e-9:
                 col.best_bid, col.best_bid_date = bid, t
             c = cost_on(lvl_t, rate_t, col)
@@ -819,7 +824,7 @@ def build_shipment_table(crop_year: int, asof: date, b0, quotes: list[dict], fut
     for col in tbl.cols:
         if col.bid is not None and col.cost is not None:
             col.ret = col.bid - col.cost
-            if col.bid_date is not None and col.bid_date >= purchase and (col.best_ret is None or col.ret > col.best_ret + 1e-9):
+            if col.bid_date is not None and col.bid_date >= since and (col.best_ret is None or col.ret > col.best_ret + 1e-9):
                 col.best_ret, col.best_ret_date = col.ret, col.bid_date     # today's break-even can differ from the quote day's
     return tbl
 

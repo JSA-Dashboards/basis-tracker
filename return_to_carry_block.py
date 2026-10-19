@@ -263,15 +263,23 @@ def render(*, obs: list, quotes: list, asof, grain: str, measure: str, tab_rate_
     if own is not None:
         st.markdown(vw.own_basis_note_html(own, tbl.b0_calc, rtc.crop_label(crop_year), spec,
                                            in_history=any(cy.crop_year == crop_year for cy in res)), unsafe_allow_html=True)
-    if tbl is not None and (tbl.b0 is not None or any(c.bid is not None for c in tbl.cols)):
-        st.markdown(vw.shipment_html(rtc.limit_shipment_table(tbl, ship_month), est, rate_note), unsafe_allow_html=True)
+    tbl_l = rtc.limit_shipment_table(tbl, ship_month) if tbl is not None else None
+    if tbl_l is not None and (tbl_l.b0 is not None or any(c.bid is not None for c in tbl_l.cols)):
+        st.markdown(vw.shipment_html(tbl_l, est, rate_note), unsafe_allow_html=True)
     if not res:
         st.info("Not enough weekly history yet to chart the crop years for this location.")
         return
     res = rd.limit_history(res, ship_month)                  # a study told to ship by the end of a month reads only the weeks up to it
-    rows = rd.summary_rows(res, measure)
+    try:                                                     # the best LOCKABLE return of each year: the nearby bid or a forward month sold ahead
+        lock = rd.lockable_bests(res, quotes, futs, rate_on, asof, measure, spec, ship_month, table=tbl)
+    except Exception:                                        # noqa: BLE001 — never lose the page over it: fall back to the nearby bid's best
+        lock = None
+    rows = rd.summary_rows(res, measure, lockable=lock)
     st.markdown(vw.headline_html(rows, measure, spec), unsafe_allow_html=True)
-    ch = vw.seasonal_chart(res, measure, logo_uri=logo_uri, spec=spec)
+    fwd = ([{"ship": c.ship, "value": c.ret, "month": c.month} for c in tbl_l.cols if c.ret is not None]
+           if tbl_l is not None and tbl_l.crop_year == res[-1].crop_year else None)        # today's forward curve, for the tracked year's line
+    ch = vw.seasonal_chart(res, measure, logo_uri=logo_uri, spec=spec, forward=fwd,
+                           best=(lock or {}).get(res[-1].crop_year) if lock is not None else None)
     if ch is not None:
         st.altair_chart(ch, **_stretch())
     bar = vw.best_bar_chart(rows, measure, derived=marks)

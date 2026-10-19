@@ -6,6 +6,7 @@ Oracles = the Research Analyst's own page-1 workbooks (`NNCARRYBA.xlsx`): fed th
 Basis Cost row they computed — the 2026 Columbus template, and the 2019-20 and 2024-25 St. Louis sheets (which mix
 measured and live roll spreads). Nothing here touches a database or the network.
 """
+import json
 import os
 import sys
 from datetime import date, timedelta
@@ -452,6 +453,65 @@ lv_m = t_mar.levels.spreads
 check("the futures-carry card counts only the spreads up to the last column shown (Dec->Mar and Mar->May for a March study; all three, to Jul, in the full table)",
       "Mar→May" in hl and "May→Jul" not in hl and ("%+.1f¢" % (lv_m["ZH"][0] + lv_m["HK"][0])) in hl and "May→Jul" in h, hl[max(0, hl.find("Futures carry")):][:260])
 check("a study that ends before the first roll says there is no roll spread yet", "no roll spread before then" in vw.shipment_html(rtc.limit_shipment_table(tb2, 11), None, "x"))
+
+print("best LOCKABLE return: the nearby bid or a forward month sold ahead, on any day (Kolten 2026-10-19; synthetic 2025-26, gross: flat +10 bids,")
+print("  harvest basis +10, futures Dec 400 / Mar 410 / May 414 / Jul 416 / Sep 410, so the nearby's best is the +16 banked to July)")
+YL = 2025
+s25 = rtc.first_wednesday(YL)                                                        # Oct 1 2025
+pxl = {"Z": 400.0, "H": 410.0, "K": 414.0, "N": 416.0, "U": 410.0}
+FL = {s25 + timedelta(days=7 * k): {rtc.contract_symbol(c, YL): v for c, v in pxl.items()} for k in range(-6, 46)}
+for d_ in rtc.roll_dates(YL).values():
+    FL[d_] = dict(FL.get(d_, {}), **{rtc.contract_symbol(c, YL): v for c, v in pxl.items()})
+obs_l = [{"date": s25 + timedelta(days=7 * k), "basis": 10.0} for k in range(0, 44)]
+res_l = rd.run_history(obs_l, FL, None)
+END = D(2026, 7, 31)
+jan = lambda b, d=D(2025, 10, 8): [{"date": d, "label": "Jan", "tag": "ZCH26", "basis": b}]
+lk0 = rd.lockable_bests(res_l, [], FL, None, END, "gross")[YL]
+check("no forward bids: the best is the nearby bid's (+16, banked to July), and there is no forward best",
+      lk0["kind"] == "nearby" and close(lk0["value"], 16.0) and lk0["forward"] is None and lk0["ship"] is None, lk0)
+lk1 = rd.lockable_bests(res_l, jan(30.0), FL, None, END, "gross")[YL]
+check("a January bid of +30 vs Mar posted Oct 8 locks 30 - (10 - (410 - 400)) = +30 > +16: the best is that forward sale, its day and shipment",
+      lk1["kind"] == "forward" and close(lk1["value"], 30.0) and lk1["date"] == D(2025, 10, 8) and lk1["ship"] == D(2026, 1, 20)
+      and lk1["letter"] == "H" and close(lk1["nearby"], 16.0), lk1)
+check("...Oct 8 is before the report's Oct 20 purchase but after the window's first bid (Oct 1): it counts, as a sale today would",
+      rd.forward_best(res_l[0], jan(30.0), FL, None, END, "gross")["date"] == D(2025, 10, 8))
+check("a forward bid posted before the window's first bid (Sep 17) does not count",
+      rd.forward_best(res_l[0], jan(50.0, D(2025, 9, 17)), FL, None, END, "gross") is None)
+lk2 = rd.lockable_bests(res_l, jan(12.0), FL, None, END, "gross")[YL]
+check("a lower forward sale (+12) leaves the nearby's +16 as the best, and still records what the forward best was",
+      lk2["kind"] == "nearby" and close(lk2["value"], 16.0) and close(lk2["forward"], 12.0))
+check("a tie goes to the nearby bid (the report's own pick)", rd.lockable_bests(res_l, jan(16.0), FL, None, END, "gross")[YL]["kind"] == "nearby")
+lk_dec = rd.lockable_bests(rd.limit_history(res_l, 12), jan(30.0), FL, None, END, "gross", ship_month=12)[YL]
+check("a study that ships by December cannot use the January sale: the best is December's nearby (+10, banked to March)",
+      lk_dec["kind"] == "nearby" and close(lk_dec["value"], 10.0) and lk_dec["forward"] is None, lk_dec)
+check("the page's harvest basis can stand in (b0=0 -> the January sale locks 30 + 10 = +40)",
+      close(rd.forward_best(res_l[0], jan(30.0), FL, None, END, "gross", b0=0.0)["value"], 40.0))
+rows_l = rd.summary_rows(res_l, "gross", lockable=rd.lockable_bests(res_l, jan(30.0), FL, None, END, "gross"))
+check("summary_rows carry the lockable best, what kind of sale it was, the shipment, and the nearby's best beside it",
+      close(rows_l[-1]["best"], 30.0) and rows_l[-1]["best_kind"] == "forward" and rows_l[-1]["best_ship"] == D(2026, 1, 20)
+      and close(rows_l[-1]["best_nearby"], 16.0) and rows_l[-1]["best_date"] == D(2025, 10, 8))
+check("without `lockable` the rows are the report's (the nearby bid's best)", close(rd.summary_rows(res_l, "gross")[-1]["best"], 16.0)
+      and rd.summary_rows(res_l, "gross")[-1]["best_kind"] == "nearby")
+check("best_when: a forward best reads 'Oct 8 · Jan ship', a nearby one its date",
+      vw.best_when(rows_l[-1]) == "Oct 8 · Jan ship" and vw.best_when(rd.summary_rows(res_l, "gross")[-1]) == "Apr 29")
+hl_l = vw.headline_html(rows_l, "gross")
+check("the headline names the sale: 'January shipment sold ahead, locked Oct 8'", "+30.0¢" in hl_l and "January shipment sold ahead, locked Oct 8" in hl_l, hl_l[:400])
+tl_l = vw.table_html(rows_l, "gross")
+check("the by-year table shows it as 'Oct 8 · Jan ship' and says what Best return now means",
+      "Oct 8 · Jan ship" in tl_l and "the most that could be LOCKED in that year" in tl_l and "no forward bids" not in tl_l)
+check("...and a year with no forward bids in the archive is called out", "1 year has no forward bids in the archive" in
+      vw.table_html(rd.summary_rows(res_l, "gross", lockable=rd.lockable_bests(res_l, [], FL, None, END, "gross")), "gross"))
+fw_pts = [{"ship": D(2025, 11, 20), "value": 22.0, "month": 11}, {"ship": D(2026, 1, 20), "value": 30.0, "month": 1}]
+sc_l = vw.seasonal_chart(res_l, "gross", forward=fw_pts, best=rd.lockable_bests(res_l, jan(30.0), FL, None, END, "gross")[YL]).to_dict()
+ds_l = [r for d_ in sc_l["datasets"].values() for r in d_]
+jan_x = (D(2026, 1, 20) - rtc.first_september_wednesday(YL)).days / 7.0
+check("the season chart draws today's forward curve: a point per shipment month at its date (Jan 20 = week %.2f from Sep 3)" % jan_x,
+      sum(1 for r in ds_l if "Shipment" in r) == 2 and any("Shipment" in r and abs(r["week"] - jan_x) < 1e-9 and r["value"] == 30.0 for r in ds_l)
+      and "open dots" in json.dumps(sc_l["title"]["subtitle"]))
+check("...and the best dot sits on the forward sale's shipment date, labelled with the month and the day it was locked",
+      any(r.get("label") == "Best +30.0¢ · Jan ship, locked Oct 8" and abs(r["week"] - jan_x) < 1e-9 for r in ds_l))
+check("without forward points or a lockable best the chart is as before (no Shipment points, the nearby best's dot)",
+      not any("Shipment" in r for d_ in vw.seasonal_chart(res_l, "gross").to_dict()["datasets"].values() for r in d_))
 
 print("\n" + ("ALL PASS" if not FAILS else "FAILURES: %s" % FAILS))
 sys.exit(1 if FAILS else 0)

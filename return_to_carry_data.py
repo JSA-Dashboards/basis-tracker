@@ -418,25 +418,90 @@ def _value(w, measure: str):
     return w.net if measure == "net" else w.gross
 
 
-def summary_rows(results: list, measure: str = "net") -> list[dict]:
+# ── the best LOCKABLE return: the nearby bid or any forward month, on any day ─────────────────────────
+# Kolten 2026-10-19: "Best return ... should be the most active best return that can be locked in at any time ... you can sell to lock in
+# this value, not have to be able to ship it to execute." The weekly history (the report's method) prices only the NEARBY bid each week:
+# selling for prompt shipment. A forward month is lockable the same day — sell the forward bid, roll the hedge to its contract at that
+# day's spread, carry the interest to its shipment date — which is exactly the shipment table's 'return' (bid - that day's break-even).
+def forward_best(cy, quotes: list[dict], futs: dict, rate_on, asof: date, measure: str = "net", spec: rtc.Spec = rtc.CORN,
+                 ship_month: int | None = None, b0: float | None = None) -> dict | None:
+    """The best return lockable by selling a FORWARD month on any day of crop year `cy`, up to `asof` and the end of the study:
+    {'value', 'date' (the day it was locked), 'ship' (the shipment date, the 20th), 'month', 'letter'}; None when no forward bid of that
+    year was posted (elevators and rail corridors only archived forward periods from 2026) or there is no harvest basis.
+    The return of each (day, month) is the shipment table's: bid - that day's break-even (harvest basis - the futures spread from the base
+    contract to the month's + the interest from the purchase to the shipment date, on the measure). Sales count from the first bid of the
+    harvest window (or the purchase, if earlier) — the same rule in every year, so the tracked year's sale TODAY counts even before the
+    report's Oct 20 purchase date. `b0` = the harvest basis to use instead of `cy.b0` (the page's table may hold the posted-quote estimate)."""
+    b0 = cy.b0 if b0 is None else b0
+    if b0 is None:
+        return None
+    end = rtc.study_end(cy.crop_year, ship_month) if ship_month else date(cy.crop_year + 1, *spec.horizon)
+    t = min(asof, end)
+    q = shipment_quotes(quotes, cy.crop_year, spec)
+    if not q:
+        return None
+    purchase = cy.purchase or rtc.purchase_date(cy.crop_year)
+    since = min(cy.b0_dates[0], purchase) if cy.b0_dates else purchase
+    known = {d: px for d, px in futs.items() if d <= t}             # a past day must not see a spread measured after it
+    table = rtc.limit_shipment_table(rtc.build_shipment_table(cy.crop_year, t, b0, q, known, rate_on, measure, spec=spec, purchase=purchase,
+                                                              best_from=since), ship_month)
+    col = rtc.best_column(table, "best_ret")                         # the earliest month wins a tie
+    if col is None:
+        return None
+    return {"value": col.best_ret, "date": col.best_ret_date, "ship": col.ship, "month": col.month, "letter": col.letter}
+
+
+def lockable_bests(results: list, quotes: list[dict], futs: dict, rate_on, asof: date, measure: str = "net", spec: rtc.Spec = rtc.CORN,
+                   ship_month: int | None = None, table=None) -> dict:
+    """{crop year: the best return lockable at any time that year} — the higher of the weekly NEARBY bid's best (`cy.best`, already
+    limited to the study) and the best FORWARD month (forward_best): {'value', 'date' (locked), 'kind' ('nearby' | 'forward'), 'ship'
+    (forward: the shipment date), 'month', 'letter', 'nearby' (the nearby best's value), 'forward' (the forward best's value, None = no
+    forward bids that year)}. `table` = the tracked year's shipment table from the page: its harvest basis is used for that year (it may be
+    the posted-quote estimate before the weekly bids). Years with neither are left out."""
+    out = {}
+    for cy in results:
+        nb = cy.best.get(measure)
+        nv = None if nb is None else _value(nb, measure)
+        fb = forward_best(cy, quotes, futs, rate_on, asof, measure, spec, ship_month,
+                          b0=table.b0 if (table is not None and table.crop_year == cy.crop_year) else None)
+        if nv is None and fb is None:
+            continue
+        if fb is not None and (nv is None or fb["value"] > nv + 1e-9):      # a tie goes to the nearby bid (the report's own pick)
+            out[cy.crop_year] = dict(fb, kind="forward", nearby=nv, forward=fb["value"])
+        else:
+            out[cy.crop_year] = {"value": nv, "date": nb.date, "kind": "nearby", "ship": None, "month": None, "letter": nb.tag,
+                                 "nearby": nv, "forward": None if fb is None else fb["value"]}
+    return out
+
+
+def summary_rows(results: list, measure: str = "net", lockable: dict | None = None) -> list[dict]:
     """One row per crop year for the table: harvest basis, the headline futures carry, best summer basis, the best return
-    on the measure (and its week), and the return at the last week."""
+    on the measure (and its week), and the return at the last week. With `lockable` (lockable_bests) the best return is the best
+    LOCKABLE one — the nearby bid or a forward month, on any day — and the row says which ('best_kind', 'best_ship' = the forward
+    month's shipment date, 'best_nearby', 'best_forward'); without it, the weekly nearby bid's best, as the report has it."""
     rows = []
     for cy in results:
         best = cy.best.get(measure)
         last = next((w for w in reversed(cy.weeks) if _value(w, measure) is not None), None)
-        rows.append({
+        row = {
             "crop_year": cy.crop_year, "label": cy.label, "weeks": len(cy.weeks), "complete": cy.complete,
             "b0": cy.b0, "b0_weeks": cy.b0_weeks, "b0_own": cy.b0_own, "b0_calc": cy.b0_calc, "carry": cy.season_carry,
             "summer": None if cy.summer is None else cy.summer.basis,
             "summer_date": None if cy.summer is None else cy.summer.date,
             "best": None if best is None else _value(best, measure),
             "best_date": None if best is None else best.date, "best_tag": None if best is None else best.tag,
+            "best_kind": None if best is None else "nearby", "best_ship": None,
+            "best_nearby": None if best is None else _value(best, measure), "best_forward": None, "lockable": lockable is not None,
             "last": None if last is None else _value(last, measure),
             "last_date": None if last is None else last.date,
             "ship_by": cy.window_end, "carry_tag": cy.carry_tag,       # set only when the study was limited (limit_history)
             "b0_window": cy.b0_window,                                 # set only when the user chose the weeks of the harvest-basis average
-        })
+        }
+        lk = (lockable or {}).get(cy.crop_year)
+        if lk is not None:
+            row.update(best=lk["value"], best_date=lk["date"], best_tag=lk["letter"], best_kind=lk["kind"], best_ship=lk["ship"],
+                       best_nearby=lk["nearby"], best_forward=lk["forward"])
+        rows.append(row)
     return rows
 
 
