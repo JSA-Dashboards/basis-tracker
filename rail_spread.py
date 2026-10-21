@@ -141,7 +141,7 @@ def forward_quotes(rows: list[dict], market: str, commodity: str = "Corn") -> tu
     bundles: list = []                  # (span, -basis, ym, quote)
     for r in rows:
         if (r.get("market") != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None
-                or _day(r.get("date")) != posted):
+                or _day(r.get("date")) != posted or _rd.is_spread_note(r.get("period"))):
             continue
         info = _rd.parse_label(r.get("period"))
         tag = resolve_tag(r.get("futures"), posted)

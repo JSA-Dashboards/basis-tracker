@@ -13,6 +13,7 @@ from regions import region_from_state
 from river_segments import river_segment, SEGMENT_ORDER
 import delivery_period as _dp
 import forward_month as _fm
+import seasonal_band as _sband
 
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
@@ -2322,8 +2323,8 @@ with tab_railfob:
             _fwd_cells = {}                        # (market, date) -> [(period, bid)] for the forward curve
             for _src in ("manual", "palmetto"):
                 for _r in _cached_rail_fob_all(_src):
-                    if _r.get("bid") is None:
-                        continue
+                    if _r.get("bid") is None or _fm.is_spread_note(_r["period"]):
+                        continue                  # a spread note's number is the spread, not a period's basis
                     _b = _seasonal_bucket(_r["period"])
                     _rc = _r.get("commodity") or "Corn"
                     if _b in _SEAS_MON:         # a month: the day's full / FH / LH bids become ONE value below
@@ -2438,11 +2439,14 @@ with tab_railfob:
             # 5-yr range band + average for THIS period — the five completed crop years
             # immediately before the CURRENT calendar marketing year (anchored to today,
             # not the corridor's max year, so recent gaps don't drag the band to old years).
+            # OLYMPIC (seasonal_band, Kolten 2026-10-20): each week's highest and lowest year
+            # are dropped before the average and the range are taken, so one freak crop year
+            # (UP Allen Station / BN Hereford 2022/23) cannot drag either.
             _rcur_my = date.today().year if date.today().month >= 9 else date.today().year - 1
             _rwin_yrs = list(range(_rcur_my - 5, _rcur_my))
             _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
             _rband = (_rwin.groupby("MktWeek")["Bid"]
-                      .agg(avg="mean", lo="min", hi="max").reset_index())
+                      .agg(avg=_sband.olympic_avg, lo=_sband.olympic_lo, hi=_sband.olympic_hi).reset_index())
             _rbyrs = sorted(_rwin["MktYear"].unique())
 
             # Forward curve = the corridor's LATEST full rundown, each delivery month placed at
@@ -2540,7 +2544,7 @@ with tab_railfob:
                 _layers.append(
                     _alt.Chart(_rband).mark_line(color=_AVG_CLR, strokeDash=[8, 4], strokeWidth=3)
                     .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q", scale=_ry_scale)))
-                _r_avg_end = _rband.nlargest(1, "MktWeek").assign(_lbl="5-yr avg")
+                _r_avg_end = _rband.nlargest(1, "MktWeek").assign(_lbl="5-yr Olympic avg")
                 _layers.append(
                     _alt.Chart(_r_avg_end).mark_text(align="left", dx=6, fontSize=10,
                                                      fontWeight="bold", color=_AVG_CLR)
@@ -2579,7 +2583,7 @@ with tab_railfob:
                 + '&nbsp;&nbsp;<span style="font-weight:400;text-transform:none">'
                 + (f'<b style="color:#000">{_curr_yr} = black</b>' if _curr_yr else '')
                 + (f'  ·  <b style="color:#2563eb">{_prev_yr} = blue</b>' if _prev_yr else '')
-                + (f'  ·  <b style="color:#d97706">5-yr avg = amber dash</b>' if not _rband.empty else '')
+                + (f'  ·  <b style="color:#d97706">5-yr Olympic avg = amber dash</b>' if not _rband.empty else '')
                 + '</span></div>', unsafe_allow_html=True)
             _rail_chart = _alt.layer(*_layers).properties(height=_H, padding=_CHART_PAD)
             st.altair_chart(_rail_chart, use_container_width=True)
@@ -2594,7 +2598,9 @@ with tab_railfob:
                                  key=f"rail_seas_{_mk}_{_pd_sel}")
             st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
                        f"than once · partial windows fold into their month (FH/LH/Split Oct, "
-                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted.")
+                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · the 5-yr "
+                       f"average and the gray band are Olympic: each week's highest and lowest year are dropped "
+                       f"(a week with fewer than five years uses them all).")
 
         st.markdown(f'<div style="{_RF_BOARDHDR}">Seasonal Chart</div>', unsafe_allow_html=True)
         try:
@@ -2766,7 +2772,8 @@ with tab_railfob:
                     return ''
                 # Spot/front row = nearest period that actually carries a bid; it's what
                 # the year-ago column falls back onto (last year is weekly Spot-only).
-                _spot_cell = next((r for r in _cells if r.get("bid") is not None), None)
+                _spot_cell = next((r for r in _cells if r.get("bid") is not None
+                                   and not _fm.is_spread_note(r.get("period"))), None)
                 _rail = _cells[0].get("rail") or ""
                 _rcol = _railcolors.get(_rail, "#64748b")
                 _pd, _pw, _pmo, _pyr = _prior_maps(_m, _eff)
@@ -3371,6 +3378,7 @@ with tab_netcarry:
                     _nc_items = [
                         {"delivery": r["period"], "futures": r.get("futures"), "basis": r["bid"]}
                         for r in _g_rows if str(r["date"]) == _dsel and r.get("bid") is not None
+                        and not _fm.is_spread_note(r["period"])
                     ]
                     _nc_asof = _nc_date.fromisoformat(_dsel[:10])
                     _nc_title = _nc_mkt

@@ -127,6 +127,35 @@ hidden) and the shipment table's `shipment_quotes` (it already ranks full > wind
 round to a whole cent ('+15' for a 14.5 midpoint). Deploy: the emailed chart runs wherever `rail_report` runs — the droplet (`post_rail.py`, the catch-up
 watcher: `git pull`) and the admin Cloud app (Reboot).
 
+## The rail seasonal charts' 5-yr average and range are Olympic (`seasonal_band.py`)
+
+Kolten 2026-10-20 ("Check the UP Allen station range and average. It seems like they are too high" ... "I think we might have a year thats skewing the data ...
+BN Hereford looks the same. I think we need to take an olympic avg approach to make cleaner"). UP Allen Station's 2022/23 had a Sep-Dec average of +59 against -12 to +27
+in the other four years of the window (2021/22-2025/26), set the top of the band in 38 weeks of 52, and by itself lifted this week's 5-yr average from -7 to +7; the same
+year is high on Group 3, Interior IA and Hereford. It is real market data, not a bad row (Allen's recorded bids were +58 to +85 in mid-2023), so the fix is in the statistic:
+for each marketing week the highest and the lowest year are dropped; the average is the mean of what is left and the band runs from the lowest to the highest of what is
+left (`olympic_avg` / `olympic_lo` / `olympic_hi`; five years in the week are needed to trim, with fewer the plain mean and min / max are used). Wired into
+`rail_report._five_year_band` (the emailed chart; legend '5-yr Olympic avg' / '5-yr range ex hi/lo (2021/22–2025/26)') and the Rail FOB tab's `_rband` in `app.py`
+(header, end label and caption say Olympic). `tests/test_seasonal_band.py` (rule, the band frame, and the Vega-Lite spec the email hands the renderer).
+**Not changed: the Bids tab's seasonal band and the Spread tab's band still use the plain mean and min / max** — say the word and they take the same helper.
+
+**Allen Station's history is an ESTIMATE, not Allen bids** (SA Master, `Corn Basis.xlsx`): `Est Domestic Allen` = the formula `NEGrp3 + 10` and `Est Mexico Allen` =
+`NEGrp3 + 20` for ~1,046 of ~1,100 weeks, so every Group 3 swing is inherited. Real Allen bids (col X 'Allen Station UP') exist from 2023-05-31 (145 weeks); the
+estimates were typed over only from 2024 (15 rows in 2024, 48 in 2025, 30 in 2026). Where both exist the real bid ran 15.6 under the estimate in 2023 (21 weeks) and 10.7 under in 2024
+(41 weeks), equal in 2025-26 — so 2023 and 2024 in the DB (`UP Illinois (Dom)` / `(Mex)`, loaded from the estimate columns by the 2026-09-21 rebuild) still run ~10-16 rich. Not corrected
+(it would change the confirmed column map and ~60 historical weeks): swap those weeks to col X if Kolten wants it.
+
+**A bad bid is corrected by UPDATE, never by `save_rail_fob`** (it re-stamps `captured_at`, and the droplet's catch-up watcher would read the re-save as a new posting and email the
+group). 2026-10-14 BN Hereford 'Oct' bid 210 (one-key slip for 110; the same posting's LH Oct is 108/113, FH Oct was 110 on 10-08) was set to 110 on one row, original kept in
+`Claude Code\_backups\bn_hereford_2026-10-14_oct_bid_210.json`; it had lifted the week-7 spot average to 132.7.
+
+**A spread note is not a spot bid** (Kolten: "fix the BN PNW as well"). BN PNW's 2026-10-19 posting opened with 'Spread-Sell FH Nov CP / Buy FH Nov ; offered' at -2, and every "nearest
+period with a bid" rule took it as the spot (the week-7 average read 76 against ~110). `return_to_carry_data.is_spread_note` (a label with the word 'spread'; `forward_month.is_spread_note`
+re-exports it) is now skipped by `obs_from_rail` / `quotes_from_rail` (Return to Carry, the Spread tab's spot line and forward quotes), `forward_month.label_info` (forward curves),
+`rail_report._nearest_bid_cell` (the emailed spot line and the table's year-ago fallback row), the Rail FOB tab's seasonal history and board spot row, and the Net Carry items
+(`net_carry_compare.rail_items` with its own inline regex — that module is vendored into every portal, `return_to_carry_data` is not under `--no-return`; and the corridor path in `app.py`).
+The row itself stays on the board and in the email table as posted. 'Sellers Oct' / 'Buyers Sep' (BN COBO's own line format) are not spread notes. `tests/test_spread_note.py`.
+
 ## Spread tab — rail corridors on either side
 
 The 🔀 Spread tab charts Location A − Location B (the front-month spot basis by marketing week against the 5-year range, with the two

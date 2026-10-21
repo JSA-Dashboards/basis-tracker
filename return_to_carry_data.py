@@ -78,12 +78,22 @@ def _parse_date(v) -> date | None:
         return None
 
 
+_SPREAD_NOTE = re.compile(r"\bspread\b", re.I)
+
+
+def is_spread_note(period: str | None) -> bool:
+    """A posted line that quotes a SPREAD between two delivery periods ('Spread-Sell FH Nov CP / Buy FH Nov ; offered'), not a period's basis: its number
+    is the spread (-2), so it is never a nearby bid, a forward quote or a month's value. BN PNW charted -2 as its spot on 2026-10-19 because the note was
+    that posting's first line (Kolten: "fix the BN PNW")."""
+    return bool(_SPREAD_NOTE.search(period or ""))
+
+
 def obs_from_rail(rows: list[dict], market: str, commodity: str = "Corn") -> list[dict]:
-    """One bid per posting date for a corridor: its 'Spot' bid, else the nearest forward period's bid.
+    """One bid per posting date for a corridor: its 'Spot' bid, else the nearest forward period's bid (a spread note is not a period).
     rows = rail_fob rows ({date, market, commodity, period, period_order, futures, bid})."""
     by_date: dict = {}
     for r in rows:
-        if r["market"] != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None:
+        if r["market"] != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None or is_spread_note(r.get("period")):
             continue
         d = _parse_date(r["date"])
         if d is None:
@@ -225,10 +235,10 @@ def shipment_quotes(raw: list[dict], crop_year: int, spec: rtc.Spec = rtc.CORN) 
 
 
 def quotes_from_rail(rows: list[dict], market: str, commodity: str = "Corn") -> list[dict]:
-    """Every posted period of a corridor with a bid: [{'date', 'label', 'tag', 'basis'}] (rail_fob rows)."""
+    """Every posted period of a corridor with a bid: [{'date', 'label', 'tag', 'basis'}] (rail_fob rows; spread notes are not periods)."""
     out = []
     for r in rows:
-        if r["market"] != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None:
+        if r["market"] != market or (r.get("commodity") or "Corn") != commodity or r.get("bid") is None or is_spread_note(r.get("period")):
             continue
         d = _parse_date(r["date"])
         if d is not None:

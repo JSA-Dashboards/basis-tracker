@@ -151,13 +151,21 @@ def _chg_yr_cell(cur_bid, yr_map, cell, tdr, cur_fut=None, curve=None, spot_cell
 
 
 # ── spot seasonal chart (front-period bid by marketing week) ──────────────────
+def _nearest_bid_cell(cells):
+    """The first cell (in period order) that carries a bid and is a delivery period: a spread note ('Spread-Sell FH Nov CP / Buy FH Nov ; offered')
+    carries a bid too (the spread, -2) but is not a nearby basis — BN PNW charted it as its spot on 2026-10-19."""
+    import forward_month as fm
+    return next((c for c in cells if c.get("bid") is not None and not fm.is_spread_note(c.get("period"))), None)
+
+
 def _spot_series(market, by_md, mkt_dates):
-    """{date -> nearest-period bid} for a corridor (smallest period_order with a bid)."""
+    """{date -> nearest-period bid} for a corridor (smallest period_order with a bid; a spread note is not a period)."""
     out = {}
     for d in sorted(mkt_dates.get(market, ())):
         cells = sorted(by_md.get((market, d), {}).values(),
                        key=lambda r: (r.get("period_order") if r.get("period_order") is not None else 99))
-        bid = next((c["bid"] for c in cells if c.get("bid") is not None), None)
+        nearest = _nearest_bid_cell(cells)
+        bid = nearest["bid"] if nearest is not None else None
         if bid is not None:
             out[d] = bid
     return out
@@ -209,6 +217,14 @@ def _fwd_curve(market, by_md, mkt_dates):
     return cur if len(cur) >= 2 else df.sort_values("MktWeek")
 
 
+def _five_year_band(hist):
+    """The prior years' average and range by marketing week, from their weekly bids (a frame with MktWeek, MyNum, Bid), as a
+    (MktWeek, lo, hi, avg) DataFrame. Olympic (seasonal_band): with five years in a week the highest and the lowest are dropped
+    before the average and the range are taken, so one freak crop year cannot drag either (UP Allen Station's 2022/23)."""
+    import seasonal_band as sb
+    return hist.groupby("MktWeek")["Bid"].agg(lo=sb.olympic_lo, hi=sb.olympic_hi, avg=sb.olympic_avg).reset_index()
+
+
 def _seasonal_png(market, by_md, mkt_dates):
     """Render the corridor's spot seasonal (recent marketing years + 5-yr band) to PNG
     bytes via vl-convert, or None if not enough history / render unavailable."""
@@ -244,8 +260,7 @@ def _seasonal_png(market, by_md, mkt_dates):
     prev_lbl = _yr(mx - 1)
     _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-5:]   # 5 prior complete years (or fewer)
     hist = df[df["MyNum"].isin(_hy)]
-    band = (hist.groupby("MktWeek")["Bid"].agg(lo="min", hi="max", avg="mean").reset_index()
-            if len(_hy) >= 2 else None)
+    band = _five_year_band(hist) if len(_hy) >= 2 else None
     _n = len(_hy)
     rng_lbl = f"{_yr(_hy[0])}–{_yr(_hy[-1])}" if _hy else ""
     _fwd = _fwd_curve(market, by_md, mkt_dates)
@@ -283,7 +298,11 @@ def _seasonal_png(market, by_md, mkt_dates):
     # Muted green/gray theme: bold near-black current year, dashed sage avg, light-sage
     # range band, brick-red forward curve. Legend up top with a swatch per series.
     _CUR, _PREV, _AVG, _BAND, _FWD = "#111827", "#2563eb", "#4b6a4b", "#c4d7bd", "#c0392b"
-    _rng_name, _avg_name = f"{_n}-yr range ({rng_lbl})", f"{_n}-yr average"
+    import seasonal_band as _sband
+    if _sband.is_trimmed(_n):                       # five years: the Olympic treatment applies, and the legend says so
+        _rng_name, _avg_name = f"{_n}-yr range ex hi/lo ({rng_lbl})", f"{_n}-yr Olympic avg"
+    else:
+        _rng_name, _avg_name = f"{_n}-yr range ({rng_lbl})", f"{_n}-yr average"
     _dom, _rng = [cur_lbl], [_CUR]
     if not prev.empty:
         _dom.append(prev_lbl); _rng.append(_PREV)      # most recent complete year, hero blue
@@ -408,7 +427,7 @@ def build_rail_html(markets: list | None = None, charts: bool = True,
             continue
         # Spot/front row = nearest period with a bid; the year-ago column falls back
         # onto it (last year's rail history is weekly Spot-only).
-        spot_cell = next((r for r in cells if r.get("bid") is not None), None)
+        spot_cell = _nearest_bid_cell(cells)
         rail = cells[0].get("rail") or ""
         rcol = _RAIL_COLORS.get(rail, "#64748b")
         pd_, pw, pmo, pyr = _prior_maps(m, eff, by_md, mkt_dates)

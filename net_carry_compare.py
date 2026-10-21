@@ -16,10 +16,15 @@ from __future__ import annotations
 
 import html
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date
 
 import net_carry as nc
+
+# A posted spread quote ('Spread-Sell FH Nov CP / Buy FH Nov ; offered', BN PNW 2026-10-19) is not a delivery period. Inline, not imported from
+# return_to_carry_data: this module is vendored into every portal, that one is skipped by `sync_carry_modules.py --no-return`.
+_SPREAD_NOTE = re.compile(r"\bspread\b", re.I)
 
 MEASURES = ("net", "gross")
 AMBER_BG, AMBER = "#fff4e5", "#f28e2b"
@@ -227,11 +232,12 @@ def snapshot_items(snap, grain: str, grain_disp) -> list[dict]:
 
 
 def rail_items(rows: list[dict], market: str, commodity: str, date_str: str) -> list[dict]:
-    """A rail corridor's quotes on one posting date as net_carry items (period = the delivery label)."""
+    """A rail corridor's quotes on one posting date as net_carry items (period = the delivery label; a spread note is not one)."""
     return [{"delivery": r["period"], "futures": r.get("futures"), "basis": r["bid"]}
             for r in rows
             if r["market"] == market and (r.get("commodity") or "Corn") == commodity
-            and str(r["date"])[:10] == date_str[:10] and r.get("bid") is not None]
+            and str(r["date"])[:10] == date_str[:10] and r.get("bid") is not None
+            and not _SPREAD_NOTE.search(r["period"] or "")]
 
 
 def rail_dates(rows: list[dict], market: str, commodity: str) -> list[date]:

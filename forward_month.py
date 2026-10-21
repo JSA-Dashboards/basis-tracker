@@ -36,8 +36,10 @@ def label_info(label):
     """(kind, months) of a posted period label: kind 'full' | 'window' | 'fh' | 'lh' | 'bundle', months a tuple of month numbers in the
     order the label names them. (None, ()) when the label names no month ('Spot', 'Return Trip', 'NC 26', note rows). The reading is
     return_to_carry_data.parse_label's, except that LP / FP / F/H / L/H are the last / first half and MP is a partial window (parse_label
-    would call all of them whole-month bids)."""
+    would call all of them whole-month bids). A spread note ('Spread-Sell FH Nov CP / Buy FH Nov ; offered') is no delivery period at all."""
     import return_to_carry_data as rd
+    if rd.is_spread_note(label):
+        return None, ()
     text = _SLASH_HALF.sub(lambda m: m.group(1).upper() + "H", str(label or ""))
     text = _PLACEMENT.sub(lambda m: "LH" if m.group(1).lower() == "lp" else "FH", text)
     info = rd.parse_label(text)
@@ -47,6 +49,12 @@ def label_info(label):
     if kind == "full" and _MID_PLACEMENT.search(text):
         kind = "window"
     return kind, tuple(info["months"])
+
+
+def is_spread_note(label) -> bool:
+    """A posted line that quotes a spread between two periods, not a period's basis (return_to_carry_data.is_spread_note): never a spot, a month or a package."""
+    import return_to_carry_data as rd
+    return rd.is_spread_note(label)
 
 
 def kind_of(label):
