@@ -24,6 +24,7 @@ import re
 from datetime import date
 
 import delivery_period as _dp
+import forward_month as _fm
 import net_carry as _nc
 import rail_paste as _rp
 import return_to_carry_data as _rd
@@ -128,10 +129,11 @@ def forward_quotes(rows: list[dict], market: str, commodity: str = "Corn") -> tu
     """(posting date, quotes) — the latest posting of a corridor, as delivery-month quotes [{'ym': (year, month), 'basis', 'tag', 'label'}].
 
     A label names its months (return_to_carry_data.parse_label) and its year is the next such month from the posting date, as in the
-    shipment table. A month with a quote of its own ('Dec', 'FH Dec', 'LH Dec', 'Dec 1-20') uses those — several are averaged later, the
-    way halves are on the elevator side; a month with none is filled by the narrowest package that names it ('JFM' for Jan, Feb and
-    Mar; of equals the higher bid), so a package never overrides a month's own bid. Cells with no bid, labels that name no month
-    ('Spot', 'Return Trip', note rows) and quotes whose contract cannot be named ('R', blank) are left out."""
+    shipment table. A month with a quote of its own ('Dec', 'FH Dec', 'LH Dec', 'Dec 1-20') keeps them all, each tagged with its `kind`;
+    forward_spread then reads one value per month (forward_month: the full-month bid, else the midpoint of FH and LH). A month with no
+    quote of its own is filled by the narrowest package that names it ('JFM' for Jan, Feb and Mar; of equals the higher bid), so a
+    package never overrides a month's own bid. Cells with no bid, labels that name no month ('Spot', 'Return Trip', note rows) and
+    quotes whose contract cannot be named ('R', blank) are left out."""
     posted = latest_posting(rows, market, commodity)
     if posted is None:
         return None, []
@@ -147,7 +149,8 @@ def forward_quotes(rows: list[dict], market: str, commodity: str = "Corn") -> tu
             continue
         for m in info["months"]:
             y = info["year"] if (info["year"] is not None and info["kind"] != "bundle") else (posted.year if m >= posted.month else posted.year + 1)
-            q = {"ym": (y, m), "basis": float(r["bid"]), "tag": tag, "label": r.get("period") or ""}
+            q = {"ym": (y, m), "basis": float(r["bid"]), "tag": tag, "label": r.get("period") or "",
+                 "kind": _fm.label_info(r.get("period"))[0] or info["kind"]}
             if info["kind"] in _OWN_KINDS:
                 own.setdefault((y, m), []).append(q)
             elif info["kind"] == "bundle":
@@ -170,7 +173,8 @@ def snapshot_quotes(rows, grain: str, grain_disp) -> list[dict]:
             continue
         ym = _dp.canonical(r.deliveryMonth or "", r.futuresSymbol)
         if ym:
-            out.append({"ym": ym, "basis": float(r.basisCents), "tag": r.futuresSymbol, "label": r.deliveryMonth or ""})
+            out.append({"ym": ym, "basis": float(r.basisCents), "tag": r.futuresSymbol, "label": r.deliveryMonth or "",
+                        "kind": _fm.kind_of(r.deliveryMonth or "")})
     return out
 
 
@@ -185,20 +189,22 @@ def market_week(year: int, month: int) -> int:
 
 
 def _cash_by_month(quotes: list[dict], curve: dict) -> dict:
-    """{ym: mean cash price (basis + its contract's futures price)} over the quotes whose contract the curve prices."""
-    acc: dict = {}
+    """{ym: the month's cash price (basis + its contract's futures price)} over the quotes whose contract the curve prices — ONE value a
+    month (forward_month): its full-month bid, else the midpoint of its FH and LH bids when both are posted, else the lone half. A quote
+    with no `kind` is a full bid, so two plain quotes of one month are averaged."""
+    items = []
     for q in quotes:
         px = (curve or {}).get(str(q.get("tag") or ""))
         if px is None or q.get("basis") is None or not q.get("ym"):
             continue
-        acc.setdefault(q["ym"], []).append(float(q["basis"]) + float(px))
-    return {ym: sum(v) / len(v) for ym, v in acc.items()}
+        items.append((q["ym"], q.get("kind") or "full", float(q["basis"]) + float(px)))
+    return _fm.pick_months(items)
 
 
 def forward_spread(a: list[dict], b: list[dict], curve: dict) -> list[dict]:
     """A − B for every delivery month both sides quote and the curve can price: [{'ym', 'MktYearNum', 'MktWeek', 'Spread', 'A', 'B'}]
     sorted by month, spreads rounded to a tenth of a cent. A, B = the quotes of the two sides; curve = {symbol: cents}, the futures day
-    both are priced on. Several quotes of one month (halves) are averaged in cash."""
+    both are priced on. A month is ONE cash value per side: its full-month bid, else the midpoint of its FH and LH bids (_cash_by_month)."""
     ca, cb = _cash_by_month(a, curve), _cash_by_month(b, curve)
     out = []
     for ym in sorted(set(ca) & set(cb)):

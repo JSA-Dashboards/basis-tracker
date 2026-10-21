@@ -122,7 +122,12 @@ R3 = [row(D, "Y", "FH Nov", -20, order=0), row(D, "Y", "LH Nov", -15, order=1), 
       row(D, "Y", "Dec 2027", 9, fut="ZCH28", order=4), row(D, "Y", "Mar 2027", 6, fut="ZCH27", order=5), row(D, "Y", "NDJF", 7, order=6)]
 _, q3 = rs.forward_quotes(R3, "Y", "Corn")
 nov = [x["basis"] for x in q3 if x["ym"] == (2026, 11)]
-check("every own quote of a month is kept (halves are averaged later, in cash)", sorted(nov) == [-20.0, -17.0, -15.0], nov)
+check("every own quote of a month is kept (forward_spread reads one value from them, in cash)", sorted(nov) == [-20.0, -17.0, -15.0], nov)
+check("each carries its kind: FH Nov 'fh', LH Nov 'lh', Split Nov a whole-month bid ('full')",
+      sorted((x["label"], x["kind"]) for x in q3 if x["ym"] == (2026, 11)) == [("FH Nov", "fh"), ("LH Nov", "lh"), ("Split Nov", "full")], q3)
+check("LP / FP / MP read as the seasonal chart reads them: last half, first half, a partial window",
+      {x["label"]: x["kind"] for x in rs.forward_quotes([row(D, "Q", "LP Nov", 1, order=0), row(D, "Q", "FP Dec", 2, order=1), row(D, "Q", "MP Jan", 3, order=2)], "Q", "Corn")[1]}
+      == {"LP Nov": "lh", "FP Dec": "fh", "MP Jan": "window"})
 check("a day window ('Dec 1-20') is its month's own bid", any(x["ym"] == (2026, 12) and x["basis"] == 4.0 for x in q3), q3)
 check("an explicit year is honoured ('Dec 2027', 'Mar 2027'); a bare month is the next one from the posting date",
       any(x["ym"] == (2027, 12) and x["basis"] == 9.0 for x in q3) and any(x["ym"] == (2027, 3) and x["basis"] == 6.0 for x in q3), q3)
@@ -156,6 +161,8 @@ sq = rs.snapshot_quotes(snap, "Corn", lambda g: g)
 check("forward rows only: not the spot row, nothing without a basis or a futures symbol, nothing of another grain",
       sorted((x["ym"], x["basis"]) for x in sq) == [((2026, 10), -38.0), ((2026, 11), -20.0), ((2026, 11), -15.0), ((2026, 12), 0.0), ((2027, 2), -6.0)], sq)
 check("each keeps the contract it is quoted off", {x["tag"] for x in sq} == {"ZCZ26", "ZCH27"})
+check("each carries its kind (FH November 'fh', LH November 'lh', a whole month 'full')",
+      {x["label"]: x["kind"] for x in sq} == {"FH November": "fh", "LH November": "lh", "Dec 26": "full", "February 2027": "full", "October": "full"}, sq)
 
 # ── the forward spread, in cash ───────────────────────────────────────────────────────────────────────
 print("the forward spread")
@@ -180,6 +187,22 @@ check("a contract the curve cannot price drops its month instead of guessing it"
 check("no curve, no forward spread", rs.forward_spread(elev, rail, {}) == [] and rs.forward_spread(elev, rail, None) == [])
 check("spreads are rounded to a tenth of a cent", rs.forward_spread([{"ym": (2026, 10), "basis": 1.0, "tag": "ZCZ26"}], [{"ym": (2026, 10), "basis": 0.0, "tag": "ZCH27"}],
                                                                   {"ZCZ26": 500.0, "ZCH27": 500.333})[0]["Spread"] == 0.7)
+
+# a month is ONE value per side (forward_month, Kolten 2026-10-20: "for months that show a full month but also a FH or LH just default to the
+# full month indication, only take the midpoint if its a FH and LH separate bids")
+print("one value per month: the full-month bid, else the midpoint of FH and LH")
+fa = [{"ym": (2026, 12), "basis": 16.0, "tag": "ZCH27", "kind": "full"}, {"ym": (2026, 12), "basis": 13.0, "tag": "ZCH27", "kind": "fh"},
+      {"ym": (2026, 11), "basis": -20.0, "tag": "ZCZ26", "kind": "fh"}, {"ym": (2026, 11), "basis": -15.0, "tag": "ZCZ26", "kind": "lh"},
+      {"ym": (2026, 10), "basis": -12.0, "tag": "ZCZ26", "kind": "fh"}]
+fb = [{"ym": (2026, 12), "basis": 0.0, "tag": "ZCZ26"}, {"ym": (2026, 11), "basis": -7.0, "tag": "ZCZ26"}, {"ym": (2026, 10), "basis": -15.0, "tag": "ZCZ26"}]
+fk = {p["ym"]: p for p in rs.forward_spread(fa, fb, CURVE)}
+check("a full-month bid is the month: Dec +16 and FH Dec +13 (both off March) against an elevator's 0 off December = 31.0 in cash, not the 29.5 of an average",
+      fk[(2026, 12)]["Spread"] == 31.0 and fk[(2026, 12)]["A"] == 531.25, fk[(2026, 12)])
+check("FH and LH posted separately and no full bid: the midpoint (Nov -17.5 against -7 = -10.5)", fk[(2026, 11)]["Spread"] == -10.5, fk[(2026, 11)])
+check("a lone half stands for its month (Oct FH -12 against -15 = +3.0)", fk[(2026, 10)]["Spread"] == 3.0, fk[(2026, 10)])
+check("the elevator side follows the same rule (a location's 'Dec 26' beats its 'FH Dec 26')",
+      rs.forward_spread([{"ym": (2026, 12), "basis": 0.0, "tag": "ZCZ26", "kind": "full"}, {"ym": (2026, 12), "basis": -30.0, "tag": "ZCZ26", "kind": "fh"}],
+                        [{"ym": (2026, 12), "basis": -10.0, "tag": "ZCZ26"}], CURVE)[0]["Spread"] == 10.0)
 
 print("marketing year and week")
 ref_year = lambda y, m: y if m >= 9 else y - 1                                                   # noqa: E731 - the Spread tab's own formulas

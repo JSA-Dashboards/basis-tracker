@@ -187,23 +187,18 @@ def _fwd_bucket(period: str):
 
 def _fwd_curve(market, by_md, mkt_dates):
     """Forward curve of the corridor's LATEST rundown as a (MktWeek, Bid) DataFrame:
-    each delivery period placed at its month's week, packages spread into carry, kept
-    to the current marketing year from today forward. None if it can't be built."""
+    each delivery month placed at its week, kept to the current marketing year from
+    today forward. A month is its FULL-month bid; its halves count only when there is
+    none (the midpoint of FH and LH when both are posted); a package spreads into carry
+    and fills only a month with no bid of its own (forward_month, Kolten 2026-10-20: Dec
+    bid +16 must not draw +15). None if it can't be built."""
     ds = sorted(mkt_dates.get(market, ()))
     if not ds:
         return None
-    pts = []
-    for period, r in by_md.get((market, ds[-1]), {}).items():
-        bid = r.get("bid")
-        if bid is None:
-            continue
-        bk = _fwd_bucket(period)
-        if bk in _MON_WK:
-            pts.append((_MON_WK[bk], float(bid)))
-        elif bk in _PKG_MON:
-            mons = _PKG_MON[bk]; ctr = (len(mons) - 1) / 2.0
-            for i, mo in enumerate(mons):
-                pts.append((_MON_WK[mo], round(float(bid) + _FWD_CARRY * (i - ctr), 1)))
+    import forward_month as fm
+    cells = [(period, r.get("bid")) for period, r in by_md.get((market, ds[-1]), {}).items()
+             if _fwd_bucket(period) in _MON_WK or _fwd_bucket(period) in _PKG_MON]
+    pts = [(_MON_WK[fm.ABBR[m]], v) for m, v in fm.rail_forward(cells, _FWD_CARRY).items()]
     if len(pts) < 2:
         return None
     import pandas as pd

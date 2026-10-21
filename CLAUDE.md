@@ -105,6 +105,28 @@ Tests: `tests/test_rail_email_log.py` (decisions, ledger on a throwaway SQLite, 
 simulated clock, the send functions), `tests/test_rail_entry_outcome.py` (the admin app headless),
 `tests/test_send_email_dispatch.py`.
 
+## Forward curves — one number per delivery month (`forward_month.py`)
+
+A posting quotes a month several ways at once — 'Dec', 'FH Dec', 'LH Dec', and packages that span it ('JFM', 'Nov-Jul'). Every chart that draws a forward
+curve from posted labels used to AVERAGE whatever landed in a month, so the chart disagreed with the board: on 2026-10-20 CSX Columbus posted Dec +16 and FH
+Dec +13 and the emailed curve drew +14.5 ('+15'); November's +19 was drawn +10 (FH Nov -12, Nov +19 and the Nov-Jul package +22 averaged). Kolten, same day:
+"for months that show a full month but also a FH or LH just default to the full month indication, only take the midpoint if its a FH and LH separate bids".
+The rule (`forward_month.month_value`, tests `tests/test_forward_month.py`):
+
+- a month's **full** bid is the month — its halves and day windows are left out;
+- no full bid: the **midpoint** of the first part (FH, a window that opens the month) and the last part (LH) when both are posted; one part alone stands for the month;
+- a **package** ('JFM', 'AMJJ', 'Nov-Jul', 'Oct/Nov') never overrides a month's own quote: it fills a month nothing of its own names, narrowest first, spread
+  `CARRY` (2c) a month around its centre so its months average back to its bid (`rail_forward`; the Spread tab's `forward_quotes` has always filled this way).
+
+A label is read by `return_to_carry_data.parse_label` (the shipment table's and the Spread tab's reading), with LP / FP / L/H / F/H (the freight sheets' spelling) =
+last / first half and MP = a partial window (`forward_month.label_info`; parse_label alone would call all of them whole months). Used by: `rail_report._fwd_curve` (the emailed seasonal chart), the Rail
+FOB tab's seasonal chart in `app.py` (the forward curve, and each month's history — a day's FH / LH / full bids become one value before the weekly average),
+the Bids tab's seasonal forward points and the Spread tab's location forward line (`pick_months`), and `rail_spread._cash_by_month` (the Spread tab's forward
+spread, both sides). NOT changed on purpose: the Net Carry tab's `monthly_carry` (a month is its BEST slot by net of interest, so the table's peak is never
+hidden) and the shipment table's `shipment_quotes` (it already ranks full > window > LH > FH, one bid per month, no averaging). The chart's data labels still
+round to a whole cent ('+15' for a 14.5 midpoint). Deploy: the emailed chart runs wherever `rail_report` runs — the droplet (`post_rail.py`, the catch-up
+watcher: `git pull`) and the admin Cloud app (Reboot).
+
 ## Spread tab — rail corridors on either side
 
 The 🔀 Spread tab charts Location A − Location B (the front-month spot basis by marketing week against the 5-year range, with the two
@@ -123,9 +145,9 @@ are in both pickers, after the locations, labelled `🚂 Rail · UP Allen Statio
 - **The red forward points are converted to cash first.** A corridor quotes December off March (ZCH, the desk rule) and an elevator off December (ZCZ), so
   the raw December figures sit on different futures months — 15¢ apart on 2026-10-09. `forward_spread` adds each bid's own futures price (the stored curve of
   the later of the two posting dates, `_cached_futures_curve_for`) and subtracts; where both quote off one contract that equals the plain basis difference.
-  A corridor's curve is its latest posting mapped to delivery months (`return_to_carry_data.parse_label`): a month's own bids (halves averaged) beat a package
-  ('JFM' for Jan-Mar, the narrowest first); 'R' (respective-option-month) packages and untagged cells are left out; short tags ('CU', 'SX') take rail_paste's
-  roll. No forward points when the two curves are more than 10 days apart or no common month can be priced — the caption under the chart says which.
+  A corridor's curve is its latest posting mapped to delivery months (`return_to_carry_data.parse_label`): a month's own bids beat a package
+  ('JFM' for Jan-Mar, the narrowest first) and a month is ONE value per side (`forward_month`, below: its full-month bid, else the midpoint of its FH and
+  LH bids); 'R' (respective-option-month) packages and untagged cells are left out; short tags ('CU', 'SX') take rail_paste's roll. No forward points when the two curves are more than 10 days apart or no common month can be priced — the caption under the chart says which.
 - `apps/basis_tracker` in the admin portal is a generated mirror (`bt_` prefix on every sibling module): the sync renames `rail_spread` by itself.
 
 ## Net Carry tab — modules and data

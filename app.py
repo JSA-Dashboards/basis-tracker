@@ -12,6 +12,7 @@ from adm_names import adm_city_from_name
 from regions import region_from_state
 from river_segments import river_segment, SEGMENT_ORDER
 import delivery_period as _dp
+import forward_month as _fm
 
 from database import (
     init_db, upsert_snapshot, get_snapshots, delete_snapshot,
@@ -2317,21 +2318,36 @@ with tab_railfob:
             _rows = []
             _spot_seen = set()                     # (market, date) with an explicit "Spot" row
             _mdate = {}                            # (market, date, commodity) -> [(period_order, bid)]
+            _mquotes = {}                          # (market, month, date, commodity) -> [(kind, bid)]
+            _fwd_cells = {}                        # (market, date) -> [(period, bid)] for the forward curve
             for _src in ("manual", "palmetto"):
                 for _r in _cached_rail_fob_all(_src):
                     if _r.get("bid") is None:
                         continue
                     _b = _seasonal_bucket(_r["period"])
-                    if _b:                      # None = not a tracked seasonal period
-                        _rows.append((_r["market"], _b, _r["date"], _r["bid"],
-                                      _r.get("commodity") or "Corn"))
+                    _rc = _r.get("commodity") or "Corn"
+                    if _b in _SEAS_MON:         # a month: the day's full / FH / LH bids become ONE value below
+                        _mquotes.setdefault((_r["market"], _b, _r["date"], _rc), []).append(
+                            (_fm.kind_of(_r["period"]), _r["bid"]))
+                    elif _b:                    # None = not a tracked seasonal period
+                        _rows.append((_r["market"], _b, _r["date"], _r["bid"], _rc))
                         if _b == "Spot":
                             _spot_seen.add((_r["market"], _r["date"]))
+                    if _b and _b != "Spot":     # the forward curve reads the posted label (a tracked package by its bucket name)
+                        _fwd_cells.setdefault((_r["market"], _r["date"]), []).append(
+                            (_r["period"] if _b in _SEAS_MON else _b, _r["bid"]))
                     # Keep every bid so live rundowns — which post named-month fronts, not a
                     # literal "Spot" row — still feed the Spot seasonal via a derived spot.
                     _po = _r.get("period_order")
-                    _mdate.setdefault((_r["market"], _r["date"], _r.get("commodity") or "Corn"),
+                    _mdate.setdefault((_r["market"], _r["date"], _rc),
                                       []).append((_po if _po is not None else 99, _r["bid"]))
+            # A month posted several ways on one day is ONE value (forward_month): its full-month
+            # bid; with none, the midpoint of FH and LH when both are posted, else the lone half.
+            # (Kolten 2026-10-20: Dec bid +16 must not chart as the +14.5 average with FH Dec.)
+            for (_m, _b, _d, _c), _qs in _mquotes.items():
+                _mv = _fm.month_value(_qs)
+                if _mv is not None:
+                    _rows.append((_m, _b, _d, _mv, _c))
             # Derived Spot = nearest-period bid, added only where no explicit "Spot" exists
             # (live rundowns after the SA-Master weekly-Spot history ends ~2026-08). Mirrors
             # the board/email spot series so the Spot chart stays continuous into the current
@@ -2429,35 +2445,21 @@ with tab_railfob:
                       .agg(avg="mean", lo="min", hi="max").reset_index())
             _rbyrs = sorted(_rwin["MktYear"].unique())
 
-            # Forward curve = the corridor's LATEST full rundown, each period placed at its
-            # delivery-month week (dashed same-colour line over the historical band).
+            # Forward curve = the corridor's LATEST full rundown, each delivery month placed at
+            # its week (dashed same-colour line over the historical band). One value per month
+            # (forward_month, Kolten 2026-10-20): a month's full-month bid is the month; its
+            # FH / LH only when there is none (their midpoint when both are posted).
             _MON_WK = {"Sep": 1, "Oct": 5, "Nov": 10, "Dec": 14, "Jan": 18, "Feb": 23,
                        "Mar": 27, "Apr": 31, "May": 36, "Jun": 40, "Jul": 45, "Aug": 49}
             # A package bid is the AVERAGE across the months it spans; the forward curve
             # spreads it into a per-month carry — later months bid higher by _CARRY ¢/mo,
-            # centered so the months still average back to the package bid. E.g. JFM +0 →
-            # Jan −2 / Feb 0 / Mar +2; AMJJ +0 → Apr −3 / May −1 / Jun +1 / Jul +3.
-            _PKG_MON = {"OND": ["Oct", "Nov", "Dec"], "JFM": ["Jan", "Feb", "Mar"],
-                        "AM": ["Apr", "May"], "JJ": ["Jun", "Jul"],
-                        "AMJJ": ["Apr", "May", "Jun", "Jul"],
-                        "Jan-Jul": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
-                        "AS": ["Aug", "Sep"]}
+            # centered so the months still average back to the package bid — and it fills
+            # only the months nothing of their own names. E.g. JFM +0 → Jan −2 / Feb 0 /
+            # Mar +2; AMJJ +0 → Apr −3 / May −1 / Jun +1 / Jul +3.
             _CARRY = 2.0                                        # ¢ of carry per month
             _lastdate = _pv["Date"].max()
-            _rfw = []
-            for _, _rr in _pv[_pv["Date"] == _lastdate].iterrows():
-                if _rr["Bid"] is None:
-                    continue
-                _bk = _seasonal_bucket(_rr["Period"])
-                _bid = float(_rr["Bid"])
-                if _bk in _MON_WK:
-                    _rfw.append({"MktWeek": _MON_WK[_bk], "Bid": _bid})
-                elif _bk in _PKG_MON:
-                    _mons = _PKG_MON[_bk]
-                    _ctr = (len(_mons) - 1) / 2.0
-                    for _i, _m in enumerate(_mons):
-                        _rfw.append({"MktWeek": _MON_WK[_m],
-                                     "Bid": round(_bid + _CARRY * (_i - _ctr), 1)})
+            _rfw = [{"MktWeek": _MON_WK[_fm.ABBR[_m]], "Bid": _v}
+                    for _m, _v in _fm.rail_forward(_fwd_cells.get((_mk, _lastdate), ()), _CARRY).items()]
             # Today's marketing week — periods whose week has already passed this year roll
             # to the NEXT marketing year (a separate segment starting back at the Sep side).
             _t = date.today()
@@ -4826,7 +4828,7 @@ with tab_bids:
                             _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
                             _fwk = ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1
                             _fwd_pts.append({"MktYearNum": _fmy, "MktWeek": max(1, min(52, _fwk)),
-                                             "Basis": float(_fr.basisCents)})
+                                             "Basis": float(_fr.basisCents), "Kind": _fm.kind_of(_dm)})
                             _present.setdefault(_fmy, set()).add(_fym[1])
                         elif re.search(r"fall", _dm, re.I) and _fr.futuresSymbol[-2:].isdigit():
                             # "Fall" bid = an October delivery; crop year from the ref symbol.
@@ -4840,13 +4842,16 @@ with tab_bids:
                                 continue
                             _wk = ((date(_fy, _mo, 1) - date(_fy, 9, 1)).days // 7) + 1
                             _fwd_pts.append({"MktYearNum": _fy, "MktWeek": max(1, min(52, _wk)),
-                                             "Basis": _fb})
+                                             "Basis": _fb, "Kind": "full"})
                             _present.setdefault(_fy, set()).add(_mo)
-                    _df_fwdc = _pd.DataFrame(_fwd_pts)
-                    if not _df_fwdc.empty:
-                        _df_fwdc = (_df_fwdc.sort_values("MktWeek")
-                                    .groupby(["MktYearNum", "MktWeek"], as_index=False)["Basis"].mean())
-                        _df_fwdc["Basis"] = _df_fwdc["Basis"].round(1)
+                    # One value per delivery month (forward_month): a full-month bid is the month;
+                    # FH / LH only when there is none (their midpoint when both are posted).
+                    _fwd_one = _fm.pick_months(((_p["MktYearNum"], _p["MktWeek"]), _p["Kind"], _p["Basis"])
+                                               for _p in _fwd_pts)
+                    _df_fwdc = _pd.DataFrame(
+                        [{"MktYearNum": _k[0], "MktWeek": _k[1], "Basis": round(_v, 1)}
+                         for _k, _v in sorted(_fwd_one.items())],
+                        columns=["MktYearNum", "MktWeek", "Basis"])
 
                     # Month labels (Sep–Aug marketing year) instead of raw week numbers.
                     # One tick at each month's first week.
@@ -6287,7 +6292,8 @@ with tab_spread:
                 if _fym:
                     _fmy = _fym[0] if _fym[1] >= 9 else _fym[0] - 1
                     _wk = max(1, min(52, ((date(_fym[0], _fym[1], 1) - date(_fmy, 9, 1)).days // 7) + 1))
-                    _rws.append({"MktYearNum": _fmy, "MktWeek": _wk, "Basis": float(_fr.basisCents)})
+                    _rws.append({"MktYearNum": _fmy, "MktWeek": _wk, "Basis": float(_fr.basisCents),
+                                 "Kind": _fm.kind_of(_fr.deliveryMonth or "")})
                     _present.setdefault(_fmy, set()).add(_fym[1])
                 elif re.search(r"fall", _fr.deliveryMonth or "", re.I) and _fr.futuresSymbol[-2:].isdigit():
                     _fall.append((2000 + int(_fr.futuresSymbol[-2:]), float(_fr.basisCents)))
@@ -6296,12 +6302,16 @@ with tab_spread:
                     if _mo in _present.get(_fy, set()):
                         continue
                     _wk = max(1, min(52, ((date(_fy, _mo, 1) - date(_fy, 9, 1)).days // 7) + 1))
-                    _rws.append({"MktYearNum": _fy, "MktWeek": _wk, "Basis": _fbv})
+                    _rws.append({"MktYearNum": _fy, "MktWeek": _wk, "Basis": _fbv, "Kind": "full"})
                     _present.setdefault(_fy, set()).add(_mo)
-            _df = _pd.DataFrame(_rws)
-            if _df.empty:
-                return _df
-            return _df.groupby(["MktYearNum", "MktWeek"], as_index=False)["Basis"].mean()
+            if not _rws:
+                return _pd.DataFrame()
+            # One value per delivery month (forward_month): a full-month bid is the month; FH / LH
+            # only when there is none (their midpoint when both are posted).
+            _one = _fm.pick_months(((_p["MktYearNum"], _p["MktWeek"]), _p["Kind"], _p["Basis"]) for _p in _rws)
+            return _pd.DataFrame([{"MktYearNum": _k[0], "MktWeek": _k[1], "Basis": _v}
+                                  for _k, _v in sorted(_one.items())],
+                                 columns=["MktYearNum", "MktWeek", "Basis"])
 
         def _spread_fwd_side(_pair, _grain):
             # (date of the newest forward curve, its delivery-month quotes) for one side: a corridor's latest
