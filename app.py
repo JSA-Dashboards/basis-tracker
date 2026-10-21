@@ -2331,7 +2331,7 @@ with tab_railfob:
                         _mquotes.setdefault((_r["market"], _b, _r["date"], _rc), []).append(
                             (_fm.kind_of(_r["period"]), _r["bid"]))
                     elif _b:                    # None = not a tracked seasonal period
-                        _rows.append((_r["market"], _b, _r["date"], _r["bid"], _rc))
+                        _rows.append((_r["market"], _b, _r["date"], _r["bid"], _rc, _r.get("bid_raw") == "est"))
                         if _b == "Spot":
                             _spot_seen.add((_r["market"], _r["date"]))
                     if _b and _b != "Spot":     # the forward curve reads the posted label (a tracked package by its bucket name)
@@ -2348,7 +2348,7 @@ with tab_railfob:
             for (_m, _b, _d, _c), _qs in _mquotes.items():
                 _mv = _fm.month_value(_qs)
                 if _mv is not None:
-                    _rows.append((_m, _b, _d, _mv, _c))
+                    _rows.append((_m, _b, _d, _mv, _c, False))
             # Derived Spot = nearest-period bid, added only where no explicit "Spot" exists
             # (live rundowns after the SA-Master weekly-Spot history ends ~2026-08). Mirrors
             # the board/email spot series so the Spot chart stays continuous into the current
@@ -2359,11 +2359,11 @@ with tab_railfob:
                 _lst.sort(key=lambda t: t[0])
                 _sb = next((b for _o, b in _lst if b is not None), None)
                 if _sb is not None:
-                    _rows.append((_m, "Spot", _d, _sb, _c))
+                    _rows.append((_m, "Spot", _d, _sb, _c, False))
             if not _rows:
                 st.caption("No rail history archived yet — the seasonal chart fills in as postings are saved.")
                 return
-            _df = _pd.DataFrame(_rows, columns=["Market", "Period", "Date", "Bid", "Commodity"])
+            _df = _pd.DataFrame(_rows, columns=["Market", "Period", "Date", "Bid", "Commodity", "Est"])
 
             try:
                 from rail_corridors import CORRIDOR_ORDER as _CO
@@ -2396,14 +2396,15 @@ with tab_railfob:
                 st.caption("Best fit")
                 _rfit = _yfit_radio("rail_seas_fit")
 
-            _sel = _pv[_pv["Period"] == _pd_sel][["Date", "Bid"]].copy()
+            _sel = _pv[_pv["Period"] == _pd_sel][["Date", "Bid", "Est"]].copy()
             _dts = _pd.to_datetime(_sel["Date"])
             _yr, _mo = _dts.dt.year, _dts.dt.month
             _sel["MktYearNum"] = _yr.where(_mo >= 9, _yr - 1)
             _sel["MktYear"] = _sel["MktYearNum"].apply(lambda y: f"{y}/{str(y + 1)[-2:]}")
             _sep1 = _pd.to_datetime(_sel["MktYearNum"].astype(str) + "-09-01")
             _sel["MktWeek"] = ((_dts - _sep1).dt.days // 7 + 1).clip(1, 52)
-            _sel = _sel.groupby(["MktYear", "MktYearNum", "MktWeek"], as_index=False)["Bid"].mean()
+            _sel = (_sel.groupby(["MktYear", "MktYearNum", "MktWeek"], as_index=False)
+                    .agg(Bid=("Bid", "mean"), Est=("Est", "max")))      # Est: any estimated posting in that week
             _sel["Bid"] = _sel["Bid"].round(1)
 
             _mx = int(_sel["MktYearNum"].max())
@@ -2601,6 +2602,15 @@ with tab_railfob:
                        f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · the 5-yr "
                        f"average and the gray band are Olympic: each week's highest and lowest year are dropped "
                        f"(a week with fewer than five years uses them all).")
+            # Estimated weeks (bid_raw 'est' in the archive) behind the 5-yr average and range — say so (UP Allen Station: Kolten 2026-10-21).
+            _n_est = int(_rwin["Est"].sum()) if not _rwin.empty else 0
+            if _n_est:
+                try:
+                    from rail_corridors import estimate_note as _est_note
+                except Exception:
+                    _est_note = lambda _m: ""
+                st.caption(f"⚠ {_n_est} of the {len(_rwin)} weeks behind the 5-yr average and range are ESTIMATES (flagged 'est' in the archive). "
+                           + (_est_note(_mk) or "They are not posted bids."))
 
         st.markdown(f'<div style="{_RF_BOARDHDR}">Seasonal Chart</div>', unsafe_allow_html=True)
         try:
@@ -2627,6 +2637,8 @@ with tab_railfob:
                 _mkt_dates.setdefault(_r["market"], set()).add(_r["date"])
 
             def _disp(num, raw):
+                if raw == "est":        # flags an ESTIMATED archive week (rail_corridors.EST_FLAG), not a typed cell: show the number
+                    raw = None
                 return raw if raw else (f"{num:+d}" if num is not None else None)
 
             def _bidoff_html(_cell, blue):
@@ -2637,7 +2649,9 @@ with tab_railfob:
                 if s == "?":
                     return f'<td style="{_TDR};color:#94a3b8">?</td>'
                 col = "color:#0693e3;font-weight:600" if blue else "color:#32373c;font-weight:700"
-                return f'<td style="{_TDR};{col}">{s}</td>'
+                _tag = (' <span style="font-size:9px;color:#d97706;font-weight:700">est</span>'
+                        if (not blue and _cell.get("bid_raw") == "est") else "")
+                return f'<td style="{_TDR};{col}">{s}{_tag}</td>'
 
             def _chg_html(cur_bid, prior_map, period, cur_fut=None):
                 if cur_bid is None or not prior_map or prior_map.get(period) is None:

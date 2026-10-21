@@ -91,6 +91,8 @@ def _prior_maps(market, cur, by_md, mkt_dates):
 
 # ── cell formatters ──────────────────────────────────────────────────────────
 def _disp(num, raw):
+    if raw == "est":                    # flags an ESTIMATED archive week (rail_corridors.EST_FLAG), it is not a typed cell: show the number
+        raw = None
     return raw if raw else (f"{num:+d}" if num is not None else None)
 
 
@@ -101,7 +103,8 @@ def _bo_cell(cell, blue, tdr):
     if s == "?":
         return f'<td style="{tdr};color:#94a3b8">?</td>'
     col = f"color:{JPSI_BLUE};font-weight:600" if blue else "color:#32373c;font-weight:700"
-    return f'<td style="{tdr};{col}">{s}</td>'
+    tag = ' <span style="font-size:9px;color:#d97706;font-weight:700">est</span>' if (not blue and cell.get("bid_raw") == "est") else ""
+    return f'<td style="{tdr};{col}">{s}{tag}</td>'
 
 
 def _chg_cell(cur_bid, prior_map, period, tdr, cur_fut=None, curve=None):
@@ -217,6 +220,12 @@ def _fwd_curve(market, by_md, mkt_dates):
     return cur if len(cur) >= 2 else df.sort_values("MktWeek")
 
 
+def _est_dates(market, by_md, mkt_dates):
+    """The posting dates whose rows are ESTIMATES, not posted bids (bid_raw 'est' in the archive: UP Allen Station before its actual bids begin)."""
+    return {d for d in mkt_dates.get(market, ())
+            if any(c.get("bid_raw") == "est" for c in by_md.get((market, d), {}).values())}
+
+
 def _five_year_band(hist):
     """The prior years' average and range by marketing week, from their weekly bids (a frame with MktWeek, MyNum, Bid), as a
     (MktWeek, lo, hi, avg) DataFrame. Olympic (seasonal_band): with five years in a week the highest and the lowest are dropped
@@ -242,13 +251,15 @@ def _seasonal_png(market, by_md, mkt_dates):
         log.warning("rail seasonal render unavailable: %s", exc)
         return None
 
+    _est = _est_dates(market, by_md, mkt_dates)
     rows = []
     for d, bid in series.items():
         dt = datetime.fromisoformat(d).date()
         my = dt.year if dt.month >= 9 else dt.year - 1
         wk = min(52, max(1, ((dt - date(my, 9, 1)).days // 7) + 1))
-        rows.append({"MktYear": f"{my}/{str(my + 1)[-2:]}", "MyNum": my, "MktWeek": wk, "Bid": bid})
-    df = pd.DataFrame(rows).groupby(["MktYear", "MyNum", "MktWeek"], as_index=False)["Bid"].mean()
+        rows.append({"MktYear": f"{my}/{str(my + 1)[-2:]}", "MyNum": my, "MktWeek": wk, "Bid": bid, "Est": d in _est})
+    df = (pd.DataFrame(rows).groupby(["MktYear", "MyNum", "MktWeek"], as_index=False)
+          .agg(Bid=("Bid", "mean"), Est=("Est", "max")))
     mx = int(df["MyNum"].max())                          # current (bold) marketing year
     if df["MyNum"].nunique() < 2:
         return None
@@ -352,9 +363,18 @@ def _seasonal_png(market, by_md, mkt_dates):
                        y=alt.value(int(250 / 2)), url="url:N"))
         layers = [layers[0], _wm] + layers[1:]
 
+    _title = f"{_RAIL_DISPLAY.get(market, market)} · Spot {_comm} Basis Seasonal"
+    _n_est = int(hist["Est"].sum()) if band is not None else 0
+    if _n_est:                                           # estimated weeks (bid_raw 'est') behind the average and range: say so on the chart
+        try:
+            from rail_corridors import estimate_short as _est_short
+        except Exception:
+            _est_short = lambda _m: ""
+        _sub = f"{_n_est} of {len(hist)} weeks behind the 5-yr avg / range are estimates" + (f": {_est_short(market)}" if _est_short(market) else "")
+        _title = alt.TitleParams(_title, subtitle=_sub, subtitleFontSize=9, subtitleColor="#b45309")
     chart = alt.layer(*layers).properties(
         width=680, height=250, padding={"left": 6, "right": 26, "top": 6, "bottom": 6},
-        title=f"{_RAIL_DISPLAY.get(market, market)} · Spot {_comm} Basis Seasonal")
+        title=_title)
     try:
         return vlc.vegalite_to_png(json.dumps(chart.to_dict(), default=str), scale=1.5)
     except Exception as exc:

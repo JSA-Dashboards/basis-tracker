@@ -139,11 +139,25 @@ left (`olympic_avg` / `olympic_lo` / `olympic_hi`; five years in the week are ne
 (header, end label and caption say Olympic). `tests/test_seasonal_band.py` (rule, the band frame, and the Vega-Lite spec the email hands the renderer).
 **Not changed: the Bids tab's seasonal band and the Spread tab's band still use the plain mean and min / max** — say the word and they take the same helper.
 
-**Allen Station's history is an ESTIMATE, not Allen bids** (SA Master, `Corn Basis.xlsx`): `Est Domestic Allen` = the formula `NEGrp3 + 10` and `Est Mexico Allen` =
-`NEGrp3 + 20` for ~1,046 of ~1,100 weeks, so every Group 3 swing is inherited. Real Allen bids (col X 'Allen Station UP') exist from 2023-05-31 (145 weeks); the
-estimates were typed over only from 2024 (15 rows in 2024, 48 in 2025, 30 in 2026). Where both exist the real bid ran 15.6 under the estimate in 2023 (21 weeks) and 10.7 under in 2024
-(41 weeks), equal in 2025-26 — so 2023 and 2024 in the DB (`UP Illinois (Dom)` / `(Mex)`, loaded from the estimate columns by the 2026-09-21 rebuild) still run ~10-16 rich. Not corrected
-(it would change the confirmed column map and ~60 historical weeks): swap those weeks to col X if Kolten wants it.
+**Allen Station's history was an ESTIMATE, not Allen bids** (SA Master, `Corn Basis.xlsx`): `Est Domestic Allen` = the formula `NEGrp3 + 10` and `Est Mexico Allen` =
+`NEGrp3 + 20` for ~1,046 of ~1,100 weeks, so every Group 3 swing was inherited. The real bids are col X 'Allen Station UP' — typed numbers, 145 weeks from 2023-05-31 to 2026-07-29 (21
+weeks inside that span have none); the estimates were typed over only from 2024. Where both exist the real bid ran 15.6 under the estimate in 2023 and 10.7 under in 2024.
+
+**`UP Illinois (Mex)` rebuilt on the real bids, 2026-10-21 (Kolten: "'Allen Station UP' is not calculated, its actual numbers. lets use this as the base line. I believe its more reflective
+of Mexico than Domestic ... use Est Mexico Allen to back fill ... prior to this we need to flag as estimated or even consider removing").** Its 1,139 weekly Spot rows (source 'manual', period
+'Spot'): the 145 actual weeks hold the actual bid (88 of them moved: 2023 by -26 on average, 2024 by -28, 2025-26 by -2) and `bid_raw` NULL; the other 994 weeks (everything before 2023-05-31 and the
+21 gaps since) keep `Est Mexico Allen` and carry `bid_raw = 'est'`. **`bid_raw = 'est'` is the estimated-week flag** (`rail_corridors.EST_FLAG`): never shown as text (`_disp` in `rail_report` and the
+Rail FOB board skip it and tag the number "est"), counted by the seasonal charts — the Rail FOB tab's caption and the emailed chart's subtitle say "N of M weeks behind the 5-yr average and range are
+estimates" with the corridor's note (`rail_corridors.ESTIMATE_NOTE` / `ESTIMATE_SHORT`). Updated in place by MERGE ... WHEN MATCHED (no insert, `captured_at` untouched, so the droplet watcher sees
+nothing); the old rows are in `Claude Code\_backups\up_illinois_mex_spot_before_actual_baseline_2026-10-21.json` (restore = merge those bids back and clear `bid_raw`). Effect on the Olympic 5-yr
+average (Sep-Dec / this week): +22.3 / +4.7 before, +17.3 / +1.3 now; on the 145 actual weeks alone (three years: 2023-24 to 2025-26, so no trimming) -3.1 / -9.0 with a band of -17 to 0.
+Whether to keep the estimated weeks in the average and range, leave them out, or delete them is still Kolten's open call. Tests: `tests/test_estimated_weeks.py`.
+
+**`UP Illinois (Dom)` = Allen Station (Mex) less 5 cents from 2023 on (Kolten, same day: "for Allen Domestic have it as 5c discount at all times back to 2023").** Its 187 weekly Spot rows
+dated 2023-01-01 to 2026-07-29 were set to the Mex bid - 5 (2023 moved -5 on average, 2024 -12, 2025-26 -4), `bid_raw` 'est' where the Mex week is an estimate (42 of them) else NULL; the 952 weeks
+before 2023 keep Group 3 + 10 and are flagged 'est' (nobody has said what they should be); the live UP rundowns after 2026-07-29 are posted bids and stay as posted. Backup
+`Claude Code\_backups\up_illinois_dom_spot_before_mex_minus_5_2026-10-21.json`; same in-place MERGE as the Mex rebuild (`captured_at` untouched). The Dom caption says the 2023-on weeks are a rule, not
+posted bids. Heads-up given to Kolten: UP's live rundowns have Mex 11-12 over Dom (median +7 since August), a wider gap than the 5-cent rule.
 
 **A bad bid is corrected by UPDATE, never by `save_rail_fob`** (it re-stamps `captured_at`, and the droplet's catch-up watcher would read the re-save as a new posting and email the
 group). 2026-10-14 BN Hereford 'Oct' bid 210 (one-key slip for 110; the same posting's LH Oct is 108/113, FH Oct was 110 on 10-08) was set to 110 on one row, original kept in

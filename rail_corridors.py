@@ -54,6 +54,30 @@ CORRIDORS = [
 ]
 RAIL_BY_CORRIDOR = {n: r for n, r in CORRIDORS}
 CORRIDOR_ORDER   = {n: i for i, (n, _) in enumerate(CORRIDORS)}
+
+# An archive week that is an ESTIMATE rather than a posted bid carries bid_raw = 'est' (the same column that holds the desk's '?'; 'est' is never shown as text — the board
+# and the email show the number with a small "est" tag, the seasonal charts count the flagged weeks). What the flag means, per corridor, for the charts' caption.
+EST_FLAG = "est"
+ESTIMATE_NOTE = {
+    "UP Illinois (Mex)": ("UP Allen Station (Mex): the actual Allen Station UP bids (Corn Basis master) begin 2023-05-31; earlier weeks, and the weeks since with no "
+                          "bid, are 'Est Mexico Allen' (Group 3 + 20)."),
+    "UP Illinois (Dom)": ("UP Allen Station (Dom): from 2023 on it is Allen Station (Mex) less 5¢ (a rule, not posted Dom bids); the weeks flagged 'est' are those before "
+                          "2023 (Group 3 + 10) and those whose Mexico week is itself an estimate."),
+}
+
+
+ESTIMATE_SHORT = {"UP Illinois (Mex)": "actual Allen Station bids start May 2023; earlier = Est Mexico Allen (Group 3 + 20)",
+                  "UP Illinois (Dom)": "from 2023 = Allen Station (Mex) less 5c (a rule, not posted bids); earlier = Group 3 + 10"}
+
+
+def estimate_note(market: str) -> str:
+    """Caption for a corridor whose archive holds estimated weeks ('' when it has none flagged)."""
+    return ESTIMATE_NOTE.get(market, "")
+
+
+def estimate_short(market: str) -> str:
+    """The same in a line short enough for a chart subtitle."""
+    return ESTIMATE_SHORT.get(market, "")
 _ALIASES = {"bncn sellers": "BN Hereford"}
 
 
