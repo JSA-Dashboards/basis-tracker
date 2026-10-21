@@ -48,10 +48,11 @@ _EXCLUDE = {"UP Illinois (Dom)"}     # Allen Station (Dom) — dropped 2026-08-2
 _ALWAYS  = {"BN Freight", "UP Freight"}
 
 try:
-    from rail_corridors import CORRIDORS, CORRIDOR_ORDER
+    from rail_corridors import CORRIDORS, CORRIDOR_ORDER, band_years as _band_years
     _RAIL_BY = {n: r for n, r in CORRIDORS}
 except Exception:                                   # registry optional
     CORRIDOR_ORDER, _RAIL_BY = {}, {}
+    _band_years = lambda _m: 5
 
 # Board display overrides (match app.py's _RAIL_DISPLAY).
 _RAIL_DISPLAY = {"BN PNW CP": "CP PNW", "UP Illinois (Dom)": "Allen Station (Dom)",
@@ -269,7 +270,7 @@ def _seasonal_png(market, by_md, mkt_dates):
     cur_lbl = _yr(mx)
     prev = df[df["MyNum"] == mx - 1]        # most recent COMPLETE marketing year
     prev_lbl = _yr(mx - 1)
-    _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-5:]   # 5 prior complete years (or fewer)
+    _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-_band_years(market):]   # the prior complete years behind the band: 5 (or fewer); 3 for the BN corridors
     hist = df[df["MyNum"].isin(_hy)]
     band = _five_year_band(hist) if len(_hy) >= 2 else None
     _n = len(_hy)

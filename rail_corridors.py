@@ -55,6 +55,22 @@ CORRIDORS = [
 RAIL_BY_CORRIDOR = {n: r for n, r in CORRIDORS}
 CORRIDOR_ORDER   = {n: i for i, (n, _) in enumerate(CORRIDORS)}
 
+# How many completed crop years the seasonal charts' average and range look back, by carrier. Kolten 2026-10-21: "use the last 3 years for the BN corridors" — 2021/22 and 2022/23 were
+# unusually tight at Hereford and the PNW (crop-year means 150 / 160 against 100-108 since), so the five-year benchmark sat ~14c above what is posted. Three years is below the Olympic
+# average's five-year minimum (seasonal_band.MIN_YEARS), so a BN chart shows the plain mean and the full range of its last three. Freight ($/car, not a basis) keeps five.
+BAND_YEARS_DEFAULT = 5
+BAND_YEARS_BY_RAIL = {"BNSF": 3}
+
+
+def band_years(market: str) -> int:
+    """Completed crop years behind a corridor's seasonal average and range (3 for the BN basis corridors, else 5)."""
+    name = market or ""
+    if name.endswith("Freight") or "Shuttle" in name:
+        return BAND_YEARS_DEFAULT
+    rail = RAIL_BY_CORRIDOR.get(name) or ("BNSF" if name.startswith("BN ") else None)
+    return BAND_YEARS_BY_RAIL.get(rail, BAND_YEARS_DEFAULT)
+
+
 # An archive week that is an ESTIMATE rather than a posted bid carries bid_raw = 'est' (the same column that holds the desk's '?'; 'est' is never shown as text — the board
 # and the email show the number with a small "est" tag, the seasonal charts count the flagged weeks). What the flag means, per corridor, for the charts' caption.
 EST_FLAG = "est"

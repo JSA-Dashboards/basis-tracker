@@ -139,6 +139,13 @@ left (`olympic_avg` / `olympic_lo` / `olympic_hi`; five years in the week are ne
 (header, end label and caption say Olympic). `tests/test_seasonal_band.py` (rule, the band frame, and the Vega-Lite spec the email hands the renderer).
 **Not changed: the Bids tab's seasonal band and the Spread tab's band still use the plain mean and min / max** — say the word and they take the same helper.
 
+**The BN corridors look back three years, not five** (Kolten 2026-10-21, after "Hereford looked historically high and skewed maybe": "use the last 3 years for the BN corridors").
+`rail_corridors.band_years(market)` = 3 for the BNSF basis corridors (BN Hereford, BN PNW, BN PNW BE / CP, BN COBO, and any unregistered 'BN ...' market), 5 for everything else — BN Freight / the
+shuttles ($/car) included. Used by `rail_report._seasonal_png` (`_hy`) and the Rail FOB tab (`_rwin_yrs`, labels and caption). Three years is under `seasonal_band.MIN_YEARS`, so nothing is
+trimmed: a BN chart shows the plain mean and the min / max of 2023/24-2025/26 and says "3-yr average" / "3-yr range (2023/24–2025/26)". Why: both 'Dlvd Hereford' and 'Dlvd PNW' in the Corn
+Basis master are 1,141 TYPED weeks (real data, unlike Allen) and rail_fob equals them, but 2021/22-2022/23 ran 150 / 160 at Hereford (174 / 166 PNW) against 100-108 (113-118) since, so the
+five-year benchmark sat ~14c above what is posted (Hereford this week: Olympic 5-yr 109, last 3 years 99, posted ~95). `tests/test_seasonal_band.py`.
+
 **Allen Station's history was an ESTIMATE, not Allen bids** (SA Master, `Corn Basis.xlsx`): `Est Domestic Allen` = the formula `NEGrp3 + 10` and `Est Mexico Allen` =
 `NEGrp3 + 20` for ~1,046 of ~1,100 weeks, so every Group 3 swing was inherited. The real bids are col X 'Allen Station UP' — typed numbers, 145 weeks from 2023-05-31 to 2026-07-29 (21
 weeks inside that span have none); the estimates were typed over only from 2024. Where both exist the real bid ran 15.6 under the estimate in 2023 and 10.7 under in 2024.

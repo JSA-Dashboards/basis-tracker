@@ -2443,8 +2443,17 @@ with tab_railfob:
             # OLYMPIC (seasonal_band, Kolten 2026-10-20): each week's highest and lowest year
             # are dropped before the average and the range are taken, so one freak crop year
             # (UP Allen Station / BN Hereford 2022/23) cannot drag either.
+            # The window is five years, three for the BN basis corridors (rail_corridors.band_years, Kolten
+            # 2026-10-21: "use the last 3 years for the BN corridors"; 2021/22-2022/23 were unusually tight at
+            # Hereford and the PNW). Under five years nothing is trimmed: the plain mean and the full range.
+            try:
+                from rail_corridors import band_years as _band_years
+            except Exception:
+                _band_years = lambda _m: 5
+            _bw = _band_years(_mk)
+            _avg_lbl = f"{_bw}-yr Olympic avg" if _sband.is_trimmed(_bw) else f"{_bw}-yr avg"
             _rcur_my = date.today().year if date.today().month >= 9 else date.today().year - 1
-            _rwin_yrs = list(range(_rcur_my - 5, _rcur_my))
+            _rwin_yrs = list(range(_rcur_my - _bw, _rcur_my))
             _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
             _rband = (_rwin.groupby("MktWeek")["Bid"]
                       .agg(avg=_sband.olympic_avg, lo=_sband.olympic_lo, hi=_sband.olympic_hi).reset_index())
@@ -2545,7 +2554,7 @@ with tab_railfob:
                 _layers.append(
                     _alt.Chart(_rband).mark_line(color=_AVG_CLR, strokeDash=[8, 4], strokeWidth=3)
                     .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q", scale=_ry_scale)))
-                _r_avg_end = _rband.nlargest(1, "MktWeek").assign(_lbl="5-yr Olympic avg")
+                _r_avg_end = _rband.nlargest(1, "MktWeek").assign(_lbl=_avg_lbl)
                 _layers.append(
                     _alt.Chart(_r_avg_end).mark_text(align="left", dx=6, fontSize=10,
                                                      fontWeight="bold", color=_AVG_CLR)
@@ -2584,7 +2593,7 @@ with tab_railfob:
                 + '&nbsp;&nbsp;<span style="font-weight:400;text-transform:none">'
                 + (f'<b style="color:#000">{_curr_yr} = black</b>' if _curr_yr else '')
                 + (f'  ·  <b style="color:#2563eb">{_prev_yr} = blue</b>' if _prev_yr else '')
-                + (f'  ·  <b style="color:#d97706">5-yr Olympic avg = amber dash</b>' if not _rband.empty else '')
+                + (f'  ·  <b style="color:#d97706">{_avg_lbl} = amber dash</b>' if not _rband.empty else '')
                 + '</span></div>', unsafe_allow_html=True)
             _rail_chart = _alt.layer(*_layers).properties(height=_H, padding=_CHART_PAD)
             st.altair_chart(_rail_chart, use_container_width=True)
@@ -2599,17 +2608,20 @@ with tab_railfob:
                                  key=f"rail_seas_{_mk}_{_pd_sel}")
             st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
                        f"than once · partial windows fold into their month (FH/LH/Split Oct, "
-                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · the 5-yr "
-                       f"average and the gray band are Olympic: each week's highest and lowest year are dropped "
-                       f"(a week with fewer than five years uses them all).")
-            # Estimated weeks (bid_raw 'est' in the archive) behind the 5-yr average and range — say so (UP Allen Station: Kolten 2026-10-21).
+                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · "
+                       + ("the 5-yr average and the gray band are Olympic: each week's highest and lowest year are dropped "
+                          "(a week with fewer than five years uses them all)." if _sband.is_trimmed(_bw) else
+                          f"the {_bw}-yr average and the gray band are the plain mean and the min / max of the last {_bw} "
+                          f"completed crop years ({', '.join(f'{y}/{(y + 1) % 100:02d}' for y in _rwin_yrs)}) — the BN corridors' "
+                          f"window; 2021/22-2022/23 were unusually tight."))
+            # Estimated weeks (bid_raw 'est' in the archive) behind the average and range — say so (UP Allen Station: Kolten 2026-10-21).
             _n_est = int(_rwin["Est"].sum()) if not _rwin.empty else 0
             if _n_est:
                 try:
                     from rail_corridors import estimate_note as _est_note
                 except Exception:
                     _est_note = lambda _m: ""
-                st.caption(f"⚠ {_n_est} of the {len(_rwin)} weeks behind the 5-yr average and range are ESTIMATES (flagged 'est' in the archive). "
+                st.caption(f"⚠ {_n_est} of the {len(_rwin)} weeks behind the {_bw}-yr average and range are ESTIMATES (flagged 'est' in the archive). "
                            + (_est_note(_mk) or "They are not posted bids."))
 
         st.markdown(f'<div style="{_RF_BOARDHDR}">Seasonal Chart</div>', unsafe_allow_html=True)

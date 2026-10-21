@@ -87,6 +87,31 @@ check("the band drops 2022: range 10 to 40 (not 0 to 100), average 23.3 (not the
 legend = json.dumps(spec)
 check("the legend names it: '5-yr Olympic avg' and '5-yr range ex hi/lo (2021/22–2025/26)'", "5-yr Olympic avg" in legend and "5-yr range ex hi/lo (2021/22" in legend and "5-yr average" not in legend, legend[:300])
 
+print("the BN corridors look back three years (Kolten 2026-10-21: 'use the last 3 years for the BN corridors')")
+import rail_corridors as rc  # noqa: E402
+
+check("band_years: 3 for the BN basis corridors", all(rc.band_years(m) == 3 for m in ("BN Hereford", "BN PNW", "BN PNW CP", "BN PNW BE", "BN COBO")), [(m, rc.band_years(m)) for m in ("BN Hereford", "BN PNW", "BN COBO")])
+check("an unregistered 'BN ...' market follows its carrier", rc.band_years("BN Something New") == 3)
+check("freight ($/car) and every other carrier keep five", all(rc.band_years(m) == 5 for m in ("BN Freight", "BN 110 Shuttle", "UP Freight", "CPKC Freight", "UP Illinois (Mex)", "UP Group 3", "CSX Columbus", "NS Ft Wayne", "CN 105s", "Nowhere", "", None)))
+by_md_b, mkt_dates_b = {}, {"BN Hereford": set()}
+for my, lvl in LEVEL.items():
+    for wk in range(1, 53):
+        d = (date(my, 9, 1) + timedelta(days=7 * (wk - 1))).isoformat()
+        by_md_b[("BN Hereford", d)] = {"Spot": {"period": "Spot", "bid": lvl, "period_order": 0, "commodity": "Corn"}}
+        mkt_dates_b["BN Hereford"].add(d)
+for wk in range(1, 9):
+    d = (date(2026, 9, 1) + timedelta(days=7 * (wk - 1))).isoformat()
+    by_md_b[("BN Hereford", d)] = {"Spot": {"period": "Spot", "bid": -15, "period_order": 0, "commodity": "Corn"}}
+    mkt_dates_b["BN Hereford"].add(d)
+with mock.patch.object(vl_convert, "vegalite_to_png", side_effect=lambda spec, scale=1: spec.encode("utf-8")):
+    spec_b = json.loads(rail_report._seasonal_png("BN Hereford", by_md_b, mkt_dates_b))
+sets_b = [v for v in spec_b["datasets"].values() if v and {"avg", "lo", "hi"} <= set(v[0])]
+bb = sets_b[0][10]
+check("the band is the last three completed years only (2023-2025 = 20, 10, 0): mean 10, range 0 to 20 — the 2021-22 spike years are out", abs(bb["avg"] - 10.0) < 1e-6 and bb["lo"] == 0 and bb["hi"] == 20, bb)
+legend_b = json.dumps(spec_b)
+check("nothing is trimmed with three years, so the legend says '3-yr average' and '3-yr range (2023/24–2025/26)', not Olympic",
+      "3-yr average" in legend_b and "3-yr range (2023/24" in legend_b and "Olympic" not in legend_b and "ex hi/lo" not in legend_b, legend_b[:300])
+
 print()
 if FAILS:
     print("FAILED (%d): %s" % (len(FAILS), "; ".join(FAILS)))
