@@ -448,6 +448,39 @@ Juneteenth, Independence, Labor, Thanksgiving and Christmas (Sat → Fri, Sun �
 nothing) and trade on Columbus and Veterans Day. `auto_import`'s guard and the Summary tab's "1 / 2 days ago" use it; the
 federal check had skipped the whole import on Columbus Day 2026-10-12. A one-off closure goes in `EXTRA_CLOSED`.
 
+### The daily pull is checked, retried and reported on what was STORED (`pull_health.py`, 2026-10-22)
+
+Kolten 2026-10-21: "For the days that have a basis pull fail are we checking and correcting where needed?" Before this: alerted, never corrected, and the
+alert counted rows PARSED, not stored — the Snowflake JWT outage of 9/29 and 9/30 ran rc=0 with 1 location stored of ~1,100 and an email naming five empties;
+no scraper was ever re-run; the same four dead ones (ZFS, VistaComm, DTN, Georges) were mailed every day. A day not pulled cannot be pulled later (a site shows
+today's bids), so the check runs inside the run. `auto_import.__main__` calls `_pull_health_check` right after `run()` and BEFORE the Changes email (a retry
+that fills a hole lands in it); `pull_health.post_run` does the rest, all of it pure and tested except one query (`tests/test_pull_health.py`, 139 checks):
+
+1. **Verify** (`load_coverage` → `evaluate`): distinct (provider, location) stored today vs a normal day = the median of the last 10 PULL days (a date is a pull day
+   when it stored ≥50% of the window's median; Inco's carried sheet alone is not). Run: <50% = **failed**, <95% = **short** (a normal day is within ~2%; 10/2-10/8 lost
+   57 locations = 95%). Provider: normally there (stored on ≥8 of the 10 days) AND ≥5 usual locations: nothing today = **missing**, <80% of usual = **short**. The one-plant
+   ethanol sites skip a day now and then, so providers under 5 locations are left to the **stale list**: locations that missed the last two pull days, seen in the last 60 days,
+   grouped by provider. Fewer than 5 pull days of history → not judged. **Backtest** (`python pull_health.py backtest`, live Snowflake, 42 trading days since 8/24): finds
+   every lost day (9/2, 9/8, 9/29, 9/30, 10/12 failed; 8/28, 9/9, 9/11, 9/24, 10/2-10/7 short) and the provider drops behind them (Cargill's 76 locations on 9/24, Andersons 10/13);
+   nothing flagged on a normal day; ~20 mails in 42 days under the policy below, against one a day.
+2. **Retry once**, after a 90 s pause, sequentially, within 20 minutes in all (`retry_scrapers`; the `_HEALTH` entry is replaced, tagged `retried`): every scraper that
+   crashed / was abandoned / returned nothing, the scraper behind each missing or short provider (`scrapers_for`: same name ignoring case and punctuation, or a prefix), and, if the
+   whole run failed, every scraper. **Not retried:** one that failed its last 2 runs in a row (the books, below), one whose abandoned thread is still running (`_THREADS`),
+   anything when the database could not be read. The first run has no books, so it enters whatever is failing as already persistent (`seeded`, "failing since X or earlier").
+3. **Verify again**, update `state/basis_pull.json` (gitignored; per machine): runs in a row each scraper failed, the issues open at the last alert (`scraper:`, `provider:`,
+   `stale:`, `run:` keys), retries that worked, last run / alert / digest.
+4. **Tell the operator** (CHANGES_EMAIL_TO, kpostin@; never the group): when the run failed, something is **new**, something **recovered**, the run failed at first and the retry fixed it,
+   on **Mondays** (a digest of everything still open, the stale locations and the week's retries that worked) and the first time. A day with only the known issues is quiet;
+   `PULL_HEALTH_ALERTS=daily` mails whenever anything is open. A mail that fails to send is retried next run (the issue list is only updated after a send).
+5. **Exit code 2** when the run stored <50% of a normal day or the database could not be read to check (3 reads, 20 s apart), after the Changes email and client reports have gone, so
+   the droplet's `cron-alert` mails and healthchecks sees a failure (9/29 and 9/30 were rc=0).
+
+Switches: `PULL_HEALTH=off` or the file `state/basis_pull.off` → the old `send_scraper_alert` runs exactly as before; `PULL_HEALTH_RETRY=off` keeps the check and mail, no retry. A run that
+enabled <85% of the scrapers (`_RUN_INFO`, counted from `run()`'s flags; the droplet's `--no-landus` is 44 of 45) is not judged. Tools: `python pull_health.py report [--date D]` (verdict + stale
+list, read-only), `backtest [--days N]`, `state`. Things to know: snapshots are filed under the UTC date of the run, which is what the check reads (a run that straddles 19:00 Central would split); a scraper
+that finishes after its budget keeps writing in its daemon thread, so a provider can look missing a moment and then fill; the Landus/ZFS/Georges/Jennie-O/CHS stale lists are real
+(Landus is `--no-landus` on the droplet). Deploy = `git pull --ff-only` on the droplet; `state/` is created on the first run, which mails once ("Basis pull check is on — N open issues") and is quiet after.
+
 ## Scrapers
 
 One module per source (`adm_`, `chs_`, `cargill_`, `bunge_`, `scoular_`, …).

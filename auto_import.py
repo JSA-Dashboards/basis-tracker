@@ -1987,6 +1987,11 @@ def run_futures_capture() -> int:
 # Per-run scraper health, populated by _run_guarded and read for the alert email.
 # Each entry: {"name", "rows", "status"} where status ∈ ok|empty|abandoned|crashed.
 _HEALTH: list[dict] = []
+# What pull_health needs to re-run a scraper: name -> (fn, budget) for every one _run_guarded has run, the thread it ran on (an
+# abandoned one may still be going), and how many scrapers the last run() was asked to run (a run with many --no-* flags is not judged).
+_REGISTRY: dict[str, tuple] = {}
+_THREADS: dict[str, threading.Thread] = {}
+_RUN_INFO: dict[str, int] = {"enabled": 0, "total": 0}
 
 
 _LOCK_FH = None
@@ -2045,6 +2050,7 @@ def _run_guarded(fn, name, budget=240):
     network read (before any DB write), abandoning the thread is safe.
     Records the outcome in _HEALTH and returns the row count (0 on timeout/crash)."""
     box = {"n": 0, "err": None}
+    _REGISTRY[name] = (fn, budget)
 
     def _target():
         try:
@@ -2054,6 +2060,7 @@ def _run_guarded(fn, name, budget=240):
             log.error("%s scrape crashed: %s", name, exc)
 
     t = threading.Thread(target=_target, name=f"scrape-{name}", daemon=True)
+    _THREADS[name] = t
     t.start()
     t.join(budget)
     if t.is_alive():
@@ -2098,6 +2105,26 @@ def send_scraper_alert(problems: list[dict], to_addr: str | None = None) -> None
         log.info("Scraper alert emailed to %s (%s)", to_addr, names)
     except Exception as exc:                           # noqa: BLE001
         log.warning("Scraper alert email failed: %s", exc)
+
+
+def _scraper_alive(name: str) -> bool:
+    t = _THREADS.get(name)
+    return bool(t and t.is_alive())
+
+
+def _pull_health_check(email: bool) -> tuple[int, bool]:
+    """After a full run: check what was STORED (not what was parsed), retry what failed once, tell the operator — pull_health.py.
+    Returns (exit code, handled). handled=False means pull_health did not run (switched off, a partial run, or it raised), so the
+    caller falls back to send_scraper_alert as before. Exit code 2 = the run stored under half a normal day, or the database
+    could not be read to check; 9/29 and 9/30 ran rc=0 with nothing stored."""
+    try:
+        import pull_health
+        res = pull_health.post_run(_HEALTH, registry=_REGISTRY, run_guarded=_run_guarded, alive=_scraper_alive,
+                                   run_info=_RUN_INFO, email=email)
+    except Exception as exc:                           # noqa: BLE001 — a broken check must never break the run
+        log.warning("Pull-health check failed (scrape unaffected): %s", exc)
+        return 0, False
+    return res.exit_code, not res.skipped
 
 
 def run(
@@ -2155,6 +2182,9 @@ def run(
     """
     init_db()
     _HEALTH.clear()
+    _args = dict(locals())
+    _flags = [v for k, v in _args.items() if k.startswith("run_") and k.endswith("_scrape")]
+    _RUN_INFO.update(enabled=sum(1 for v in _flags if v), total=len(_flags))
     total = 0
     # Each scraper runs under a wall-clock budget (POET needs longer for its
     # Playwright browser) so one hung provider can't block the daily email.
@@ -2785,6 +2815,10 @@ if __name__ == "__main__":
             run_pruning=not args.no_prune,
         )
 
+        # Verify what was stored, retry what failed, alert the operator — BEFORE the Changes email, so a retry that fills a
+        # hole lands in it. The alert goes out from here; the old scraper alert below is the fallback when this did not run.
+        _health_rc, _health_done = _pull_health_check(email=not args.no_email)
+
         # ── Email the daily Changes report via Outlook (full scheduled run) ──
         if not args.no_email:
             try:
@@ -2808,5 +2842,10 @@ if __name__ == "__main__":
             # the *-only manual runs don't double-alert.
             problems = [h for h in _HEALTH
                         if h["status"] in ("abandoned", "crashed", "empty")]
-            if problems:
+            if problems and not _health_done:
                 send_scraper_alert(problems)
+
+        # Surface a pull that stored (almost) nothing to cron — cron-alert mails on a non-zero exit, healthchecks sees a failure.
+        if _health_rc:
+            log.error("Exiting %d: the pull stored under half a normal day, or could not be verified (pull_health).", _health_rc)
+            sys.exit(_health_rc)
