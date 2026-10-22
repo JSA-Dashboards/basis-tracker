@@ -112,6 +112,52 @@ legend_b = json.dumps(spec_b)
 check("nothing is trimmed with three years, so the legend says '3-yr average' and '3-yr range (2023/24–2025/26)', not Olympic",
       "3-yr average" in legend_b and "3-yr range (2023/24" in legend_b and "Olympic" not in legend_b and "ex hi/lo" not in legend_b, legend_b[:300])
 
+print("a partial year is not a year behind the band")
+check("years with enough weekly bids are kept, oldest first", sb.full_years({2023: 48, 2022: 14, 2024: 50, 2025: 30}, range(2021, 2026)) == [2023, 2024, 2025])
+check("a year with no bids has no weeks", sb.full_years({}, [2024]) == [])
+check("exactly the minimum counts, one fewer does not", sb.full_years({2024: sb.MIN_YEAR_WEEKS}, [2024]) == [2024] and sb.full_years({2024: sb.MIN_YEAR_WEEKS - 1}, [2024]) == [])
+check("a smaller minimum lets a forward period's part-year through", sb.full_years({2024: 10}, [2024], 1) == [2024])
+
+# UP Allen Station with its estimated weeks hidden: 14 weeks of ACTUAL bids in 2022/23 (+70, from 2023-05-31), then three whole years (20, 10, 0), then this year
+MK = "UP Illinois (Mex)"
+by_md_a, mkt_dates_a = {}, {MK: set()}
+
+
+def put_a(d, bid):
+    by_md_a[(MK, d)] = {"Spot": {"period": "Spot", "bid": bid, "period_order": 0, "commodity": "Corn"}}
+    mkt_dates_a[MK].add(d)
+
+
+for my, lvl, weeks in ((2022, 70, range(39, 53)), (2023, 20, range(1, 53)), (2024, 10, range(1, 53)), (2025, 0, range(1, 53))):
+    for wk in weeks:
+        put_a((date(my, 9, 1) + timedelta(days=7 * (wk - 1))).isoformat(), lvl)
+for wk in range(1, 9):
+    put_a((date(2026, 9, 1) + timedelta(days=7 * (wk - 1))).isoformat(), -15)
+with mock.patch.object(vl_convert, "vegalite_to_png", side_effect=lambda spec, scale=1: spec.encode("utf-8")):
+    spec_a = json.loads(rail_report._seasonal_png(MK, by_md_a, mkt_dates_a))
+band_a = [v for v in spec_a["datasets"].values() if v and {"avg", "lo", "hi"} <= set(v[0])][0]
+w45 = next(r for r in band_a if r["MktWeek"] == 45)
+check("the 14-week 2022/23 is left out of the band even in the weeks it covers (week 45 = mean of 20, 10, 0 - not lifted by the +70)", abs(w45["avg"] - 10.0) < 1e-6 and w45["lo"] == 0 and w45["hi"] == 20, w45)
+legend_a = json.dumps(spec_a, ensure_ascii=True)
+check("... and the legend counts three years, not four", "3-yr average" in legend_a and "3-yr range (2023/24" in legend_a and "4-yr" not in legend_a, legend_a[:300])
+
+# the rule is for a corridor whose estimated weeks are hidden only: the same series on any other corridor keeps its part-year in the band, exactly as before
+by_md_c = {("CSX Columbus", d): v for (_m, d), v in by_md_a.items()}
+mkt_dates_c = {"CSX Columbus": set(mkt_dates_a[MK])}
+with mock.patch.object(vl_convert, "vegalite_to_png", side_effect=lambda spec, scale=1: spec.encode("utf-8")):
+    spec_c = json.loads(rail_report._seasonal_png("CSX Columbus", by_md_c, mkt_dates_c))
+legend_c = json.dumps(spec_c, ensure_ascii=True)
+band_c = [v for v in spec_c["datasets"].values() if v and {"avg", "lo", "hi"} <= set(v[0])][0]
+w45c = next(r for r in band_c if r["MktWeek"] == 45)
+check("any other corridor keeps a part-year behind its band as before: '4-yr average (2022/23-2025/26)'", "4-yr average" in legend_c and "4-yr range (2022/23" in legend_c, legend_c[:300])
+check("... so week 45 still includes the +70 of the part-year (mean of 70, 20, 10, 0 = 25)", abs(w45c["avg"] - 25.0) < 1e-6 and w45c["hi"] == 70, w45c)
+# and with the estimates shown again, Allen is back to the old whole-window treatment too
+os.environ["RAIL_SHOW_ESTIMATES"] = "1"
+with mock.patch.object(vl_convert, "vegalite_to_png", side_effect=lambda spec, scale=1: spec.encode("utf-8")):
+    legend_s = json.dumps(json.loads(rail_report._seasonal_png(MK, by_md_a, mkt_dates_a)), ensure_ascii=True)
+os.environ.pop("RAIL_SHOW_ESTIMATES")
+check("... and Allen with the estimates shown again counts the part-year like every other corridor", "4-yr average" in legend_s, legend_s[:300])
+
 print()
 if FAILS:
     print("FAILED (%d): %s" % (len(FAILS), "; ".join(FAILS)))

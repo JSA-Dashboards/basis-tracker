@@ -166,6 +166,18 @@ before 2023 keep Group 3 + 10 and are flagged 'est' (nobody has said what they s
 `Claude Code\_backups\up_illinois_dom_spot_before_mex_minus_5_2026-10-21.json`; same in-place MERGE as the Mex rebuild (`captured_at` untouched). The Dom caption says the 2023-on weeks are a rule, not
 posted bids. Heads-up given to Kolten: UP's live rundowns have Mex 11-12 over Dom (median +7 since August), a wider gap than the 5-cent rule.
 
+**The estimated weeks are HIDDEN for now (Kolten 2026-10-22: "side bar that still but hide data that is pure estimate at least for now").** Keep / exclude / delete stays open (sidebarred). Meanwhile
+`database.get_rail_fob_all` / `get_rail_fob_dates` / `get_rail_fob` leave out every row with `bid_raw = 'est'` — 1,988 rows, 994 each for `UP Illinois (Mex)` and `(Dom)`; `rail_fob` itself is untouched — so
+everything that reads the archive sees Allen from 2023-05-31 only: the emailed chart, the Rail FOB tab (board dates, seasonal chart), the Spread tab, Net Carry and Return to Carry (Allen Station's Return to
+Carry history is now 2023-24 on — three completed crop years and the one in progress, checked on live data, instead of 21 — and its 'average best net return' is a three-year number). `RAIL_SHOW_ESTIMATES=1` in the environment (or `include_estimates=True` on a call) brings them back; the 'est' tags, captions and chart subtitle above are dormant,
+not deleted (the desk's '?' and every posted bid are kept: the clause is `bid_raw IS NULL OR bid_raw <> 'est'`). What had to follow, for the corridors that have hidden weeks ONLY (checked on live data:
+of every corridor the emailed report charts, just the two Allen ones change; UP Interior IA, UP Freight and a few tiny corridors have part-years too, and are deliberately left as they were): a prior
+marketing year is one of the years behind the Spot band only with ≥26 weekly values (`seasonal_band.full_years`; Allen's 2022/23 is 8-14 actual weeks, +58 to +85, and would lift June-August alone),
+the legends and captions count the years actually used ("3-yr average", "3-yr range (2023/24–2025/26)", the Rail FOB tab's caption), and the emailed chart and the Rail FOB tab say why the history stops (`rail_corridors.estimate_hidden_note`:
+"Allen Station's actual bids begin May 2023; the estimated weeks before it (Group 3 + 20) are not shown"). Live effect on Allen Mex's band, week 8: average +1.3 (range -10 to +14) with the estimates,
+-9.0 (-17 to 0) without; July +47 -> +21. Not changed: the Bids / Spread tab bands (still plain). Other copies of this: the Rail FOB portal's `rail_data.py` has the same filter; the admin portal's
+`apps/basis_tracker` mirror gets it on its next sync. Tests: `tests/test_estimated_weeks.py` (the loaders on a throwaway SQLite, the chart note), `tests/test_seasonal_band.py` (`full_years`, a 14-week year).
+
 **A bad bid is corrected by UPDATE, never by `save_rail_fob`** (it re-stamps `captured_at`, and the droplet's catch-up watcher would read the re-save as a new posting and email the
 group). 2026-10-14 BN Hereford 'Oct' bid 210 (one-key slip for 110; the same posting's LH Oct is 108/113, FH Oct was 110 on 10-08) was set to 110 on one row, original kept in
 `Claude Code\_backups\bn_hereford_2026-10-14_oct_bid_210.json`; it had lifted the week-7 spot average to 132.7.

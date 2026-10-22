@@ -94,6 +94,21 @@ def estimate_note(market: str) -> str:
 def estimate_short(market: str) -> str:
     """The same in a line short enough for a chart subtitle."""
     return ESTIMATE_SHORT.get(market, "")
+
+
+# The estimated weeks are HIDDEN for now (database.get_rail_fob_all & co. leave bid_raw 'est' out; Kolten 2026-10-22: "hide data that is pure estimate at least for now"), so a chart
+# that stops at the first actual bid says why instead of flagging weeks it no longer draws.
+ESTIMATE_HIDDEN = {
+    "UP Illinois (Mex)": "Allen Station's actual bids begin May 2023; the estimated weeks before it (Group 3 + 20) are not shown",
+    "UP Illinois (Dom)": "from 2023 on it is Allen Station (Mex) less 5c (a rule, not posted bids); the estimated weeks before it (Group 3 + 10) are not shown",
+}
+
+
+def estimate_hidden_note(market: str) -> str:
+    """Why a corridor's history is short while its estimated weeks are hidden ('' for a corridor with none)."""
+    return ESTIMATE_HIDDEN.get(market, "")
+
+
 _ALIASES = {"bncn sellers": "BN Hereford"}
 
 

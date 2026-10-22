@@ -26,6 +26,10 @@ from changes_report import (signature_html, send_email, JPSI_DARK, JPSI_BLUE,
                             _roll_adjust, _futures_curve, JSA_GROUP_BCC,
                             dashboard_cta_html)
 from database import get_rail_fob_all
+try:
+    from database import rail_estimates_shown as _est_shown
+except ImportError:                       # an older database module (a stale process): it hides nothing either
+    _est_shown = lambda: True
 
 # Load DATABASE_URL when rail_report is invoked standalone (a script or the scheduled
 # task) so we connect to Postgres — otherwise database.py silently falls back to the
@@ -48,11 +52,12 @@ _EXCLUDE = {"UP Illinois (Dom)"}     # Allen Station (Dom) — dropped 2026-08-2
 _ALWAYS  = {"BN Freight", "UP Freight"}
 
 try:
-    from rail_corridors import CORRIDORS, CORRIDOR_ORDER, band_years as _band_years
+    from rail_corridors import CORRIDORS, CORRIDOR_ORDER, band_years as _band_years, estimate_hidden_note as _hidden_note
     _RAIL_BY = {n: r for n, r in CORRIDORS}
 except Exception:                                   # registry optional
     CORRIDOR_ORDER, _RAIL_BY = {}, {}
     _band_years = lambda _m: 5
+    _hidden_note = lambda _m: ""
 
 # Board display overrides (match app.py's _RAIL_DISPLAY).
 _RAIL_DISPLAY = {"BN PNW CP": "CP PNW", "UP Illinois (Dom)": "Allen Station (Dom)",
@@ -270,7 +275,12 @@ def _seasonal_png(market, by_md, mkt_dates):
     cur_lbl = _yr(mx)
     prev = df[df["MyNum"] == mx - 1]        # most recent COMPLETE marketing year
     prev_lbl = _yr(mx - 1)
-    _hy = sorted(y for y in df["MyNum"].unique() if y < mx)[-_band_years(market):]   # the prior complete years behind the band: 5 (or fewer); 3 for the BN corridors
+    import seasonal_band as _sband
+    _prior = [y for y in df["MyNum"].unique() if y < mx]
+    _hid_est = (not _est_shown()) and bool(_hidden_note(market))      # a corridor whose estimated weeks are hidden now starts at its first ACTUAL bid, mid-year
+    if _hid_est:                                      # ... and that part-year (Allen Station's 2022/23 is 14 weeks, +58 to +85) is not one of the years behind the band: it would lift June-August alone
+        _prior = _sband.full_years(df.groupby("MyNum")["MktWeek"].nunique().to_dict(), _prior)
+    _hy = sorted(_prior)[-_band_years(market):]   # the prior complete years behind the band: 5 (or fewer); 3 for the BN corridors
     hist = df[df["MyNum"].isin(_hy)]
     band = _five_year_band(hist) if len(_hy) >= 2 else None
     _n = len(_hy)
@@ -310,7 +320,6 @@ def _seasonal_png(market, by_md, mkt_dates):
     # Muted green/gray theme: bold near-black current year, dashed sage avg, light-sage
     # range band, brick-red forward curve. Legend up top with a swatch per series.
     _CUR, _PREV, _AVG, _BAND, _FWD = "#111827", "#2563eb", "#4b6a4b", "#c4d7bd", "#c0392b"
-    import seasonal_band as _sband
     if _sband.is_trimmed(_n):                       # five years: the Olympic treatment applies, and the legend says so
         _rng_name, _avg_name = f"{_n}-yr range ex hi/lo ({rng_lbl})", f"{_n}-yr Olympic avg"
     else:
@@ -373,6 +382,8 @@ def _seasonal_png(market, by_md, mkt_dates):
             _est_short = lambda _m: ""
         _sub = f"{_n_est} of {len(hist)} weeks behind the 5-yr avg / range are estimates" + (f": {_est_short(market)}" if _est_short(market) else "")
         _title = alt.TitleParams(_title, subtitle=_sub, subtitleFontSize=9, subtitleColor="#b45309")
+    elif _hid_est:                                       # estimated weeks are hidden: a corridor that has some says why its history stops
+        _title = alt.TitleParams(_title, subtitle=_hidden_note(market), subtitleFontSize=9, subtitleColor="#b45309")
     chart = alt.layer(*layers).properties(
         width=680, height=250, padding={"left": 6, "right": 26, "top": 6, "bottom": 6},
         title=_title)

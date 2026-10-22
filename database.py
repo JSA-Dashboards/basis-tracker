@@ -1679,7 +1679,26 @@ def save_rail_fob(date: str, source: str, rows: list) -> int:
     return len(rows)
 
 
-def get_rail_fob(source: str, date: str) -> list:
+# Pure-estimate archive weeks (bid_raw = 'est' — UP Allen Station before its actual bids begin; rail_corridors.EST_FLAG) are HIDDEN from every reader of the rail archive: the
+# board, the seasonal charts, the Spread tab, Net Carry and Return to Carry. Kolten 2026-10-22: "side bar that still but hide data that is pure estimate at least for now" — whether
+# to keep, exclude or delete them is still open, so the rows stay in rail_fob. RAIL_SHOW_ESTIMATES=1 (or include_estimates=True on a call) brings them back. The flag is repeated
+# here rather than imported from rail_corridors because this module is copied on its own into the portals.
+RAIL_EST_FLAG = "est"
+
+
+def rail_estimates_shown(include_estimates=None) -> bool:
+    """Whether the estimated archive weeks are returned: the call's include_estimates if given, else RAIL_SHOW_ESTIMATES (1/true/yes/on). Default: hidden."""
+    if include_estimates is not None:
+        return bool(include_estimates)
+    return os.getenv("RAIL_SHOW_ESTIMATES", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _rail_est_clause(include_estimates=None) -> str:
+    """The WHERE addition that leaves estimated weeks out ('' when they are shown). `NULL <> 'est'` is NULL, so the IS NULL half is what keeps an ordinary bid."""
+    return "" if rail_estimates_shown(include_estimates) else f" AND (bid_raw IS NULL OR bid_raw <> '{RAIL_EST_FLAG}')"
+
+
+def get_rail_fob(source: str, date: str, include_estimates=None) -> list:
     """Return all rail FOB cells for a source + date, ordered by market then period_order."""
     conn = get_conn()
     c    = conn.cursor()
@@ -1687,27 +1706,27 @@ def get_rail_fob(source: str, date: str) -> list:
     try:
         c.execute(f"""SELECT market, rail, commodity, period, period_order, futures,
                              bid, offer, bid_raw, offer_raw
-                      FROM rail_fob WHERE source={ph} AND date={ph}
+                      FROM rail_fob WHERE source={ph} AND date={ph}{_rail_est_clause(include_estimates)}
                       ORDER BY market, period_order, period""", (source, date))
         return [dict(r) for r in c.fetchall()]
     finally:
         conn.close()
 
 
-def get_rail_fob_dates(source: str) -> list:
-    """Distinct posting dates for a source, most recent first."""
+def get_rail_fob_dates(source: str, include_estimates=None) -> list:
+    """Distinct posting dates for a source, most recent first (a date holding only estimated weeks is not a posting date while they are hidden)."""
     conn = get_conn()
     c    = conn.cursor()
     ph   = _ph()
     try:
-        c.execute(f"SELECT DISTINCT date FROM rail_fob WHERE source={ph} ORDER BY date DESC",
+        c.execute(f"SELECT DISTINCT date FROM rail_fob WHERE source={ph}{_rail_est_clause(include_estimates)} ORDER BY date DESC",
                   (source,))
         return [r["date"] for r in c.fetchall()]
     finally:
         conn.close()
 
 
-def get_rail_fob_all(source: str) -> list:
+def get_rail_fob_all(source: str, include_estimates=None) -> list:
     """All rail FOB cells for a source across every date (for trend/change columns)."""
     conn = get_conn()
     c    = conn.cursor()
@@ -1715,7 +1734,7 @@ def get_rail_fob_all(source: str) -> list:
     try:
         c.execute(f"""SELECT date, market, rail, commodity, period, period_order, futures,
                              bid, offer, bid_raw, offer_raw
-                      FROM rail_fob WHERE source={ph}
+                      FROM rail_fob WHERE source={ph}{_rail_est_clause(include_estimates)}
                       ORDER BY market, period_order, period, date""", (source,))
         return [dict(r) for r in c.fetchall()]
     finally:

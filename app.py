@@ -2451,9 +2451,20 @@ with tab_railfob:
             except Exception:
                 _band_years = lambda _m: 5
             _bw = _band_years(_mk)
-            _avg_lbl = f"{_bw}-yr Olympic avg" if _sband.is_trimmed(_bw) else f"{_bw}-yr avg"
             _rcur_my = date.today().year if date.today().month >= 9 else date.today().year - 1
             _rwin_yrs = list(range(_rcur_my - _bw, _rcur_my))
+            # A corridor whose estimated weeks are hidden (database.rail_estimates_shown) now starts at its first ACTUAL bid, mid-year: UP Allen Station's 2022/23 is 14 weeks of actual
+            # bids (+58 to +85) and is not one of the years behind its Spot band — it would lift June-August alone. Every other corridor keeps the whole calendar window.
+            try:
+                from database import rail_estimates_shown as _rest
+                from rail_corridors import estimate_hidden_note as _hid_note
+            except Exception:
+                _rest, _hid_note = (lambda: True), (lambda _m: "")
+            _hid_est = (not _rest()) and bool(_hid_note(_mk)) and _pd_sel == "Spot"
+            if _hid_est:
+                _rwin_yrs = _sband.full_years(_sel.groupby("MktYearNum")["MktWeek"].nunique().to_dict(), _rwin_yrs)
+            _nu = len(_rwin_yrs) if _hid_est else _bw             # the years behind the band that the labels and the caption count
+            _avg_lbl = f"{_nu}-yr Olympic avg" if _sband.is_trimmed(_nu) else f"{_nu}-yr avg"
             _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
             _rband = (_rwin.groupby("MktWeek")["Bid"]
                       .agg(avg=_sband.olympic_avg, lo=_sband.olympic_lo, hi=_sband.olympic_hi).reset_index())
@@ -2606,14 +2617,19 @@ with tab_railfob:
                 subtitleFontSize=11, subtitleColor="#64748b", anchor="start", offset=12))
             _chart_download_copy(_chart_png(_rail_export, width=1100, height=_H), _rail_fname,
                                  key=f"rail_seas_{_mk}_{_pd_sel}")
+            if _sband.is_trimmed(_nu):
+                _band_txt = (f"the {_nu}-yr average and the gray band are Olympic: each week's highest and lowest year are dropped "
+                             "(a week with fewer than five years uses them all).")
+            elif _nu:
+                _band_txt = (f"the {_nu}-yr average and the gray band are the plain mean and the min / max of the last {_nu} "
+                             f"completed crop years ({', '.join(f'{y}/{(y + 1) % 100:02d}' for y in _rwin_yrs)}) — "
+                             + ("the BN corridors' window; 2021/22-2022/23 were unusually tight." if _bw < 5
+                                else "every completed crop year with enough weekly bids."))
+            else:
+                _band_txt = "no completed crop year has enough weekly bids yet for an average and a gray band."
             st.caption(f"{int(_p_n[_pd_sel])} postings · weekly average where a period was posted more "
                        f"than once · partial windows fold into their month (FH/LH/Split Oct, "
-                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · "
-                       + ("the 5-yr average and the gray band are Olympic: each week's highest and lowest year are dropped "
-                          "(a week with fewer than five years uses them all)." if _sband.is_trimmed(_bw) else
-                          f"the {_bw}-yr average and the gray band are the plain mean and the min / max of the last {_bw} "
-                          f"completed crop years ({', '.join(f'{y}/{(y + 1) % 100:02d}' for y in _rwin_yrs)}) — the BN corridors' "
-                          f"window; 2021/22-2022/23 were unusually tight."))
+                       f"Oct 10-31, LH Oct/FH Nov → Oct) · the board keeps every period as posted · " + _band_txt)
             # Estimated weeks (bid_raw 'est' in the archive) behind the average and range — say so (UP Allen Station: Kolten 2026-10-21).
             _n_est = int(_rwin["Est"].sum()) if not _rwin.empty else 0
             if _n_est:
@@ -2621,8 +2637,11 @@ with tab_railfob:
                     from rail_corridors import estimate_note as _est_note
                 except Exception:
                     _est_note = lambda _m: ""
-                st.caption(f"⚠ {_n_est} of the {len(_rwin)} weeks behind the {_bw}-yr average and range are ESTIMATES (flagged 'est' in the archive). "
+                st.caption(f"⚠ {_n_est} of the {len(_rwin)} weeks behind the {_nu}-yr average and range are ESTIMATES (flagged 'est' in the archive). "
                            + (_est_note(_mk) or "They are not posted bids."))
+            # The estimated weeks are hidden for now (database.rail_estimates_shown; Kolten 2026-10-22): a corridor that has some says why its history is short.
+            if not _rest() and _hid_note(_mk):
+                st.caption("ℹ " + _hid_note(_mk) + ".")
 
         st.markdown(f'<div style="{_RF_BOARDHDR}">Seasonal Chart</div>', unsafe_allow_html=True)
         try:
