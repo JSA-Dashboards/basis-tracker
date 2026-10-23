@@ -582,6 +582,41 @@ same ids — in `Claude Code\_backups\canola_zero_rows_2026-10-14.csv`. `Claude 
 default, refuses unless every candidate is a zero-basis non-spot non-NCGA row and no snapshot would end up empty); `--restore <csv>` puts rows back. Cargill
 West Fargo's flaxseed (147 rows) and hi-oleic sunflower (588) are flat-priced the same way and are still stored as zeros.
 
+### Hollander & Feuerhaken's daily bid PDF (hfgrain.com/bids, 2026-10-23)
+
+Kolten: "Can we try to scrap this page daily? It has some useful locations. But its a daily PDF." H&F is a Northbrook, IL grain brokerage; its Bids page is one link ("Today's Bid PDF",
+`/s/HFBids-YYYYMMDD.pdf` -> Squarespace's CDN) to a one-page landscape Access report with a block of delivery periods per buyer (period | basis in cents | contract | flat price), a
+"Futures Settlements" panel, the buyers' hours and a USDA calendar. `hfgrain_scraper.py` (`run_hfgrain` in `auto_import.py`, flags `--hfgrain-only` / `--no-hfgrain`, parser
+`parsers/hfgrain_parser.py`, `tests/test_hfgrain_scraper.py` with the saved sheet `tests/fixtures/hfbids_2026-10-22.pdf`; needs pdfplumber = `requirements-dev.txt`, installed on the
+droplet at 0.11.0 and skipped on Cloud):
+
+- **Terms (read 2026-10-23):** no terms-of-use or copyright page on hfgrain.com (Home / About / Bids / Contact), the Squarespace robots.txt leaves `/bids` and `/s/` open, the PDF carries no
+  restriction. One page and one PDF a day. Not a licence problem; worth knowing it is a brokerage's own customer sheet.
+- **Only today's PDF exists** — every older `/s/HFBids-YYYYMMDD.pdf` is a 404 (checked 2026-10-23), so there is nothing to backfill and a sheet not captured the day it is up can be replaced
+  before we see it. H&F uploaded the 10-22 sheet at 15:39 CT (the address carries the upload time in ms); the daily run starts 15:45, so a later posting is caught by `deploy/run_hfgrain.sh`
+  (cron `10 17 * * 1-5`, `auto_import.py --hfgrain-only`) — install it in the droplet crontab through `cron-alert` (its healthchecks check needs a weekday schedule set by hand).
+- **Every row is checked:** flat price = the day's settlement + basis, so `flat - basis` must equal the settlement of the row's contract in the sheet's own panel (all 28 rows of the
+  10-22 sheet do). A row that does not add up, or whose period is unknown, is not filed; with no settlement panel (or no date, or no bid blocks) nothing is filed and the run reports
+  `empty` (the pull-health alert). A sheet more than 5 days old is not filed either.
+- **Filed under the SHEET's date**, source `hfgrain`, row ids `HF_<buyer>_<C|S|W><n>`, subject `H&F bids PDF of <date> (revised), uploaded <UTC>`. Labels carry a month name
+  (`Oct 2026`, `LH Oct 2026`, `By Oct 25` for 'BY 10/25'); contracts are `CZ26 -> ZCZ26`, `SX26 -> ZSX26`, `WZ26 -> ZWZ26` (CBOT soft red winter, raw grain 'Wheat (Soft Red Winter)').
+  First capture of a day wins (a REVISED sheet re-posted after we filed is not picked up: ask for replace-on-change if the logs show late revisions).
+- **Which buyers (`TARGETS`) — Kolten 2026-10-23: "We are only needing Ingredion, South Bend Ethanol, Lake side, and Incobrassa on this. Add inco into the existing one we have."** Filed under their own
+  names (source `hfgrain`): **Ingredion** (corn, the **Argo** plant, Bedford Park IL — Kolten: "Argo"; filed in the existing Ingredion / Chicago, IL series, the Dow Jones Chicago processor basis the archive holds
+  2010 to 2023-07, so it continues after a three-year gap; CHS's own 'Ingredion' location is Indianapolis, a different stream 2c under H&F's), **South Bend Ethanol** (corn, 3201 W Calvert, South Bend IN), **Lakeside Grain** (soybeans + wheat; GROWMARK's Calumet
+  River terminal in Chicago, ex-COFCO B-House; coordinates approximate). **Incobrasa is folded into the existing INCO / Gilman, IL series, not filed beside it** (below). Read and checked but NOT
+  filed (`enabled: False`): Marquis Hennepin, Cargill Hammond, ADM Mendota wheat, CHS-Rochelle — H&F's bids are not the buyers' own posted ones (10-22: Cargill Hammond Nov +5 in our archive vs -10 on the
+  sheet, ADM Mendota wheat Nov +32 vs +30, CHS Rochelle 2c apart) and filing them under the buyer would merge two bid streams into one snapshot. An unknown block (a new buyer) is logged and skipped.
+- **Incobrasa into INCO (`inco_bids.fold_hf`, tests `tests/test_inco_hf_merge.py`, 30 checks).** The sheet quotes Incobrasa for Oct / Nov / Dec only, a subset of the six-month sheet Kolten pastes, so
+  the block REPLACES those months on the sheet's own day and leaves Jan-Mar as the last Inco sheet had them (a plain 'Oct' and an 'LH Oct' are both October: H&F's replace all windows of the month).
+  The day is replaced outright, like `inco_bids.py post` does, and the days after it re-carried; a second run of the same sheet writes nothing, a re-issued (REVISED) sheet replaces the day. The folded
+  day's subject is `carried forward from <last Inco sheet> sheet; Oct/Nov/Dec from H&F bids PDF of <date>` — still 'carried', so the stale-sheet guard and the 15:45 `inco_bids.py carry` keep measuring
+  from the last sheet Kolten PASTED (the H&F refresh must not hide that Jan-Mar are weeks old); when that sheet is more than 21 days before the day, its other months are NOT carried into the H&F day
+  (a visible gap, as in `plan_carry`). With no Inco history at all, H&F alone starts the series (subject `H&F bids PDF of <date> (Oct/Nov/Dec)`). INCO keeps source `manual` and its location_meta
+  (the scraper adds none). Its 10-22 numbers equal the 10-19 hand sheet, so the first fold changes nothing but the subject.
+- Pull health: the three new locations are three different providers, each under pull_health's 5-location provider floor, and INCO is already carried every business day, so a sheet that is late never raises a provider-missing alert; a
+  sheet that stops coming (or an unreadable one) shows as the `HFGrain` scraper being `empty`.
+
 ### Known-unbuilt
 
 - **Ray-Carroll** (`ray-carroll.com`) is the same aghost family but a

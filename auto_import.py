@@ -137,6 +137,8 @@ from hec_scraper import fetch_hec                          # Hopkinsville Elevat
 from georges_scraper import fetch_georges                  # Georges Inc. feed mills (corn basis PDF)
 from agricharts_md_scraper import fetch_agricharts_md
 from agrex_scraper import fetch_agrex_bids
+from hfgrain_scraper import fetch_hfgrain_bids
+from parsers.hfgrain_parser import parse_hfgrain_location
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
@@ -1470,6 +1472,69 @@ def run_ncga() -> int:
     return total_rows
 
 
+def run_hfgrain() -> int:
+    """
+    File the four buyers wanted from Hollander & Feuerhaken's daily bid PDF (hfgrain_scraper.py): Ingredion, South Bend Ethanol and Lakeside Grain as locations of their own, and
+    Incobrasa FOLDED INTO the existing INCO / Gilman, IL series (inco_bids.fold_hf: H&F's Oct-Dec replace the same months of the day, the later months stay as the last Inco sheet had
+    them). Every row is checked against the sheet's own settlement panel before it is kept, and the rows go in under the SHEET's date, so a page that has not been updated yet repeats
+    an existing snapshot and adds nothing. Skips cleanly where pdfplumber is missing (Cloud). Returns the number of bid rows read.
+    """
+    log.info("=" * 60)
+    log.info("HFGrain (Hollander & Feuerhaken bid PDF) scrape starting…")
+    log.info("=" * 60)
+    try:
+        locs = fetch_hfgrain_bids()
+    except Exception as exc:
+        log.error("HFGrain scrape failed: %s", exc)
+        return 0
+    if not locs:
+        log.warning("HFGrain returned no bids.")
+        return 0
+
+    folds = [l for l in locs if l.get("merge") == "inco"]      # Incobrasa: folded into the existing INCO / Gilman, IL series (inco_bids.fold_hf), not filed beside it
+    locs = [l for l in locs if l.get("merge") != "inco"]
+    _snaps, _metas, total_rows, errors = [], {}, 0, 0
+    for loc in locs:
+        try:
+            snap_req = parse_hfgrain_location(loc)
+            if snap_req is None:
+                continue
+            _snaps.append(snap_req)
+            _metas.setdefault(snap_req.provider, []).append({"location": snap_req.location, **(loc.get("meta") or {})})
+            total_rows += len(snap_req.rows)
+            log.info("  ✓  %-20s %-28s  sheet of %s  %d row(s)", snap_req.provider, snap_req.location, snap_req.timestamp[:10], len(snap_req.rows))
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  HFGrain %s: %s", loc.get("location", "?"), exc)
+
+    try:
+        upsert_snapshots([s.model_dump() for s in _snaps])
+    except Exception as exc:
+        log.error("HFGrain bulk snapshot upsert failed: %s", exc)
+    for _prov, _items in _metas.items():
+        try:
+            upsert_location_metas(_prov, _items)
+        except Exception as exc:
+            log.error("HFGrain %s location-meta failed: %s", _prov, exc)
+
+    for loc in folds:
+        try:
+            import inco_bids
+            res = inco_bids.fold_hf(loc)
+            total_rows += len(loc.get("bids") or [])
+            if res is False:
+                errors += 1
+            log.info("  ✓  %-20s %-28s  sheet of %s  %d row(s) %s", "INCO", "Gilman, IL", loc.get("sheet_date"), len(loc.get("bids") or []),
+                     {True: "folded into the Inco series and read back", None: "already in the Inco series", False: "NOT written (see above)"}[res])
+        except Exception as exc:
+            errors += 1
+            log.error("  ✗  HFGrain INCO fold: %s", exc)
+
+    log.info("-" * 60)
+    log.info("HFGrain done: %d location(s)  |  %d row(s)  |  %d error(s)  (bulk upsert)", len(_snaps) + len(folds), total_rows, errors)
+    return total_rows
+
+
 def run_scoular() -> int:
     """
     Scrape Scoular (Bushel-powered cashbidssingle pages) for all ~66 US locations
@@ -2173,6 +2238,7 @@ def run(
     run_georges_scrape: bool = True,
     run_agmd_scrape: bool = True,
     run_agrex_scrape: bool = True,
+    run_hfgrain_scrape: bool = True,
     run_pruning: bool = True,
 ) -> int:
     """
@@ -2279,6 +2345,8 @@ def run(
         total += _run_guarded(run_agricharts_md, "AgriCharts-MD")
     if run_agrex_scrape:
         total += _run_guarded(run_agrex, "Agrex")
+    if run_hfgrain_scrape:                              # the sheet is posted ~15:40 CT: a late one is picked up by the next run (deploy/run_hfgrain.sh)
+        total += _run_guarded(run_hfgrain, "HFGrain", 120)
 
     # Capture today's futures curve (for per-day basis anchoring as history builds)
     run_futures_capture()
@@ -2573,6 +2641,10 @@ if __name__ == "__main__":
     agrex_group.add_argument("--no-agrex", dest="no_agrex", action="store_true", help="Skip Agrex cash-bids terminal (Agrex, WNY Energy, Oracle Pork) scrape")
     agrex_group.add_argument("--agrex-only", dest="agrex_only", action="store_true", help="Run Agrex cash-bids terminal scrape only")
 
+    hfgrain_group = parser.add_mutually_exclusive_group()
+    hfgrain_group.add_argument("--no-hfgrain", dest="no_hfgrain", action="store_true", help="Skip the Hollander & Feuerhaken (hfgrain.com) daily bid PDF scrape")
+    hfgrain_group.add_argument("--hfgrain-only", dest="hfgrain_only", action="store_true", help="Run the Hollander & Feuerhaken bid PDF scrape only")
+
     prune_group = parser.add_mutually_exclusive_group()
     prune_group.add_argument(
         "--no-prune", dest="no_prune", action="store_true",
@@ -2755,6 +2827,9 @@ if __name__ == "__main__":
     elif args.agrex_only:
         init_db()
         run_agrex()
+    elif args.hfgrain_only:
+        init_db()
+        run_hfgrain()
     else:
         # The emailing run WAITS its turn (the Changes email must still go out even
         # if it loses the wake-up race); the --no-email refresh just steps aside.
@@ -2812,6 +2887,7 @@ if __name__ == "__main__":
             run_georges_scrape=not args.no_georges,
             run_agmd_scrape=not args.no_agmd,
             run_agrex_scrape=not args.no_agrex,
+            run_hfgrain_scrape=not args.no_hfgrain,
             run_pruning=not args.no_prune,
         )
 
