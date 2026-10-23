@@ -594,7 +594,13 @@ droplet at 0.11.0 and skipped on Cloud):
   restriction. One page and one PDF a day. Not a licence problem; worth knowing it is a brokerage's own customer sheet.
 - **Only today's PDF exists** — every older `/s/HFBids-YYYYMMDD.pdf` is a 404 (checked 2026-10-23), so there is nothing to backfill and a sheet not captured the day it is up can be replaced
   before we see it. H&F uploaded the 10-22 sheet at 15:39 CT (the address carries the upload time in ms); the daily run starts 15:45, so a later posting is caught by `deploy/run_hfgrain.sh`
-  (cron `10 17 * * 1-5`, `auto_import.py --hfgrain-only`) — install it in the droplet crontab through `cron-alert` (its healthchecks check needs a weekday schedule set by hand).
+  (cron `10 17 * * 1-5`, `auto_import.py --hfgrain-only`, through `cron-alert`, installed 2026-10-23; crontab backup `/opt/alerting/crontab.backup.20261023_141121`). Its healthchecks heartbeat
+  pings return 404 (`cron-alert` sends `?create=1` but the check `hf-grain-bid-pdf` was not created — the same happened that day to three other new jobs, so the account may be at its check limit):
+  create the check by hand with a weekday 17:10 schedule, or accept that this catch-up has no dead-man's-switch (cron-alert's failure email works regardless).
+- **Deployed 2026-10-23 (c3da023):** droplet pulled, tests pass there on pdfplumber 0.11.0; the first live run (14:09 CT, through the wrapper) filed the 10-22 sheet — Ingredion / Chicago, IL 4 rows
+  (929 snapshots now: the Dow Jones 2010-2023-07 history plus this), South Bend Ethanol 3, Lakeside Grain 6, and folded Incobrasa into INCO (10-22 replaced, 10-23 carried from it; read back, no
+  duplicates). Backup of INCO's October snapshots before the fold: `Claude Code\_backups\inco_before_hf_fold_2026-10-23.json` (restore = put those snapshots and rows back with the
+  delete-then-upsert `inco_bids.apply_plan` uses). Ingredion's location_meta now has type Corn Processing and Argo's coordinates (41.77, -87.81, approximate).
 - **Every row is checked:** flat price = the day's settlement + basis, so `flat - basis` must equal the settlement of the row's contract in the sheet's own panel (all 28 rows of the
   10-22 sheet do). A row that does not add up, or whose period is unknown, is not filed; with no settlement panel (or no date, or no bid blocks) nothing is filed and the run reports
   `empty` (the pull-health alert). A sheet more than 5 days old is not filed either.
