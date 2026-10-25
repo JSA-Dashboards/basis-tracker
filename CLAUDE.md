@@ -640,7 +640,39 @@ Mendota, IL / CHS Rt 47 is in Northern IL / Cargill Paris Mill is in Paris, IL /
 Terminal' in Los Angeles, Cargill 'Paris Mill' in Florida, CHS 'Ottawa River Mkt' in Ohio, GPRE 'Madison' in Nebraska. **Fix a pin in BOTH places:** `upsert_location_meta(provider, location, lat=, lon=)` on the live row
 (the database wins) and the entry in `coords_seed.json` (so a fresh or local database does not re-create it). CHS 'Rt. 47 Terminal' is pinned at Elburn IL as an APPROXIMATION — Kolten only knew "Northern IL"; it posts
 soybeans only and prices like the CHS country elevators (Meredith Rd Elburn, Newark), not the Illinois River terminals (Morris, Seneca), and CHS already has a separate 'Morris, IL' — so correct it when the town is known.
-Old rows: `Claude Code\_backups\location_meta_pins_before_2026-10-25.json`. Only IL rows were checked against their pins; GPRE 'Superior' (state IA) sits in Nebraska (40.02, -98.07) and may be the same fault.
+Old rows: `Claude Code\_backups\location_meta_pins_before_2026-10-25.json`. A second pass the same day (Kolten: "check every state's pins. Stateline is wrong and Idalia West looks to be as well") tested every pinned row against its state's bounding box (+0.1 degree) and against the state
+in its own name (', KS'): 10 of 657 failed, all fixed (old rows: `..._b.json`). **ADM 'State Line, OK'** was State Line, MS (it is the ADM elevator at Optima, OK); GPRE 'Superior' was Superior, NE (it is Superior, IA); Scoular
+'Walnut Grove Farms / Schochoh' sat in TN; CGB 'Tallulah Port' and 'Falls City' in TX; CHS 'Idalia West' in Arizona and 'Stateline' at Lake Tahoe, both now APPROXIMATE (Idalia CO; Julesburg CO — Stateline's bids equal
+Julesburg's in every line); CHS 'New Haven' was labeled ND and pinned in Connecticut: it has HRW wheat bids at the NE Colorado level, OpenStreetMap has no New Haven in ND and does in Logan County CO, so it is CO now
+(`chs_populate_meta.STATE_CORRECTIONS` said ND and would have undone it); Tyson Camilla / Humboldt had state 'Unknown' from Tyson's own feed (GA / TN now; `tyson_scraper._clean_state` stops the daily upsert writing 'Unknown'
+back; `tests/test_tyson_state.py`). **A bounding box cannot see a right-state, wrong-town pin.** ADM's bootstrap (`adm.gradable.com/api/commodities/merchandising/bootstrap`, the call `adm_scraper` already makes) carries a
+Google-geocoded address for every market (`markets[].address.geocode.lat/lng`): 112 of 131 ADM pins are within 12 miles of it (median 1.4) and 8 were not — Marshall MN x2 (270 mi off), Oakland IL (a Chicago neighborhood, 151),
+Country Store KS (96), Panhandle OK (24), Clinton IA x2 (20) — all moved to ADM's own coordinates. The CHS (Bushel) and Scoular feeds carry no coordinates. Still open: 636 of 1,301 rows have no pin (11 of them ADM, fillable
+from that same bootstrap), and the other providers' within-state pins are unchecked.
+
+### River Valley Coop (StoneX Stonehedge component) and Alcivia (AgriCharts), 2026-10-25
+
+Kolten: "A couple scrapers to add. River Valley Coop https://www.rivervalleycoop.com/products-services/grain and Alcivia https://www.alcivia.com/wisconsin-grain-services/cash-bids-grain-wisconsin-grain/".
+
+**Alcivia** is the AgriCharts platform: the page's bids table is `alciviacoop.agricharts.com/inc/cashbids/cashbids-js.php` (`var bids = [...]`). One `TENANTS` row in `agricharts_scraper.py` (multi shape, state WI) files 15
+locations (14 elevators + Menomonie Feed Mill; corn, soybeans, wheat; soybean meal is on the page but nothing is posted). The feed's names are ALL CAPS, so `titlecase` ('FALL CREEK' -> 'Fall Creek, WI'), and it carries each
+location's own latitude / longitude, which `pins` turns into the map pins (`run_agricharts_tenants` now passes `lat` / `lon`; a tenant without `pins` sends None, so its stored pins are untouched). Windows are labeled by their
+start month like every AgriCharts tenant ('Oct/Nov 26' -> 'Oct 2026'). `tests/test_alcivia_agricharts.py` (28 checks; fixture `tests/fixtures/alcivia_feed_2026-10-25.json`).
+
+**River Valley Cooperative** (Eldridge IA; 22 IA / IL elevators). Its "Grain Bids" section is a StoneX Stonehedge iframe (`stonehedge.stonex.com/component/bids?key=...`), and the component's own JavaScript is a thin client over ONE
+REST call: `GET https://api.stonehedge.stonex.com/settings/v2/delivery-periods` with `Authorization: key <embed key>`. Plain requests, no OAuth or streaming (that is the full StoneX app), re-polled by the widget every 60 s, "Data
+provided by StoneX. All prices delayed 10 minutes." The response is delivery periods (commodity x window, contract symbol 'CZ26' -> ZCZ26, `lastUpdatedDateUtc`), each with `bids` [{location, cash, basis}] in $/bu.
+`stonex_scraper.py` (`run_stonex`, flags `--stonex-only` / `--no-stonex`) files only the co-op's OWN 22 locations (state and pin from its Locations map: `RIVER_VALLEY_LOCATIONS`; 20 post bids today, the Eldridge HQ and the
+seasonal Duncan do not) as provider 'River Valley Coop', Country Elevator, corn + soybeans, labels 'Nov 2026' / 'FH Nov 2026' / 'LH Nov 2026'. **Not filed: the 26 destination points on the board** (ADM - Burlington, CGB, Cargill,
+CHS, Gavilon, Marquis, Ingredion ...): they are River Valley's direct-ship delivered bids, not those buyers' own posted ones, and filing them under ADM would merge two bid streams into one snapshot (the H&F reason). A board whose
+newest own-location update is more than 5 days old files nothing (`MAX_AGE_DAYS`; the merchandisers touch the headline months most days and deferred months sit unchanged for a week). `tests/test_stonex_scraper.py` (48 checks;
+fixture `tests/fixtures/stonex_rv_2026-10-25.json`). River Valley also posts three daily closing-bid PDFs (IL North / IL South / IA under `rivervalleycoop.com/getmedia/`, behind Incapsula bot protection): not needed, the board
+has the same locations. **Other StoneX customers:** if United Cooperative's cash-bids page embeds the same `component/bids` iframe, one more SITES row would do (not checked).
+
+**Terms read 2026-10-25.** `stonehedge.stonex.com/robots.txt` allows everything (`Disallow:` empty) and the API host has none. The StoneX terms of use (stonex.com/terms-of-use/) say nothing about scraping or automated access;
+the one relevant sentence is "No part of this material may be copied, photocopied or duplicated in any form by any means or redistributed without the prior written consent of StoneX Group Inc." The data are River Valley's own
+public bids. We use the co-op's public embed key from our server once a day (the call its own page makes every minute); if StoneX or River Valley object, the scraper is one SITES row to remove. AgriCharts' robots.txt
+disallows `/markets/` only (we read `/inc/cashbids/`); alcivia.com's and rivervalleycoop.com's robots files block nothing we read. Nothing was filed live before the code was pushed.
 
 ### Known-unbuilt
 
@@ -649,4 +681,4 @@ Old rows: `Claude Code\_backups\location_meta_pins_before_2026-10-25.json`. Only
   Bigger job, not started.
 - **United Cooperative** is **not** DTN — it is StoneX/Stonehedge, served via an
   OAuth token exchange plus a streaming gateway. Not requests-scrapeable.
-  Left sheet-fed deliberately.
+  Left sheet-fed deliberately. (2026-10-25: River Valley Coop's StoneX board turned out to be a plain REST component, `stonex_scraper.py`, so check whether United's page embeds the same `component/bids` iframe before assuming the streaming app.)

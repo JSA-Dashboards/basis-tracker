@@ -1,0 +1,299 @@
+[
+ {
+  "name": "BALDWIN",
+  "city": "Baldwin",
+  "state": "WI",
+  "latitude": "44.968448000",
+  "longitude": "-92.374671000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "cashbids": [
+   {
+    "id": "119714714",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -75,
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "notes": "Oct/Nov 26"
+   },
+   {
+    "id": "139087757",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -60,
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "notes": "December 26"
+   },
+   {
+    "id": "139087758",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -70,
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "notes": "January 27"
+   },
+   {
+    "id": "139087759",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -65,
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "notes": "February 27"
+   },
+   {
+    "id": "139087760",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -60,
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "notes": "March 27"
+   },
+   {
+    "id": "137205326",
+    "name": "CORN",
+    "symbol": "ZCZ27",
+    "basis": -65,
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "notes": "Oct/Nov 27"
+   },
+   {
+    "id": "119714701",
+    "name": "SOYBEANS",
+    "symbol": "ZSX26",
+    "basis": -95,
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "notes": "Oct/Nov 26"
+   },
+   {
+    "id": "139129328",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "basis": -95,
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "notes": "December 26"
+   },
+   {
+    "id": "139129329",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "basis": -90,
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "notes": "January 27"
+   },
+   {
+    "id": "139129330",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "basis": -90,
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "notes": "February 27"
+   },
+   {
+    "id": "139129331",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "basis": -85,
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "notes": "March 27"
+   },
+   {
+    "id": "137205340",
+    "name": "SOYBEANS",
+    "symbol": "ZSX27",
+    "basis": -85,
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "notes": "Oct/Nov 27"
+   },
+   {
+    "id": "114765761",
+    "name": "WHEAT",
+    "symbol": "ZWZ26",
+    "basis": -160,
+    "delivery_start": "07/01/2026",
+    "delivery_end": "02/28/2027",
+    "notes": "Storage Only"
+   },
+   {
+    "id": "133135120",
+    "name": "WHEAT",
+    "symbol": "ZWU27",
+    "basis": -150,
+    "delivery_start": "07/01/2027",
+    "delivery_end": "08/31/2027",
+    "notes": "July 27"
+   }
+  ]
+ },
+ {
+  "name": "Four Corners (New Richmond)",
+  "city": "New Richmond",
+  "state": "WI",
+  "latitude": "45.122823000",
+  "longitude": "-92.372462700",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "cashbids": [
+   {
+    "id": "126641136",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -75,
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "notes": "Oct/Nov 26"
+   },
+   {
+    "id": "139092528",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -65,
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "notes": "December 26"
+   },
+   {
+    "id": "139092529",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -75,
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "notes": "January 27"
+   },
+   {
+    "id": "139092530",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -70,
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "notes": "February 27"
+   },
+   {
+    "id": "139092531",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -65,
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "notes": "March 27"
+   },
+   {
+    "id": "137205332",
+    "name": "CORN",
+    "symbol": "ZCZ27",
+    "basis": -65,
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "notes": "Oct/Nov 27"
+   }
+  ]
+ },
+ {
+  "name": "MENOMONIE FEED MILL",
+  "city": "Menomonie",
+  "state": "WI",
+  "latitude": "44.908008000",
+  "longitude": "-91.853247000",
+  "facility_type": "Feed Mill",
+  "hide_on_sites_and_apis": "0",
+  "cashbids": [
+   {
+    "id": "119714717",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -65,
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "notes": "Oct/Nov 26"
+   },
+   {
+    "id": "139092511",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -60,
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "notes": "December 26"
+   },
+   {
+    "id": "132639359",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -55,
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "notes": "Jan 27"
+   },
+   {
+    "id": "132639360",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -50,
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "notes": "Feb 27"
+   },
+   {
+    "id": "132639361",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "basis": -45,
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "notes": "March 27"
+   },
+   {
+    "id": "137205329",
+    "name": "CORN",
+    "symbol": "ZCZ27",
+    "basis": -60,
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "notes": "Oct/Nov 27"
+   }
+  ]
+ },
+ {
+  "name": "HIDDEN TEST SITE",
+  "city": "Nowhere",
+  "state": "WI",
+  "latitude": "44.0",
+  "longitude": "-90.0",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "1",
+  "cashbids": [
+   {
+    "id": "900001",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "basis": -75,
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "notes": "Oct/Nov 26"
+   }
+  ]
+ },
+ {
+  "name": "NO BIDS TEST SITE",
+  "city": "Nowhere",
+  "state": "WI",
+  "latitude": "44.1",
+  "longitude": "-90.1",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "cashbids": []
+ }
+]

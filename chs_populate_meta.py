@@ -137,7 +137,7 @@ STATE_CORRECTIONS: dict[str, str] = {
     "Lakota":                 "ND",   # Lakota, ND (not IA)
     "Milton":                 "ND",   # Milton, ND (not WA)
     "Napoleon":               "ND",   # Napoleon, ND (not OH)
-    "New Haven":              "ND",   # New Haven, ND (not MI)
+    "New Haven":              "CO",   # New Haven, Logan County CO - HRW wheat bids at the NE Colorado level (Julesburg / Haxtun / Holyoke); there is no New Haven in ND
     "Norma":                  "ND",   # Norma, ND (not WI)
     "Selkirk":                "ND",   # Selkirk, ND (not MI)
     "Underwood (13¢ Dump fee)": "ND",  # Underwood, ND

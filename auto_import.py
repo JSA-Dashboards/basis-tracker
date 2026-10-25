@@ -129,6 +129,7 @@ from vistacomm_scraper import fetch_vistacomm
 from dtn_playwright_scraper import fetch_dtn_playwright   # lazy playwright inside fn
 from dtn_http_scraper import fetch_dtn_http               # browser-free aghost decode
 from dtn_content_scraper import fetch_dtn_content         # DTN content-services JSON API
+from stonex_scraper import fetch_stonex                   # StoneX Stonehedge embeddable bids component (River Valley Coop)
 from fse_scraper import fetch_fse                         # Farm Service Elevator (ASP.NET)
 from cpi_scraper import fetch_cpi                          # CPI (static HTML tables)
 from bushel_powered_scraper import fetch_bushel_powered    # newer Bushel (bushelpowered API)
@@ -530,7 +531,8 @@ def run_agricharts_tenants() -> int:
         snaps, metas = by_prov[req.provider]
         snaps.append(req)
         metas.append({"location": req.location, "state": loc.get("state"),
-                      "facility_type": loc.get("facility_type")})
+                      "facility_type": loc.get("facility_type"),
+                      "lat": loc.get("lat"), "lon": loc.get("lon")})     # pins only for tenants that opt in (Alcivia); None keeps what is stored
         total += len(req.rows)
         log.info("  ✓  %-12s %-24s %d row(s)", req.provider, req.location, len(req.rows))
     for prov, (snaps, metas) in by_prov.items():
@@ -673,6 +675,42 @@ def run_dtn_content() -> int:
         rows += len(r.rows)
         log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
     log.info("DTN-content done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
+    return rows
+
+
+def run_stonex() -> int:
+    """Scrape the StoneX Stonehedge bids component that River Valley Cooperative embeds on its website. Only the co-op's own elevators are filed (its board also quotes
+    direct-ship destination points - ADM, Cargill, CHS ... - which are not those buyers' own bids). Locations carry the pins and states from the co-op's own map."""
+    log.info("=" * 60)
+    log.info("StoneX scrape starting…")
+    log.info("=" * 60)
+    try:
+        reqs, metas = fetch_stonex()
+    except Exception as exc:
+        log.error("StoneX scrape failed: %s", exc)
+        return 0
+    if not reqs:
+        log.warning("StoneX scrape returned no data.")
+        return 0
+    try:
+        upsert_snapshots([r.model_dump() for r in reqs])
+    except Exception as exc:
+        log.error("StoneX bulk snapshot upsert failed: %s", exc)
+    by_prov: dict[str, list] = {}
+    for m in metas:
+        by_prov.setdefault(m["provider"], []).append(
+            {"location": m["location"], "state": m.get("state"), "facility_type": m.get("facility_type"),
+             "lat": m.get("lat"), "lon": m.get("lon")})
+    for prov, items in by_prov.items():
+        try:
+            upsert_location_metas(prov, items)
+        except Exception as exc:
+            log.error("StoneX meta upsert failed for %s: %s", prov, exc)
+    rows = 0
+    for r in reqs:
+        rows += len(r.rows)
+        log.info("  ✓  %-30s %d row(s)", f"{r.provider} · {r.location}", len(r.rows))
+    log.info("StoneX done: %d location(s)  |  %d row(s)  (bulk)", len(reqs), rows)
     return rows
 
 
@@ -2230,6 +2268,7 @@ def run(
     run_vistacomm_scrape: bool = True,
     run_dtn_scrape: bool = True,
     run_dtn_content_scrape: bool = True,
+    run_stonex_scrape: bool = True,
     run_fse_scrape: bool = True,
     run_cpi_scrape: bool = True,
     run_bushel_powered_scrape: bool = True,
@@ -2329,6 +2368,8 @@ def run(
         total += _run_guarded(run_dtn_playwright, "DTN", 480)
     if run_dtn_content_scrape:
         total += _run_guarded(run_dtn_content, "DTN-Content", 120)
+    if run_stonex_scrape:
+        total += _run_guarded(run_stonex, "StoneX", 120)
     if run_fse_scrape:
         total += _run_guarded(run_fse, "FSE", 120)
     if run_cpi_scrape:
@@ -2616,6 +2657,9 @@ if __name__ == "__main__":
     dtnc_group = parser.add_mutually_exclusive_group()
     dtnc_group.add_argument("--no-dtn-content", dest="no_dtn_content", action="store_true", help="Skip DTN content-services plants (NFP, Central United) scrape")
     dtnc_group.add_argument("--dtn-content-only", dest="dtn_content_only", action="store_true", help="Run DTN content-services plants (NFP, Central United) scrape only")
+    stonex_group = parser.add_mutually_exclusive_group()
+    stonex_group.add_argument("--no-stonex", dest="no_stonex", action="store_true", help="Skip the StoneX Stonehedge bids component (River Valley Coop) scrape")
+    stonex_group.add_argument("--stonex-only", dest="stonex_only", action="store_true", help="Run the StoneX Stonehedge bids component (River Valley Coop) scrape only")
     fse_group = parser.add_mutually_exclusive_group()
     fse_group.add_argument("--no-fse", dest="no_fse", action="store_true", help="Skip Farm Service Elevator (Willmar/Swanville MN) scrape")
     fse_group.add_argument("--fse-only", dest="fse_only", action="store_true", help="Run Farm Service Elevator scrape only")
@@ -2803,6 +2847,9 @@ if __name__ == "__main__":
     elif args.dtn_content_only:
         init_db()
         run_dtn_content()
+    elif args.stonex_only:
+        init_db()
+        run_stonex()
     elif args.fse_only:
         init_db()
         run_fse()
@@ -2879,6 +2926,7 @@ if __name__ == "__main__":
             run_vistacomm_scrape=not args.no_vistacomm,
             run_dtn_scrape=not args.no_dtn,
             run_dtn_content_scrape=not args.no_dtn_content,
+            run_stonex_scrape=not args.no_stonex,
             run_fse_scrape=not args.no_fse,
             run_cpi_scrape=not args.no_cpi,
             run_bushel_powered_scrape=not args.no_bushel_powered,

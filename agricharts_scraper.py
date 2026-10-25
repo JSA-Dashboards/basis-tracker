@@ -52,6 +52,10 @@ TENANTS: list[dict] = [
     {"provider": "Meadowland Co-op", "host": "https://meadsprout2.agricharts.com",
      "shape": "single", "location": "Lamberton, MN", "state": "MN",
      "facility": "Country Elevator"},
+    # Alcivia (WI): 14 elevators + a feed mill in one feed (alcivia.com/wisconsin-grain-services/cash-bids-grain-wisconsin-grain/). Its names are ALL CAPS
+    # ('FALL CREEK'), so `titlecase`; the feed carries each location's own latitude / longitude, which become the map pins (`pins`).
+    {"provider": "Alcivia", "host": "https://alciviacoop.agricharts.com",
+     "shape": "multi", "state": "WI", "titlecase": True, "pins": True},
 ]
 
 
@@ -69,6 +73,22 @@ def _facility_from_name(name: str) -> str:
 def _clean_loc(name: str) -> str:
     # "Hedrick, IA Feed Mill" -> "Hedrick, IA"; "Mill 240 at Tarkio, MO Feed Mill" -> keep town
     return re.sub(r"\s+(Feed Mill|Elevator|Mill|Terminal)\s*$", "", name).strip()
+
+
+def _title_caps(name: str) -> str:
+    """'FALL CREEK' -> 'Fall Creek'; a name that is already mixed case ('Four Corners (New Richmond)') is left as it is."""
+    return name.title() if name.isupper() else name
+
+
+def _feed_pin(loc: dict) -> dict:
+    """{'lat', 'lon'} from the feed location's own coordinates, or {} when it has none (or 0,0)."""
+    try:
+        la, lo = float(loc.get("latitude")), float(loc.get("longitude"))
+    except (TypeError, ValueError):
+        return {}
+    if not (-90 <= la <= 90 and -180 <= lo <= 180) or (la, lo) == (0.0, 0.0):
+        return {}
+    return {"lat": round(la, 5), "lon": round(lo, 5)}
 
 
 def fetch_agricharts_bids() -> list[dict]:
@@ -109,6 +129,8 @@ def fetch_agricharts_bids() -> list[dict]:
                 if not raw_name or raw_name.lower() in ("futures only", ""):
                     continue                       # skip the futures-only pseudo row
                 location = _clean_loc(raw_name)
+                if t.get("titlecase"):
+                    location = _title_caps(location)
                 state = loc.get("state") or t.get("state")
                 # Some feeds (JBS) embed the state in the name ("Hedrick, IA Feed
                 # Mill"); others (Garden City Coop) don't — append it so every
@@ -123,6 +145,7 @@ def fetch_agricharts_bids() -> list[dict]:
                 "provider": t["provider"], "location_name": location,
                 "state": state, "city": loc.get("city") or "",
                 "facility_type": facility, "timestamp": ts,
+                **(_feed_pin(loc) if t.get("pins") else {}),
                 "cashbids": [{
                     "bid_id": str(b.get("id") or ""), "grain": b.get("name") or "",
                     "symbol": b.get("symbol") or "", "basis": int(b.get("basis") or 0),

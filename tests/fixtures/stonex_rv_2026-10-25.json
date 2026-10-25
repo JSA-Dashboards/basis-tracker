@@ -1,0 +1,2084 @@
+{
+ "lastUpdatedBy": "Michelle Cooney",
+ "lastUpdatedDate": "2026-10-24T13:25:45.68Z",
+ "deliveryPeriods": [
+  {
+   "name": "OCT 26",
+   "start": "2026-10-01T00:00:00Z",
+   "end": "2026-10-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.843Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.17,
+     "cash": 4.39
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.3,
+     "cash": 4.26
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.17,
+     "cash": 4.39
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.35,
+     "cash": 4.21
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.23,
+     "cash": 4.33
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.4,
+     "cash": 4.16
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.19,
+     "cash": 4.37
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.35,
+     "cash": 4.21
+    }
+   ]
+  },
+  {
+   "name": "OCT 26",
+   "start": "2026-10-01T00:00:00Z",
+   "end": "2026-10-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:25:45.68Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX26",
+    "maturityMonth": 11,
+    "maturityYear": 2026,
+    "price": 12.565
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.45,
+     "cash": 12.12
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.32,
+     "cash": 12.25
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.39,
+     "cash": 12.18
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.55,
+     "cash": 12.02
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.15,
+     "cash": 12.42
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.4,
+     "cash": 12.17
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.55,
+     "cash": 12.02
+    },
+    {
+     "location": {
+      "id": "PJ4CAT23BV0HL1WJKOYD",
+      "name": "Duncan"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.38,
+     "cash": 12.19
+    }
+   ]
+  },
+  {
+   "name": "LH Oct 26",
+   "start": "2026-10-16T00:00:00Z",
+   "end": "2026-10-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-08T20:41:06.437Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": []
+  },
+  {
+   "name": "10/19 - 10/24",
+   "start": "2026-10-19T00:00:00Z",
+   "end": "2026-10-24T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T13:24:28.703Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": []
+  },
+  {
+   "name": "10/21 - 10/23",
+   "start": "2026-10-21T00:00:00Z",
+   "end": "2026-10-23T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-21T19:18:44.237Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": []
+  },
+  {
+   "name": "FH Nov 26",
+   "start": "2026-11-01T00:00:00Z",
+   "end": "2026-11-15T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T20:15:53.007Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": null,
+     "cash": null
+    }
+   ]
+  },
+  {
+   "name": "NOV 26",
+   "start": "2026-11-01T00:00:00Z",
+   "end": "2026-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:09:07.423Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX26",
+    "maturityMonth": 11,
+    "maturityYear": 2026,
+    "price": 12.565
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.08,
+     "cash": 12.49
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.36,
+     "cash": 12.21
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.04,
+     "cash": 12.61
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.2,
+     "cash": 12.37
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": null,
+     "cash": null
+    }
+   ]
+  },
+  {
+   "name": "Nov 26",
+   "start": "2026-11-01T00:00:00Z",
+   "end": "2026-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:12:23.89Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.13,
+     "cash": 4.43
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.35,
+     "cash": 4.21
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.1,
+     "cash": 4.46
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.4,
+     "cash": 4.16
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.35,
+     "cash": 4.21
+    }
+   ]
+  },
+  {
+   "name": "FH Nov 26",
+   "start": "2026-11-01T00:00:00Z",
+   "end": "2026-11-15T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-23T20:33:31.893Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX26",
+    "maturityMonth": 11,
+    "maturityYear": 2026,
+    "price": 12.565
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.44,
+     "cash": 12.13
+    }
+   ]
+  },
+  {
+   "name": "LH Nov 26",
+   "start": "2026-11-16T00:00:00Z",
+   "end": "2026-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T20:15:53.02Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.3,
+     "cash": 4.26
+    }
+   ]
+  },
+  {
+   "name": "LH Nov",
+   "start": "2026-11-16T00:00:00Z",
+   "end": "2026-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T20:35:24.207Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX26",
+    "maturityMonth": 11,
+    "maturityYear": 2026,
+    "price": 12.565
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.15,
+     "cash": 12.42
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.42,
+     "cash": 12.15
+    }
+   ]
+  },
+  {
+   "name": "Dec 26",
+   "start": "2026-12-01T00:00:00Z",
+   "end": "2026-12-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:09:07.553Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SF27",
+    "maturityMonth": 1,
+    "maturityYear": 2027,
+    "price": 12.685
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.29,
+     "cash": 12.4
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.13,
+     "cash": 12.56
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.23,
+     "cash": 12.46
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.51,
+     "cash": 12.18
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.0,
+     "cash": 12.69
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.6,
+     "cash": 12.09
+    },
+    {
+     "location": {
+      "id": "PJ4CAT23BV0HL1WJKOYD",
+      "name": "Duncan"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.22,
+     "cash": 12.47
+    }
+   ]
+  },
+  {
+   "name": "DEC 26",
+   "start": "2026-12-01T00:00:00Z",
+   "end": "2026-12-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.913Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.21,
+     "cash": 4.35
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.13,
+     "cash": 4.43
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.23,
+     "cash": 4.33
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.3,
+     "cash": 4.26
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.0,
+     "cash": 4.56
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.22,
+     "cash": 4.34
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.2,
+     "cash": 4.36
+    }
+   ]
+  },
+  {
+   "name": "LH Dec 26",
+   "start": "2026-12-16T00:00:00Z",
+   "end": "2026-12-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T13:31:37.37Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ26",
+    "maturityMonth": 12,
+    "maturityYear": 2026,
+    "price": 4.56
+   },
+   "bids": []
+  },
+  {
+   "name": "Jan 27",
+   "start": "2027-01-01T00:00:00Z",
+   "end": "2027-01-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.853Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CH27",
+    "maturityMonth": 3,
+    "maturityYear": 2027,
+    "price": 4.7025
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.31,
+     "cash": 4.39
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.36,
+     "cash": 4.34
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.45,
+     "cash": 4.25
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.08,
+     "cash": 4.62
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.34,
+     "cash": 4.36
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.3,
+     "cash": 4.4
+    }
+   ]
+  },
+  {
+   "name": "Jan 27",
+   "start": "2027-01-01T00:00:00Z",
+   "end": "2027-01-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:09:07.613Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SF27",
+    "maturityMonth": 1,
+    "maturityYear": 2027,
+    "price": 12.685
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.29,
+     "cash": 12.4
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.23,
+     "cash": 12.46
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.84,
+     "cash": 11.85
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.03,
+     "cash": 12.72
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.85,
+     "cash": 11.84
+    },
+    {
+     "location": {
+      "id": "PJ4CAT23BV0HL1WJKOYD",
+      "name": "Duncan"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.22,
+     "cash": 12.47
+    }
+   ]
+  },
+  {
+   "name": "Feb 27",
+   "start": "2027-02-01T00:00:00Z",
+   "end": "2027-02-28T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.867Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CH27",
+    "maturityMonth": 3,
+    "maturityYear": 2027,
+    "price": 4.7025
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.27,
+     "cash": 4.43
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.31,
+     "cash": 4.39
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.45,
+     "cash": 4.25
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.04,
+     "cash": 4.66
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.29,
+     "cash": 4.41
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.25,
+     "cash": 4.45
+    }
+   ]
+  },
+  {
+   "name": "Feb 27",
+   "start": "2027-02-01T00:00:00Z",
+   "end": "2027-02-28T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-16T20:26:00.147Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SH27",
+    "maturityMonth": 3,
+    "maturityYear": 2027,
+    "price": 12.76
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.4,
+     "cash": 12.36
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.34,
+     "cash": 12.42
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.84,
+     "cash": 11.92
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.05,
+     "cash": 12.71
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.85,
+     "cash": 11.91
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.33,
+     "cash": 12.43
+    }
+   ]
+  },
+  {
+   "name": "March 27",
+   "start": "2027-03-01T00:00:00Z",
+   "end": "2027-03-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.877Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CH27",
+    "maturityMonth": 3,
+    "maturityYear": 2027,
+    "price": 4.7025
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.25,
+     "cash": 4.45
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.2,
+     "cash": 4.5
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.26,
+     "cash": 4.44
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.45,
+     "cash": 4.25
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.0,
+     "cash": 4.7
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.22,
+     "cash": 4.48
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.25,
+     "cash": 4.45
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.2,
+     "cash": 4.5
+    }
+   ]
+  },
+  {
+   "name": "Mar 27",
+   "start": "2027-03-01T00:00:00Z",
+   "end": "2027-03-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:05:21.543Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SH27",
+    "maturityMonth": 3,
+    "maturityYear": 2027,
+    "price": 12.76
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.32,
+     "cash": 12.44
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.16,
+     "cash": 12.6
+    },
+    {
+     "location": {
+      "id": "4MJ0IRM4S4T17X6AY8D1",
+      "name": "Eldridge"
+     },
+     "basis": null,
+     "cash": null
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.26,
+     "cash": 12.5
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.54,
+     "cash": 12.22
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.02,
+     "cash": 12.74
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.26,
+     "cash": 12.5
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.58,
+     "cash": 12.18
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.25,
+     "cash": 12.51
+    }
+   ]
+  },
+  {
+   "name": "April 27",
+   "start": "2027-04-01T00:00:00Z",
+   "end": "2027-04-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.917Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CK27",
+    "maturityMonth": 5,
+    "maturityYear": 2027,
+    "price": 4.79
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.31,
+     "cash": 4.48
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.19,
+     "cash": 4.6
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.28,
+     "cash": 4.51
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.45,
+     "cash": 4.34
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.05,
+     "cash": 4.74
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.2,
+     "cash": 4.59
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.27,
+     "cash": 4.52
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.2,
+     "cash": 4.59
+    }
+   ]
+  },
+  {
+   "name": "April 27",
+   "start": "2027-04-01T00:00:00Z",
+   "end": "2027-04-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-21T21:03:49.647Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SK27",
+    "maturityMonth": 5,
+    "maturityYear": 2027,
+    "price": 12.84
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.37,
+     "cash": 12.47
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.16,
+     "cash": 12.68
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.31,
+     "cash": 12.53
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.54,
+     "cash": 12.3
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.09,
+     "cash": 12.75
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.26,
+     "cash": 12.58
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.62,
+     "cash": 12.22
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.3,
+     "cash": 12.54
+    }
+   ]
+  },
+  {
+   "name": "May 27",
+   "start": "2027-05-01T00:00:00Z",
+   "end": "2027-05-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-16T20:26:00.203Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SK27",
+    "maturityMonth": 5,
+    "maturityYear": 2027,
+    "price": 12.84
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.32,
+     "cash": 12.52
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.15,
+     "cash": 12.69
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.26,
+     "cash": 12.58
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.53,
+     "cash": 12.31
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.08,
+     "cash": 12.76
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.22,
+     "cash": 12.62
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.6,
+     "cash": 12.24
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.25,
+     "cash": 12.59
+    }
+   ]
+  },
+  {
+   "name": "May 27",
+   "start": "2027-05-01T00:00:00Z",
+   "end": "2027-05-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.847Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CK27",
+    "maturityMonth": 5,
+    "maturityYear": 2027,
+    "price": 4.79
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.29,
+     "cash": 4.5
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.15,
+     "cash": 4.64
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.25,
+     "cash": 4.54
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.43,
+     "cash": 4.36
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.02,
+     "cash": 4.77
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.16,
+     "cash": 4.63
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.24,
+     "cash": 4.55
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.17,
+     "cash": 4.62
+    }
+   ]
+  },
+  {
+   "name": "June 27",
+   "start": "2027-06-01T00:00:00Z",
+   "end": "2027-06-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.903Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CN27",
+    "maturityMonth": 7,
+    "maturityYear": 2027,
+    "price": 4.855
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.31,
+     "cash": 4.55
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.18,
+     "cash": 4.68
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.33,
+     "cash": 4.53
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.43,
+     "cash": 4.43
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.04,
+     "cash": 4.82
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.2,
+     "cash": 4.66
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.32,
+     "cash": 4.54
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.17,
+     "cash": 4.69
+    }
+   ]
+  },
+  {
+   "name": "June 27",
+   "start": "2027-06-01T00:00:00Z",
+   "end": "2027-06-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-19T22:18:04.48Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SN27",
+    "maturityMonth": 7,
+    "maturityYear": 2027,
+    "price": 12.8925
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.37,
+     "cash": 12.52
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.15,
+     "cash": 12.74
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.31,
+     "cash": 12.58
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.53,
+     "cash": 12.36
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.07,
+     "cash": 12.82
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.27,
+     "cash": 12.62
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.62,
+     "cash": 12.27
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.3,
+     "cash": 12.59
+    }
+   ]
+  },
+  {
+   "name": "July 2027",
+   "start": "2027-07-01T00:00:00Z",
+   "end": "2027-07-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-24T13:21:34.83Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CN27",
+    "maturityMonth": 7,
+    "maturityYear": 2027,
+    "price": 4.855
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.29,
+     "cash": 4.57
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.15,
+     "cash": 4.71
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.28,
+     "cash": 4.58
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.43,
+     "cash": 4.43
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": 0.0,
+     "cash": 4.86
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.17,
+     "cash": 4.69
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.27,
+     "cash": 4.59
+    },
+    {
+     "location": {
+      "id": "ZKX4TPZ6YKIY26WL0CGD",
+      "name": "Sunbury"
+     },
+     "basis": -0.14,
+     "cash": 4.72
+    }
+   ]
+  },
+  {
+   "name": "July 27",
+   "start": "2027-07-01T00:00:00Z",
+   "end": "2027-07-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-16T20:26:00.167Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SN27",
+    "maturityMonth": 7,
+    "maturityYear": 2027,
+    "price": 12.8925
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "11EDEIPHYCKESM9VV8SJ",
+      "name": "Altona"
+     },
+     "basis": -0.32,
+     "cash": 12.57
+    },
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.13,
+     "cash": 12.76
+    },
+    {
+     "location": {
+      "id": "5KZ7UQMU1LK90XLQW7YS",
+      "name": "Wyoming"
+     },
+     "basis": -0.26,
+     "cash": 12.63
+    },
+    {
+     "location": {
+      "id": "7CSPTR1QIQF898CHM32X",
+      "name": "Dewitt"
+     },
+     "basis": -0.51,
+     "cash": 12.38
+    },
+    {
+     "location": {
+      "id": "9YEHI4A1C5JTVRZBMSBS",
+      "name": "CGB-Hennepin"
+     },
+     "basis": -0.05,
+     "cash": 12.84
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.22,
+     "cash": 12.67
+    },
+    {
+     "location": {
+      "id": "IWRMN4TLX6F9N12EXWFZ",
+      "name": "Donahue"
+     },
+     "basis": -0.6,
+     "cash": 12.29
+    },
+    {
+     "location": {
+      "id": "Q0V01WURVW7C56WEXI3S",
+      "name": "Valley"
+     },
+     "basis": -0.25,
+     "cash": 12.64
+    }
+   ]
+  },
+  {
+   "name": "Aug 27",
+   "start": "2027-08-01T00:00:00Z",
+   "end": "2027-08-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-01T18:56:46.313Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SQ27",
+    "maturityMonth": 8,
+    "maturityYear": 2027,
+    "price": 12.73
+   },
+   "bids": []
+  },
+  {
+   "name": "August 27",
+   "start": "2027-08-01T00:00:00Z",
+   "end": "2027-08-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-19T20:44:33.713Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CU27",
+    "maturityMonth": 9,
+    "maturityYear": 2027,
+    "price": 4.82
+   },
+   "bids": []
+  },
+  {
+   "name": "September 27",
+   "start": "2027-09-01T00:00:00Z",
+   "end": "2027-09-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T20:49:16.607Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CU27",
+    "maturityMonth": 9,
+    "maturityYear": 2027,
+    "price": 4.82
+   },
+   "bids": []
+  },
+  {
+   "name": "Sept 27",
+   "start": "2027-09-01T00:00:00Z",
+   "end": "2027-09-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-22T20:09:11.08Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX27",
+    "maturityMonth": 11,
+    "maturityYear": 2027,
+    "price": 12.31
+   },
+   "bids": []
+  },
+  {
+   "name": "Oct 27",
+   "start": "2027-10-01T00:00:00Z",
+   "end": "2027-10-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-12T15:09:45.49Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX27",
+    "maturityMonth": 11,
+    "maturityYear": 2027,
+    "price": 12.31
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.45,
+     "cash": 11.86
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.55,
+     "cash": 11.76
+    }
+   ]
+  },
+  {
+   "name": "Oct 27",
+   "start": "2027-10-01T00:00:00Z",
+   "end": "2027-10-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-14T19:25:55.35Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ27",
+    "maturityMonth": 12,
+    "maturityYear": 2027,
+    "price": 4.95
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "4FWIS4V9JQVT6BRUV33Y",
+      "name": "ADM - Burlington"
+     },
+     "basis": -0.4,
+     "cash": 4.55
+    },
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.4,
+     "cash": 4.55
+    }
+   ]
+  },
+  {
+   "name": "November 27",
+   "start": "2027-11-01T00:00:00Z",
+   "end": "2027-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-09-03T16:00:58.997Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ27",
+    "maturityMonth": 12,
+    "maturityYear": 2027,
+    "price": 4.95
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.4,
+     "cash": 4.55
+    }
+   ]
+  },
+  {
+   "name": "Nov 27",
+   "start": "2027-11-01T00:00:00Z",
+   "end": "2027-11-30T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-09-01T19:27:53.977Z",
+   "commodity": {
+    "id": 46,
+    "name": "Soybeans"
+   },
+   "contract": {
+    "symbol": "SX27",
+    "maturityMonth": 11,
+    "maturityYear": 2027,
+    "price": 12.31
+   },
+   "bids": [
+    {
+     "location": {
+      "id": "DDO02Z94HR8VX01J7NXQ",
+      "name": "Cargill - Muscatine"
+     },
+     "basis": -0.55,
+     "cash": 11.76
+    }
+   ]
+  },
+  {
+   "name": "December 27",
+   "start": "2027-12-01T00:00:00Z",
+   "end": "2027-12-31T00:00:00Z",
+   "isSpot": false,
+   "lastUpdatedDateUtc": "2026-10-05T13:15:43.29Z",
+   "commodity": {
+    "id": 7,
+    "name": "Corn"
+   },
+   "contract": {
+    "symbol": "CZ27",
+    "maturityMonth": 12,
+    "maturityYear": 2027,
+    "price": 4.95
+   },
+   "bids": []
+  }
+ ]
+}

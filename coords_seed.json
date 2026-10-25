@@ -129,15 +129,15 @@
     "provider": "ADM",
     "location": "Clinton, IA (Corn Processing)",
     "state": "",
-    "lat": 41.90547,
-    "lon": -90.559997
+    "lat": 41.8174,
+    "lon": -90.2158
   },
   {
     "provider": "ADM",
     "location": "Clinton, IA (Elevator)",
     "state": "",
-    "lat": 41.90547,
-    "lon": -90.559997
+    "lat": 41.827,
+    "lon": -90.193
   },
   {
     "provider": "ADM",
@@ -164,8 +164,8 @@
     "provider": "ADM",
     "location": "Country Store, KS",
     "state": "",
-    "lat": 37.956436,
-    "lon": -98.966756
+    "lat": 37.6794,
+    "lon": -100.6886
   },
   {
     "provider": "ADM",
@@ -472,15 +472,15 @@
     "provider": "ADM",
     "location": "Marshall, MN (Corn Processing)",
     "state": "",
-    "lat": 48.360534,
-    "lon": -96.381968
+    "lat": 44.4716,
+    "lon": -95.7755
   },
   {
     "provider": "ADM",
     "location": "Marshall, MN (South House)",
     "state": "",
-    "lat": 48.360534,
-    "lon": -96.381968
+    "lat": 44.4581,
+    "lon": -95.7922
   },
   {
     "provider": "ADM",
@@ -619,8 +619,8 @@
     "provider": "ADM",
     "location": "Oakland, IL",
     "state": "",
-    "lat": 41.823614,
-    "lon": -87.605635
+    "lat": 39.6552,
+    "lon": -88.0213
   },
   {
     "provider": "ADM",
@@ -654,8 +654,8 @@
     "provider": "ADM",
     "location": "Panhandle, OK",
     "state": "",
-    "lat": 36.592886,
-    "lon": -101.605323
+    "lat": 36.8194,
+    "lon": -101.2687
   },
   {
     "provider": "ADM",
@@ -780,8 +780,8 @@
     "provider": "ADM",
     "location": "State Line, OK",
     "state": "",
-    "lat": 31.436189,
-    "lon": -88.474121
+    "lat": 36.8858,
+    "lon": -101.2977
   },
   {
     "provider": "ADM",
@@ -1284,8 +1284,8 @@
     "provider": "CGB",
     "location": "CGB - Falls City",
     "state": "",
-    "lat": 28.98147,
-    "lon": -98.018322
+    "lat": 40.0608,
+    "lon": -95.6019
   },
   {
     "provider": "CGB",
@@ -1438,8 +1438,8 @@
     "provider": "CGB",
     "location": "CGB - Tallulah Port",
     "state": "LA",
-    "lat": 32.841509,
-    "lon": -97.404186
+    "lat": 32.4085,
+    "lon": -91.1869
   },
   {
     "provider": "CGB",
@@ -2390,8 +2390,8 @@
     "provider": "CHS",
     "location": "Idalia West",
     "state": "CO",
-    "lat": 32.759264,
-    "lon": -111.684018
+    "lat": 39.7039,
+    "lon": -102.294
   },
   {
     "provider": "CHS",
@@ -2655,9 +2655,9 @@
   {
     "provider": "CHS",
     "location": "New Haven",
-    "state": "ND",
-    "lat": 41.308214,
-    "lon": -72.925052
+    "state": "CO",
+    "lat": 40.483,
+    "lon": -102.8363
   },
   {
     "provider": "CHS",
@@ -2873,8 +2873,8 @@
     "provider": "CHS",
     "location": "Stateline",
     "state": "CO",
-    "lat": 38.966774,
-    "lon": -119.944275
+    "lat": 40.9883,
+    "lon": -102.264
   },
   {
     "provider": "CHS",
@@ -3580,8 +3580,8 @@
     "provider": "GPRE",
     "location": "Superior",
     "state": "",
-    "lat": 40.020847,
-    "lon": -98.070044
+    "lat": 43.4313,
+    "lon": -94.9464
   },
   {
     "provider": "GPRE",
@@ -4147,8 +4147,8 @@
     "provider": "Scoular",
     "location": "Scoular - Walnut Grove Farms / Schochoh",
     "state": "KY",
-    "lat": 35.720559,
-    "lon": -86.427479
+    "lat": 36.7228,
+    "lon": -86.7911
   },
   {
     "provider": "Scoular",

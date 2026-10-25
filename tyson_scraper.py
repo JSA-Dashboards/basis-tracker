@@ -17,6 +17,13 @@ log = logging.getLogger(__name__)
 _API_URL = "https://www.localgrainservices.com/api/lgs/locations"
 
 
+def _clean_state(raw) -> str | None:
+    """Tyson's own State, or None when it has none. The feed says 'Unknown' for Camilla and Humboldt and run_tyson writes the
+    state every day, so 'Unknown' would overwrite the GA / TN a person set (the upsert keeps the stored value only for None)."""
+    s = raw.strip() if isinstance(raw, str) else ""
+    return None if not s or s.lower() == "unknown" else s
+
+
 def fetch_tyson_bids() -> list[dict]:
     """
     Fetch all Tyson LGS locations and their public bids.
@@ -50,7 +57,7 @@ def fetch_tyson_bids() -> list[dict]:
         name     = (loc.get("Name") or "").strip()
         loc_type = loc.get("Type") or ""
         city     = loc.get("City") or None
-        state    = loc.get("State") or None
+        state    = _clean_state(loc.get("State"))
         lat      = loc.get("Latitude")
         lon      = loc.get("Longitude")
 
