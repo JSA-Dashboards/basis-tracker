@@ -9,6 +9,7 @@ Usage (standalone test):
     python scoular_scraper.py
 """
 import logging
+import re
 import time
 from datetime import datetime, timezone
 
@@ -117,6 +118,21 @@ SCOULAR_LOCATIONS: dict[int, dict] = {
 
 # ── Private helpers ────────────────────────────────────────────────────────────
 
+_US_STATES = frozenset(
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split()
+)
+_STATE_IN_NAME = re.compile(r",\s*([A-Z]{2})\b")
+
+
+def _page_state(location_name: str) -> str:
+    """The state a page names for itself ('Ada, KS' -> 'KS', 'Pisgah, IL - Elevator' -> 'IL'), or '' when it names none.
+
+    SCOULAR_LOCATIONS is keyed by ID but the location name is read from the PAGE, and Bushel answers a retired ID with a
+    sibling's page ('Ada, KS'): ID 1889 ('Andres, IL') filed Ada, KS under IL. A page that says where it is outranks the table."""
+    m = _STATE_IN_NAME.search(location_name or "")
+    return m.group(1) if m and m.group(1) in _US_STATES else ""
+
+
 def _parse_location_page(html: str) -> tuple[str, list[dict]]:
     """
     Parse the .cashBidLocation div from a Scoular cashbidssingle page.
@@ -213,7 +229,7 @@ def fetch_scoular_bids(loc_ids: list[int] | None = None) -> list[dict]:
         {
             "loc_id":        int,
             "location_name": str,    # scraped from page h2
-            "state":         str,    # from SCOULAR_LOCATIONS metadata
+            "state":         str,    # the page name's own ", KS" if it has one, else SCOULAR_LOCATIONS metadata
             "city":          str,
             "timestamp":     str,    # ISO-8601 UTC date-normalised
             "cashbids": [
@@ -284,7 +300,7 @@ def fetch_scoular_bids(loc_ids: list[int] | None = None) -> list[dict]:
         results.append({
             "loc_id":        loc_id,
             "location_name": location_name,
-            "state":         meta.get("state", ""),
+            "state":         _page_state(location_name) or meta.get("state", ""),
             "city":          meta.get("city", ""),
             "timestamp":     today_utc,
             "cashbids":      cashbids,

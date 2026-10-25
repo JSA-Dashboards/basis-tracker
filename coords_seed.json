@@ -492,9 +492,9 @@
   {
     "provider": "ADM",
     "location": "Mendota (Wheat Milling)",
-    "state": "",
-    "lat": 36.753549,
-    "lon": -120.381557
+    "state": "IL",
+    "lat": 41.5473,
+    "lon": -89.1176
   },
   {
     "provider": "ADM",
@@ -2726,8 +2726,8 @@
     "provider": "CHS",
     "location": "Ottawa River Mkt",
     "state": "IL",
-    "lat": 41.716025,
-    "lon": -83.713579
+    "lat": 41.3456,
+    "lon": -88.8425
   },
   {
     "provider": "CHS",
@@ -2796,8 +2796,8 @@
     "provider": "CHS",
     "location": "Rt. 47 Terminal",
     "state": "IL",
-    "lat": 34.033723,
-    "lon": -118.265353
+    "lat": 41.8894,
+    "lon": -88.4719
   },
   {
     "provider": "CHS",
@@ -3440,8 +3440,8 @@
     "provider": "Cargill",
     "location": "Paris Mill",
     "state": "IL",
-    "lat": 30.270861,
-    "lon": -81.827728
+    "lat": 39.6111,
+    "lon": -87.6961
   },
   {
     "provider": "Cargill",
@@ -3551,9 +3551,9 @@
   {
     "provider": "GPRE",
     "location": "Madison",
-    "state": "",
-    "lat": 41.906494,
-    "lon": -97.596151
+    "state": "IL",
+    "lat": 38.6814,
+    "lon": -90.1537
   },
   {
     "provider": "GPRE",

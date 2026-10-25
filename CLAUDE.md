@@ -623,6 +623,25 @@ droplet at 0.11.0 and skipped on Cloud):
 - Pull health: the three new locations are three different providers, each under pull_health's 5-location provider floor, and INCO is already carried every business day, so a sheet that is late never raises a provider-missing alert; a
   sheet that stops coming (or an unreadable one) shows as the `HFGrain` scraper being `empty`.
 
+### Scoular: the PAGE names the state, not the id table (2026-10-23)
+
+Kolten: "This should be the state of KS, not IL" — Scoular `Ada, KS` sat in `location_meta` as IL with Kansas coordinates. `scoular_scraper` takes a location's NAME from the page's `<h2>` but its
+STATE from `SCOULAR_LOCATIONS`, which is keyed by Bushel id, and Bushel answers a retired id with one sibling's page, `Ada, KS` (9 of the 66 ids do: 1889 'Andres, IL', 1894, 1904, 1923, 1925, 1947-49,
+2344). The name de-dup keeps the FIRST id to return a page and 1889 heads the table, so Ada's bids (a real elevator: sorghum + HRW wheat, 58 daily snapshots since 2026-06-12) were filed with
+'Andres, IL's state, and since `upsert_location_metas` is `COALESCE(new, old)` every daily run wrote IL back. `_page_state(name)` now reads the state off the page name (`Ada, KS` -> KS,
+`Pisgah, IL - Elevator` -> IL; a name with no ', XX' keeps the table's), checked against all 66 live pages: it changes Ada, KS and nothing else. The retired ids stay in the table (the de-dup makes them
+harmless). Live row corrected with `upsert_location_meta` (state only; it was IL). `tests/test_scoular_state.py`. **Deploy = `git pull --ff-only` on the droplet — until then the next daily run puts IL back.**
+
+### Map pins come from `coords_seed.json` — frozen name-only geocodes (2026-10-25)
+
+`location_meta` lat/lon are filled from `coords_seed.json` (`database.seed_geocoding`, called from `init_db`) only where a row has NO coordinates: a pin already in the database is never overwritten by it, and
+`chs_populate_meta.py` writes state and type, not pins. The seed's entries are Nominatim lookups by NAME, so a small place can land on a bigger one of the same name elsewhere. Five IL rows did (Kolten: "ADM Mendota is in
+Mendota, IL / CHS Rt 47 is in Northern IL / Cargill Paris Mill is in Paris, IL / CHS Ottawa River Market is in Ottawa, IL / GPRE Madison is in Madison, IL"): ADM 'Mendota (Wheat Milling)' was in California, CHS 'Rt. 47
+Terminal' in Los Angeles, Cargill 'Paris Mill' in Florida, CHS 'Ottawa River Mkt' in Ohio, GPRE 'Madison' in Nebraska. **Fix a pin in BOTH places:** `upsert_location_meta(provider, location, lat=, lon=)` on the live row
+(the database wins) and the entry in `coords_seed.json` (so a fresh or local database does not re-create it). CHS 'Rt. 47 Terminal' is pinned at Elburn IL as an APPROXIMATION — Kolten only knew "Northern IL"; it posts
+soybeans only and prices like the CHS country elevators (Meredith Rd Elburn, Newark), not the Illinois River terminals (Morris, Seneca), and CHS already has a separate 'Morris, IL' — so correct it when the town is known.
+Old rows: `Claude Code\_backups\location_meta_pins_before_2026-10-25.json`. Only IL rows were checked against their pins; GPRE 'Superior' (state IA) sits in Nebraska (40.02, -98.07) and may be the same fault.
+
 ### Known-unbuilt
 
 - **Ray-Carroll** (`ray-carroll.com`) is the same aghost family but a
