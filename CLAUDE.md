@@ -695,8 +695,17 @@ nearest-to-the-provider's-pins rule picks; the other towns a name lists ('Hitchc
 requests, both answered); the other 41 are the one-time pass's leftovers (28 not place names, Grebner SD / Kintyre Flats MT / Gladstone Bluff, Suez, Yorkwood IL / Planters KY / C&O Grain OH not in OpenStreetMap, the held Skyline KY /
 Old Dominion VA / CPI Lewis NE, the two feed contradictions, and Cargill 'Forest City' — an orphan row seeded from `facility_tags_seed.json`, no state and no bids; the live location is 'Forest City (MO)'). That run found a bug the
 tests could not: Snowflake's cursor hands back dicts, so unpacking a row as a tuple reads the column NAMES (SQLite's rows unpack as values and hid it). `load_rows` now goes through `database.get_all_location_meta()` and is tested with a
-dict-only stub. Tests: `tests/test_pin_missing.py` (71 checks; no network — the geocoder is a dict, the clock simulated, the database a throwaway SQLite); 40 deliberate breakages of its rules, run on a scratch copy, are all caught. **Deploy = `git pull --ff-only` on the droplet and the cron line. The Premier / Keystone `states` config must be on the droplet before the next 15:45 CT daily run, or that run
-writes WI / IN back (the pins stay).**
+dict-only stub. Tests: `tests/test_pin_missing.py` (71 checks; no network — the geocoder is a dict, the clock simulated, the database a throwaway SQLite); 40 deliberate breakages of its rules, run on a scratch copy, are all caught.
+
+**Deployed 2026-10-26 (`34208b1`).** Droplet pulled at 08:36 CT, before that day's 15:45 import, so the Premier / Keystone labels hold (a deploy that missed the 15:45 run would have had it write WI / IN back; the pins would have stayed).
+The six related test files pass on its Python 3.12.3, and `state/nominatim_cache.json` was seeded from the pass's answers (412 keys). The cron line is installed (08:50; crontab backup `/opt/alerting/crontab.backup.20261026_0850`, diff = exactly
+the comment and the job):
+`45 17 * * 5 /opt/alerting/cron-alert "Map pins for new locations" "/opt/basis-tracker/logs/pin_missing_*.log" /opt/basis-tracker/deploy/run_pin_missing.sh`, next run Fri 10-30 17:45 CT. **First real run 08:51 CT**, through the wrapper
+and not `cron-alert` (so it could not ping healthchecks): 11 s, rc 0, pinned Premier 'Fairbanks' (42.6392, -92.0489) and Primient 'LeRoy' (40.3520, -88.7642) with no geocoder request, mailed the operator once (2 placed, 2 held back,
+11 to place by hand) and remembered the other 41 (28 of them 'not a place name', never mailed). A before / after dump of all 1,301 `location_meta` rows shows exactly those two rows changed, lat and lon only. Undo: set lat = lon = NULL
+on those two. **Heartbeat:** `cron-alert` pings healthchecks with `?create=1` under the slug `map-pins-for-new-locations`. If the account is at its check limit that 404s (as the H&F check's did on 10-23) and the job has no dead-man's
+switch, only `cron-alert`'s failure email; if it does auto-create the check, the default period is one day and it will false-alarm six days a week for this weekly job — create it by hand with a Friday 17:45 CT schedule. Data noise seen on
+the way: CHS has a second, double-encoded copy of its two dump-fee locations ('Fergus Falls South (8Â¢ Dump fee)', 'Underwood (13Â¢ Dump fee)', no state, no pin) beside the proper ones; they are two of the 28 quiet rows.
 
 ### River Valley Coop (StoneX Stonehedge component) and Alcivia (AgriCharts), 2026-10-25
 
