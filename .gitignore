@@ -43,6 +43,9 @@ desktop.ini
 history/
 _ldc_probe*.py
 _watch_*.py
+_inco_preview.html
+_inco_seasonal.png
+_rail_preview.html
 
 # ── Single-instance lock for auto_import.py ────────────────────────────────
 .auto_import.lock

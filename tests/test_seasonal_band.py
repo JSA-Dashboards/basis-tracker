@@ -1,10 +1,11 @@
-"""The 5-year average and range behind the rail seasonal charts are Olympic (seasonal_band): each week's highest and lowest year are dropped before the average and the
-range are taken, so one freak crop year cannot drag either.
+"""The 5-year AVERAGE behind the rail seasonal charts is Olympic (seasonal_band): each week's highest and lowest year are dropped before the mean, so one freak crop year cannot
+drag it. The RANGE is the true one - the lowest to the highest of every year in the window, nothing trimmed.
 
     python tests/test_seasonal_band.py
 
 Kolten 2026-10-20: UP Allen Station's 2022/23 (a Sep-Dec average of +59 against -12 to +27 in the other four years) set the top of the 5-yr band in 38 weeks of 52, and BN
-Hereford looked the same - "I think we need to take an olympic avg approach to make cleaner". Pure functions plus the emailed chart's spec; no database.
+Hereford looked the same - "I think we need to take an olympic avg approach to make cleaner". 2026-10-26: "take out the ex hi / low on these and make true 5 year range. Keep the
+average line as we have it." Pure functions plus the emailed chart's spec; no database.
 """
 import json
 import os
@@ -35,12 +36,14 @@ isnan = lambda x: x != x  # noqa: E731
 print("the Olympic rule")
 check("five years: the highest and the lowest are dropped (0 10 20 40 100 -> 10 20 40)", sb.kept([40, 100, 20, 10, 0]) == [10.0, 20.0, 40.0], sb.kept([40, 100, 20, 10, 0]))
 check("the average is the mean of the middle three: 23.3, not the plain 34", abs(sb.olympic_avg([40, 100, 20, 10, 0]) - 70 / 3) < 1e-9, sb.olympic_avg([40, 100, 20, 10, 0]))
-check("the range runs from the lowest to the highest of what is left: 10 to 40, not 0 to 100", (sb.olympic_lo([40, 100, 20, 10, 0]), sb.olympic_hi([40, 100, 20, 10, 0])) == (10.0, 40.0))
+check("the range is the TRUE one - lowest to highest of every year: 0 to 100, not the Olympic 10 to 40", (sb.range_lo([40, 100, 20, 10, 0]), sb.range_hi([40, 100, 20, 10, 0])) == (0.0, 100.0))
+check("the old trimmed range functions are gone (nothing can quietly draw ex hi/lo again)", not hasattr(sb, "olympic_lo") and not hasattr(sb, "olympic_hi"))
 check("more than five (a six-year week) still drops one at each end", sb.kept([1, 2, 3, 4, 5, 6]) == [2.0, 3.0, 4.0, 5.0])
 check("fewer than five years: nothing to spare, the plain mean and the full range",
-      sb.kept([1, 2, 3, 100]) == [1.0, 2.0, 3.0, 100.0] and sb.olympic_avg([1, 2, 3, 100]) == 26.5 and (sb.olympic_lo([1, 2, 3, 100]), sb.olympic_hi([1, 2, 3, 100])) == (1.0, 100.0))
+      sb.kept([1, 2, 3, 100]) == [1.0, 2.0, 3.0, 100.0] and sb.olympic_avg([1, 2, 3, 100]) == 26.5 and (sb.range_lo([1, 2, 3, 100]), sb.range_hi([1, 2, 3, 100])) == (1.0, 100.0))
 check("a missing value is not a year (a NaN or None among five leaves four: plain)", sb.kept([1, nan, 3, None, 5, 7]) == [1.0, 3.0, 5.0, 7.0] and sb.olympic_avg([10, nan, 20, 30, 40]) == 25.0)
-check("no values, no number", isnan(sb.olympic_avg([])) and isnan(sb.olympic_lo([])) and isnan(sb.olympic_hi([nan, None])))
+check("... nor does it enter the range", (sb.range_lo([4, nan, None, 9]), sb.range_hi([4, nan, None, 9])) == (4.0, 9.0))
+check("no values, no number", isnan(sb.olympic_avg([])) and isnan(sb.range_lo([])) and isnan(sb.range_hi([nan, None])))
 check("negative basis works the same way (-30 -20 -17 -5 +65 -> -20 -17 -5)", sb.kept([-30, -20, -17, -5, 65]) == [-20.0, -17.0, -5.0])
 check("a tie at the top or bottom drops one copy only", sb.kept([5, 5, 5, 5, 5]) == [5.0, 5.0, 5.0] and sb.kept([1, 1, 2, 3, 3]) == [1.0, 2.0, 3.0])
 check("is_trimmed: five years or more", sb.is_trimmed(5) and sb.is_trimmed(6) and not sb.is_trimmed(4) and not sb.is_trimmed(0))
@@ -56,7 +59,7 @@ for wk in (1, 2, 3):
         rows.append({"MktWeek": wk, "MyNum": my, "Bid": v})
 rows += [{"MktWeek": 4, "MyNum": 2021, "Bid": 40.0}, {"MktWeek": 4, "MyNum": 2022, "Bid": 100.0}, {"MktWeek": 4, "MyNum": 2023, "Bid": 20.0}, {"MktWeek": 4, "MyNum": 2024, "Bid": 10.0}]  # four years
 band = rail_report._five_year_band(pd.DataFrame(rows)).set_index("MktWeek")
-check("a full week: avg 23.3, range 10 to 40", abs(band.loc[1, "avg"] - 70 / 3) < 1e-9 and band.loc[1, "lo"] == 10 and band.loc[1, "hi"] == 40, band.loc[1].to_dict())
+check("a full week: the Olympic average 23.3, the true range 0 to 100", abs(band.loc[1, "avg"] - 70 / 3) < 1e-9 and band.loc[1, "lo"] == 0 and band.loc[1, "hi"] == 100, band.loc[1].to_dict())
 check("a week with only four years is not trimmed: avg 42.5, range 10 to 100", band.loc[4, "avg"] == 42.5 and band.loc[4, "lo"] == 10 and band.loc[4, "hi"] == 100, band.loc[4].to_dict())
 check("the columns the chart reads", sorted(rail_report._five_year_band(pd.DataFrame(rows)).columns) == ["MktWeek", "avg", "hi", "lo"])
 
@@ -83,9 +86,9 @@ with mock.patch.object(vl_convert, "vegalite_to_png", side_effect=lambda spec, s
 band_sets = [v for v in spec["datasets"].values() if v and {"avg", "lo", "hi"} <= set(v[0])]
 check("the chart carries the band data", len(band_sets) >= 1 and len(band_sets[0]) == 52, [len(v) for v in band_sets])
 b = band_sets[0][10]
-check("the band drops 2022: range 10 to 40 (not 0 to 100), average 23.3 (not the plain 34)", abs(b["avg"] - 70 / 3) < 1e-6 and b["lo"] == 10 and b["hi"] == 40, b)
+check("the average drops 2022 (23.3, not the plain 34) but the range keeps it: 0 to 100 - the freak year is in the band, not in the line", abs(b["avg"] - 70 / 3) < 1e-6 and b["lo"] == 0 and b["hi"] == 100, b)
 legend = json.dumps(spec)
-check("the legend names it: '5-yr Olympic avg' and '5-yr range ex hi/lo (2021/22–2025/26)'", "5-yr Olympic avg" in legend and "5-yr range ex hi/lo (2021/22" in legend and "5-yr average" not in legend, legend[:300])
+check("the legend names them: '5-yr Olympic avg' and '5-yr range (2021/22–2025/26)' - no 'ex hi/lo'", "5-yr Olympic avg" in legend and "5-yr range (2021/22" in legend and "ex hi/lo" not in legend and "5-yr average" not in legend, legend[:300])
 
 print("the BN corridors look back three years (Kolten 2026-10-21: 'use the last 3 years for the BN corridors')")
 import rail_corridors as rc  # noqa: E402

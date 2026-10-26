@@ -127,16 +127,19 @@ hidden) and the shipment table's `shipment_quotes` (it already ranks full > wind
 round to a whole cent ('+15' for a 14.5 midpoint). Deploy: the emailed chart runs wherever `rail_report` runs — the droplet (`post_rail.py`, the catch-up
 watcher: `git pull`) and the admin Cloud app (Reboot).
 
-## The rail seasonal charts' 5-yr average and range are Olympic (`seasonal_band.py`)
+## The rail seasonal charts' 5-yr average is Olympic, the range is the true range (`seasonal_band.py`)
 
 Kolten 2026-10-20 ("Check the UP Allen station range and average. It seems like they are too high" ... "I think we might have a year thats skewing the data ...
 BN Hereford looks the same. I think we need to take an olympic avg approach to make cleaner"). UP Allen Station's 2022/23 had a Sep-Dec average of +59 against -12 to +27
 in the other four years of the window (2021/22-2025/26), set the top of the band in 38 weeks of 52, and by itself lifted this week's 5-yr average from -7 to +7; the same
 year is high on Group 3, Interior IA and Hereford. It is real market data, not a bad row (Allen's recorded bids were +58 to +85 in mid-2023), so the fix is in the statistic:
-for each marketing week the highest and the lowest year are dropped; the average is the mean of what is left and the band runs from the lowest to the highest of what is
-left (`olympic_avg` / `olympic_lo` / `olympic_hi`; five years in the week are needed to trim, with fewer the plain mean and min / max are used). Wired into
-`rail_report._five_year_band` (the emailed chart; legend '5-yr Olympic avg' / '5-yr range ex hi/lo (2021/22–2025/26)') and the Rail FOB tab's `_rband` in `app.py`
-(header, end label and caption say Olympic). `tests/test_seasonal_band.py` (rule, the band frame, and the Vega-Lite spec the email hands the renderer).
+for each marketing week the highest and the lowest year are dropped and the average is the mean of what is left (`olympic_avg`; five years in the week are needed to trim, with fewer
+the plain mean is used). **The range is NOT trimmed (Kolten 2026-10-26: "take out the ex hi / low on these and make true 5 year range. Keep the average line as we have it").** The band runs
+from the lowest to the highest of EVERY year in the window (`range_lo` / `range_hi`), the freak year included, behind the Olympic average line; the first version had trimmed the range as well
+(`olympic_lo` / `olympic_hi`, legend '5-yr range ex hi/lo') — those functions are gone, and Allen's 2022/23 is back in the band's ceiling. Wired into `rail_report._five_year_band` (the emailed
+charts, rail and Inco; legend '5-yr Olympic avg' / '5-yr range (2021/22–2025/26)') and the Rail FOB tab's `_rband` in `app.py` (header and end label say Olympic avg; the caption says the gray band is the
+true range of the last N completed crop years). With fewer than five years nothing changes: the plain mean and the full range, as before. `tests/test_seasonal_band.py` (rule, the band frame, and the
+Vega-Lite spec the email hands the renderer).
 **Not changed: the Bids tab's seasonal band and the Spread tab's band still use the plain mean and min / max** — say the word and they take the same helper.
 
 **The BN corridors look back three years, not five** (Kolten 2026-10-21, after "Hereford looked historically high and skewed maybe": "use the last 3 years for the BN corridors").
@@ -619,9 +622,35 @@ droplet at 0.11.0 and skipped on Cloud):
   day's subject is `carried forward from <last Inco sheet> sheet; Oct/Nov/Dec from H&F bids PDF of <date>` — still 'carried', so the stale-sheet guard and the 15:45 `inco_bids.py carry` keep measuring
   from the last sheet Kolten PASTED (the H&F refresh must not hide that Jan-Mar are weeks old); when that sheet is more than 21 days before the day, its other months are NOT carried into the H&F day
   (a visible gap, as in `plan_carry`). With no Inco history at all, H&F alone starts the series (subject `H&F bids PDF of <date> (Oct/Nov/Dec)`). INCO keeps source `manual` and its location_meta
-  (the scraper adds none). Its 10-22 numbers equal the 10-19 hand sheet, so the first fold changes nothing but the subject.
+  (the scraper adds none). Its 10-22 numbers equal the 10-19 hand sheet, so the first fold changes nothing but the subject. **A day that holds a sheet Kolten POSTED is never replaced by the fold
+  (`plan_hf`, 2026-10-26)**: H&F publishes every business day, so a posted sheet and H&F's PDF of the same day are the normal case, and the fold would have overwritten the posted Oct / Nov / Dec and marked the day
+  'carried' (from itself), which the stale-sheet guard then no longer counted as a real sheet. Only carried days take H&F's block.
 - Pull health: the three new locations are three different providers, each under pull_health's 5-location provider floor, and INCO is already carried every business day, so a sheet that is late never raises a provider-missing alert; a
   sheet that stops coming (or an unreadable one) shows as the `HFGrain` scraper being `empty`.
+
+### Inco update email (`inco_report.py`, 2026-10-26)
+
+Kolten, the day he pasted a sheet ("Oct/Nov: +25X, Dec: +20F, Jan: +25F, Feb: +20H, Mar: +30H"): "Can we make an auto email like we do on rail when Inco update occurs. Put the normal table of bids and trends
+and then a seasonal chart" and "setup to send to soyprocessing@jpsi.com". `inco_report.py` is the rail update email for Incobrasa (Gilman, IL), made of the same pieces (`rail_report`'s chart, `changes_report`'s
+button / watermark / signature / `send_email`):
+
+- **When:** `inco_bids.py post --commit` emails the sheet once the write has been read back (VERIFIED). `--no-email` skips it, `--to ADDR` sends a test copy to ADDR only (logged as kind 'test'; the list is untouched),
+  `--force-email` sends a sheet that already went out. A send that fails leaves the sheet saved, says so and exits 3 with the resend command (`python inco_report.py --send --date D`). There is no catch-up watcher
+  like the rail one: `post` is the only writer. The daily carry-forward and the H&F fold change what a day shows without a new sheet and never email.
+- **To whom:** To `soyprocessing@jpsi.com` (`INCO_EMAIL_TO` overrides), no BCC (`INCO_EMAIL_BCC`). Sent by `changes_report.send_email`: from a PC that is the local Outlook, from the droplet Graph (basis-tracker@jpsi.com),
+  so post from the droplet when the list should hear from the tracker rather than from Kolten.
+- **What:** the sheet as a table - Period / Fut / Bid and the change in cents vs the previous sheet (the day before: on a posting day that is the last sheet, carried or H&F-refreshed), ~1 week, ~1 month and ~1 year
+  (the nearest snapshot within 3 / 4 / 4 days) - matched by DELIVERY MONTH (`delivery_period.canonical`, so 'FH Oct', '9/27-Oct' and 'Oct 2026' are all October; a split month uses its nearest slot). A contract roll is
+  spread-adjusted and marked with a rolled arrow exactly as in the rail email. When the earlier sheet did not quote that month, the FRONT row is compared with that sheet's front bid (raw); that is also how the year-ago
+  column reads INCO's weekly 'Spot' history (the archive before August 2026 is one weekly Spot row, from 2023-01). Then the spot seasonal chart: `rail_report._seasonal_png` itself, handed INCO's history in the shape it
+  reads (`inco_report.rail_shaped`) - this year black, last year blue, the average (Olympic once five complete years exist) and the true range of the complete years before them (three now: 2023/24-2025/26), the posted
+  curve in red. INCO's 2022/23 is a part-year (Jan-Aug 2023) and is left out of the band (`MIN_YEAR_WEEKS`).
+- **No double sends:** `inco_email_log` (created on first use) holds a signature of each emailed sheet (its date and every label / contract / bid); posting the same sheet again does not mail the list a second time, a
+  corrected sheet is a new signature and does. A failed send writes nothing, so the retry is not mistaken for a duplicate.
+- **"Oct/Nov +25X" is one bid for two months:** filed as TWO rows, Oct 2026 and Nov 2026, both +25 on ZSX26 (`delivery_period` reads only the first month name, so a single 'Oct/Nov' row would have left November out of
+  the series).
+- Tests: `tests/test_inco_report.py` (the series as the live archive has it - weekly Spot history, real sheets, carried days - the table cell by cell, the chart's spec and a real render, the send, the ledger, and
+  `inco_bids.py post` end to end with a fake sender) and `tests/test_inco_hf_merge.py` (the guard above).
 
 ### Scoular: the PAGE names the state, not the id table (2026-10-23)
 

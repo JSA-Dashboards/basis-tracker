@@ -131,6 +131,21 @@ wrote = [s for s in plan["write"] if s["timestamp"][:10] == "2026-11-20"][0]
 check("the day holds ONLY what H&F quotes — the stale Feb / Mar are not carried into it", sorted(r["deliveryMonth"] for r in wrote["rows"]) == ["Dec 2026", "Jan 2027", "Nov 2026"], [r["deliveryMonth"] for r in wrote["rows"]])
 check("... and the plan says why", any("NOT carried" in n for n in plan["notes"]), plan["notes"])
 
+print("\ninco: a day that holds a sheet Kolten POSTED is not replaced by H&F's relay of it (2026-10-26: a real sheet and H&F's daily PDF landed on the same day)")
+T23n = date(2026, 11, 23)
+POSTED = [("Nov 2026", "ZSX26", 36), ("Dec 2026", "ZSF27", 24), ("Jan 2027", "ZSF27", 28), ("Feb 2027", "ZSH27", 22)]
+check("a sheet is posted for 11-23", post_sheet("2026-11-23", POSTED, T23n))
+HP = [("Nov 2026", "ZSX26", 33), ("Dec 2026", "ZSF27", 19)]                 # H&F's PDF of the same day, with different bids
+res = ib.fold_hf(loc("2026-11-23", HP), today=T23n)
+d_p, subj_p = day("2026-11-23")
+check("the fold writes nothing", res is None, res)
+check("the posted bids stand: Nov +36 and Dec +24, not H&F's +33 / +19", d_p["Nov 2026"] == ("ZSX26", 36) and d_p["Dec 2026"] == ("ZSF27", 24) and len(d_p) == 4, d_p)
+check("the day is still a REAL sheet (no 'carried' mark), so the stale-sheet guard keeps counting from it", not subj_p and not ib.is_carried([s for s in ib.load_snaps() if s["d"] == T23n][0]), subj_p)
+check("the plan says why", any("posted" in n for n in ib.plan_hf(ib.load_snaps(), T23n, rows(HP), T23n)["notes"]))
+T24n = date(2026, 11, 24)
+ib.apply_plan(ib.plan_carry(ib.load_snaps(), T24n))
+check("the next day (a carried copy of that sheet) still takes H&F's block", ib.fold_hf(loc("2026-11-24", HP), today=T24n) is True and day("2026-11-24")[0]["Nov 2026"] == ("ZSX26", 33))
+
 print("\ninco: no Inco history at all")
 db.DB_PATH = Path(tempfile.mkdtemp(prefix="inco_hf_empty_")) / "t.db"
 db.init_db()

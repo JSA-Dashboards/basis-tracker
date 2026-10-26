@@ -22,6 +22,11 @@ Inco does NOT post daily. They send a sheet and it HOLDS until the next one (Kol
 
           Sheet lines are  LABEL, FUTURES, BASIS  (basis in cents; "flat" = 0).
 
+          A committed sheet is then EMAILED (inco_report: the table with its changes and the
+          seasonal chart, To soyprocessing@jpsi.com) once the write has been read back. --no-email
+          skips it; --to ADDR sends a test copy to ADDR only; a failed send leaves the sheet
+          saved, says so, and exits 3 (resend: python inco_report.py --send --date D).
+
 Rules this encodes (each one bit us once):
   * Labels MUST carry a month name. delivery_period.canonical() reads the first month
     name in a label and otherwise falls back to the futures contract's month, so a bare
@@ -306,6 +311,10 @@ def plan_hf(snaps: list[dict], D: date, hf_rows: list[dict], today: date, max_ag
     if not merged:
         return {"delete": [], "write": [], "notes": notes + ["nothing left of H&F's Incobrasa rows on %s after the expired ones were dropped" % D]}
     existing = next((s for s in snaps if s["d"] == D), None)
+    if existing is not None and not is_carried(existing):
+        # A sheet Kolten POSTED on D is the day's record: H&F's relay of the same bids must not replace it (and the replacement would mark the day 'carried', so the stale-sheet
+        # guard would stop counting it as a real sheet). Found 2026-10-26, the day a real sheet and H&F's daily PDF first landed together.
+        return {"delete": [], "write": [], "notes": notes + ["INCO %s holds a sheet that was posted, not a carried copy — H&F's Incobrasa rows are not folded over it" % D]}
     mark = HF_PREFIX + D.isoformat()
     if existing is not None and mark in str(existing.get("email_subject") or "") and _signature(load_rows(existing["id"])) == _signature(merged):
         return {"delete": [], "write": [], "notes": notes + ["INCO %s already holds H&F's sheet of %s — nothing to write" % (D, D)]}
@@ -422,9 +431,43 @@ def cmd_post(args) -> int:
         print("inco_bids:     %-14s %-7s %+d" % (r["deliveryMonth"], r["futuresSymbol"], r["basisCents"]))
     show_plan(plan, "write")
     if not args.commit:
-        print("inco_bids: PREVIEW ONLY — nothing written. Re-run with --commit.")
+        print("inco_bids: update email after --commit: %s" % _email_plan(args))
+        print("inco_bids: PREVIEW ONLY — nothing written, nothing emailed. Re-run with --commit.")
         return 0
-    return 0 if apply_plan(plan) else 1
+    if not apply_plan(plan):
+        return 1
+    return _email_after_post(args, D)
+
+
+def _email_plan(args) -> str:
+    """Who the update email would go to, for the preview."""
+    if getattr(args, "no_email", False):
+        return "none (--no-email)"
+    try:
+        import inco_report
+        to, bcc = inco_report.recipients(getattr(args, "to", None))
+    except Exception as exc:                                  # the preview must work even if the report module cannot load
+        return "(unknown: %s)" % exc
+    return "To %s%s%s" % (to, " + BCC %s" % bcc if bcc else "", "  [test: not logged as the list's copy]" if getattr(args, "to", None) else "")
+
+
+def _email_after_post(args, D: date) -> int:
+    """Email the sheet just posted (inco_report). It is already saved and read back, so a failure here is reported and never undone: exit 3, with the resend command."""
+    if getattr(args, "no_email", False):
+        print("inco_bids: email skipped (--no-email).")
+        return 0
+    try:
+        import inco_report
+        sent = inco_report.send_inco_update_email(D, to_addr=getattr(args, "to", None), force=getattr(args, "force_email", False))
+    except Exception as exc:
+        print("inco_bids: the sheet is SAVED but the update email FAILED: %s" % exc)
+        print("inco_bids: resend it with: python inco_report.py --send --date %s" % D)
+        return 3
+    if sent:
+        print("inco_bids: update email sent.")
+    else:
+        print("inco_bids: update email NOT sent: this exact sheet was already emailed (--force-email to send it again).")
+    return 0
 
 
 def main() -> int:
@@ -441,6 +484,9 @@ def main() -> int:
     pp.add_argument("--date", required=True, help="sheet date, YYYY-MM-DD (a business day)")
     pp.add_argument("--file", help="read the sheet from this file instead of stdin")
     pp.add_argument("--commit", action="store_true")
+    pp.add_argument("--no-email", action="store_true", help="write the sheet but do not send the update email")
+    pp.add_argument("--to", help="send the update email only to this address (a test copy; the list gets nothing)")
+    pp.add_argument("--force-email", action="store_true", help="email the list even if this exact sheet already went out")
     pp.add_argument("--max-age", type=int, default=MAX_AGE_DAYS)
     pp.add_argument("--today", help=argparse.SUPPRESS)       # testing only
     pp.set_defaults(fn=cmd_post)

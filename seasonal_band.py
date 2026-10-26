@@ -1,12 +1,13 @@
-"""seasonal_band.py - the 5-year average and range behind the rail seasonal charts, Olympic style.
+"""seasonal_band.py - the 5-year average and range behind the rail seasonal charts: an Olympic average, a true range.
 
-One freak crop year drags a plain 5-year average and blows out its range: on 2026-10-20 UP Allen Station's 2022/23 (a Sep-Dec average of +59 against -12 to +27 in
-the other four years of its window) set the top of the band in 38 weeks of 52 and lifted the October average from -7 to +7; BN Hereford looked the same (Kolten: "I think we need to take
-an olympic avg approach to make cleaner"). For each marketing week the highest and the lowest year are dropped; the average is the mean of what is left and the band
-runs from the lowest to the highest of what is left. Trimming needs five years in that week (MIN_YEARS): with fewer there is nothing to spare, and the plain mean and
-min / max are used.
+One freak crop year drags a plain 5-year average: on 2026-10-20 UP Allen Station's 2022/23 (a Sep-Dec average of +59 against -12 to +27 in the other four years of its window) lifted the
+October average from -7 to +7; BN Hereford looked the same (Kolten: "I think we need to take an olympic avg approach to make cleaner"). So the AVERAGE is Olympic: for each marketing week the
+highest and the lowest year are dropped and it is the mean of what is left. Trimming needs five years in that week (MIN_YEARS): with fewer there is nothing to spare and the plain mean is used.
 
-Pure - values in, numbers out. rail_report._five_year_band (the emailed chart) and app.py's Rail FOB tab call these through pandas groupby().agg().
+The RANGE is not trimmed. The first version drew the Olympic range too (lowest to highest of what was left); Kolten 2026-10-26: "take out the ex hi / low on these and make true 5 year
+range. Keep the average line as we have it." So the band runs from the lowest to the highest of EVERY year in the window, the freak year included, behind the Olympic average line.
+
+Pure - values in, numbers out. rail_report._five_year_band (the emailed charts: rail and Inco) and app.py's Rail FOB tab call these through pandas groupby().agg().
 """
 from __future__ import annotations
 
@@ -25,18 +26,20 @@ def olympic_avg(values) -> float:
     return sum(k) / len(k) if k else float("nan")
 
 
-def olympic_lo(values) -> float:
-    k = kept(values)
-    return k[0] if k else float("nan")
+def range_lo(values) -> float:
+    """The lowest year of the week: the band's floor. Every year counts - nothing is trimmed (a missing value is not a year)."""
+    vs = [float(v) for v in values if v is not None and v == v]
+    return min(vs) if vs else float("nan")
 
 
-def olympic_hi(values) -> float:
-    k = kept(values)
-    return k[-1] if k else float("nan")
+def range_hi(values) -> float:
+    """The highest year of the week: the band's ceiling."""
+    vs = [float(v) for v in values if v is not None and v == v]
+    return max(vs) if vs else float("nan")
 
 
 def is_trimmed(n_years: int) -> bool:
-    """Whether a window of n_years completed years gets the Olympic treatment (what a legend or caption may claim)."""
+    """Whether a window of n_years completed years gets the Olympic AVERAGE (what a legend or caption may claim; the range is never trimmed)."""
     return n_years >= MIN_YEARS
 
 

@@ -2440,9 +2440,9 @@ with tab_railfob:
             # 5-yr range band + average for THIS period — the five completed crop years
             # immediately before the CURRENT calendar marketing year (anchored to today,
             # not the corridor's max year, so recent gaps don't drag the band to old years).
-            # OLYMPIC (seasonal_band, Kolten 2026-10-20): each week's highest and lowest year
-            # are dropped before the average and the range are taken, so one freak crop year
-            # (UP Allen Station / BN Hereford 2022/23) cannot drag either.
+            # OLYMPIC AVERAGE (seasonal_band, Kolten 2026-10-20): each week's highest and lowest year
+            # are dropped before the average is taken, so one freak crop year
+            # (UP Allen Station / BN Hereford 2022/23) cannot drag it. The RANGE is not trimmed: lowest to highest of every year (Kolten 2026-10-26).
             # The window is five years, three for the BN basis corridors (rail_corridors.band_years, Kolten
             # 2026-10-21: "use the last 3 years for the BN corridors"; 2021/22-2022/23 were unusually tight at
             # Hereford and the PNW). Under five years nothing is trimmed: the plain mean and the full range.
@@ -2467,7 +2467,7 @@ with tab_railfob:
             _avg_lbl = f"{_nu}-yr Olympic avg" if _sband.is_trimmed(_nu) else f"{_nu}-yr avg"
             _rwin  = _sel[_sel["MktYearNum"].isin(_rwin_yrs)]
             _rband = (_rwin.groupby("MktWeek")["Bid"]
-                      .agg(avg=_sband.olympic_avg, lo=_sband.olympic_lo, hi=_sband.olympic_hi).reset_index())
+                      .agg(avg=_sband.olympic_avg, lo=_sband.range_lo, hi=_sband.range_hi).reset_index())
             _rbyrs = sorted(_rwin["MktYear"].unique())
 
             # Forward curve = the corridor's LATEST full rundown, each delivery month placed at
@@ -2618,8 +2618,8 @@ with tab_railfob:
             _chart_download_copy(_chart_png(_rail_export, width=1100, height=_H), _rail_fname,
                                  key=f"rail_seas_{_mk}_{_pd_sel}")
             if _sband.is_trimmed(_nu):
-                _band_txt = (f"the {_nu}-yr average and the gray band are Olympic: each week's highest and lowest year are dropped "
-                             "(a week with fewer than five years uses them all).")
+                _band_txt = (f"the {_nu}-yr average is Olympic (each week's highest and lowest year are dropped; a week with fewer than five years uses them all) and the gray band is the true range: "
+                             f"each week's lowest to highest of the last {_nu} completed crop years ({', '.join(f'{y}/{(y + 1) % 100:02d}' for y in _rwin_yrs)}).")
             elif _nu:
                 _band_txt = (f"the {_nu}-yr average and the gray band are the plain mean and the min / max of the last {_nu} "
                              f"completed crop years ({', '.join(f'{y}/{(y + 1) % 100:02d}' for y in _rwin_yrs)}) — "

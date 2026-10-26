@@ -234,10 +234,12 @@ def _est_dates(market, by_md, mkt_dates):
 
 def _five_year_band(hist):
     """The prior years' average and range by marketing week, from their weekly bids (a frame with MktWeek, MyNum, Bid), as a
-    (MktWeek, lo, hi, avg) DataFrame. Olympic (seasonal_band): with five years in a week the highest and the lowest are dropped
-    before the average and the range are taken, so one freak crop year cannot drag either (UP Allen Station's 2022/23)."""
+    (MktWeek, lo, hi, avg) DataFrame. The AVERAGE is Olympic (seasonal_band): with five years in a week the highest and the lowest
+    are dropped before the mean, so one freak crop year cannot drag it (UP Allen Station's 2022/23). The RANGE is the true lowest to
+    highest of every year in the window (Kolten 2026-10-26: "take out the ex hi / low on these and make true 5 year range. Keep the
+    average line as we have it")."""
     import seasonal_band as sb
-    return hist.groupby("MktWeek")["Bid"].agg(lo=sb.olympic_lo, hi=sb.olympic_hi, avg=sb.olympic_avg).reset_index()
+    return hist.groupby("MktWeek")["Bid"].agg(lo=sb.range_lo, hi=sb.range_hi, avg=sb.olympic_avg).reset_index()
 
 
 def _seasonal_png(market, by_md, mkt_dates):
@@ -320,10 +322,8 @@ def _seasonal_png(market, by_md, mkt_dates):
     # Muted green/gray theme: bold near-black current year, dashed sage avg, light-sage
     # range band, brick-red forward curve. Legend up top with a swatch per series.
     _CUR, _PREV, _AVG, _BAND, _FWD = "#111827", "#2563eb", "#4b6a4b", "#c4d7bd", "#c0392b"
-    if _sband.is_trimmed(_n):                       # five years: the Olympic treatment applies, and the legend says so
-        _rng_name, _avg_name = f"{_n}-yr range ex hi/lo ({rng_lbl})", f"{_n}-yr Olympic avg"
-    else:
-        _rng_name, _avg_name = f"{_n}-yr range ({rng_lbl})", f"{_n}-yr average"
+    _rng_name = f"{_n}-yr range ({rng_lbl})"        # the true lowest to highest year of the window, never trimmed
+    _avg_name = f"{_n}-yr Olympic avg" if _sband.is_trimmed(_n) else f"{_n}-yr average"      # five years: the average drops each week's high and low year, and the legend says so
     _dom, _rng = [cur_lbl], [_CUR]
     if not prev.empty:
         _dom.append(prev_lbl); _rng.append(_PREV)      # most recent complete year, hero blue
