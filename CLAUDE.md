@@ -647,8 +647,56 @@ Julesburg's in every line); CHS 'New Haven' was labeled ND and pinned in Connect
 (`chs_populate_meta.STATE_CORRECTIONS` said ND and would have undone it); Tyson Camilla / Humboldt had state 'Unknown' from Tyson's own feed (GA / TN now; `tyson_scraper._clean_state` stops the daily upsert writing 'Unknown'
 back; `tests/test_tyson_state.py`). **A bounding box cannot see a right-state, wrong-town pin.** ADM's bootstrap (`adm.gradable.com/api/commodities/merchandising/bootstrap`, the call `adm_scraper` already makes) carries a
 Google-geocoded address for every market (`markets[].address.geocode.lat/lng`): 112 of 131 ADM pins are within 12 miles of it (median 1.4) and 8 were not — Marshall MN x2 (270 mi off), Oakland IL (a Chicago neighborhood, 151),
-Country Store KS (96), Panhandle OK (24), Clinton IA x2 (20) — all moved to ADM's own coordinates. The CHS (Bushel) and Scoular feeds carry no coordinates. Still open: 636 of 1,301 rows have no pin (11 of them ADM, fillable
-from that same bootstrap), and the other providers' within-state pins are unchecked.
+Country Store KS (96), Panhandle OK (24), Clinton IA x2 (20) — all moved to ADM's own coordinates. The CHS (Bushel) and Scoular feeds carry no coordinates. **The one-time pin pass (2026-10-25; Kolten: "Why don't those have a pin?" ... "yes, run the one-time pass").** 636 of 1,301 rows had no pin: none was in `coords_seed.json` (built mid-June by the manual,
+name-only `geocode_locations.py`), 565 first appeared after it, 552 were still posting bids (so they showed in the Bids tab but not on the map: `get_map_data` requires a pin), and nothing re-runs the geocoder (the Map tab only
+tells you to; `init_db` returns before seeding on Snowflake; scrapers set no coordinates, except Tyson and the ones added 10-23 / 10-25). The pass (`Claude Code\_backups\pin_pass_2026-10-25\pin_pass.py`, with the revert
+list and every Nominatim answer; dry run by default) placed **586**, lat / lon only: 11 from ADM's own addresses, **217 from the coordinates every AgriCharts `cashbids-js.php` feed carries per location** (27 hosts probed, all
+answer; matched by name inside the provider's own host), 356 from structured Nominatim lookups (city + state, never a bare name) accepted only when the result is a settlement of that name inside the state's border (the
+same-name town nearest the provider's other pins wins when there are several), and 2 copied pins. Independent check: 23 feed pins re-looked-up in Nominatim were a median 0.1 mi away, at most 10.7. **50 still have no pin:**
+names that are not a place (Futures-Only, 'CGB - Cross Country', 'To Buy for HCP', the See-Mor and GSI- rows ...), towns OpenStreetMap lacks (Grebner SD, Kintyre Flats MT, Gladstone Bluff / Suez / Yorkwood IL, Planters KY,
+Fairbanks IA), six held back by hand because the only same-name town OSM has is 95-240 miles from the provider's other sites (Skyline KY, LeRoy IL, Old Dominion VA, Keystone's Holland and White Cloud IN, CPI 'Lewis'), and two
+where the co-op's own feed contradicts our state (CFE 'Germantown, MN' sits near Paullina IA; FS Grain 'Kentland, IN' at Newark IL). **State labels found wrong on the way (the pins were right), FIXED 2026-10-26 (Kolten: "Both"):**
+Premier Cooperative's provider-wide 'WI' (`dtn_content_scraper.SITES` `state`) covered 10 Iowa sites (Big River Dyersville, Fairbanks, Ft Atkinson/Waucoma, Homeland (Lawler), Manchester, New Albin, Ossian, Postville, Valero CC at Charles
+City, Viserion Mcgregor; premiercooperative.com/locations) and Keystone's 'IN' covered three Ohio sites (College Corner, Eldorado, Verona) and four Michigan ones (Fremont MI, Hamilton, Holland, White Cloud; Keystone is Co-Alliance + Ceres
+Solutions and keystonecoop.com/locations gives every site's state and coordinates). The live rows were corrected (Premier: state only; Keystone: state AND all 16 pins from its own coordinates, because the label had made the pin pass put
+College Corner, Verona, Pershing and Hamilton at same-named Indiana towns; old rows: `Claude Code\_backups\keystone_premier_labels_pins_before_2026-10-26.json`) AND the two SITES rows now carry a `states` override
+(`dtn_content_scraper._state_from`: the override, else the ', XX' in the name, else the row's `state`). Both are needed: `fetch_dtn_content` writes `state` into `location_meta` every day and the upsert keeps a stored value only for None, so a
+label fixed in the database alone is put back by the next run. The bounding-box audit cannot see this kind of error (north-east Iowa is inside Wisconsin's box). `tests/test_dtn_content_states.py` (29 checks on the real SITES rows with canned
+responses, including that WITHOUT the overrides the old labels come back). **Keeping it from recurring:** the weekly pin job below, and scrapers passing the coordinates their feeds carry (`agricharts_scraper` `pins: True` does it for Alcivia).
+
+### Weekly pin job — `pin_missing.py` (2026-10-26)
+
+Kolten's "Both" (fix the Premier / Keystone labels, and build the job that keeps new locations pinned). A scraper creates a `location_meta` row with a state and a type and no coordinates, and `get_map_data` needs a pin, so every location a
+scraper adds would again show in the Bids tab and not on the map. `pin_missing.py` is the one-time pass as a standalone job, for the droplet (`deploy/run_pin_missing.sh`; cron `45 17 * * 5`, Fridays 5:45 PM Central, through
+`/opt/alerting/cron-alert`, after the 15:45 import and the 17:10 H&F catch-up). Its sources, in order of trust:
+
+- **ADM's own Google-geocoded addresses** (the bootstrap call `adm_scraper` makes), matched by display name and checked against the row's state.
+- **The coordinates every AgriCharts `cashbids-js.php` feed carries** (the hosts of `agricharts_scraper.TENANTS` + `agricharts_md_scraper.SITES`; matched by name inside the provider's own hosts; a host whose locations share one pin, four or more,
+  is a head-office address and is not trusted; a feed pin that falls outside the row's own state is refused and is NOT passed on to the geocoder — FS Grain 'Kentland, IN' sits at Newark IL in its own feed).
+- **Structured Nominatim** (city + state, never a bare name; at least 1.25 s apart; answers cached in `state/nominatim_cache.json`), accepted only for a settlement whose name is the city AND whose point is inside the state's box; when the state
+  has several such towns the one nearest the provider's other pins wins (Primient's LeRoy), else the first is taken and the row is listed as ambiguous. `ALIAS` holds the hand-made readings: names that are not a town ('Homeland (Lawler)',
+  'Meredith Rd Elburn') and rows that copy another row's pin ('Mendota BN Rail').
+
+What it will not do: write anything but lat / lon (plus `state` for a row that has none, when an ALIAS names it — never a label that exists, never a pin that exists). A pin more than 120 miles (`FAR_MILES`) from the same provider's other
+pins in that state is **held back**, not written (Hopkinsville's 'Skyline': the only Skyline OSM has is in Letcher County, 242 mi away); `NATIONAL` providers are exempt, `ACCEPT_FAR` lets through ones checked by hand, `HOLD` keeps one out
+(CPI 'Lewis, NE'). A name that is not a place (`SKIP_RE`: 'Futures-Only', 'CGB - Cross Country', the GSI- and See-Mor rows) is not looked up, and a name whose own state ('Fremont MI') disagrees with the label on file is not guessed at.
+
+**Silent unless something happened.** The operator (`CHANGES_EMAIL_TO`, kpostin@; never the group) gets one mail when a location was pinned, held back or could not be placed, each with its source; "not a place name" rows are remembered but
+never mailed (`QUIET`). What it could not place is remembered in `state/pin_missing.json` (gitignored; per machine) and tried again after 30 days, or at once when the row's state label changes; a held-back row is mailed once, not every
+month; a mail that fails to send is retried next run (the row is stored `emailed: False`); a row somebody pins by hand drops out of the books; a failed geocoder request is NOT written off (the row is tried again next run). The first run
+mails everything still open from before, once. Switches: `state/pin_missing.off` (touch it), `--dry-run` (plans and prints; writes and mails nothing), `--no-email` (what it would have mailed counts as seen), `--retry-all`, `--max-lookups N`
+(new geocoder requests per run, default 400), `--state-dir`, `--allow-sqlite` (tests; without it the job refuses a backend that is not Snowflake, because a local SQLite is empty). Undo a run: set lat = lon = NULL on the rows it mailed.
+
+**Other spellings of the same town are asked too.** The first dry run held Primient's 'LeRoy' back: the geocoder's answer for 'LeRoy' is only Leroy Township in Boone County (155 mi from Primient's other Illinois sites), and the lookup stopped
+there, so 'Le Roy' (OSM's spelling of the McLean County town beside Heyworth) was never asked. After a hit the job now also asks the same town's other spellings (`spelling()`: Le Roy, Fort / Ft, Saint / St, Mount / Mt) and the
+nearest-to-the-provider's-pins rule picks; the other towns a name lists ('Hitchcock-Tulare, SD') are not asked, and a row is never placed on half an answer (a failed or over-budget request for the second spelling leaves it for next run).
+
+**Dry run on the live database, 2026-10-26:** 43 of 1,301 rows had no pin and two were placeable (Premier 'Fairbanks' -> Fairbank, IA through ALIAS; Primient 'LeRoy' -> Le Roy, McLean County, about 20 mi from its Heyworth; two geocoder
+requests, both answered); the other 41 are the one-time pass's leftovers (28 not place names, Grebner SD / Kintyre Flats MT / Gladstone Bluff, Suez, Yorkwood IL / Planters KY / C&O Grain OH not in OpenStreetMap, the held Skyline KY /
+Old Dominion VA / CPI Lewis NE, the two feed contradictions, and Cargill 'Forest City' — an orphan row seeded from `facility_tags_seed.json`, no state and no bids; the live location is 'Forest City (MO)'). That run found a bug the
+tests could not: Snowflake's cursor hands back dicts, so unpacking a row as a tuple reads the column NAMES (SQLite's rows unpack as values and hid it). `load_rows` now goes through `database.get_all_location_meta()` and is tested with a
+dict-only stub. Tests: `tests/test_pin_missing.py` (71 checks; no network — the geocoder is a dict, the clock simulated, the database a throwaway SQLite); 40 deliberate breakages of its rules, run on a scratch copy, are all caught. **Deploy = `git pull --ff-only` on the droplet and the cron line. The Premier / Keystone `states` config must be on the droplet before the next 15:45 CT daily run, or that run
+writes WI / IN back (the pins stay).**
 
 ### River Valley Coop (StoneX Stonehedge component) and Alcivia (AgriCharts), 2026-10-25
 

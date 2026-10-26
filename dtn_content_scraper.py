@@ -56,12 +56,19 @@ SITES: list[dict] = [
      "facility_type": "Country Elevator", "origin": "https://centralunitedcoop.com"},
     {"provider": "Premier Cooperative", "site_id": "E0266901",
      "api_key": "Ymv7TuCB46yoIZwTzFaXgijkFTIBGpHc", "state": "WI",
+     # Premier's board is mostly Iowa: its own Manchester, Postville, New Albin, Ossian and Fort Atkinson / Waucoma sites and the plants it quotes direct-ship bids for (premiercooperative.com/locations,
+     # 2026-10-26); Mazomanie, Mineral Point, Richland Center and Westby are Wisconsin, the default. 'Fairbanks' is the POET plant at Fairbank, IA.
+     "states": {"Big River Dyersville": "IA", "Fairbanks": "IA", "Ft Atkinson/Waucoma": "IA", "Homeland (Lawler)": "IA", "Manchester": "IA", "New Albin": "IA", "Ossian": "IA",
+                "Postville": "IA", "Valero CC": "IA", "Viserion Mcgregor": "IA"},
      "facility_type": "Country Elevator", "origin": "https://www.premiercooperative.com",
      # Shell Rock Soy (IA) is tracked by its own dedicated shellrock_scraper, so drop
      # Premier's duplicate of it (Kolten 2026-09-28).
      "exclude": ["Shell Rock Soy"]},
     {"provider": "Keystone Cooperative", "site_id": "E0135301",
      "api_key": "mwjIkt1IAVwF8bQL8YVRjy0lL0M3wBJl", "state": "IN",
+     # Keystone (Co-Alliance + Ceres Solutions, Indianapolis) is Indiana, Ohio and Michigan: keystonecoop.com/locations gives the state of every site (2026-10-26). 'Fremont MI' carries its state
+     # without a comma, which _state_from does not read.
+     "states": {"College Corner": "OH", "Eldorado": "OH", "Verona": "OH", "Fremont MI": "MI", "Hamilton": "MI", "Holland": "MI", "White Cloud": "MI"},
      "facility_type": "Country Elevator", "origin": "https://www.keystonecoop.com"},
     # Centerra is mostly OH; Volant is its PA location.
     {"provider": "Centerra Co-op", "site_id": "E0178501",
