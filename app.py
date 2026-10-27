@@ -5381,8 +5381,11 @@ with tab_bmaps:
                        "purple is above the baseline, brown below. Each colour class is a tenth of the mapped area.")
             bm1, bm2, bm3 = st.columns([1, 1.3, 1.7])
             with bm1:
-                bm_crop = st.selectbox("Commodity", ["Corn", "Soybeans"], key="bm_crop")
+                bm_crop = st.selectbox("Commodity", list(_bm.COMMODITIES), key="bm_crop")
             with bm2:
+                if st.session_state.get("_bm_last_crop") != bm_crop:                                  # a new commodity opens on its own region (wheat: its own states)
+                    st.session_state["_bm_last_crop"] = bm_crop
+                    st.session_state["bm_region"] = _bm.default_region(bm_crop)
                 bm_region = st.selectbox("Region", list(_bm.REGIONS) + ["Custom states"], key="bm_region")
             with bm3:
                 bm_types = st.multiselect("Location type (the basis map)", _bm_types, default=["Country Elevator"] if "Country Elevator" in _bm_types else [], key="bm_types",
@@ -5390,8 +5393,11 @@ with tab_bmaps:
                                           help="Which kinds of location's bids make the surface. Country elevators are the default: a crush plant or river terminal bids at a different level, "
                                                "and mixing them makes bumps around the plants. The 3-year and last-year comparisons always use every type, because the history files hold plants and terminals.")
             bm4, bm5 = st.columns([1.3, 2.7])
+            _bm_opts = _bm.baselines_for(bm_crop)
+            if st.session_state.get("bm_base") not in _bm_opts:                                       # wheat has only the 30 / 7-day comparisons: never keep a choice it cannot show
+                st.session_state["bm_base"] = _bm_opts[0]
             with bm4:
-                bm_base = st.selectbox("Compare with", list(_bm.BASELINES), format_func=lambda k: _bm.BASELINES[k], key="bm_base",
+                bm_base = st.selectbox("Compare with", _bm_opts, format_func=lambda k: _bm.BASELINES[k], key="bm_base",
                                        help="The right-hand map is today's basis minus this. The 3-year average (the same days of the last three years) rests on the few dozen locations with that history; "
                                             "30 and 7 days ago use every location, against the same futures contract.")
             with bm5:
@@ -5418,6 +5424,9 @@ with tab_bmaps:
                         _bm_notes.append(f"The deviation rests on {_bm_r['n_dev']:,} locations with {'two or more years of history' if bm_base == '3yr' else 'history from last year'} for these days "
                                          f"({', '.join(str(y) for y in _bm_r['dev_years']) or 'none found'}), mostly plants and terminals, because the daily scrape of country elevators began in June 2026: "
                                          "a broad regional picture, with the locations shown as dots.")
+                    if "Wheat" in bm_crop:
+                        _bm_notes.append("Wheat bids are sorted by the futures market they are quoted against (Chicago for soft red winter, Kansas City for hard red winter); spring wheat has too few bids to map. "
+                                         "The tracker holds no wheat before June 2026, so wheat compares with 30 or 7 days ago only.")
                     st.caption("  \n".join(_bm_notes))
                     if not _view_only():
                         st.download_button("⬇️ Download PNG", _bm_r["png"], file_name=f"{bm_crop.lower()}_basis_maps_{_bm_asof.isoformat()}.png", mime="image/png", key="bm_dl")

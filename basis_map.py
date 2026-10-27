@@ -242,25 +242,51 @@ def _text(draw, xy, s: str, size: int, fill=(25, 25, 25), bold: bool = False, an
         draw.text((xy[0] + 1, xy[1]), s, font=_font(size), fill=fill, anchor=anchor)
 
 
-def fmt_cents(v: float, signed: bool = False) -> str:
-    """-18 -> '-18', 9 -> '9' (or '+9' signed, 0 always '0'): whole cents."""
-    n = int(round(v))
-    return f"{n:+d}" if signed and n else f"{n:d}"
+def fmt_cents(v: float, signed: bool = False, decimals: int = 0) -> str:
+    """-18 -> '-18', 9 -> '9' (or '+9' signed, 0 always '0'): whole cents, or that many decimals (a zero after rounding is a plain '0')."""
+    n = round(float(v), decimals)
+    if n == 0:
+        return "0"
+    if decimals == 0:
+        return f"{int(n):+d}" if signed else f"{int(n):d}"
+    return f"{n:+.{decimals}f}" if signed else f"{n:.{decimals}f}"
+
+
+def edge_labels(edges, signed: bool = False) -> list:
+    """The legend's labels, one per class (its lower bound): whole cents, or tenths (then hundredths) of a cent when whole cents would show the same number twice, as they do on a hard red winter month
+    that moved by 3 cents (+3 +2 +1 +1 0 -1 -1 -2 -3 -3)."""
+    for dec in (0, 1, 2):
+        labels = [fmt_cents(e, signed, dec) for e in list(edges)[:-1]]
+        if len(set(labels)) == len(labels):
+            break
+    return labels
+
+
+EXCHANGE = {"ZC": "CBT", "ZS": "CBT", "ZW": "CBT", "KE": "KC"}              # the market's name in the box: ZW is Chicago soft red winter, KE Kansas City hard red winter
+
+
+def futures_root(symbol: str | None) -> str:
+    """'ZWZ26' -> 'ZW', 'KEZ26' -> 'KE', 'MWEZ26' -> 'MWE': the futures market of a contract symbol (the symbol itself when it does not end in a month letter and two digits)."""
+    sy = symbol or ""
+    return sy[:-3] if len(sy) >= 5 and sy[-2:].isdigit() and sy[-3:-2] in MONTH_OF else sy
 
 
 def futures_label(symbol: str | None, cents: float | None) -> str | None:
-    """'ZCZ26', 463 -> 'CBT Dec Futures Price: $4.63' (the contract month, as the AgManager boxes name it); None when either is missing."""
+    """'ZCZ26', 463 -> 'CBT Dec Futures Price: $4.63' (the contract month, as the AgManager boxes name it; 'KC Dec' for hard red winter wheat's KEZ26); None when either is missing. A symbol it cannot
+    read is named as it came."""
     if not symbol or cents is None:
         return None
-    mon = MONTH_OF.get(symbol[2:3]) if len(symbol) >= 4 else None
-    return f"CBT {mon or symbol} Futures Price: ${cents / 100:.2f}"
+    mon = MONTH_OF.get(symbol[-3:-2]) if len(symbol) >= 5 and symbol[-2:].isdigit() else None
+    root = symbol[:-3] if mon else ""
+    return f"{EXCHANGE.get(root, root or 'CBT')} {mon or symbol} Futures Price: ${cents / 100:.2f}"
 
 
 # -- the points ------------------------------------------------------------------------------------------------------
-def nearby_bids(rows, grain_ok, *, types=None, states=None, symbol: str | None = None) -> dict:
+def nearby_bids(rows, grain_ok, *, types=None, states=None, symbol: str | None = None, bid_ok=None) -> dict:
     """Each location's nearest-delivery basis for a commodity, from database.get_map_data() rows: {(provider, location): {lat, lon, state, type, basis, symbol, month}}, plus the contract they are quoted
     against and what was left out. `grain_ok(grain) -> bool` picks the commodity's grains. Only bids quoted off ONE futures contract are kept, the most common one unless `symbol` names it, so every basis is
-    against the same futures month and the surface is not mixing December and March bases. Returns (points, symbol, n_other_contract)."""
+    against the same futures month and the surface is not mixing December and March bases. `bid_ok(bid) -> bool`, when given, narrows the bids a location may offer BEFORE its nearest delivery is picked
+    (wheat's class is the futures market the bid is quoted against, so a location that bids both has its nearest bid of the class asked for). Returns (points, symbol, n_other_contract)."""
     best = {}
     for r in rows:
         if types and (r.get("facility_type") or "") not in types:
@@ -269,7 +295,7 @@ def nearby_bids(rows, grain_ok, *, types=None, states=None, symbol: str | None =
             continue
         if r.get("lat") is None or r.get("lon") is None:
             continue
-        bids = [b for b in r["bids"] if grain_ok(b["grain"]) and b.get("basis") is not None]
+        bids = [b for b in r["bids"] if grain_ok(b["grain"]) and b.get("basis") is not None and (bid_ok is None or bid_ok(b))]
         if not bids:
             continue
         b = min(bids, key=lambda x: _dp.deliv_key(x["delivery_month"], x["futures_symbol"]))
@@ -383,11 +409,12 @@ def render_panel(surface, view: View, geo: dict, mask: np.ndarray, *, title: str
         lx, ly = PAD, HEADER_H + (52 if futures else 4)
         d.rectangle((lx, ly, LEFT_W - PAD, ly + 24 + 10 * 19 + 8), outline=(40, 40, 40), width=1, fill=(255, 255, 255))
         _text(d, (lx + 8, ly + 6), legend_title, 12, bold=True)
+        labels = edge_labels(edges, signed=(mode == "diverging"))
         for i in range(10):
             cls = 9 - i
             y = ly + 26 + i * 19
             d.rectangle((lx + 8, y, lx + 28, y + 15), fill=tuple(int(c) for c in ramp_rgb((cls + 0.5) / 10, mode)), outline=(90, 90, 90))
-            _text(d, (lx + 36, y + 1), fmt_cents(edges[cls], signed=(mode == "diverging")), 13)
+            _text(d, (lx + 36, y + 1), labels[cls], 13)
         lines_ov = _lines_overlay(view, geo, mask)
         img.paste(lines_ov, (ox, oy), lines_ov)
     else:
@@ -447,8 +474,34 @@ REGIONS = {
     "Western Corn Belt": ["IA", "MN", "NE", "SD", "ND", "KS", "MO"],
     "Eastern Corn Belt": ["IL", "IN", "OH", "MI", "WI", "KY"],
     "Nebraska and Kansas": ["NE", "KS"],
+    "Soft red winter states": ["IL", "IN", "OH", "MI", "WI", "MO", "KY"],
+    "Hard red winter states": ["KS", "NE", "CO", "SD", "OK"],
 }
 BASELINES = {"3yr": "3-year average (same days)", "1yr": "Last year (same days)", "30d": "30 days ago", "7d": "7 days ago"}
+# What can be mapped. Wheat is two commodities because its bids are filed by the futures market they are quoted against, not by class: the tracker's grain map has one generic 'Wheat' (a few 'HWW' and
+# durum rows aside), and a bid's contract says which wheat it is - ZW is Chicago soft red winter, KE Kansas City hard red winter (spring wheat, MWE, has five bids: too few to map). `history`: whether
+# the weekly history files (the 3-year / last-year baselines) cover it: the tracker holds no wheat before June 2026.
+COMMODITIES = {
+    "Corn": {"canonical": "Corn", "grain": lambda g: g == "Corn", "root": None, "history": True, "region": "Corn Belt"},
+    "Soybeans": {"canonical": "Soybeans", "grain": lambda g: g == "Soybeans", "root": None, "history": True, "region": "Corn Belt"},
+    "Soft Red Winter Wheat": {"canonical": "Wheat", "grain": lambda g: g == "Wheat", "root": "ZW", "history": False, "region": "Soft red winter states"},
+    "Hard Red Winter Wheat": {"canonical": "Wheat", "grain": lambda g: g == "Wheat", "root": "KE", "history": False, "region": "Hard red winter states"},
+}
+
+
+def commodity_spec(crop: str) -> dict:
+    """The entry for a commodity; a name the registry does not know is taken as a grain of that exact name, with history and the Corn Belt."""
+    return COMMODITIES.get(crop) or {"canonical": crop, "grain": lambda g, c=crop: g == c, "root": None, "history": True, "region": "Corn Belt"}
+
+
+def baselines_for(crop: str) -> list:
+    """The baselines worth offering for a commodity: all four where the weekly history files cover it, only the 30 / 7-day changes where they do not (wheat)."""
+    return list(BASELINES) if commodity_spec(crop)["history"] else ["30d", "7d"]
+
+
+def default_region(crop: str) -> str:
+    """The preset region a commodity opens on."""
+    return commodity_spec(crop)["region"]
 
 
 def _types_phrase(types) -> str:
@@ -479,9 +532,11 @@ def build_pair(rows, crop: str, states, types, baseline: str, as_of: date, *, fe
     if view is None:
         return {"image": None, "png": None, "error": "none of the states picked has an outline", "symbol": None, "n_level": 0, "n_other": 0, "n_dev": 0, "dev_years": []}
     mask = state_mask(view, states, geo)
-    grain_ok = lambda g: g == crop                                                             # noqa: E731
+    spec = commodity_spec(crop)
+    grain_ok = spec["grain"]
+    bid_ok = (lambda b: futures_root(b.get("futures_symbol")) == spec["root"]) if spec["root"] else None
     tset = set(types) if types else None
-    lvl, sym, n_other = nearby_bids(rows, grain_ok, types=tset, states=set(states))
+    lvl, sym, n_other = nearby_bids(rows, grain_ok, types=tset, states=set(states), bid_ok=bid_ok)
     fut = futures_label(sym, futures_cents(sym) if sym else None)
     fine = PRESETS["fine"]
     surf1 = interpolate(view, mask, [p["lon"] for p in lvl.values()], [p["lat"] for p in lvl.values()], [p["basis"] for p in lvl.values()], **fine) if lvl else None
@@ -489,10 +544,13 @@ def build_pair(rows, crop: str, states, types, baseline: str, as_of: date, *, fe
                       note="No bids for these states and types", footer=f"JSA Basis Tracker | {len(lvl)} {_types_phrase(tset)} | blank = no bid within {fine['gap_km']:.0f} km")
     # the baseline and the deviation
     dev, preset, years_used, title2, sub2 = {}, "fine", [], f"{crop} Basis Deviation, {mmddyyyy(as_of)}", ""
+    note2 = "Not enough locations with a baseline" if sym else "No bids for these states and types"
     if sym:
-        grains = raw_grains(crop)
-        if baseline in ("3yr", "1yr"):
-            cur, _, _ = nearby_bids(rows, grain_ok, types=None, states=set(states), symbol=sym)
+        grains = raw_grains(spec["canonical"])
+        if baseline in ("3yr", "1yr") and not spec["history"]:
+            preset, sub2, note2 = "regional", f"Basis Deviation from the {BASELINES[baseline].lower()}", f"No {crop.lower()} history in the tracker before June 2026"
+        elif baseline in ("3yr", "1yr"):
+            cur, _, _ = nearby_bids(rows, grain_ok, types=None, states=set(states), symbol=sym, bid_ok=bid_ok)
             n_back = 3 if baseline == "3yr" else 1
             per = {}
             for y in range(as_of.year - n_back, as_of.year):
@@ -508,7 +566,7 @@ def build_pair(rows, crop: str, states, types, baseline: str, as_of: date, *, fe
         else:
             days, w = (30, 3) if baseline == "30d" else (7, 2)
             t = as_of - timedelta(days=days)
-            cur, _, _ = nearby_bids(rows, grain_ok, types=tset, states=set(states), symbol=sym)
+            cur, _, _ = nearby_bids(rows, grain_ok, types=tset, states=set(states), symbol=sym, bid_ok=bid_ok)
             then = nearby_from_rows(fetch(grains, *window_bounds(t, w), spot=False, symbol=sym), t, symbol=sym)
             dev = deviation(cur, {k: {"basis": v["basis"], "years": 1} for k, v in then.items()})
             title2 = f"{crop} Basis Change, {mmddyyyy(as_of)}"
@@ -518,7 +576,7 @@ def build_pair(rows, crop: str, states, types, baseline: str, as_of: date, *, fe
         surf2 = interpolate(view, mask, [p["lon"] for p in dev.values()], [p["lat"] for p in dev.values()], [p["basis"] for p in dev.values()], **PRESETS[preset])
     what = "locations with history (mostly plants and terminals)" if baseline in ("3yr", "1yr") else _types_phrase(tset)
     p2 = render_panel(surf2, view, geo, mask, title=title2, subtitle=sub2, mode="diverging", legend_title="cents/bu", futures=fut,
-                      note="Not enough locations with a baseline" if sym else "No bids for these states and types",
+                      note=note2,
                       markers=[(p["lon"], p["lat"]) for p in dev.values()] if preset == "regional" else None,
                       footer=f"JSA Basis Tracker | {len(dev)} {what}" + (" | dots = those locations" if preset == "regional" else ""))
     img = compose([p1, p2])

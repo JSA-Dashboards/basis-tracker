@@ -540,7 +540,7 @@ counties does exactly that).
 ## 🌡️ Basis Maps tab — AgManager-style basis surface and deviation (`basis_map.py`, 2026-10-27)
 
 Kolten 2026-10-27, with a page of AgManager.info maps (Nebraska / Kansas soybean and corn basis, "cash price minus nearby futures price", and the basis deviation from the "3 year average basis"): "So now I am
-wanting to recreate something like this". A tab of its own after Map, **🌡️ Basis Maps**: for Corn or Soybeans, a Region (presets: Corn Belt, Western Corn Belt, Eastern Corn Belt, Nebraska and Kansas, or Custom states),
+wanting to recreate something like this". A tab of its own after Map, **🌡️ Basis Maps**: for a Commodity (Corn, Soybeans, Soft Red Winter Wheat, Hard Red Winter Wheat), a Region (presets: Corn Belt, Western Corn Belt, Eastern Corn Belt, Nebraska and Kansas, Soft red winter states, Hard red winter states, or Custom states),
 the Location types whose bids make the surface (country elevators by default) and a **Compare with** switch, it draws two panels side by side as one PNG (`st.image`; a Download PNG button on the admin build only,
 like every download): the **basis surface** and its **deviation** from the baseline. Each panel is the AgManager layout: bold underlined title ('Corn Basis, 10-27-2026'), the formula as subtitle, a futures box ('CBT Dec
 Futures Price: $4.49', the price of the contract the bids are quoted against), a ten-class legend box in cents, the surface with county lines and heavier state lines, the JSA logo. The PNG is the product: it is built by
@@ -556,13 +556,21 @@ pure code with Pillow and numpy (no matplotlib, no shapely, no Streamlit), so it
   so for the same days of 2023-25 only the `jsa_history` weekly files exist: 29 corn and 64 soybean locations with two or more years (checked 2026-10-27), almost all crush plants and river terminals (the Illinois River
   corn terminals share one series), which is why 3-year / last-year ignore the Location-type filter (history exists for those alone), use a broad 'regional' interpolation (up to 220 km) and mark the locations with dots,
   and why the caption says so. 30 / 7 days ago have every location (478 corn country elevators). The history deepens by itself: by Oct 2027 last year's days are daily bids, by 2029 a true 3-year average.
+- **Wheat (Kolten 2026-10-27, "Add wheat to the basis maps").** The grain map has no wheat classes (only plain `Wheat`, `Wheat (HWW)`, `Wheat (Durum)`), so a class is **the futures market the bid is quoted against**: the registry
+  `COMMODITIES` (`commodity_spec`) makes *Soft Red Winter Wheat* the `Wheat` bids on **ZW** (Chicago: 151 locations with a nearby bid on 10-27, 86 of them on the December contract ZWZ26, the deferred ZWN27-only ones are
+  left out and counted as 'another contract') and *Hard Red Winter Wheat* the `Wheat` bids on **KE** (Kansas City: 62 locations, 59 on KEZ26). `nearby_bids(..., bid_ok=)` narrows a location's bids to its own market BEFORE the
+  nearest delivery is chosen, so an elevator that posts both a Chicago and a Kansas City bid is in each map with its own bid; `Wheat (HWW)` / `Wheat (Durum)` are not either class. The futures box names the exchange from the
+  symbol root (`futures_label`: 'CBT Dec Futures Price: $5.12', 'KC Dec Futures Price: $5.30'). Spring wheat (MWE / MW) has 5 locations: too few to map, left out. **Wheat compares with 30 or 7 days ago only:** the tracker
+  holds no wheat before June 2026 (the 2026 web forward rows, 257 locations), so `baselines_for` offers those two, the tab resets 'Compare with' and Region when the Commodity changes, and `build_pair` asked for 3yr / 1yr
+  makes no database call and says on the panel that there is no history. Country-elevator wheat maps are patchy (about 56 soft red winter and 41 hard red winter country elevators): clear the Location type for the plants
+  and terminals too. The legend prints tenths of a cent where whole cents would repeat (`edge_labels`: a hard red winter month that moved 3 cents would read +3 +2 +1 +1 0 -1 -1 -2 -3 -3).
 - **Data readers added to `database.py`:** `get_raw_grains(canonical)` (the grain map's raw names, inactive ones left out) and `get_basis_window(grains, start, end, spot=None, symbol=None)` (the basis rows of the snapshots in a
   window; spot / forward and one contract can be asked for, which keeps a recent window to one day's bids). **Outlines:** `data/maps/us_geometry.json.gz` (341 KB: the lower 48's state rings, county lines and state lines,
   simplified to 0.01 degree, county borders noded and de-duplicated), built once by `python heat_build.py geometry` (shapely, requirements-dev.txt) from the same Plotly county GeoJSON as the heat lattice. A copy of the
   app without that file hides the tab's content with a note (`basis_map.available()`).
 - **Tests:** `tests/test_basis_map.py` (the view and its mask against Iowa's real area, the surface on constant / gradient / sparse fields, classes and colours, the points and baselines, panels as pixels, the whole pair
-  with stand-in readers for each baseline, the two database readers on a throwaway SQLite). **Not built yet:** wheat (the baseline history exists for it, the corn / soybean pair is the AgManager sample), a $/bushel legend
-  option (the sample's), and putting the PNG into an email or report (the picture is pure, so it is a call).
+  with stand-in readers for each baseline, the wheat classes (futures label and root, registry, regions, baselines, the Chicago / Kansas City split of `nearby_bids`, a soft and a hard red winter pair, the legend decimals), the
+  two database readers on a throwaway SQLite). **Not built yet:** a $/bushel legend option (the AgManager sample's), and putting the PNG into an email or report (the picture is pure, so it is a call).
 
 ## Scrapers
 

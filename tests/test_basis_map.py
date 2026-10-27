@@ -273,6 +273,110 @@ except ValueError:
 check("an unknown baseline is refused", bad)
 check("the region presets are all real states", all(s in geo["states"] for ss in bm.REGIONS.values() for s in ss))
 
+print("wheat")
+check("tenths of a cent where asked, a plain 0 whenever the rounded value is zero (never '-0.0')", bm.fmt_cents(0.64, True, 1) == "+0.6" and bm.fmt_cents(-0.64, True, 1) == "-0.6" and bm.fmt_cents(-0.04, True, 1) == "0"
+      and bm.fmt_cents(2.456, False, 2) == "2.46" and bm.fmt_cents(-18.4, False, 0) == "-18")
+wide = np.linspace(-44.0, 44.0, 11)
+narrow = np.linspace(-3.0, 3.0, 11)
+check("the legend is in whole cents while whole cents are all different (a wide scale), in tenths when they would repeat (a hard red winter month that moved 3 cents), and says zero as 0",
+      bm.edge_labels(wide, True) == ["-44", "-35", "-26", "-18", "-9", "0", "+9", "+18", "+26", "+35"]
+      and bm.edge_labels(narrow, True) == ["-3.0", "-2.4", "-1.8", "-1.2", "-0.6", "0", "+0.6", "+1.2", "+1.8", "+2.4"], (bm.edge_labels(wide, True), bm.edge_labels(narrow, True)))
+check("a level scale of deciles that are whole cents apart keeps whole cents", bm.edge_labels(np.array([-104.0, -89, -83, -70, -51, -45, -37, -31, -27, -20, 5]), False)[:3] == ["-104", "-89", "-83"])
+check("the futures box names the market: Chicago for soft red winter, KC for hard red winter, a three-letter root (Minneapolis) as it is",
+      bm.futures_label("ZWZ26", 512.0) == "CBT Dec Futures Price: $5.12" and bm.futures_label("KEZ26", 530.0) == "KC Dec Futures Price: $5.30"
+      and bm.futures_label("ZWN27", 600.0) == "CBT Jul Futures Price: $6.00" and bm.futures_label("MWEZ26", 600.0) == "MWE Dec Futures Price: $6.00", bm.futures_label("MWEZ26", 600.0))
+check("the market of a contract symbol is its root; one that does not end in a month and two digits is returned as it is",
+      [bm.futures_root(x) for x in ("ZWZ26", "KEZ26", "MWEZ26", "ZCH27", "ZC", "", None, "@MW")] == ["ZW", "KE", "MWE", "ZC", "ZC", "", "", "@MW"])
+check("the registry has corn, soybeans and the two winter wheats; every one opens on a real region", list(bm.COMMODITIES) == ["Corn", "Soybeans", "Soft Red Winter Wheat", "Hard Red Winter Wheat"]
+      and all(spec["region"] in bm.REGIONS for spec in bm.COMMODITIES.values()))
+check("wheat's regions are the soft red winter states and the hard red winter states, real states all", all(s_ in geo["states"] for k in ("Soft red winter states", "Hard red winter states") for s_ in bm.REGIONS[k])
+      and bm.default_region("Soft Red Winter Wheat") == "Soft red winter states" and bm.default_region("Hard Red Winter Wheat") == "Hard red winter states" and bm.default_region("Corn") == "Corn Belt")
+check("a name the registry does not know is a grain of that name (with history, on the Corn Belt)", bm.commodity_spec("Oats")["grain"]("Oats") and not bm.commodity_spec("Oats")["grain"]("Corn")
+      and bm.commodity_spec("Oats")["history"] and bm.default_region("Oats") == "Corn Belt")
+check("corn and soybeans offer all four comparisons, wheat only 30 and 7 days (the tracker holds no wheat before June 2026)",
+      bm.baselines_for("Corn") == list(bm.BASELINES) and bm.baselines_for("Soybeans") == list(bm.BASELINES) and bm.baselines_for("Hard Red Winter Wheat") == ["30d", "7d"] and bm.baselines_for("Soft Red Winter Wheat") == ["30d", "7d"])
+check("wheat is the grain map's plain 'Wheat': a hard white winter or durum row is not soft or hard red winter", all(bm.COMMODITIES[c]["grain"]("Wheat") and not bm.COMMODITIES[c]["grain"]("Wheat (HWW)")
+      and not bm.COMMODITIES[c]["grain"]("Wheat (Durum)") and not bm.COMMODITIES[c]["grain"]("Corn") for c in ("Soft Red Winter Wheat", "Hard Red Winter Wheat")))
+wrows = [
+    loc("W", "both", 39.0, -90.0, [bid("Wheat", "Oct 2026", "ZWZ26", -55), bid("Wheat", "Nov 2026", "KEZ26", -70)], state="IL"),
+    loc("W", "kc", 38.5, -98.0, [bid("Wheat", "Oct 2026", "KEZ26", -60)], state="KS"),
+    loc("W", "kclate", 38.0, -97.0, [bid("Wheat", "Oct 2026", "ZWZ26", -40), bid("Wheat", "Nov 2026", "KEZ26", -80)], state="KS"),
+    loc("W", "deferred", 40.0, -89.0, [bid("Wheat", "Jul 2027", "ZWN27", -30)], state="IL"),
+    loc("W", "white", 39.5, -91.0, [bid("Wheat (HWW)", "Oct 2026", "ZWZ26", -10)], state="IL"),
+]
+srw = lambda **k: bm.nearby_bids(wrows, bm.COMMODITIES["Soft Red Winter Wheat"]["grain"], bid_ok=lambda b: bm.futures_root(b["futures_symbol"]) == "ZW", **k)
+hrw = lambda **k: bm.nearby_bids(wrows, bm.COMMODITIES["Hard Red Winter Wheat"]["grain"], bid_ok=lambda b: bm.futures_root(b["futures_symbol"]) == "KE", **k)
+ps, ss, os_ = srw()
+ph, sh, oh = hrw()
+check("soft red winter is the bids quoted against Chicago: a location that bids both is in it with its Chicago bid (-55), against the Dec contract; the deferred July bid is left out and counted",
+      set(ps) == {("W", "both"), ("W", "kclate")} and ss == "ZWZ26" and ps[("W", "both")]["basis"] == -55 and os_ == 1 and ("W", "kc") not in ps, (list(ps), ss, os_))
+check("hard red winter is the bids quoted against Kansas City: the same location's KC bid (-70) is its nearest KC bid even though its Chicago bid is earlier, and a location whose only nearby is Chicago's is not in it",
+      set(ph) == {("W", "both"), ("W", "kc"), ("W", "kclate")} and sh == "KEZ26" and ph[("W", "both")]["basis"] == -70 and ph[("W", "kclate")]["basis"] == -80 and oh == 0, (list(ph), sh, ph.get(("W", "both"))))
+check("the filter works before the nearest month is picked: 'kclate' is soft red winter -40 (Oct) and hard red winter -80 (Nov)", ps[("W", "kclate")]["basis"] == -40 and ph[("W", "kclate")]["basis"] == -80)
+
+W_IL = [("S%02d" % i, 38.0 + (i // 4) * 0.8, -91.0 + (i % 4) * 0.9) for i in range(12)]
+W_KS = [("K%02d" % i, 37.2 + (i // 4) * 0.6, -100.0 + (i % 4) * 0.9) for i in range(12)]
+wbig = ([loc("W", n, la, lo, [bid("Wheat", "Oct 2026", "ZWZ26", -60 + i)], state="IL") for i, (n, la, lo) in enumerate(W_IL)]
+        + [loc("W", f"late{i}", 39.0 + i * 0.3, -90.0, [bid("Wheat", "Jul 2027", "ZWN27", -35)], state="IL") for i in range(4)]
+        + [loc("W", n, la, lo, [bid("Wheat", "Oct 2026", "KEZ26", -70 + i)], state="KS") for i, (n, la, lo) in enumerate(W_KS)]
+        + [loc("W", "ilkc", 39.0, -90.3, [bid("Wheat", "Oct 2026", "KEZ26", -90)], state="IL")])
+wcalls, wgrains, wfut = [], [], []
+
+
+def wfetch(grains, start, end, spot=None, symbol=None):
+    wcalls.append((start, end, spot, symbol))
+    nm = W_IL if symbol == "ZWZ26" else W_KS
+    return [wr("W", n, "2026-09-26T15:45:00", False, "Oct 2026", symbol, -70 + i) for i, (n, la, lo) in enumerate(nm)]
+
+
+wcommon = dict(fetch=wfetch, raw_grains=lambda c: (wgrains.append(c) or [c]), futures_cents=lambda sy: (wfut.append(sy) or 512.0))
+rs = bm.build_pair(wbig, "Soft Red Winter Wheat", ["IL"], ["Country Elevator"], "30d", date(2026, 10, 27), width=300, **wcommon)
+check("a soft red winter pair: the 12 Oct elevators against ZWZ26 (the Chicago bid of the KC-only location is not one), the 4 deferred-only ones counted as another contract",
+      rs["error"] is None and rs["symbol"] == "ZWZ26" and rs["n_level"] == 12 and rs["n_other"] == 4 and rs["png"][:4] == b"\x89PNG", {k: v for k, v in rs.items() if k not in ("image", "png")})
+check("... its 30-day baseline reads the Chicago contract's forward rows only, and the history readers are asked for the grain map's 'Wheat'; the futures box asks for the Chicago price",
+      wcalls == [("2026-09-24T00:00:00", "2026-10-01T00:00:00", False, "ZWZ26")] and wgrains == ["Wheat"] and wfut == ["ZWZ26"], (wcalls, wgrains, wfut))
+check("... and the 12 locations that had a bid then and now are compared", rs["n_dev"] == 12 and rs["dev_years"] == [])
+wcalls.clear()
+rh = bm.build_pair(wbig, "Hard Red Winter Wheat", ["KS"], ["Country Elevator"], "7d", date(2026, 10, 27), width=300, **wcommon)
+check("a hard red winter pair works the same way against KEZ26, seven days back", rh["error"] is None and rh["symbol"] == "KEZ26" and rh["n_level"] == 12 and rh["n_dev"] == 12 and wcalls == [("2026-10-18T00:00:00", "2026-10-23T00:00:00", False, "KEZ26")], (rh["symbol"], rh["n_level"], wcalls))
+wcalls.clear()
+rm = bm.build_pair(wbig, "Soft Red Winter Wheat", ["IL"], ["Country Elevator"], "3yr", date(2026, 10, 27), width=300, **wcommon)
+check("a multi-year baseline for wheat is not attempted (no history to read): no database call, no deviation, the panel says so, nothing crashes",
+      rm["error"] is None and wcalls == [] and rm["n_dev"] == 0 and rm["dev_years"] == [] and rm["png"][:4] == b"\x89PNG" and rm["n_level"] == 12)
+rall = bm.build_pair(wbig, "Soft Red Winter Wheat", ["IL", "KS"], [], "30d", date(2026, 10, 27), width=300, **wcommon)
+check("in a region with both wheats each class keeps to its own market: of Illinois and Kansas together the soft red winter map holds the 12 Illinois elevators that quote Chicago, not the 12 Kansas elevators or the Illinois one that quotes Kansas City",
+      rall["n_level"] == 12 and rall["symbol"] == "ZWZ26", rall["n_level"])
+
+# a location that posts a NEARER Chicago month and a LATER Kansas City month: the market is chosen before the nearest month in the comparison's bids too
+W_BOTH = [("B%02d" % i, 37.4 + (i // 4) * 0.6, -99.5 + (i % 4) * 0.9) for i in range(8)]
+wboth = [loc("W", n, la, lo, [bid("Wheat", "Oct 2026", "ZWZ26", -50), bid("Wheat", "Nov 2026", "KEZ26", -75 + i)], state="KS") for i, (n, la, lo) in enumerate(W_BOTH)]
+wbcalls = []
+
+
+def wfetch_both(grains, start, end, spot=None, symbol=None):
+    wbcalls.append((start[:4], spot, symbol))
+    yr = int(start[:4])
+    if spot is False:                                                                          # the 30 / 7-day windows: the forward rows of the contract asked for
+        return [wr("W", n, "2026-10-20T15:45:00", False, "Nov 2026", symbol, -80 + i) for i, (n, la, lo) in enumerate(W_BOTH)]
+    return [wr("W", n, f"{yr}-10-27T00:00:00", True, "Spot", "KE", -80 + i + (yr - 2023)) for i, (n, la, lo) in enumerate(W_BOTH)]   # the weekly history files: spot rows
+
+
+wbcommon = dict(fetch=wfetch_both, raw_grains=lambda c: [c], futures_cents=lambda sy: 530.0)
+rb = bm.build_pair(wboth, "Hard Red Winter Wheat", ["KS"], ["Country Elevator"], "7d", date(2026, 10, 27), width=300, **wbcommon)
+check("a location whose Chicago month is nearer than its Kansas City month is in the hard red winter change map with its Kansas City bid (+5 on last week's -80 + i), not dropped: the market comes before the nearest month in the comparison too",
+      rb["symbol"] == "KEZ26" and rb["n_level"] == 8 and rb["n_dev"] == 8, {k: v for k, v in rb.items() if k not in ("image", "png")})
+hist = bm.COMMODITIES["Hard Red Winter Wheat"]
+hist["history"] = True                                                                         # the day the tracker holds three years of wheat
+wbcalls.clear()
+try:
+    offered = bm.baselines_for("Hard Red Winter Wheat")
+    ry = bm.build_pair(wboth, "Hard Red Winter Wheat", ["KS"], [], "3yr", date(2026, 10, 27), width=300, **wbcommon)
+finally:
+    hist["history"] = False
+check("... and the day wheat has history it is compared like corn: all four baselines on offer, the three years asked for, the same 8 locations' Kansas City bids compared (not dropped for their nearer Chicago month)",
+      offered == list(bm.BASELINES) and [c[0] for c in wbcalls] == ["2023", "2024", "2025"] and ry["dev_years"] == [2023, 2024, 2025] and ry["n_dev"] == 8, ({k: v for k, v in ry.items() if k not in ("image", "png")}, wbcalls))
+check("... and once the flag is back to False the multi-year baseline is not attempted again", bm.baselines_for("Hard Red Winter Wheat") == ["30d", "7d"])
+
 print("the two database readers")
 database.DB_PATH = Path(tempfile.mkdtemp(prefix="bm_")) / "t.db"
 assert database._backend() == "sqlite", "refusing to run on a non-sqlite backend"
