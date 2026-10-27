@@ -1,0 +1,481 @@
+{
+ "Corn": {
+  "2021": {
+   "counties": 1937,
+   "drawn": 14986425000,
+   "estimated_counties": 466,
+   "estimated_pct": 19.5,
+   "left_off": [
+    [
+     "OR",
+     13200000
+    ],
+    [
+     "FL",
+     11616000
+    ],
+    [
+     "AZ",
+     3258000
+    ],
+    [
+     "UT",
+     3043000
+    ]
+   ],
+   "official": 15017788000,
+   "published_pct": 80.3
+  },
+  "2022": {
+   "counties": 1901,
+   "drawn": 13584749800,
+   "estimated_counties": 389,
+   "estimated_pct": 7.7,
+   "left_off": [
+    [
+     "OR",
+     10665000
+    ],
+    [
+     "AZ",
+     9900000
+    ],
+    [
+     "FL",
+     9184000
+    ],
+    [
+     "WY",
+     8568000
+    ],
+    [
+     "MT",
+     7728000
+    ],
+    [
+     "NJ",
+     6612000
+    ],
+    [
+     "NM",
+     5364000
+    ],
+    [
+     "WV",
+     5040000
+    ],
+    [
+     "UT",
+     2310000
+    ]
+   ],
+   "official": 13650531000,
+   "published_pct": 91.9
+  },
+  "2023": {
+   "counties": 1889,
+   "drawn": 15266083000,
+   "estimated_counties": 459,
+   "estimated_pct": 13.8,
+   "left_off": [
+    [
+     "OR",
+     11770000
+    ],
+    [
+     "NJ",
+     10920000
+    ],
+    [
+     "FL",
+     9796000
+    ],
+    [
+     "MT",
+     8772000
+    ],
+    [
+     "WY",
+     8721000
+    ],
+    [
+     "AZ",
+     7828000
+    ],
+    [
+     "NM",
+     7285000
+    ],
+    [
+     "UT",
+     4995000
+    ],
+    [
+     "WV",
+     4350000
+    ]
+   ],
+   "official": 15340520000,
+   "published_pct": 85.8
+  },
+  "2024": {
+   "counties": 1885,
+   "drawn": 14826711000,
+   "estimated_counties": 618,
+   "estimated_pct": 25.3,
+   "left_off": [
+    [
+     "OR",
+     13104000
+    ],
+    [
+     "WY",
+     10075000
+    ],
+    [
+     "NJ",
+     9577000
+    ],
+    [
+     "NM",
+     7693000
+    ],
+    [
+     "FL",
+     6627000
+    ],
+    [
+     "MT",
+     6545000
+    ],
+    [
+     "UT",
+     4509000
+    ],
+    [
+     "AZ",
+     4275000
+    ],
+    [
+     "WV",
+     2640000
+    ]
+   ],
+   "official": 14891756000,
+   "published_pct": 74.4
+  },
+  "2025": {
+   "counties": 1883,
+   "drawn": 16891280700,
+   "estimated_counties": 672,
+   "estimated_pct": 27.5,
+   "left_off": [
+    [
+     "OR",
+     17700000
+    ],
+    [
+     "NJ",
+     10787000
+    ],
+    [
+     "MT",
+     10164000
+    ],
+    [
+     "FL",
+     8835000
+    ],
+    [
+     "WY",
+     7830000
+    ],
+    [
+     "NM",
+     7612000
+    ],
+    [
+     "UT",
+     5676000
+    ],
+    [
+     "WV",
+     4743000
+    ],
+    [
+     "AZ",
+     2574000
+    ]
+   ],
+   "official": 16963628000,
+   "published_pct": 72.1
+  }
+ },
+ "Soybeans": {
+  "2021": {
+   "counties": 1687,
+   "drawn": 4463630000,
+   "estimated_counties": 363,
+   "estimated_pct": 19.0,
+   "left_off": [],
+   "official": 4464492000,
+   "published_pct": 81.0
+  },
+  "2022": {
+   "counties": 1671,
+   "drawn": 4270381000,
+   "estimated_counties": 303,
+   "estimated_pct": 6.7,
+   "left_off": [],
+   "official": 4270381000,
+   "published_pct": 93.3
+  },
+  "2023": {
+   "counties": 1666,
+   "drawn": 4162057000,
+   "estimated_counties": 388,
+   "estimated_pct": 14.0,
+   "left_off": [],
+   "official": 4162057000,
+   "published_pct": 86.0
+  },
+  "2024": {
+   "counties": 1661,
+   "drawn": 4374228000,
+   "estimated_counties": 542,
+   "estimated_pct": 24.4,
+   "left_off": [],
+   "official": 4374228000,
+   "published_pct": 75.6
+  },
+  "2025": {
+   "counties": 1666,
+   "drawn": 4261038000,
+   "estimated_counties": 594,
+   "estimated_pct": 28.1,
+   "left_off": [],
+   "official": 4261038000,
+   "published_pct": 71.9
+  }
+ },
+ "Wheat": {
+  "2021": {
+   "counties": 1467,
+   "drawn": 1629324000,
+   "estimated_counties": 468,
+   "estimated_pct": 16.6,
+   "left_off": [
+    [
+     "AL",
+     9130000
+    ],
+    [
+     "UT",
+     4278000
+    ],
+    [
+     "DE",
+     2450000
+    ],
+    [
+     "NJ",
+     1072000
+    ]
+   ],
+   "official": 1646254000,
+   "published_pct": 82.6
+  },
+  "2022": {
+   "counties": 1363,
+   "drawn": 1595086000,
+   "estimated_counties": 406,
+   "estimated_pct": 16.0,
+   "left_off": [
+    [
+     "PA",
+     15330000
+    ],
+    [
+     "AL",
+     8640000
+    ],
+    [
+     "NY",
+     7200000
+    ],
+    [
+     "GA",
+     5800000
+    ],
+    [
+     "SC",
+     5700000
+    ],
+    [
+     "DE",
+     4104000
+    ],
+    [
+     "UT",
+     3168000
+    ],
+    [
+     "WY",
+     1615000
+    ],
+    [
+     "NJ",
+     1540000
+    ],
+    [
+     "NM",
+     1530000
+    ]
+   ],
+   "official": 1649713000,
+   "published_pct": 81.2
+  },
+  "2023": {
+   "counties": 1355,
+   "drawn": 1738464000,
+   "estimated_counties": 460,
+   "estimated_pct": 21.7,
+   "left_off": [
+    [
+     "PA",
+     17480000
+    ],
+    [
+     "AL",
+     10875000
+    ],
+    [
+     "NY",
+     9720000
+    ],
+    [
+     "DE",
+     6348000
+    ],
+    [
+     "SC",
+     5510000
+    ],
+    [
+     "GA",
+     4675000
+    ],
+    [
+     "UT",
+     4611000
+    ],
+    [
+     "WY",
+     2700000
+    ],
+    [
+     "NJ",
+     2624000
+    ],
+    [
+     "NM",
+     935000
+    ]
+   ],
+   "official": 1803942000,
+   "published_pct": 75.5
+  },
+  "2024": {
+   "counties": 1333,
+   "drawn": 1930171000,
+   "estimated_counties": 1276,
+   "estimated_pct": 98.0,
+   "left_off": [
+    [
+     "PA",
+     15000000
+    ],
+    [
+     "NY",
+     9000000
+    ],
+    [
+     "UT",
+     4851000
+    ],
+    [
+     "AL",
+     4260000
+    ],
+    [
+     "DE",
+     3744000
+    ],
+    [
+     "GA",
+     3540000
+    ],
+    [
+     "SC",
+     3510000
+    ],
+    [
+     "WY",
+     2821000
+    ],
+    [
+     "NM",
+     1800000
+    ]
+   ],
+   "official": 1978697000,
+   "published_pct": 1.9
+  },
+  "2025": {
+   "counties": 1368,
+   "drawn": 1951255700,
+   "estimated_counties": 566,
+   "estimated_pct": 25.1,
+   "left_off": [
+    [
+     "NY",
+     7810000
+    ],
+    [
+     "UT",
+     5202000
+    ],
+    [
+     "NM",
+     4805000
+    ],
+    [
+     "GA",
+     4290000
+    ],
+    [
+     "AL",
+     4260000
+    ],
+    [
+     "SC",
+     3600000
+    ],
+    [
+     "DE",
+     3526000
+    ],
+    [
+     "WY",
+     2670000
+    ],
+    [
+     "PA",
+     1757300
+    ]
+   ],
+   "official": 1989176000,
+   "published_pct": 73.4
+  }
+ }
+}

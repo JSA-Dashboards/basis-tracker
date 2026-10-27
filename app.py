@@ -5146,6 +5146,7 @@ with tab_map:
     if tab_map.open:
         import pydeck as pdk
         import pandas as pd
+        import heat_layer as _heat
 
         # Pins are colored by Location Type (facility_type).
         _FTYPE_COLORS = {
@@ -5263,6 +5264,34 @@ with tab_map:
                 for r in filtered
             ])
 
+            # ── Production heat (heat_layer.py): NASS county production under the pins ─────────────────
+            heat_layers, heat_note, heat_palette, heat_pins, _pin_edge = [], None, "Heat", True, {}
+            if _heat.available():
+                hc1, hc2, hc3, hc4, hc5 = st.columns([1.5, 1, 1.4, 1.1, 0.8])
+                with hc1:
+                    heat_on = st.checkbox("🔥 Production heat", key="map_heat_on",
+                                          help="NASS county production for the commodity above, drawn under the pins: where the crop is grown. Counties NASS withheld are filled from their share of "
+                                               "their state in earlier years, so every state adds up to NASS's total.")
+                _hy = _heat.years(sel_commodity) if heat_on and sel_commodity in _heat.CROPS else []
+                if _hy:
+                    if st.session_state.get("map_heat_year") not in _hy:
+                        st.session_state["map_heat_year"] = _hy[0]
+                    with hc2:
+                        heat_year = st.selectbox("Crop year", _hy, key="map_heat_year")
+                    with hc3:
+                        heat_km = st.slider("Smoothing (km)", 40, 300, 150, 10, key="map_heat_km")
+                    with hc4:
+                        heat_palette = st.radio("Colors", list(_heat.PALETTES), horizontal=True, key="map_heat_palette")
+                    with hc5:
+                        heat_pins = st.checkbox("Pins", value=True, key="map_heat_pins", help="Untick to see the production heat on its own.")
+                    _hp = _heat.points(sel_commodity, heat_year)
+                    if len(_hp):
+                        heat_layers = [_heat.layer(_hp, _heat.radius_px(heat_km), heat_palette)]
+                        _pin_edge = {"stroked": True, "get_line_color": [255, 255, 255], "line_width_min_pixels": 1}      # pins keep their own colors on any heat
+                    heat_note = _heat.describe(sel_commodity, heat_year, heat_km, _heat.summary(sel_commodity, heat_year))
+                elif heat_on:
+                    st.caption(f"No production layer for {sel_commodity} (corn, soybeans and wheat only).")
+
             layer = pdk.Layer(
                 "ScatterplotLayer",
                 data=df,
@@ -5273,10 +5302,11 @@ with tab_map:
                 radius_max_pixels=18,
                 pickable=True,
                 auto_highlight=True,
+                **_pin_edge,
             )
             view = pdk.ViewState(latitude=39.5, longitude=-98.35, zoom=3.8, pitch=0)
             deck = pdk.Deck(
-                layers=[layer],
+                layers=heat_layers + ([layer] if heat_pins else []),
                 initial_view_state=view,
                 tooltip={"text": "{tooltip}"},
                 map_style="https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
@@ -5300,6 +5330,9 @@ with tab_map:
                 unsafe_allow_html=True,
             )
             st.caption(f"{len(filtered)} locations shown  •  geocoding may be incomplete — run `python geocode_locations.py` to fill gaps")
+            if heat_note:
+                st.markdown(_heat.legend_html(heat_palette), unsafe_allow_html=True)
+                st.caption(heat_note)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: SUMMARY

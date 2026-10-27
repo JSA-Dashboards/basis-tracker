@@ -496,6 +496,37 @@ list, read-only), `backtest [--days N]`, `state`. Things to know: snapshots are 
 that finishes after its budget keeps writing in its daemon thread, so a provider can look missing a moment and then fill; the Landus/ZFS/Georges/Jennie-O/CHS stale lists are real
 (Landus is `--no-landus` on the droplet). Deploy = `git pull --ff-only` on the droplet; `state/` is created on the first run, which mails once ("Basis pull check is on — N open issues") and is quiet after.
 
+## Map tab — production heat under the pins (`heat_layer.py` + `heat_build.py`, 2026-10-27)
+
+Kolten 2026-10-27, after the production heat map had first been built in rma-production-map's own dashboard: "No I am wanting this on the basis dashboard" (and, earlier, "Lets start with production
+concentration map but we will trend towards the basis on the map concept"). The 🗺️ Map tab has a **🔥 Production heat** checkbox (off by default; the view build has it too): NASS county production for the
+commodity picked in "Commodity (tooltip)" (corn, soybeans, wheat; any other says so) drawn as a deck.gl HeatmapLayer UNDER the basis pins, with Crop year, Smoothing (km), Colors (Heat / Green) and a Pins
+toggle (untick it to see the heat alone). The pins get a white edge while there is heat under them. Under the map: the gradient legend and a caption (what is drawn, how much NASS published, how the rest was
+filled, which states are left off). `app.py` only places the controls (about 30 lines in the Map tab, CRLF file: patch it in binary mode); everything else is `heat_layer.py`, pure and tested.
+
+**It runs on three small committed files** (`data/heat/`, 430 KB): `county_lattice.csv.gz` (fips, lon, lat: a 0.1-degree lattice of points inside every county), `county_production.csv.gz` (crop, year, fips, value, est:
+NASS bushels, corn / soybeans / wheat, 2021-2025) and `county_production_meta.json` (per crop-year: official, drawn, published_pct, estimated_pct, left_off). So the app needs no NASS key, no county shapes and no
+shapely, and nothing new in the Cloud Secrets. A county's value is divided evenly over its lattice points (deterministic; random dots speckle), so the heat follows county shapes and adds up to the NASS number. The
+smoothing is asked in km and turned into pixels for the Map tab's opening view (`radius_px`): the HeatmapLayer's visible kernel is only about a third of its pixel radius, and a pixel radius does not follow the
+zoom, so zooming in tightens the blur. pydeck cannot serialise a DataFrame under pandas 3, so the layer's data goes in as records.
+
+**NASS publishes fewer county figures every year, so the builder completes each year's counties (`heat_build.fill_withheld`).** Published counties held 90% of the US corn crop in 2022 and 73% in 2024 and 2025
+(Illinois 100% -> 63%), and NASS published only 2% of 2024 wheat's county figures at all (58 rows against 1,006 in 2023). Scaling the published counties up to the state total (what the S&D tab of
+rma-production-map does) moves the hot spots to whichever counties NASS happened to publish, so the builder keeps every published figure and spreads what a state's published counties leave of NASS's official
+state total over its withheld counties, by their share of the state in the latest of the 5 earlier years NASS published them. Every state then adds up to NASS's total; a state with no county at all (OR, NJ, MT, FL,
+WY, NM for corn: about 0.4% of the crop) is left off and named in the caption. A year NASS published under half of carries a warning ("mostly an estimate", `MOSTLY_ESTIMATED`). This is a copy of rma-production-map's
+`heat_map.fill_withheld` (tested in both repos), minus that app's RMA fallback, which is why this one looks back 5 years and that one 3.
+
+**Refreshing the data.** NASS's county figures for a crop year arrive after the January Crop Production Annual Summary; then `python heat_build.py production --years 2022-2026` (a NASS key: `--key`, `NASS_API_KEY`
+in the environment, or in `.env`; about 60 calls, answers cached in `state/heat_cache/` so a re-run is free), commit `data/heat/`, push, Reboot both Cloud apps. `lattice` needs shapely (requirements-dev.txt) and was
+done once from Plotly's county GeoJSON. The files are byte-stable (no gzip timestamp), so a rebuild with unchanged data shows no diff in git. The Map tab hides the control (`heat_layer.available()`) when the files
+are missing or damaged, so a copy of the app without them (a portal mirror that does not carry `data/`) still works.
+
+Checked on live data 2026-10-27 (local view build): corn 2025 16.89B bu over 1,883 counties (72% published; NASS official 16.96B), soybeans 4.26B over 1,666, wheat 1.95B; the same totals the rma-production-map heat
+tab showed (whose district numbers, IA North Central 474.3M bu and IL Northwest 423.0M bu, were checked against an independent QuickStats recompute). Tests: `tests/test_heat_layer.py` (49 checks, the shipped files
+included) and `tests/test_heat_build.py` (65: QuickStats rows, the fill, the files, the lattice). **Next:** basis on the same canvas (the pins' basis as colour, or a basis surface) and a 2026 forecast year (the
+state forecast spread by last year's shares: `fill_withheld` with no published counties does exactly that).
+
 ## Scrapers
 
 One module per source (`adm_`, `chs_`, `cargill_`, `bunge_`, `scoular_`, …).
