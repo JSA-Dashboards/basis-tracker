@@ -268,6 +268,38 @@ else:
     back = pd.read_csv(d3 / "county_lattice.csv.gz", dtype={"fips": str})
     check("it round-trips with its FIPS codes intact (leading zeros kept)", back["fips"].tolist() == lp["fips"].tolist() and set(back["fips"]) == {"17001", "17149", "17999", "19001"})
 
+print("the map outlines (build_geometry)")
+if not HAVE_SHAPELY:
+    print("  (shapely is not installed: outline tests skipped)")
+else:
+    def _box(x0, y0, x1, y1):
+        return {"type": "Polygon", "coordinates": [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]}
+
+    def _feat(st_, co, geom):
+        return {"type": "Feature", "properties": {"STATE": st_, "COUNTY": co, "NAME": co}, "geometry": geom}
+
+    def _length(lines):
+        return sum(math.hypot(b[0] - a[0], b[1] - a[1]) for ln in lines for a, b in zip(ln, ln[1:]))
+
+    G = hb.build_geometry({"features": [_feat("17", "001", _box(-91.5, 39.5, -91.0, 40.0)), _feat("17", "003", _box(-91.0, 39.5, -90.5, 40.0)), _feat("19", "001", _box(-91.5, 40.0, -91.0, 40.5)),
+                                        _feat("99", "001", _box(-80.0, 30.0, -79.0, 31.0)), _feat("17", "000", {"type": "Banana", "coordinates": []})]}, tol=0.001)
+    check("each state is one outline of its counties: IL's two counties are one ring spanning both, IA one ring; a state code we do not map (99) and an unreadable polygon are left out",
+          set(G["states"]) == {"IL", "IA"} and len(G["states"]["IL"]) == 1 and len(G["states"]["IA"]) == 1
+          and (min(x for x, y in G["states"]["IL"][0]), max(x for x, y in G["states"]["IL"][0])) == (-91.5, -90.5), G["states"])
+    check("a county border shared by two counties is drawn once: three half-degree squares have 5.0 degrees of distinct border, not the 6.0 of three separate outlines", abs(_length(G["county_lines"]) - 5.0) < 1e-6, _length(G["county_lines"]))
+    check("a state border shared by two states is drawn once too: IL's 3.0 round plus IA's 2.0, less the 0.5 they share", abs(_length(G["state_lines"]) - 4.5) < 1e-6, _length(G["state_lines"]))
+    check("lines are lists of two or more [lon, lat] points rounded to a thousandth of a degree", all(len(ln) >= 2 and all(len(pt) == 2 and round(pt[0], 3) == pt[0] and round(pt[1], 3) == pt[1] for pt in ln) for ln in G["county_lines"] + G["state_lines"]))
+    fine = hb.build_geometry({"features": [_feat("17", "001", {"type": "Polygon", "coordinates": [[[-91.0, 40.0], [-90.5, 40.0003], [-90.0, 40.0], [-90.0, 41.0], [-91.0, 41.0], [-91.0, 40.0]]]})]}, tol=0.01)
+    check("simplification drops a point within the tolerance of the line (the 0.0003-degree kink)", len(fine["states"]["IL"][0]) == 5, fine["states"]["IL"][0])
+    out_g = Path(tempfile.mkdtemp())
+    hb.write_geometry(G, out_g)
+    out_g2 = Path(tempfile.mkdtemp())
+    hb.write_geometry(G, out_g2)
+    import basis_map as _bm_
+    back = _bm_.geometry(str(out_g / "us_geometry.json.gz"))
+    check("the file reads back through basis_map exactly as it was built, and rebuilding gives the same bytes", back == G and (out_g / "us_geometry.json.gz").read_bytes() == (out_g2 / "us_geometry.json.gz").read_bytes())
+    check("the shipped file has 48 states and DC, with no Alaska or Hawaii", len(_bm_.geometry()["states"]) == 49 and not ({"AK", "HI"} & set(_bm_.geometry()["states"])))
+
 print("the command line")
 check("year ranges", hb._years("2021-2025") == [2021, 2022, 2023, 2024, 2025] and hb._years("2024") == [2024])
 try:

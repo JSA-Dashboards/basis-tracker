@@ -168,6 +168,18 @@ def _cached_futures_curve_for(date_str: str) -> dict:
     stored = get_futures_curve(date_str)
     return stored if stored else _cached_futures_curve()
 
+@st.cache_data(ttl=600, show_spinner=False)
+def _cached_basis_maps(crop: str, states: tuple, types: tuple, baseline: str, as_of_iso: str) -> dict:
+    """The Basis Maps tab's pair of pictures (basis_map.build_pair) as PNG bytes plus the numbers for its captions; cached ten minutes per choice and day."""
+    import basis_map as _bm
+    from datetime import date as _date
+    import database as _db
+    curve = _cached_futures_curve_for(as_of_iso)
+    r = _bm.build_pair(_cached_get_map_data(), crop, list(states), list(types), baseline, _date.fromisoformat(as_of_iso),
+                       fetch=_db.get_basis_window, raw_grains=_db.get_raw_grains, futures_cents=lambda sym: curve.get(sym))
+    return {k: v for k, v in r.items() if k != "image"}
+
+
 @st.cache_data(show_spinner=False)
 def _jsa_watermark_uri() -> str:
     """The JSA 50-year logo as a base64 data URI (for the table watermarks)."""
@@ -1643,7 +1655,7 @@ _admin = not _view_only()
 _tab_labels = ["🔔 Changes", "📈 Trends", "📊 Summary", "📋 Bids", "🚂 Rail FOB"]
 if _admin:
     _tab_labels.append("✏️ Rail Entry")      # admin: paste-in rail rundowns
-_tab_labels += ["🌊 River FOB", "🔀 Spread", "💵 Net Carry", "🗺️ Map"]
+_tab_labels += ["🌊 River FOB", "🔀 Spread", "💵 Net Carry", "🗺️ Map", "🌡️ Basis Maps"]
 if _admin:
     _tab_labels.append("📧 Client Reports")  # admin: personalized client basis emails
     _tab_labels.append("📥 Export")          # no download tab in the read-only build
@@ -1657,6 +1669,7 @@ tab_railfob  = _ti["🚂 Rail FOB"]
 tab_netcarry = _ti["💵 Net Carry"]
 tab_riverfob = _ti["🌊 River FOB"]
 tab_map      = _ti["🗺️ Map"]
+tab_bmaps    = _ti["🌡️ Basis Maps"]
 tab_summary  = _ti["📊 Summary"]
 tab_trends   = _ti["📈 Trends"]
 tab_spread   = _ti["🔀 Spread"]
@@ -5147,6 +5160,7 @@ with tab_map:
         import pydeck as pdk
         import pandas as pd
         import heat_layer as _heat
+        import map_basis as _mb
 
         # Pins are colored by Location Type (facility_type).
         _FTYPE_COLORS = {
@@ -5254,18 +5268,31 @@ with tab_map:
                 fut = f" ({fut})" if fut else ""
                 return f"{row['location']}  |  {_fmt_basis(bid['basis'])}{fut}"
 
+            # ── Pin colors (map_basis.py): the location type, or the basis in the tooltip relative to the pins shown ──
+            pin_mode = st.radio("Pin colors", ["Location type", "Basis"], horizontal=True, key="map_pin_mode",
+                                help="Basis: the bid in the tooltip (the commodity and delivery month above) sets the color: green where it is stronger than most of the pins shown, purple where it is weaker.")
+            _pin_unit = " C$/t" if sel_commodity == "Canola" else "c"
+            _bid_basis = {id(r): (_map_loc_bid(r) or {}).get("basis") for r in filtered}
+            _basis_scale = _mb.scale(list(_bid_basis.values())) if pin_mode == "Basis" else None
+
+            def _pin_color(r):
+                if _basis_scale:
+                    return _mb.color(_bid_basis[id(r)], _basis_scale)
+                return _FTYPE_COLORS.get(r.get("facility_type"), _DEFAULT_COLOR)
+
             df = pd.DataFrame([
                 {
                     "lat":     r["lat"],
                     "lon":     r["lon"],
                     "tooltip": _tooltip_text(r),
-                    "color":   _FTYPE_COLORS.get(r.get("facility_type"), _DEFAULT_COLOR),
+                    "color":   _pin_color(r),
                 }
                 for r in filtered
             ])
 
             # ── Production heat (heat_layer.py): NASS county production under the pins ─────────────────
-            heat_layers, heat_note, heat_palette, heat_pins, _pin_edge = [], None, "Heat", True, {}
+            heat_layers, heat_note, heat_palette, heat_pins = [], None, "Heat", True
+            _pin_edge = {"stroked": True, "get_line_color": [70, 70, 70, 170], "line_width_min_pixels": 1} if _basis_scale else {}      # a grey pin needs an edge on a light map
             if _heat.available():
                 hc1, hc2, hc3, hc4, hc5 = st.columns([1.5, 1, 1.4, 1.1, 0.8])
                 with hc1:
@@ -5314,7 +5341,7 @@ with tab_map:
             st.pydeck_chart(deck, use_container_width=True)
 
             # ── Legend by Location Type (only types present in the view) ──────────
-            _ftypes_shown = sorted({r["facility_type"] for r in filtered if r.get("facility_type")})
+            _ftypes_shown = [] if _basis_scale else sorted({r["facility_type"] for r in filtered if r.get("facility_type")})
             legend_parts = []
             for ft in _ftypes_shown:
                 c = _FTYPE_COLORS.get(ft, _DEFAULT_COLOR)
@@ -5329,10 +5356,71 @@ with tab_map:
                 '<div style="padding:8px 0;margin-top:4px">' + "".join(legend_parts) + "</div>",
                 unsafe_allow_html=True,
             )
+            if pin_mode == "Basis":
+                if _basis_scale:
+                    st.markdown(_mb.legend_html(_basis_scale, _pin_unit), unsafe_allow_html=True)
+                st.caption(_mb.describe(_basis_scale, sel_commodity, sel_deliv, sum(1 for _v in _bid_basis.values() if _v is None), _pin_unit))
             st.caption(f"{len(filtered)} locations shown  •  geocoding may be incomplete — run `python geocode_locations.py` to fill gaps")
             if heat_note:
                 st.markdown(_heat.legend_html(heat_palette), unsafe_allow_html=True)
                 st.caption(heat_note)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB: BASIS MAPS  (basis_map.py: AgManager-style surface of today's basis and its deviation)
+# ═══════════════════════════════════════════════════════════════════════════════
+with tab_bmaps:
+    if tab_bmaps.open:
+        import basis_map as _bm
+        if not _bm.available():
+            st.info("The map outlines (data/maps/us_geometry.json.gz) are not in this copy of the app, so the basis maps cannot be drawn.")
+        else:
+            from rail_corridors import today_ct as _today_ct
+            _bmd = _cached_get_map_data()
+            _bm_types = sorted({r["facility_type"] for r in _bmd if r.get("facility_type")})
+            st.caption("Today's basis between the bids, and how far it is from a baseline: where basis is strong or weak, and where it has moved. Blue is stronger, red weaker; "
+                       "purple is above the baseline, brown below. Each colour class is a tenth of the mapped area.")
+            bm1, bm2, bm3 = st.columns([1, 1.3, 1.7])
+            with bm1:
+                bm_crop = st.selectbox("Commodity", ["Corn", "Soybeans"], key="bm_crop")
+            with bm2:
+                bm_region = st.selectbox("Region", list(_bm.REGIONS) + ["Custom states"], key="bm_region")
+            with bm3:
+                bm_types = st.multiselect("Location type (the basis map)", _bm_types, default=["Country Elevator"] if "Country Elevator" in _bm_types else [], key="bm_types",
+                                          placeholder="All types",
+                                          help="Which kinds of location's bids make the surface. Country elevators are the default: a crush plant or river terminal bids at a different level, "
+                                               "and mixing them makes bumps around the plants. The 3-year and last-year comparisons always use every type, because the history files hold plants and terminals.")
+            bm4, bm5 = st.columns([1.3, 2.7])
+            with bm4:
+                bm_base = st.selectbox("Compare with", list(_bm.BASELINES), format_func=lambda k: _bm.BASELINES[k], key="bm_base",
+                                       help="The right-hand map is today's basis minus this. The 3-year average (the same days of the last three years) rests on the few dozen locations with that history; "
+                                            "30 and 7 days ago use every location, against the same futures contract.")
+            with bm5:
+                if bm_region == "Custom states":
+                    bm_states = st.multiselect("States", sorted(_bm.geometry()["states"]), default=["NE", "KS"], key="bm_states")
+                else:
+                    bm_states = _bm.REGIONS[bm_region]
+            _bm_asof = _today_ct()
+            if not bm_states:
+                st.info("Pick at least one state.")
+            else:
+                with st.spinner("Drawing the maps…"):
+                    _bm_r = _cached_basis_maps(bm_crop, tuple(bm_states), tuple(sorted(bm_types)), bm_base, _bm_asof.isoformat())
+                if _bm_r.get("error"):
+                    st.warning(_bm_r["error"])
+                else:
+                    st.image(_bm_r["png"], use_container_width=True)
+                    _bm_notes = [f"{_bm_r['n_level']:,} bids quoted against {_bm_r['symbol']}" + (f"; {_bm_r['n_other']:,} quoted against another contract are left out." if _bm_r["n_other"] else ".")] if _bm_r["symbol"] else ["No bids in these states for the location types picked."]
+                    if _bm_r["n_level"] < 80 and bm_types:
+                        _bm_notes.append("Few bids in these states for the location types picked, so much of the map is blank: clear the Location type box to use every type and fill it in.")
+                    if bm_base in ("30d", "7d"):
+                        _bm_notes.append(f"The right-hand map compares the {_bm_r['n_dev']:,} locations that had a bid both then and now, against the same futures contract.")
+                    if bm_base in ("3yr", "1yr"):
+                        _bm_notes.append(f"The deviation rests on {_bm_r['n_dev']:,} locations with {'two or more years of history' if bm_base == '3yr' else 'history from last year'} for these days "
+                                         f"({', '.join(str(y) for y in _bm_r['dev_years']) or 'none found'}), mostly plants and terminals, because the daily scrape of country elevators began in June 2026: "
+                                         "a broad regional picture, with the locations shown as dots.")
+                    st.caption("  \n".join(_bm_notes))
+                    if not _view_only():
+                        st.download_button("⬇️ Download PNG", _bm_r["png"], file_name=f"{bm_crop.lower()}_basis_maps_{_bm_asof.isoformat()}.png", mime="image/png", key="bm_dl")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TAB: SUMMARY

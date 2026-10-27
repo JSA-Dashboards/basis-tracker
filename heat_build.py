@@ -300,6 +300,75 @@ def write_lattice(df: pd.DataFrame, out: Path = OUT) -> None:
     df.to_csv(out / "county_lattice.csv.gz", index=False, compression={"method": "gzip", "mtime": 0})
 
 
+# -- the map outlines (basis_map.py) ------------------------------------------------------------------
+MAPS = HERE / "data" / "maps"
+SIMPLIFY = 0.01             # degrees (about 1 km): well under a pixel at any state-level map
+FIPS_ABBR = {"01": "AL", "04": "AZ", "05": "AR", "06": "CA", "08": "CO", "09": "CT", "10": "DE", "11": "DC", "12": "FL", "13": "GA", "16": "ID", "17": "IL", "18": "IN", "19": "IA", "20": "KS",
+             "21": "KY", "22": "LA", "23": "ME", "24": "MD", "25": "MA", "26": "MI", "27": "MN", "28": "MS", "29": "MO", "30": "MT", "31": "NE", "32": "NV", "33": "NH", "34": "NJ", "35": "NM",
+             "36": "NY", "37": "NC", "38": "ND", "39": "OH", "40": "OK", "41": "OR", "42": "PA", "44": "RI", "45": "SC", "46": "SD", "47": "TN", "48": "TX", "49": "UT", "50": "VT", "51": "VA",
+             "53": "WA", "54": "WV", "55": "WI", "56": "WY"}                  # the lower 48 and DC: Alaska, Hawaii and the territories are not on these maps
+
+
+def _round_line(coords) -> list:
+    out = []
+    for x, y in coords:
+        p = [round(float(x), 3), round(float(y), 3)]
+        if not out or out[-1] != p:
+            out.append(p)
+    return out
+
+
+def _line_parts(geom) -> list:
+    """The lines of a (Multi)LineString / collection as lists of [lon, lat], two points at least."""
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "LineString":
+        c = _round_line(geom.coords)
+        return [c] if len(c) >= 2 else []
+    if hasattr(geom, "geoms"):
+        return [p for g in geom.geoms for p in _line_parts(g)]
+    return []
+
+
+def build_geometry(geo: dict, tol: float = SIMPLIFY) -> dict:
+    """The outlines the basis maps draw, from a county GeoJSON (properties STATE + COUNTY):
+      states        {abbr: [ring, ...]}   each state's outer ring(s), simplified: what a map is clipped to (islands and the Upper Peninsula are rings of their own)
+      county_lines  [line, ...]           every county border once (shared borders noded and de-duplicated), simplified
+      state_lines   [line, ...]           every state border once
+    Rings and lines are lists of [lon, lat] rounded to 0.001 degree."""
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    by_state: dict = {}
+    for feat in geo["features"]:
+        ab = FIPS_ABBR.get(feat["properties"]["STATE"])
+        if not ab:
+            continue
+        try:
+            g = shape(feat["geometry"]).buffer(0)
+        except Exception:                                                     # noqa: BLE001 - one bad polygon must not stop the build
+            continue
+        if not g.is_empty:
+            by_state.setdefault(ab, []).append(g)
+    states, state_polys, county_edges = {}, [], []
+    for ab in sorted(by_state):
+        u = unary_union(by_state[ab])
+        state_polys.append(u)
+        s = u.simplify(tol, preserve_topology=True)
+        polys = list(s.geoms) if s.geom_type == "MultiPolygon" else [s]
+        states[ab] = [_round_line(p.exterior.coords) for p in polys if not p.is_empty]
+        county_edges.extend(g.boundary for g in by_state[ab])
+    county_lines = _line_parts(unary_union(county_edges).simplify(tol, preserve_topology=False))
+    state_lines = _line_parts(unary_union([p.boundary for p in state_polys]).simplify(tol, preserve_topology=False))
+    return {"states": states, "county_lines": county_lines, "state_lines": state_lines}
+
+
+def write_geometry(geom: dict, out: Path = MAPS) -> None:
+    out.mkdir(parents=True, exist_ok=True)
+    with gzip.GzipFile(out / "us_geometry.json.gz", "wb", mtime=0) as f:
+        f.write(json.dumps(geom, separators=(",", ":")).encode("utf-8"))
+
+
 # -- command line ------------------------------------------------------------------------------------------
 def _years(s: str) -> list:
     a, _, b = s.partition("-")
@@ -311,12 +380,25 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     pl = sub.add_parser("lattice", help="the county lattice (needs shapely; once)")
     pl.add_argument("--geojson", help="a local county GeoJSON (properties STATE, COUNTY); default: download Plotly's")
+    pg = sub.add_parser("geometry", help="the state / county outlines the basis maps draw (needs shapely; once)")
+    pg.add_argument("--geojson", help="a local county GeoJSON (properties STATE, COUNTY); default: download Plotly's")
     pp = sub.add_parser("production", help="NASS county production, withheld counties filled")
     pp.add_argument("--years", default=f"{time.localtime().tm_year - 5}-{time.localtime().tm_year - 1}", help="e.g. 2021-2025 (default: the last five completed years)")
     pp.add_argument("--crops", default=",".join(CROPS))
     pp.add_argument("--key")
     pp.add_argument("--no-cache", action="store_true", help="ask NASS again even where an answer is cached")
     a = ap.parse_args(argv)
+    if a.cmd == "geometry":
+        if a.geojson:
+            geo = json.loads(Path(a.geojson).read_text(encoding="utf-8"))
+        else:
+            with urllib.request.urlopen(COUNTY_GEOJSON, timeout=120) as r:
+                geo = json.load(r)
+        g = build_geometry(geo)
+        write_geometry(g)
+        print(f"geometry: {len(g['states'])} states, {len(g['county_lines'])} county lines ({sum(len(x) for x in g['county_lines'])} points), "
+              f"{len(g['state_lines'])} state lines -> {MAPS / 'us_geometry.json.gz'}")
+        return 0
     if a.cmd == "lattice":
         if a.geojson:
             geo = json.loads(Path(a.geojson).read_text(encoding="utf-8"))

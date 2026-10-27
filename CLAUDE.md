@@ -496,7 +496,7 @@ list, read-only), `backtest [--days N]`, `state`. Things to know: snapshots are 
 that finishes after its budget keeps writing in its daemon thread, so a provider can look missing a moment and then fill; the Landus/ZFS/Georges/Jennie-O/CHS stale lists are real
 (Landus is `--no-landus` on the droplet). Deploy = `git pull --ff-only` on the droplet; `state/` is created on the first run, which mails once ("Basis pull check is on — N open issues") and is quiet after.
 
-## Map tab — production heat under the pins (`heat_layer.py` + `heat_build.py`, 2026-10-27)
+## Map tab — production heat under the pins, pins coloured by basis (`heat_layer.py` + `heat_build.py` + `map_basis.py`, 2026-10-27)
 
 Kolten 2026-10-27, after the production heat map had first been built in rma-production-map's own dashboard: "No I am wanting this on the basis dashboard" (and, earlier, "Lets start with production
 concentration map but we will trend towards the basis on the map concept"). The 🗺️ Map tab has a **🔥 Production heat** checkbox (off by default; the view build has it too): NASS county production for the
@@ -519,13 +519,50 @@ WY, NM for corn: about 0.4% of the crop) is left off and named in the caption. A
 
 **Refreshing the data.** NASS's county figures for a crop year arrive after the January Crop Production Annual Summary; then `python heat_build.py production --years 2022-2026` (a NASS key: `--key`, `NASS_API_KEY`
 in the environment, or in `.env`; about 60 calls, answers cached in `state/heat_cache/` so a re-run is free), commit `data/heat/`, push, Reboot both Cloud apps. `lattice` needs shapely (requirements-dev.txt) and was
-done once from Plotly's county GeoJSON. The files are byte-stable (no gzip timestamp), so a rebuild with unchanged data shows no diff in git. The Map tab hides the control (`heat_layer.available()`) when the files
+done once from Plotly's county GeoJSON. The files carry no gzip timestamp, so a rebuild with unchanged data on the same machine shows no diff in git (the CSV's line endings follow the OS, so build on this PC, not the droplet, to keep it that way). The Map tab hides the control (`heat_layer.available()`) when the files
 are missing or damaged, so a copy of the app without them (a portal mirror that does not carry `data/`) still works.
 
 Checked on live data 2026-10-27 (local view build): corn 2025 16.89B bu over 1,883 counties (72% published; NASS official 16.96B), soybeans 4.26B over 1,666, wheat 1.95B; the same totals the rma-production-map heat
 tab showed (whose district numbers, IA North Central 474.3M bu and IL Northwest 423.0M bu, were checked against an independent QuickStats recompute). Tests: `tests/test_heat_layer.py` (49 checks, the shipped files
-included) and `tests/test_heat_build.py` (65: QuickStats rows, the fill, the files, the lattice). **Next:** basis on the same canvas (the pins' basis as colour, or a basis surface) and a 2026 forecast year (the
-state forecast spread by last year's shares: `fill_withheld` with no published counties does exactly that).
+included) and `tests/test_heat_build.py` (72: QuickStats rows, the fill, the files, the lattice, the map outlines).
+
+**Pins coloured by basis (`map_basis.py`, same day; Kolten: "we will trend towards the basis on the map concept", then "Yes" to colouring the pins by basis level over the production heat).** A **Pin colors**
+switch above the heat controls: *Location type* (the default, as before) or *Basis*. Basis colours each pin by the SAME bid the tooltip shows (the commodity and the delivery month picked above the map): purple
+where it is weaker than most of the pins shown, green where it is stronger, grey in the middle, a faint grey pin where the location has no bid for that month. Basis is not comparable across commodities,
+delivery months or location types (a river terminal and a country elevator sit at different levels), so the scale is always **relative to the pins shown**: the median of the bids on the map is the grey, the
+10th percentile the fullest purple and the 90th the fullest green (clipped beyond), so the Location Type and State filters compare a place with its peers. The legend and a caption under the map give the numbers
+(corn, spot, 2026-10-27: median -35c, fullest colours at -80c and +9c over 1,002 bids; weak across the northern Plains and Upper Midwest, strong along the river, the south and the east). Fewer than five bids
+(`MIN_BIDS`) and the pins keep their location-type colours and the caption says why. Purple / green, not red / green, so the pins read on the heat's yellow-to-red and for colour-blind readers; a basis-coloured pin
+gets a grey edge (a white one when the heat is on). Canola keeps its C$/t unit. `tests/test_map_basis.py` (35 checks: the percentile scale, position and colours, shift / scale invariance, the words).
+**Next:** a basis SURFACE (interpolated over the locations) if the pins are not enough, and a 2026 forecast year for the heat (the state forecast spread by last year's shares: `fill_withheld` with no published
+counties does exactly that).
+
+## 🌡️ Basis Maps tab — AgManager-style basis surface and deviation (`basis_map.py`, 2026-10-27)
+
+Kolten 2026-10-27, with a page of AgManager.info maps (Nebraska / Kansas soybean and corn basis, "cash price minus nearby futures price", and the basis deviation from the "3 year average basis"): "So now I am
+wanting to recreate something like this". A tab of its own after Map, **🌡️ Basis Maps**: for Corn or Soybeans, a Region (presets: Corn Belt, Western Corn Belt, Eastern Corn Belt, Nebraska and Kansas, or Custom states),
+the Location types whose bids make the surface (country elevators by default) and a **Compare with** switch, it draws two panels side by side as one PNG (`st.image`; a Download PNG button on the admin build only,
+like every download): the **basis surface** and its **deviation** from the baseline. Each panel is the AgManager layout: bold underlined title ('Corn Basis, 10-27-2026'), the formula as subtitle, a futures box ('CBT Dec
+Futures Price: $4.49', the price of the contract the bids are quoted against), a ten-class legend box in cents, the surface with county lines and heavier state lines, the JSA logo. The PNG is the product: it is built by
+pure code with Pillow and numpy (no matplotlib, no shapely, no Streamlit), so it can go into an email or report as it is.
+
+- **The surface (`interpolate`).** Each location's nearest-delivery basis (the Map tab's 'Spot (Front Month)' bid, `nearby_bids`), kept to ONE futures contract (the most common one, ZCZ26 for 97% of corn bids; the
+  rest are counted and left out) so a December and a March basis are never mixed. A Gaussian-weighted local mean of the 24 nearest bids, the bandwidth following how far apart they are (the 5th-nearest distance,
+  kept between 15 and 70 km): fine where the bids are dense, broad where they are not; computed on a 4-pixel grid inside the states picked and smoothed up; blank further than 100 km from any bid. 0.2-0.4 s.
+  Level maps colour by DECILES of the surface (as the AgManager legends do: the class labels are the lower bounds, each colour a tenth of the mapped area); blue strong, red weak.
+- **The deviation (`deviation`, `build_pair`).** A symmetric scale around zero (a deviation must not colour 'stronger than average' as weak); purple above the baseline, brown below. Baselines: *3-year average (same days)*
+  and *Last year (same days)* read `database.get_basis_window` for the same calendar days +-5 of each year and reduce them (`nearby_from_rows`: the weekly spot history files' mean, else the forward rows of the nearest
+  snapshot); *30 days ago* / *7 days ago* read the stored daily bids of that day against the SAME futures contract, so a change is a change of basis, not of contract. **The history is thin:** the daily scrape began 2026-06,
+  so for the same days of 2023-25 only the `jsa_history` weekly files exist: 29 corn and 64 soybean locations with two or more years (checked 2026-10-27), almost all crush plants and river terminals (the Illinois River
+  corn terminals share one series), which is why 3-year / last-year ignore the Location-type filter (history exists for those alone), use a broad 'regional' interpolation (up to 220 km) and mark the locations with dots,
+  and why the caption says so. 30 / 7 days ago have every location (478 corn country elevators). The history deepens by itself: by Oct 2027 last year's days are daily bids, by 2029 a true 3-year average.
+- **Data readers added to `database.py`:** `get_raw_grains(canonical)` (the grain map's raw names, inactive ones left out) and `get_basis_window(grains, start, end, spot=None, symbol=None)` (the basis rows of the snapshots in a
+  window; spot / forward and one contract can be asked for, which keeps a recent window to one day's bids). **Outlines:** `data/maps/us_geometry.json.gz` (341 KB: the lower 48's state rings, county lines and state lines,
+  simplified to 0.01 degree, county borders noded and de-duplicated), built once by `python heat_build.py geometry` (shapely, requirements-dev.txt) from the same Plotly county GeoJSON as the heat lattice. A copy of the
+  app without that file hides the tab's content with a note (`basis_map.available()`).
+- **Tests:** `tests/test_basis_map.py` (the view and its mask against Iowa's real area, the surface on constant / gradient / sparse fields, classes and colours, the points and baselines, panels as pixels, the whole pair
+  with stand-in readers for each baseline, the two database readers on a throwaway SQLite). **Not built yet:** wheat (the baseline history exists for it, the corn / soybean pair is the AgManager sample), a $/bushel legend
+  option (the sample's), and putting the PNG into an email or report (the picture is pure, so it is a call).
 
 ## Scrapers
 

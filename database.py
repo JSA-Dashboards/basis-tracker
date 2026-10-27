@@ -1857,6 +1857,49 @@ def get_snapshots_asof(pairs: list[tuple[str, str]], asof_iso: str, max_age_days
     return result
 
 
+def get_raw_grains(canonical: str) -> list[str]:
+    """The raw grain strings the grain map files under a canonical grain ('Corn' -> ['Corn', 'Yellow Corn']); [canonical] when the map has none (or no table)."""
+    conn = get_conn()
+    c = conn.cursor()
+    ph = _ph()
+    try:
+        c.execute(f"SELECT raw_grain FROM grain_map WHERE canonical_grain = {ph} AND is_active = 1", (canonical,))
+        got = [r["raw_grain"] for r in c.fetchall()]
+    except Exception:
+        got = []
+    finally:
+        conn.close()
+    return got or [canonical]
+
+
+def get_basis_window(grains: list[str], start_iso: str, end_iso: str, spot: bool | None = None, symbol: str | None = None) -> list[dict]:
+    """The basis rows of every snapshot between two ISO timestamps (start included, end not) for the raw `grains`: [{provider, location, timestamp, is_spot, delivery_month, futures_symbol,
+    basis_cents}] - the baselines of the Basis Maps tab (a location's nearby basis a week, a month or a year ago, or in the same days of earlier years). spot=True / False keeps only the spot /
+    forward rows, symbol one futures contract; both cut the rows read, which for a recent window is a day's bids for every location."""
+    if not grains:
+        return []
+    conn = get_conn()
+    c = conn.cursor()
+    ph = _ph()
+    try:
+        sql = f"""SELECT s.provider AS provider, s.location AS location, s.timestamp AS timestamp, r.grain AS grain, r.is_spot AS is_spot,
+                         r.delivery_month AS delivery_month, r.futures_symbol AS futures_symbol, r.basis_cents AS basis_cents
+                  FROM snapshots s JOIN snapshot_rows r ON r.snapshot_id = s.id
+                  WHERE r.grain IN ({",".join(ph for _ in grains)}) AND s.timestamp >= {ph} AND s.timestamp < {ph}"""
+        params = [*grains, start_iso, end_iso]
+        if spot is not None:
+            sql += f" AND r.is_spot = {ph}"
+            params.append(1 if spot else 0)
+        if symbol:
+            sql += f" AND r.futures_symbol = {ph}"
+            params.append(symbol)
+        c.execute(sql, params)
+        return [{"provider": r["provider"], "location": r["location"], "timestamp": str(r["timestamp"]), "is_spot": bool(r["is_spot"]), "delivery_month": r["delivery_month"],
+                 "futures_symbol": r["futures_symbol"], "basis_cents": _scale_basis(r["grain"], r["basis_cents"])} for r in c.fetchall()]
+    finally:
+        conn.close()
+
+
 def get_forward_locations(asof_iso: str, days: int = 10) -> list[dict]:
     """Every distinct (provider, location, grain) that posted FORWARD (non-spot) basis in the `days`
     days up to `asof_iso` — the pick-list for a side-by-side comparison. `grain` is the raw grain
