@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -112,6 +113,25 @@ SITES: dict[str, dict] = {
         "style": "h2", "facility": "Country Elevator",
         "locmap": {"Madison": ("Madison, MN", "MN", "Country Elevator")},
     },
+    # Beachner Grain, Inc. (Parsons KS): 24 elevators in SE Kansas and NE Oklahoma, added 2026-10-27. beachnergrain.com/cash-bids switches location by an ASP.NET postback; each
+    # location also has its own GET page, /cashbidssingle-<id> (<id> = the dropdown's option value, also /cbloc-<id> on the Locations page), which is what is read here. The boards
+    # are named by commodity CLASS: "Hard Wheat" is Kansas City (c6 'Dec 26 KCBT Red Wheat' -> KE, stored 'Wheat HRW'), "Soft Wheat" Chicago (ZW, 'Wheat SRW'), "Milo" is priced off the
+    # corn board. Every bid is "Cash" against a futures month. States and pins: each elevator's street address on its /cbloc page, looked up in Nominatim 2026-10-27 (the 9 with no street
+    # match are the town; Harris is the hamlet, its address is a Garnett mailing one; Neosho Valley is at Erie; St. Paul has no street on the page).
+    "Beachner Grain": {
+        "style": "pages", "facility": "Country Elevator", "delay": 1.0,
+        "grains": {"corn": ("Corn", "ZC"), "soybeans": ("Soybeans", "ZS"), "milo": ("Milo", "ZC"), "hard wheat": ("Wheat HRW", "KE"), "soft wheat": ("Wheat SRW", "ZW")},
+        "pages": [{"url": f"https://www.beachnergrain.com/cashbidssingle-{_id}", "loc": (f"{_town}, {_st}", _st, "Country Elevator"), "pin": (_lat, _lon)}
+                  for _id, _town, _st, _lat, _lon in [
+                      (1962, "Afton", "OK", 36.69627, -94.96474), (2037, "Altamont", "KS", 37.19034, -95.29719), (2038, "Bronson", "KS", 37.89787, -95.07211),
+                      (2039, "Chanute", "KS", 37.66011, -95.46195), (2040, "Erie", "KS", 37.57589, -95.24351), (2041, "Fredonia", "KS", 37.5445, -95.81843),
+                      (2042, "Garnett", "KS", 38.27885, -95.24575), (2043, "Greeley", "KS", 38.36668, -95.12936), (2045, "Harris", "KS", 38.31946, -95.43637),
+                      (2046, "Humboldt", "KS", 37.8106, -95.43693), (2047, "Independence", "KS", 37.23185, -95.71498), (2048, "Kincaid", "KS", 38.08002, -95.15188),
+                      (2049, "LaCygne", "KS", 38.3475, -94.76279), (2050, "Miami", "OK", 36.87085, -94.87293), (2051, "Mound City", "KS", 38.14277, -94.81274),
+                      (2052, "Neodesha", "KS", 37.41443, -95.67999), (2083, "Neosho Valley", "KS", 37.56811, -95.24331), (2053, "Paola", "KS", 38.57417, -94.88743),
+                      (2054, "Parsons", "KS", 37.34078, -95.25963), (2055, "Richmond", "KS", 38.40147, -95.25603), (2063, "St. Paul", "KS", 37.51858, -95.17236),
+                      (2057, "Thayer", "KS", 37.4886, -95.47264), (2058, "Walnut", "KS", 37.5986, -95.07882), (2059, "Welch", "OK", 36.87014, -95.09292)]],
+    },
 }
 
 
@@ -126,12 +146,12 @@ def _grain(text: str) -> str:
     return "Corn"
 
 
-def _fut_symbol(fut_month: str, grain: str):
+def _fut_symbol(fut_month: str, grain: str, root: str | None = None):
     m = re.search(r"([A-Za-z]{3})[A-Za-z]*\s+(\d{2})", fut_month or "")
     if not m:
         return None
     code = _MON.get(m.group(1).lower())
-    return f"{_ROOT.get(grain, 'ZC')}{code}{m.group(2)}" if code else None
+    return f"{root or _ROOT.get(grain, 'ZC')}{code}{m.group(2)}" if code else None
 
 
 def _delivery(label: str) -> str:
@@ -170,20 +190,54 @@ def scrape_site(cfg: dict) -> list[dict]:
     # pinned (location, state, facility). Every cbCommodity board on the page takes
     # that location; the board's <h3> only sets the grain. Used where a site moved
     # to one page per plant (Harvestone's /cashbidssingle-<id>).
+    # Optional per site: "delay" (seconds between pages, for a site with many), "grains" (board
+    # heading -> (raw grain, CME root) for a site whose boards are named by commodity CLASS, e.g.
+    # Beachner's "Hard Wheat" = KE / "Soft Wheat" = ZW / "Milo"; a heading it does not list is
+    # skipped and logged, never guessed) and, per page, "pin" ((lat, lon) for the map).
     if cfg.get("style") == "pages":
         out = []
-        for pg in cfg["pages"]:
-            r = requests.get(pg["url"], headers=HEADERS, timeout=40)
-            r.raise_for_status()
+        grains = cfg.get("grains")
+        sess = requests.Session()
+        sess.headers.update(HEADERS)
+        failed, last_exc = 0, None
+        for k, pg in enumerate(cfg["pages"]):
+            if k and cfg.get("delay"):
+                time.sleep(cfg["delay"])
+            # one reset or timeout must not cost the other pages (Beachner: 24 pages, a connection reset on 2026-10-27): retry, then skip the page and carry on
+            for attempt in range(3):
+                try:
+                    r = sess.get(pg["url"], timeout=40)
+                    r.raise_for_status()
+                    break
+                except requests.RequestException as exc:
+                    last_exc = exc
+                    r = None
+                    if attempt < 2:
+                        time.sleep(2 * (attempt + 1))
+            if r is None:
+                failed += 1
+                log.error("Bushel-sites: %s could not be read (%s): skipped", pg["loc"][0], last_exc)
+                continue
             soup = BeautifulSoup(r.text, "html.parser")
             loc, state, ftype = pg["loc"]
             for div in soup.find_all("div", class_="cbCommodity"):
                 h = div.find("h3")
+                head = h.get_text(strip=True) if h else ""
                 rows = _rows_of(div)
-                if rows:
-                    out.append({"location": loc, "state": state, "facility_type": ftype,
-                                "grain": _grain(h.get_text(strip=True) if h else ""),
-                                "rows": rows})
+                if not rows:
+                    continue
+                board = {"location": loc, "state": state, "facility_type": ftype, "grain": _grain(head), "rows": rows}
+                if grains is not None:
+                    hit = grains.get(head.strip().lower())
+                    if hit is None:
+                        log.warning("Bushel-sites: %s board %r has no entry in the site's grains map: skipped", loc, head)
+                        continue
+                    board["grain"], board["root"] = hit
+                if pg.get("pin"):
+                    board["lat"], board["lon"] = pg["pin"]
+                out.append(board)
+        if failed == len(cfg["pages"]):
+            raise last_exc                      # nothing read at all: let the caller log the site as failed, as before
         return out
 
     r = requests.get(cfg["url"], headers=HEADERS, timeout=40)
@@ -231,14 +285,18 @@ def scrape_site(cfg: dict) -> list[dict]:
 def parse_board(board: dict, provider: str) -> NewSnapshotRequest | None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
     grain = board["grain"]
+    root = board.get("root")                  # set by a site's "grains" map (class-named boards); else the root follows the grain
     rows = []
     for i, c in enumerate(board["rows"]):
         basis = _cents(c.get("c3", ""))
-        sym = _fut_symbol(c.get("c6", ""), grain)
+        sym = _fut_symbol(c.get("c6", ""), grain, root)
         if basis is None or not sym:
             continue
+        slug = re.sub(r"[^A-Za-z0-9]", "", c.get("c1", ""))
+        # a class-named board can share a contract with another one at the same location (Corn and Milo are both ZC), so its row id carries the grain; every other site keeps its old ids
+        rid = f"{sym}_{re.sub(r'[^A-Za-z0-9]', '', grain)}_{i}_{slug}" if root else f"{sym[1]}_{i}_{slug}"
         rows.append(SnapshotRow(
-            id=f"{sym[1]}_{i}_{re.sub(r'[^A-Za-z0-9]', '', c.get('c1', ''))}",
+            id=rid,
             grain=grain, deliveryMonth=_delivery(c.get("c1", "")),
             futuresSymbol=sym, basisCents=basis, isSpot=False))
     if not rows:

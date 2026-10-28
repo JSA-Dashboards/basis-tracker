@@ -1,0 +1,1918 @@
+{
+ "blenheim": {
+  "market_id": 331848804,
+  "display_name": "Blenheim, ON",
+  "instruments_data": {
+   "crops": [
+    {
+     "crop_id": 1,
+     "crm_display_name": "Corn (Canadian)"
+    },
+    {
+     "crop_id": 2,
+     "crm_display_name": "Soybeans (Canadian)"
+    },
+    {
+     "crop_id": 5,
+     "crm_display_name": "Wheat (Northern Canadian Soft Red Winter)"
+    }
+   ],
+   "instruments": [
+    {
+     "id": 91482,
+     "basis_bid": 1.2975,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.2975,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 5.8,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 5.8,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Harvest'26 Wet Corn",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 91480,
+     "basis_bid": 3.7775,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 3.7775,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 16.0975,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.0975,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2026-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Harvest'26",
+     "futures": {
+      "contract_month": "2026-11-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSX26",
+       "cme_globex": "ZSX6",
+       "display": "ZSX6",
+       "fbn": "ZSX26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.32
+       }
+      }
+     }
+    },
+    {
+     "id": 120814,
+     "basis_bid": 1.0575,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.0575,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 7.4,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 7.4,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 5,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Harvest'27 Wheat",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZWN27",
+       "cme_globex": "ZWN7",
+       "display": "ZWN7",
+       "fbn": "ZWN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 6.3425
+       }
+      }
+     }
+    }
+   ]
+  }
+ },
+ "windsor": {
+  "market_id": 371712385,
+  "display_name": "Windsor, ON",
+  "instruments_data": {
+   "crops": [
+    {
+     "crop_id": 1,
+     "crm_display_name": "Corn (Canadian)"
+    },
+    {
+     "crop_id": 2,
+     "crm_display_name": "Soybeans (Canadian)"
+    },
+    {
+     "crop_id": 5,
+     "crm_display_name": "Wheat (Northern Canadian Soft Red Winter)"
+    },
+    {
+     "crop_id": 26,
+     "crm_display_name": "Canola"
+    }
+   ],
+   "instruments": [
+    {
+     "id": 109953,
+     "basis_bid": 1.6675,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.6675,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.17,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.17,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Nov 26 Corn",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 116589,
+     "basis_bid": 1.5475,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.5475,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.1875,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.1875,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-03-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Dec 26 Corn",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCH27",
+       "cme_globex": "ZCH7",
+       "display": "ZCH7",
+       "fbn": "ZCH27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.64
+       }
+      }
+     }
+    },
+    {
+     "id": 115462,
+     "basis_bid": 1.79,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.79,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.515,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.515,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-05-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "March 27 Corn",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCK27",
+       "cme_globex": "ZCK7",
+       "display": "ZCK7",
+       "fbn": "ZCK27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.725
+       }
+      }
+     }
+    },
+    {
+     "id": 115464,
+     "basis_bid": 1.85,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.85,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.575,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.575,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-05-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "April 27 Corn",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCK27",
+       "cme_globex": "ZCK7",
+       "display": "ZCK7",
+       "fbn": "ZCK27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.725
+       }
+      }
+     }
+    },
+    {
+     "id": 127775,
+     "basis_bid": 1.9175,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.9175,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.7125,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.7125,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "May 27 Corn",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCN27",
+       "cme_globex": "ZCN7",
+       "display": "ZCN7",
+       "fbn": "ZCN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.795
+       }
+      }
+     }
+    },
+    {
+     "id": 127776,
+     "basis_bid": 1.9975,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.9975,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.7925,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.7925,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "June 27 Corn",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCN27",
+       "cme_globex": "ZCN7",
+       "display": "ZCN7",
+       "fbn": "ZCN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.795
+       }
+      }
+     }
+    },
+    {
+     "id": 127777,
+     "basis_bid": 1.655,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.655,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 6.5625,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 6.5625,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-12-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Nov 27 Corn",
+     "futures": {
+      "contract_month": "2027-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ27",
+       "cme_globex": "ZCZ7",
+       "display": "ZCZ7",
+       "fbn": "ZCZ27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.9075
+       }
+      }
+     }
+    },
+    {
+     "id": 109955,
+     "basis_bid": 4.185,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 4.185,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 16.505,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.505,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2026-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Oct 26 Beans",
+     "futures": {
+      "contract_month": "2026-11-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSX26",
+       "cme_globex": "ZSX6",
+       "display": "ZSX6",
+       "fbn": "ZSX26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.32
+       }
+      }
+     }
+    },
+    {
+     "id": 115642,
+     "basis_bid": 4.245,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 4.245,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 16.565,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.565,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2026-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Nov 26 Beans",
+     "futures": {
+      "contract_month": "2026-11-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSX26",
+       "cme_globex": "ZSX6",
+       "display": "ZSX6",
+       "fbn": "ZSX26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.32
+       }
+      }
+     }
+    },
+    {
+     "id": 114217,
+     "basis_bid": 4.525,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 4.525,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 16.975,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.975,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2027-01-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Jan 27 Beans",
+     "futures": {
+      "contract_month": "2027-01-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSF27",
+       "cme_globex": "ZSF7",
+       "display": "ZSF7",
+       "fbn": "ZSF27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.45
+       }
+      }
+     }
+    },
+    {
+     "id": 114219,
+     "basis_bid": 4.655,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 4.655,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 17.1925,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.1925,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2027-03-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "March 27 Beans",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSH27",
+       "cme_globex": "ZSH7",
+       "display": "ZSH7",
+       "fbn": "ZSH27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.5375
+       }
+      }
+     }
+    },
+    {
+     "id": 116475,
+     "basis_bid": 3.9125,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 3.9125,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 16.0425,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.0425,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 2,
+     "contract_month": "2027-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "Nov 27 Beans",
+     "futures": {
+      "contract_month": "2027-11-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZSX27",
+       "cme_globex": "ZSX7",
+       "display": "ZSX7",
+       "fbn": "ZSX27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 12.13
+       }
+      }
+     }
+    },
+    {
+     "id": 115427,
+     "basis_bid": 1.335,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.335,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 7.6775,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 7.6775,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 5,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "July 27 Wheat",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZWN27",
+       "cme_globex": "ZWN7",
+       "display": "ZWN7",
+       "fbn": "ZWN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 6.3425
+       }
+      }
+     }
+    },
+    {
+     "id": 127192,
+     "basis_bid": 1.3125,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": 1.3125,
+       "currency": "cad",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 7.915,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 7.915,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 5,
+     "contract_month": "2028-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "July 28 Wheat",
+     "futures": {
+      "contract_month": "2028-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZWN28",
+       "cme_globex": "ZWN8",
+       "display": "ZWN8",
+       "fbn": "ZWN28",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 6.6025
+       }
+      }
+     }
+    },
+    {
+     "id": 125356,
+     "basis_bid": -30.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -30.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 17.66060452,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.66060452,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "July 2027 Winter Canola",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSN27",
+       "cme_globex": null,
+       "display": "RSN27",
+       "fbn": "RSN27",
+       "ice": "RS  FMN0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 808.7
+       }
+      }
+     }
+    }
+   ]
+  }
+ },
+ "carberry": {
+  "market_id": 347074487,
+  "display_name": "Watson, SK",
+  "instruments_data": {
+   "crops": [
+    {
+     "crop_id": 26,
+     "crm_display_name": "Canola (Canadian)"
+    }
+   ],
+   "instruments": [
+    {
+     "id": 116441,
+     "basis_bid": -60.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -60.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.23178972,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.23178972,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2026-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "October",
+     "futures": {
+      "contract_month": "2026-11-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSX26",
+       "cme_globex": null,
+       "display": "RSX26",
+       "fbn": "RSX26",
+       "ice": "RS  FMX0026*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 775.7
+       }
+      }
+     }
+    },
+    {
+     "id": 119464,
+     "basis_bid": -50.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -50.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.45858572,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.45858572,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2026-11-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "November",
+     "futures": {
+      "contract_month": "2026-11-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSX26",
+       "cme_globex": null,
+       "display": "RSX26",
+       "fbn": "RSX26",
+       "ice": "RS  FMX0026*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 775.7
+       }
+      }
+     }
+    },
+    {
+     "id": 119465,
+     "basis_bid": -50.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -50.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.73527684,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.73527684,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-01-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "December",
+     "futures": {
+      "contract_month": "2027-01-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSF27",
+       "cme_globex": null,
+       "display": "RSF27",
+       "fbn": "RSF27",
+       "ice": "RS  FMF0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 787.9
+       }
+      }
+     }
+    },
+    {
+     "id": 123337,
+     "basis_bid": -55.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -55.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.62187884,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.62187884,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-01-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "January",
+     "futures": {
+      "contract_month": "2027-01-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSF27",
+       "cme_globex": null,
+       "display": "RSF27",
+       "fbn": "RSF27",
+       "ice": "RS  FMF0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 787.9
+       }
+      }
+     }
+    },
+    {
+     "id": 125436,
+     "basis_bid": -55.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -55.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.8736224,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.8736224,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-03-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "February",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSH27",
+       "cme_globex": null,
+       "display": "RSH27",
+       "fbn": "RSH27",
+       "ice": "RS  FMH0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 799.0
+       }
+      }
+     }
+    },
+    {
+     "id": 125437,
+     "basis_bid": -50.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -50.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 16.9870204,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 16.9870204,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-03-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "March",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSH27",
+       "cme_globex": null,
+       "display": "RSH27",
+       "fbn": "RSH27",
+       "ice": "RS  FMH0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 799.0
+       }
+      }
+     }
+    },
+    {
+     "id": 126502,
+     "basis_bid": -50.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -50.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 17.17526108,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.17526108,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-05-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "April",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSK27",
+       "cme_globex": null,
+       "display": "RSK27",
+       "fbn": "RSK27",
+       "ice": "RS  FMK0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 807.3
+       }
+      }
+     }
+    },
+    {
+     "id": 126503,
+     "basis_bid": -45.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -45.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 17.28865908,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.28865908,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-05-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "May",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSK27",
+       "cme_globex": null,
+       "display": "RSK27",
+       "fbn": "RSK27",
+       "ice": "RS  FMK0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 807.3
+       }
+      }
+     }
+    },
+    {
+     "id": 126504,
+     "basis_bid": -45.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -45.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 17.32041052,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.32041052,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "June",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSN27",
+       "cme_globex": null,
+       "display": "RSN27",
+       "fbn": "RSN27",
+       "ice": "RS  FMN0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 808.7
+       }
+      }
+     }
+    },
+    {
+     "id": 126505,
+     "basis_bid": -40.0,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -40.0,
+       "currency": "cad",
+       "quantity_unit": "metric_tons"
+      }
+     },
+     "cash_bid": 17.43380852,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 17.43380852,
+       "currency": "cad",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 26,
+     "contract_month": "2027-07-01",
+     "currency": "cad",
+     "deleted": false,
+     "display_name": "July",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "cad",
+      "quantity_unit": "metric_tons",
+      "symbols": {
+       "barchart": "RSN27",
+       "cme_globex": null,
+       "display": "RSN27",
+       "fbn": "RSN27",
+       "ice": "RS  FMN0027*IFUS",
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 808.7
+       }
+      }
+     }
+    }
+   ]
+  }
+ },
+ "us": {
+  "market_id": 331844986,
+  "display_name": "Cedar Rapids, IA",
+  "instruments_data": {
+   "crops": [
+    {
+     "crop_id": 1,
+     "crm_display_name": "Corn"
+    }
+   ],
+   "instruments": [
+    {
+     "id": 116528,
+     "basis_bid": -0.21,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.21,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.2925,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.2925,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "October",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 119628,
+     "basis_bid": -0.18,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.18,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.3225,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.3225,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "FHNovember",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 119629,
+     "basis_bid": -0.14,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.14,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.3625,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.3625,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "LH November",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 119631,
+     "basis_bid": -0.12,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.12,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.3825,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.3825,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "FH December",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 119630,
+     "basis_bid": -0.08,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.08,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.4225,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.4225,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2026-12-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "LH December",
+     "futures": {
+      "contract_month": "2026-12-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCZ26",
+       "cme_globex": "ZCZ6",
+       "display": "ZCZ6",
+       "fbn": "ZCZ26",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.5025
+       }
+      }
+     }
+    },
+    {
+     "id": 119617,
+     "basis_bid": -0.21,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.21,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.43,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.43,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-03-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "January",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCH27",
+       "cme_globex": "ZCH7",
+       "display": "ZCH7",
+       "fbn": "ZCH27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.64
+       }
+      }
+     }
+    },
+    {
+     "id": 119619,
+     "basis_bid": -0.17,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.17,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.47,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.47,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-03-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "February",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCH27",
+       "cme_globex": "ZCH7",
+       "display": "ZCH7",
+       "fbn": "ZCH27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.64
+       }
+      }
+     }
+    },
+    {
+     "id": 120855,
+     "basis_bid": -0.14,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.14,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.5,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.5,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-03-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "March",
+     "futures": {
+      "contract_month": "2027-03-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCH27",
+       "cme_globex": "ZCH7",
+       "display": "ZCH7",
+       "fbn": "ZCH27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.64
+       }
+      }
+     }
+    },
+    {
+     "id": 123340,
+     "basis_bid": -0.15,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.15,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.575,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.575,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-05-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "April",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCK27",
+       "cme_globex": "ZCK7",
+       "display": "ZCK7",
+       "fbn": "ZCK27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.725
+       }
+      }
+     }
+    },
+    {
+     "id": 123342,
+     "basis_bid": -0.13,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.13,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.595,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.595,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-05-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "May",
+     "futures": {
+      "contract_month": "2027-05-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCK27",
+       "cme_globex": "ZCK7",
+       "display": "ZCK7",
+       "fbn": "ZCK27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.725
+       }
+      }
+     }
+    },
+    {
+     "id": 127948,
+     "basis_bid": -0.13,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.13,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.665,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.665,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-07-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "June",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCN27",
+       "cme_globex": "ZCN7",
+       "display": "ZCN7",
+       "fbn": "ZCN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.795
+       }
+      }
+     }
+    },
+    {
+     "id": 127951,
+     "basis_bid": -0.13,
+     "basis_info": {
+      "in_ext_units": {
+       "bid": -0.13,
+       "currency": "usd",
+       "quantity_unit": "bushels"
+      }
+     },
+     "cash_bid": 4.665,
+     "cash_info": {
+      "in_ext_units": {
+       "bid": 4.665,
+       "currency": "usd",
+       "quantity_unit": "bushels",
+       "rounding": {
+        "mode": null,
+        "offset": null
+       }
+      }
+     },
+     "commodity_id": 1,
+     "contract_month": "2027-07-01",
+     "currency": "usd",
+     "deleted": false,
+     "display_name": "July",
+     "futures": {
+      "contract_month": "2027-07-01",
+      "currency": "usd",
+      "quantity_unit": "bushels",
+      "symbols": {
+       "barchart": "ZCN27",
+       "cme_globex": "ZCN7",
+       "display": "ZCN7",
+       "fbn": "ZCN27",
+       "ice": null,
+       "miax": null
+      },
+      "pricing": {
+       "delayed": {
+        "price": 4.795
+       }
+      }
+     }
+    }
+   ]
+  }
+ }
+}

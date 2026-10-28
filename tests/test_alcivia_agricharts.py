@@ -41,8 +41,8 @@ ALCIVIA = next((t for t in ag.TENANTS if t["provider"] == "Alcivia"), None)
 print("alcivia: the tenant row and the two helpers")
 check("Alcivia is a multi-location AgriCharts tenant on alciviacoop.agricharts.com, WI, with titlecase and pins on",
       ALCIVIA is not None and (ALCIVIA["host"], ALCIVIA["shape"], ALCIVIA["state"], ALCIVIA.get("titlecase"), ALCIVIA.get("pins")) == ("https://alciviacoop.agricharts.com", "multi", "WI", True, True), ALCIVIA)
-check("no other tenant has pins or titlecase switched on (their stored pins and names are untouched)", [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")] == ["Alcivia"],
-      [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")])
+check("no tenant but Alcivia and Ag Partners Coop (added 2026-10-27, see test_agpartners_agricharts.py) has pins or titlecase switched on (the others' stored pins and names are untouched)",
+      [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")] == ["Alcivia", "Ag Partners Coop"], [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")])
 for raw, want in (("FALL CREEK", "Fall Creek"), ("BALDWIN", "Baldwin"), ("Four Corners (New Richmond)", "Four Corners (New Richmond)"), ("MENOMONIE FEED MILL", "Menomonie Feed Mill"), ("Kings Valley (Osseo)", "Kings Valley (Osseo)")):
     check("_title_caps(%r) -> %r" % (raw, want), ag._title_caps(raw) == want, ag._title_caps(raw))
 for loc, want in (({"latitude": "44.968448000", "longitude": "-92.374671000"}, {"lat": 44.96845, "lon": -92.37467}), ({"latitude": None, "longitude": None}, {}), ({"latitude": "", "longitude": ""}, {}),
@@ -81,7 +81,9 @@ check("facility types come from the feed (elevators, and the feed mill)", (by["B
       by["Menomonie Feed Mill, WI"]["facility_type"]) == ("Country Elevator", "Country Elevator", "Feed Mill"), {k: v["facility_type"] for k, v in by.items()})
 check("map pins are the feed's own coordinates (Baldwin WI 44.96845 / -92.37467)", (by["Baldwin, WI"]["lat"], by["Baldwin, WI"]["lon"]) == (44.96845, -92.37467), (by["Baldwin, WI"].get("lat"), by["Baldwin, WI"].get("lon")))
 check("... and every filed location has one", all("lat" in l and "lon" in l for l in locs))
-check("Baldwin carries its 14 bids (corn, soybeans, wheat)", len(by["Baldwin, WI"]["cashbids"]) == 14 and {b["grain"] for b in by["Baldwin, WI"]["cashbids"]} == {"CORN", "SOYBEANS", "WHEAT"})
+check("Baldwin carries 13 of its 14 bids (corn, soybeans, wheat): the wheat 'Storage Only' window is a storage price, not a bid, and `skip_notes` drops it (test_open_windows_tenants.py)",
+      len(by["Baldwin, WI"]["cashbids"]) == 13 and {b["grain"] for b in by["Baldwin, WI"]["cashbids"]} == {"CORN", "SOYBEANS", "WHEAT"}
+      and [b["symbol"] for b in by["Baldwin, WI"]["cashbids"] if b["grain"] == "WHEAT"] == ["ZWU27"], len(by["Baldwin, WI"]["cashbids"]))
 
 print("\nalcivia: parsed through the shared AgriCharts parser")
 for l in locs:

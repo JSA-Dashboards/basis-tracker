@@ -330,17 +330,42 @@ _GRAIN_PFX: dict[str, str] = {
 }
 
 
+def canadian_basis(instr: dict, usdcad: Optional[float]):
+    """What to store for an instrument's basis: ('as_posted', None) | ('converted', US$ per bushel) | ('skip', None).
+
+    ADM posts its Ontario corn, soybeans and wheat as a Canadian-dollar CASH price (`cash_info.in_ext_units`: currency 'cad', bushels) against futures in US dollars (`futures.currency`
+    'usd'), and its `basis_bid` is simply the first minus the second: Blenheim corn C$5.785 - US$4.4875 = 1.2975, which looked like a +130 cent basis (soybeans +379). The real basis in US
+    terms is cash / USDCAD - futures (USDCAD = Canadian dollars per US dollar): 5.785 / 1.405 - 4.4875 = -0.37. Canola is CAD against ICE canola futures in CAD per tonne: both sides are
+    the same currency, so its posted basis is already a basis (stored as C$/t, grain_units.py). A US market (cash in USD) is untouched.
+    A Canadian-dollar-against-US-futures instrument that cannot be converted exactly (no rate, no futures price, a unit other than bushels) is SKIPPED, never stored as the mixed number."""
+    cash = (instr.get("cash_info") or {}).get("in_ext_units") or {}
+    cash_cur = (cash.get("currency") or instr.get("currency") or "").lower()
+    if cash_cur != "cad":
+        return "as_posted", None
+    fut = instr.get("futures") or {}
+    if (fut.get("currency") or "").lower() != "usd":
+        return "as_posted", None
+    basis_unit = (((instr.get("basis_info") or {}).get("in_ext_units") or {}).get("quantity_unit") or "").lower()
+    price = (((fut.get("pricing") or {}).get("delayed") or {}).get("price"))
+    cash_bid = instr.get("cash_bid")
+    if (not usdcad or usdcad <= 0 or price is None or cash_bid is None
+            or basis_unit != "bushels" or (cash.get("quantity_unit") or "").lower() != "bushels" or (fut.get("quantity_unit") or "").lower() not in ("bushels", "bushel")):
+        return "skip", None
+    return "converted", float(cash_bid) / float(usdcad) - float(price)
+
+
 def parse_instruments(
     market_id: int,
     display_name: str,
     instruments_data: dict,
     timestamp: str,
+    usdcad: Optional[float] = None,
 ) -> Optional["NewSnapshotRequest"]:
     """
     Parse one ADM Gradable instruments response → NewSnapshotRequest.
 
-    Used by adm_scraper.py and auto_import.py.
-    Returns None if the location has no active bid rows.
+    Used by adm_scraper.py and auto_import.py. `usdcad` (Canadian dollars per US dollar, fx_rates.py) converts Canadian-dollar-against-US-futures bids to US cents per bushel
+    (canadian_basis); without it those instruments are skipped. Returns None if the location has no active bid rows.
     """
     # Build crop_id → grain name from this response's crops list
     crop_map: dict[int, str] = {}
@@ -364,8 +389,11 @@ def parse_instruments(
         futures_sym    = (
             (instr.get("futures") or {}).get("symbols", {}).get("fbn", "") or ""
         )
+        how, usd_basis = canadian_basis(instr, usdcad)
+        if how == "skip":
+            continue                                                  # a C$ price against US futures we cannot convert: not stored as the mixed number
         try:
-            basis_cents = int(round(float(basis_bid) * 100))
+            basis_cents = int(round(float(usd_basis if how == "converted" else basis_bid) * 100))
         except (TypeError, ValueError):
             continue
 

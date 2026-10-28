@@ -41,8 +41,12 @@ TENANTS: list[dict] = [
      "facility": "Corn Processing"},
     {"provider": "JBS", "host": "https://jbslivepork.com",
      "shape": "multi", "state": None},
+    # Garden City Coop posts, per commodity, an 'Old Crop' window (since 09/01/2025, to 12/01/2026) AND a 'New Crop 2026' window (since 09/01/2026) with the same basis; the parser's start-month rule dropped
+    # BOTH from the first October on (114 of its 134 bids on 2026-10-27: the whole in-season board, HRW wheat / corn / milo, with only the deferred KEN27 wheat left). `open_windows` files each open
+    # window under the current month (the pair collapses to one row, the later-starting window); `skip_zero_basis` drops the corn bids at four locations posted at exactly 0 (a posted-but-not-bid
+    # placeholder, the same AgriCharts convention as writeBidRow: the other 17 corn bids are +10 to +45).
     {"provider": "Garden City Coop", "host": "https://gccoop.agricharts.com",
-     "shape": "multi", "state": "KS"},
+     "shape": "multi", "state": "KS", "open_windows": True, "skip_zero_basis": True},
     # Gold Eagle Coop posts its whole co-op; we only track the Goldfield plant.
     # `want` filters a multi feed to specific locations and renames/reclassifies them.
     {"provider": "Gold Eagle Coop", "host": "https://goldeagle.agricharts.com",
@@ -54,8 +58,17 @@ TENANTS: list[dict] = [
      "facility": "Country Elevator"},
     # Alcivia (WI): 14 elevators + a feed mill in one feed (alcivia.com/wisconsin-grain-services/cash-bids-grain-wisconsin-grain/). Its names are ALL CAPS
     # ('FALL CREEK'), so `titlecase`; the feed carries each location's own latitude / longitude, which become the map pins (`pins`).
+    # Alcivia's harvest window is 'Oct/Nov 26' (10/01 - 11/30): the start-month rule would drop it for all of November, so `open_windows`. Its wheat 'Storage' / 'Storage Only' windows (07/01/2026 - 02/28/2027,
+    # basis -100 to -160, 8 locations) are storage prices, not delivery bids: `skip_notes` keeps them out (the old rule dropped them, by accident; with open_windows they would appear as a nearby wheat bid).
     {"provider": "Alcivia", "host": "https://alciviacoop.agricharts.com",
-     "shape": "multi", "state": "WI", "titlecase": True, "pins": True},
+     "shape": "multi", "state": "WI", "titlecase": True, "pins": True, "open_windows": True, "skip_notes": ["Storage"]},
+    # Ag Partners Cooperative (Seneca KS; agpartnerscoop.com/grain/cash-bids embeds this feed): 20 elevators in NE Kansas, one in Nebraska (Rulo) and one in Missouri (Tarkio); the feed gives each
+    # location's state and pin. Its 'AGP St Joe' row is the co-op's DIRECT-SHIP bid to AGP's plant (facility_type 'Direct Ship', 'Broker Beans'): AGP's own plant is the AGP provider's
+    # location, so it is `skip`ped here (the River Valley / H&F reason: one bid stream, one snapshot). Its wheat is Kansas City hard red winter (KEZ26) under the feed's name 'Red Wheat',
+    # which grain_map reads as soft red winter, so `grain_alias` files it as 'Wheat, Hrw'. Its main bids are HARVEST windows ('09/01/2026 - 11/30/2026'): `open_windows` keeps a window that
+    # started in an earlier month but has not ended, filed under the current month (the parser's start-month rule alone would drop them from October on; see the parser).
+    {"provider": "Ag Partners Coop", "host": "https://agpartners.agricharts.com",
+     "shape": "multi", "state": "KS", "pins": True, "skip": ["AGP St Joe"], "grain_alias": {"Red Wheat": "Wheat, Hrw"}, "open_windows": True},
 ]
 
 
@@ -113,6 +126,10 @@ def fetch_agricharts_bids() -> list[dict]:
             if str(loc.get("hide_on_sites_and_apis") or "").strip().lower() in ("1", "true", "yes"):
                 continue
             cashbids = loc.get("cashbids") or []
+            if t.get("skip_zero_basis") or t.get("skip_notes"):
+                skip_notes = [s.lower() for s in t.get("skip_notes", ())]
+                cashbids = [b for b in cashbids if not (t.get("skip_zero_basis") and not int(b.get("basis") or 0))
+                            and not any(s in (b.get("notes") or "").lower() for s in skip_notes)]
             if not cashbids:
                 continue
             raw_name = (loc.get("name") or "").strip()
@@ -128,6 +145,8 @@ def fetch_agricharts_bids() -> list[dict]:
             else:
                 if not raw_name or raw_name.lower() in ("futures only", ""):
                     continue                       # skip the futures-only pseudo row
+                if raw_name.upper() in {s.upper() for s in t.get("skip", ())}:
+                    continue                       # a location of the feed that is another company's bid stream (Ag Partners' direct-ship row to AGP)
                 location = _clean_loc(raw_name)
                 if t.get("titlecase"):
                     location = _title_caps(location)
@@ -147,10 +166,11 @@ def fetch_agricharts_bids() -> list[dict]:
                 "facility_type": facility, "timestamp": ts,
                 **(_feed_pin(loc) if t.get("pins") else {}),
                 "cashbids": [{
-                    "bid_id": str(b.get("id") or ""), "grain": b.get("name") or "",
+                    "bid_id": str(b.get("id") or ""), "grain": (t.get("grain_alias") or {}).get(b.get("name") or "", b.get("name") or ""),
                     "symbol": b.get("symbol") or "", "basis": int(b.get("basis") or 0),
-                    "delivery_start": b.get("delivery_start") or "",
+                    "delivery_start": b.get("delivery_start") or "", "delivery_end": b.get("delivery_end") or "",
                 } for b in cashbids],
+                **({"open_windows": True} if t.get("open_windows") else {}),
             })
         time.sleep(0.5)
     return out

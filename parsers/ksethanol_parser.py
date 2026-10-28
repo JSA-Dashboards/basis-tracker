@@ -42,11 +42,20 @@ def parse_ksethanol_location(loc: dict) -> Optional[NewSnapshotRequest]:
     # is already in the past (e.g. a lingering 'Sep 2025' milo bid on a 2026 feed —
     # it otherwise creates a phantom nearest-month slot and a bogus roll downstream).
     snap_ym = None
+    snap_day = None
     try:
         _st = datetime.fromisoformat((timestamp or "").replace("Z", "+00:00"))
         snap_ym = (_st.year, _st.month)
+        snap_day = _st.date()
     except (ValueError, TypeError):
         snap_ym = None
+
+    # `open_windows` (a tenant opts in; agricharts_scraper sets it on the loc): a bid whose window STARTED in an earlier month but has not ended is this month's bid, not a stale one.
+    # Without it the start month alone decides, which drops a harvest window ('Sep 1 - Nov 30') for the whole of October and November, the co-op's main bid.
+    open_windows = bool(loc.get("open_windows"))
+    # Under open_windows two overlapping windows can land on the same month (Garden City posts an 'Old Crop' window since 09/01/2025 AND a 'New Crop 2026' one since 09/01/2026, same basis):
+    # one row per (grain, month, contract) is kept, the one whose window started LAST (then the later bid id).
+    kept: dict[tuple, tuple] = {}
 
     rows: list[SnapshotRow] = []
     for bid in cashbids:
@@ -55,6 +64,7 @@ def parse_ksethanol_location(loc: dict) -> Optional[NewSnapshotRequest]:
         basis     = bid.get("basis")
         del_start = bid.get("delivery_start") or ""
         bid_id    = bid.get("bid_id") or ""
+        started   = None
 
         if basis is None or not symbol:
             continue
@@ -63,22 +73,39 @@ def parse_ksethanol_location(loc: dict) -> Optional[NewSnapshotRequest]:
         if snap_ym:
             try:
                 _dd = datetime.strptime(del_start, "%m/%d/%Y")
+                started = _dd
                 if (_dd.year, _dd.month) < snap_ym:
-                    continue
+                    del_end = bid.get("delivery_end") or ""
+                    if not (open_windows and del_end):
+                        continue
+                    _de = datetime.strptime(del_end, "%m/%d/%Y")
+                    if _de.date() < snap_day:
+                        continue                                    # the window ended before today: stale (to the day: a window that ends 12/01 is filed on 12/01 and gone on 12/02)
+                    del_start = f"{snap_ym[1]:02d}/01/{snap_ym[0]}"  # still open: filed under this month
             except (ValueError, TypeError):
                 pass
 
         pfx    = _GRAIN_PFX.get(grain, grain[:2].upper() if grain else "XX")
         row_id = f"{pfx}_{bid_id}" if bid_id else f"{pfx}_{del_start}"
 
-        rows.append(SnapshotRow(
+        row = SnapshotRow(
             id            = row_id,
             grain         = grain,
             deliveryMonth = _delivery_label(del_start),
             futuresSymbol = symbol,
             basisCents    = int(basis),
             isSpot        = False,
-        ))
+        )
+        if open_windows:
+            key, rank = (grain, row.deliveryMonth, symbol), (started or datetime.min, bid_id)
+            if key in kept:
+                if rank <= kept[key][0]:
+                    continue                                # an overlapping window that started earlier: the later one is already in
+                rows[kept[key][1]] = row
+                kept[key] = (rank, kept[key][1])
+                continue
+            kept[key] = (rank, len(rows))
+        rows.append(row)
 
     if not rows:
         return None

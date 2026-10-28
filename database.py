@@ -451,6 +451,13 @@ _SQLITE_DDL = [
         captured_at TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (date, symbol)
     )""",
+    """CREATE TABLE IF NOT EXISTS fx_rates (
+        date        TEXT NOT NULL,
+        pair        TEXT NOT NULL,
+        rate        REAL NOT NULL,
+        captured_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (date, pair)
+    )""",
     """CREATE TABLE IF NOT EXISTS rail_fob (
         date         TEXT NOT NULL,
         source       TEXT NOT NULL DEFAULT 'manual',
@@ -537,6 +544,13 @@ _PG_DDL = [
         price_cents DOUBLE PRECISION NOT NULL,
         captured_at TEXT,
         PRIMARY KEY (date, symbol)
+    )""",
+    """CREATE TABLE IF NOT EXISTS fx_rates (
+        date        TEXT NOT NULL,
+        pair        TEXT NOT NULL,
+        rate        DOUBLE PRECISION NOT NULL,
+        captured_at TEXT,
+        PRIMARY KEY (date, pair)
     )""",
     """CREATE TABLE IF NOT EXISTS rail_fob (
         date         TEXT NOT NULL,
@@ -1564,6 +1578,61 @@ def get_futures_rows(date_from: str, date_to: str) -> dict:
         for r in c.fetchall():
             out.setdefault(str(r["date"])[:10], {})[r["symbol"]] = (r["price_cents"], r["captured_at"])
         return out
+    finally:
+        conn.close()
+
+
+def upsert_fx_rates(rows: list) -> int:
+    """Upsert fx_rates rows [(date 'YYYY-MM-DD', pair 'USDCAD', rate, captured_at)]: the daily closes of a currency pair (units of the second currency per one of the first: USDCAD 1.405 =
+    Canadian dollars per US dollar). One row per (date, pair); a later capture of the same day replaces it. Returns rows written."""
+    if not rows:
+        return 0
+    rows = [(d, p, float(r), cap) for d, p, r, cap in rows]
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = _ph()
+    sql  = (f"INSERT INTO fx_rates (date, pair, rate, captured_at) VALUES ({ph},{ph},{ph},{ph}) "
+            f"ON CONFLICT (date, pair) DO UPDATE SET rate = EXCLUDED.rate, captured_at = EXCLUDED.captured_at")
+    try:
+        if _use_sf():
+            _merge_bulk(c, "fx_rates", [("date", "string"), ("pair", "string"), ("rate", "float"), ("captured_at", "string")],
+                        rows, ["date", "pair"], update_cols=["rate", "captured_at"])
+            conn.commit()
+            return len(rows)
+        for r in rows:
+            c.execute(sql, r)
+        conn.commit()
+    finally:
+        conn.close()
+    return len(rows)
+
+
+def get_fx_rates(pair: str, date_from: str, date_to: str) -> dict:
+    """Every stored rate of a pair between two ISO dates inclusive: {'YYYY-MM-DD': rate}."""
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = _ph()
+    try:
+        c.execute(f"SELECT date, rate FROM fx_rates WHERE pair={ph} AND date >= {ph} AND date <= {ph} ORDER BY date", (pair, date_from, date_to))
+        return {str(r["date"])[:10]: float(r["rate"]) for r in c.fetchall()}
+    finally:
+        conn.close()
+
+
+def get_fx_rate_on(pair: str, date: str, max_age_days: int = 7) -> float | None:
+    """The rate of a pair on `date`, or the latest one before it within `max_age_days` (weekends, holidays, a missed capture); None when there is none that recent."""
+    from datetime import date as _date, timedelta
+    try:
+        floor = (_date.fromisoformat(date[:10]) - timedelta(days=max_age_days)).isoformat()
+    except ValueError:
+        return None
+    conn = get_conn()
+    c    = conn.cursor()
+    ph   = _ph()
+    try:
+        c.execute(f"SELECT rate FROM fx_rates WHERE pair={ph} AND date <= {ph} AND date >= {ph} ORDER BY date DESC LIMIT 1", (pair, date[:10], floor))
+        r = c.fetchone()
+        return float(r["rate"]) if r else None
     finally:
         conn.close()
 

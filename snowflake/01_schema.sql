@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS futures_prices (
     PRIMARY KEY (date, symbol)
 );
 
+-- Daily closes of a currency pair (USDCAD 1.405 = Canadian dollars per US dollar), from Massive's currency aggregates: the rate the ADM import converts
+-- Ontario's Canadian-dollar corn / soybean / wheat bids to US cents per bushel with (fx_rates.py). Added 2026-10-28.
+CREATE TABLE IF NOT EXISTS fx_rates (
+    date        STRING NOT NULL,
+    pair        STRING NOT NULL,
+    rate        FLOAT  NOT NULL,
+    captured_at STRING,
+    PRIMARY KEY (date, pair)
+);
+
 CREATE TABLE IF NOT EXISTS futures_history (
     as_of     STRING NOT NULL,
     commodity STRING NOT NULL,

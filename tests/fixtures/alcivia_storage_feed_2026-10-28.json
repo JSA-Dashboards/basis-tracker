@@ -1,0 +1,336 @@
+[
+ {
+  "name": "BALDWIN",
+  "id": "79427",
+  "city": "Baldwin",
+  "state": "WI",
+  "latitude": "44.968448000",
+  "longitude": "-92.374671000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "119714714",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -75,
+    "notes": "Oct/Nov 26",
+    "active": true
+   },
+   {
+    "id": "139087757",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "basis": -60,
+    "notes": "December 26",
+    "active": true
+   },
+   {
+    "id": "139087758",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "basis": -70,
+    "notes": "January 27",
+    "active": true
+   },
+   {
+    "id": "139087759",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "basis": -65,
+    "notes": "February 27",
+    "active": true
+   },
+   {
+    "id": "139087760",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "basis": -60,
+    "notes": "March 27",
+    "active": true
+   },
+   {
+    "id": "137205326",
+    "commodity": "137392",
+    "name": "CORN",
+    "symbol": "ZCZ27",
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -65,
+    "notes": "Oct/Nov 27",
+    "active": true
+   },
+   {
+    "id": "119714701",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSX26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -95,
+    "notes": "Oct/Nov 26",
+    "active": true
+   },
+   {
+    "id": "139129328",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "basis": -95,
+    "notes": "December 26",
+    "active": true
+   },
+   {
+    "id": "139129329",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "basis": -90,
+    "notes": "January 27",
+    "active": true
+   },
+   {
+    "id": "139129330",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "basis": -90,
+    "notes": "February 27",
+    "active": true
+   },
+   {
+    "id": "139129331",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "basis": -85,
+    "notes": "March 27",
+    "active": true
+   },
+   {
+    "id": "137205340",
+    "commodity": "137393",
+    "name": "SOYBEANS",
+    "symbol": "ZSX27",
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -85,
+    "notes": "Oct/Nov 27",
+    "active": true
+   },
+   {
+    "id": "114765761",
+    "commodity": "137394",
+    "name": "WHEAT",
+    "symbol": "ZWZ26",
+    "delivery_start": "07/01/2026",
+    "delivery_end": "02/28/2027",
+    "basis": -160,
+    "notes": "Storage Only",
+    "active": true
+   },
+   {
+    "id": "133135120",
+    "commodity": "137394",
+    "name": "WHEAT",
+    "symbol": "ZWU27",
+    "delivery_start": "07/01/2027",
+    "delivery_end": "08/31/2027",
+    "basis": -150,
+    "notes": "July 27",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "BELLEVILLE",
+  "id": "79410",
+  "city": "Belleville",
+  "state": "WI",
+  "latitude": "42.867959000",
+  "longitude": "-89.530850000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "139083338",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -60,
+    "notes": "Oct/Nov 26",
+    "active": true
+   },
+   {
+    "id": "139083341",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCZ26",
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "basis": -55,
+    "notes": "December 26",
+    "active": true
+   },
+   {
+    "id": "139083340",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "basis": -65,
+    "notes": "January 27",
+    "active": true
+   },
+   {
+    "id": "139083339",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "basis": -60,
+    "notes": "February 27",
+    "active": true
+   },
+   {
+    "id": "119714708",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCH27",
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "basis": -55,
+    "notes": "March 27",
+    "active": true
+   },
+   {
+    "id": "137205321",
+    "commodity": "137411",
+    "name": "CORN",
+    "symbol": "ZCZ27",
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -60,
+    "notes": "Oct/Nov 27",
+    "active": true
+   },
+   {
+    "id": "119714695",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSX26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -95,
+    "notes": "Oct/Nov 26",
+    "active": true
+   },
+   {
+    "id": "139129302",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "delivery_start": "12/01/2026",
+    "delivery_end": "12/31/2026",
+    "basis": -95,
+    "notes": "December 26",
+    "active": true
+   },
+   {
+    "id": "139129303",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSF27",
+    "delivery_start": "01/01/2027",
+    "delivery_end": "01/31/2027",
+    "basis": -90,
+    "notes": "January 27",
+    "active": true
+   },
+   {
+    "id": "139129304",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "delivery_start": "02/01/2027",
+    "delivery_end": "02/28/2027",
+    "basis": -90,
+    "notes": "February 27",
+    "active": true
+   },
+   {
+    "id": "139129305",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSH27",
+    "delivery_start": "03/01/2027",
+    "delivery_end": "03/31/2027",
+    "basis": -85,
+    "notes": "March 27",
+    "active": true
+   },
+   {
+    "id": "137205333",
+    "commodity": "137412",
+    "name": "SOYBEANS",
+    "symbol": "ZSX27",
+    "delivery_start": "10/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -95,
+    "notes": "Oct/Nov 27",
+    "active": true
+   },
+   {
+    "id": "114765767",
+    "commodity": "137413",
+    "name": "WHEAT",
+    "symbol": "ZWZ26",
+    "delivery_start": "07/01/2026",
+    "delivery_end": "02/28/2027",
+    "basis": -105,
+    "notes": "Storage",
+    "active": true
+   },
+   {
+    "id": "133132803",
+    "commodity": "137413",
+    "name": "WHEAT",
+    "symbol": "ZWU27",
+    "delivery_start": "07/01/2027",
+    "delivery_end": "08/31/2027",
+    "basis": -105,
+    "notes": "July 27",
+    "active": true
+   }
+  ]
+ }
+]

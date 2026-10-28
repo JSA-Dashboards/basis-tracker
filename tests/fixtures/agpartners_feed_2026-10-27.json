@@ -1,0 +1,287 @@
+[
+ {
+  "name": "AGP St Joe",
+  "id": "54976",
+  "city": "St Joseph",
+  "state": "MO",
+  "latitude": "39.765686000",
+  "longitude": "-94.814655000",
+  "facility_type": "Direct Ship",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "135612837",
+    "commodity": "168653",
+    "name": "Broker Beans",
+    "symbol": "ZSX26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -15,
+    "notes": "NewCrop2026",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "Axtell",
+  "id": "86968",
+  "city": "Axtell",
+  "state": "KS",
+  "latitude": "39.873386700",
+  "longitude": "-96.258109500",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "130584464",
+    "commodity": "168655",
+    "name": "Soybeans",
+    "symbol": "ZSX26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -60,
+    "notes": "NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "137191061",
+    "commodity": "168655",
+    "name": "Soybeans",
+    "symbol": "ZSX27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -80,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "130584408",
+    "commodity": "168654",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -55,
+    "notes": "Cash/NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "135931436",
+    "commodity": "168654",
+    "name": "Corn",
+    "symbol": "ZCZ27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -60,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "138925547",
+    "commodity": "168656",
+    "name": "Red Wheat",
+    "symbol": "KEZ26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "10/31/2026",
+    "basis": -70,
+    "notes": "Cash",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "Denton",
+  "id": "86972",
+  "city": "Denton",
+  "state": "KS",
+  "latitude": "39.732212400",
+  "longitude": "-95.269884300",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "130584506",
+    "commodity": "168670",
+    "name": "Soybeans",
+    "symbol": "ZSX26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -60,
+    "notes": "NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "137191073",
+    "commodity": "168670",
+    "name": "Soybeans",
+    "symbol": "ZSX27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -80,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "130584421",
+    "commodity": "168669",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -50,
+    "notes": "Cash/NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "135931441",
+    "commodity": "168669",
+    "name": "Corn",
+    "symbol": "ZCZ27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -55,
+    "notes": "NewCrop2027",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "Rulo",
+  "id": "86976",
+  "city": "Rulo",
+  "state": "NE",
+  "latitude": "40.053698000",
+  "longitude": "-95.428882000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "130584503",
+    "commodity": "168682",
+    "name": "Soybeans",
+    "symbol": "ZSX26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -60,
+    "notes": "NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "137191079",
+    "commodity": "168682",
+    "name": "Soybeans",
+    "symbol": "ZSX27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -80,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "130584435",
+    "commodity": "168681",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -50,
+    "notes": "Cash/NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "135931446",
+    "commodity": "168681",
+    "name": "Corn",
+    "symbol": "ZCZ27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -55,
+    "notes": "NewCrop2027",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "Seneca",
+  "id": "86978",
+  "city": "Seneca",
+  "state": "KS",
+  "latitude": "39.834908000",
+  "longitude": "-96.054615200",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "130584460",
+    "commodity": "168688",
+    "name": "Soybeans",
+    "symbol": "ZSX26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -60,
+    "notes": "NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "137191063",
+    "commodity": "168688",
+    "name": "Soybeans",
+    "symbol": "ZSX27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -80,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "130584405",
+    "commodity": "168686",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -55,
+    "notes": "Cash/NewCrop2026",
+    "active": true
+   },
+   {
+    "id": "135931435",
+    "commodity": "168686",
+    "name": "Corn",
+    "symbol": "ZCZ27",
+    "delivery_start": "09/01/2027",
+    "delivery_end": "11/30/2027",
+    "basis": -60,
+    "notes": "NewCrop2027",
+    "active": true
+   },
+   {
+    "id": "138925545",
+    "commodity": "168689",
+    "name": "Red Wheat",
+    "symbol": "KEZ26",
+    "delivery_start": "10/01/2026",
+    "delivery_end": "10/31/2026",
+    "basis": -70,
+    "notes": "Cash",
+    "active": true
+   },
+   {
+    "id": "137613170",
+    "commodity": "168687",
+    "name": "Milo",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "11/30/2026",
+    "basis": -140,
+    "notes": "Cash",
+    "active": true
+   }
+  ]
+ }
+]

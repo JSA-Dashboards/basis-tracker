@@ -1,0 +1,241 @@
+<html><head><script language="JavaScript" type="text/javascript">
+	// NoScrapeOffset: -108.2256
+	function displayNumber(x, decimal_places)
+	{
+		
+				if( +10.822500 <= +10.822500 )
+				x = x -(+ (  10.822500 )  );
+			
+				if( -21.645100 <= - 3.819700 )
+				x = x -(- (  21.645100 )  );
+			
+				if( -27.374700 <= -10.185900 )
+				x = x -(- (  27.374700 )  );
+			
+				if( + 8.276100 <= + 4.138000 )
+				x = x -(+ (   8.276100 )  );
+			
+				if( +11.459200 <= -26.738000 )
+				x = x -(+ (  11.459200 )  );
+			
+				if( +21.645100 <= -21.645100 )
+				x = x -(+ (  21.645100 )  );
+			
+				if( +24.828200 <= +27.693000 )
+				x = x -(+ (  24.828200 )  );
+			
+				if( +21.963400 <= -28.966200 )
+				x = x -(+ (  21.963400 )  );
+			
+				if( +14.642300 <= -12.414100 )
+				x = x -(+ (  14.642300 )  );
+			
+				if( - 5.411300 <= - 1.273200 )
+				x = x -(- (   5.411300 )  );
+			
+				if( -31.512700 <= + 1.909900 )
+				x = x -(- (  31.512700 )  );
+			
+				if( -21.008500 <= + 0.000000 )
+				x = x -(- (  21.008500 )  );
+			
+				if( -11.459200 <= - 4.774600 )
+				x = x -(- (  11.459200 )  );
+			
+				if( -14.960600 <= -17.507000 )
+				x = x -(- (  14.960600 )  );
+			
+				if( -14.642300 <= +27.693000 )
+				x = x -(- (  14.642300 )  );
+			
+				if( +18.143700 <= +18.462000 )
+				x = x -(+ (  18.143700 )  );
+			
+				if( - 4.456300 <= -30.239400 )
+				x = x -(- (   4.456300 )  );
+			
+				if( -28.966200 <= - 4.774600 )
+				x = x -(- (  28.966200 )  );
+			
+				if( - 0.954900 <= -14.323900 )
+				x = x -(- (   0.954900 )  );
+			
+		document.write( getRoundedString(x, decimal_places) );
+	}
+	function getRoundedString(x, decimal_places){
+		if( decimal_places == 0 ){
+			return Math.round(x);
+		}
+		else{
+			base = Math.pow(10,decimal_places);
+			number = Math.round( x * base ) / base;
+			numberString = number.toString();
+			if( numberString.indexOf('.') == -1 ){
+				numberString = numberString + ".0";
+			}
+			while(numberString.length - numberString.indexOf('.') - 1 < decimal_places){
+				numberString = numberString + '0';
+			}
+			numberString = numberString.substring(0, numberString.indexOf('.') + decimal_places + 1);
+		
+			return numberString;
+		}
+	}
+</script></head><body><table align="center" border="0" cellpadding="0" cellspacing="0" name="commodity-ldp" width="630">
+<tr valign="middle">
+<th align="left" valign="top">
+<font color="000000" face="verdana, geneva, tahoma, sans-serif" size="2">
+<b>
+<a href="index.cfm?show=11&amp;mid=26&amp;cmid=0&amp;layout=1034" style="{color:000000;}" title="See all bids for Wheat, SRW">
+										WHEAT, SRW
+									</a>
+</b>
+</font>
+</th>
+<td align="right">
+<table align="right" border="0" cellpadding="3" cellspacing="0">
+<tr><td>
+<div style="text-align:right">
+<span class="mainStyles_standard mainStyles_normalFontSize">
+USDA has adjusted the calculations of LDP data.  <br/><a href="https://agnews.dtn.com/index.cfm?show=10&amp;mid=242" target="_blank">Click here for more information.</a>
+</span>
+</div>
+</td></tr>
+</table>
+</td>
+</tr>
+</table><table align="center" border="0" class="DataGrid DataGridPlus" name="cashbids-data-table" width="630">
+<col/>
+<col class="oddc"/>
+<col/>
+<col class="oddc"/>
+<col/>
+<col class="oddc"/>
+<col/>
+<thead>
+<tr valign="bottom">
+<th class="PageTableHeader" nowrap="nowrap">Delivery</th>
+<th class="PageTableHeader">Cash Price</th>
+<th class="PageTableHeader">Futures Month</th>
+<th class="PageTableHeader">Basis</th>
+<th class="PageTableHeader">Futures Change</th>
+<th class="PageTableHeader">Futures Price</th>
+<th class="PageTableHeader">Settle Price</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td nowrap="nowrap">
+							Oct 31, 2026 
+						</td>
+<td class="highlight" nowrap="nowrap">
+<div>
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-102.2756,2); 
+														//-->
+														</script>
+													
+															 <img alt="10/27/2026 1:19:00 PM CST" src="/images/time.gif" title="10/27/2026 1:19:00 PM CST">
+</img></div>
+</td>
+<td align="center" nowrap="nowrap">
+<a class="basisMonth" href="javascript: showBasisMonth('2', '@W6Z')" title="Basis Month Details.">@W6Z</a>
+</td>
+<td nowrap="nowrap">
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-108.3756,2); 
+														//-->
+													</script>
+</td>
+<td align="center" nowrap="nowrap">
+<div class="negativeChange">
+												 -5'6
+											</div>
+</td>
+<td align="center" nowrap="nowrap" title="10/27/2026 1:19:00 PM CST">
+<div>
+												610'2<span style="font-size:90%;" title="Settled Price">s</span>
+</div>
+</td>
+<td align="center" nowrap="nowrap"><span title="Tue 10/27, 1:19 P"> 610'2<span style="font-size:90%;" title="Settled Price">s</span></span></td>
+</tr>
+<tbody>
+<tr class="alt">
+<td nowrap="nowrap">
+							Nov 30, 2026 
+						</td>
+<td class="highlight" nowrap="nowrap">
+<div>
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-102.2256,2); 
+														//-->
+														</script>
+													
+															 <img alt="10/27/2026 1:19:00 PM CST" src="/images/time.gif" title="10/27/2026 1:19:00 PM CST"/>
+</div>
+</td>
+<td align="center" nowrap="nowrap">
+<a class="basisMonth" href="javascript: showBasisMonth('2', '@W6Z')" title="Basis Month Details.">@W6Z</a>
+</td>
+<td nowrap="nowrap">
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-108.3256,2); 
+														//-->
+													</script>
+</td>
+<td align="center" nowrap="nowrap">
+<div class="negativeChange">
+												 -5'6
+											</div>
+</td>
+<td align="center" nowrap="nowrap" title="10/27/2026 1:19:00 PM CST">
+<div>
+												610'2<span style="font-size:90%;" title="Settled Price">s</span>
+</div>
+</td>
+<td align="center" nowrap="nowrap"><span title="Tue 10/27, 1:19 P"> 610'2<span style="font-size:90%;" title="Settled Price">s</span></span></td>
+</tr>
+<tbody>
+<tr>
+<td nowrap="nowrap">
+							Jul 31, 2027 
+						</td>
+<td class="highlight" nowrap="nowrap">
+<div>
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-102.0456,2); 
+														//-->
+														</script>
+													
+															 <img alt="10/27/2026 1:19:00 PM CST" src="/images/time.gif" title="10/27/2026 1:19:00 PM CST"/>
+</div>
+</td>
+<td align="center" nowrap="nowrap">
+<a class="basisMonth" href="javascript: showBasisMonth('2', '@W7N')" title="Basis Month Details.">@W7N</a>
+</td>
+<td nowrap="nowrap">
+<script type="text/javascript">
+														<!-- 
+															displayNumber(-108.3756,2); 
+														//-->
+													</script>
+</td>
+<td align="center" nowrap="nowrap">
+<div class="negativeChange">
+												 -6'4
+											</div>
+</td>
+<td align="center" nowrap="nowrap" title="10/27/2026 1:19:00 PM CST">
+<div>
+												633'4<span style="font-size:90%;" title="Settled Price">s</span>
+</div>
+</td>
+<td align="center" nowrap="nowrap"><span title="Tue 10/27, 1:19 P"> 633'4<span style="font-size:90%;" title="Settled Price">s</span></span></td>
+</tr>
+</tbody>
+</tbody></tbody></table></body></html>

@@ -127,7 +127,9 @@ if __name__ == "__main__":
 
     sys.path.insert(0, str(Path(__file__).parent))
     from parsers.adm_parser import parse_instruments
+    from fx_rates import usdcad_now
 
+    usdcad = usdcad_now()                    # Canadian-dollar corn / soybean / wheat bids are converted to US cents per bushel (parsers/adm_parser.canadian_basis)
     bids = fetch_adm_bids()
     print(f"\n{'='*60}")
     print(f"Total locations fetched: {len(bids)}")
@@ -140,6 +142,7 @@ if __name__ == "__main__":
             item["display_name"],
             item["instruments_data"],
             item["timestamp"],
+            usdcad=usdcad,
         )
         if snap:
             rows_total += len(snap.rows)

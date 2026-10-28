@@ -143,6 +143,7 @@ from parsers.hfgrain_parser import parse_hfgrain_location
 from wpe_scraper import fetch_wpe_bids
 from parsers.wpe_parser import parse_wpe_location
 from adm_names import adm_state_from_name
+from fx_rates import usdcad_now                            # USD/CAD: ADM's Canadian-dollar bids are converted to US cents per bushel
 
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG_FILE = Path(__file__).parent / "auto_import.log"
@@ -249,8 +250,15 @@ def run_adm() -> int:
     errors         = 0
     skipped        = 0
 
-    # ADM locations to drop (e.g. Canadian sites priced in CAD → bogus basis).
-    _ADM_SKIP = {"Windsor, ON"}
+    # ADM locations to drop. Windsor, ON was dropped here: its bids (and Ontario's) are a Canadian-dollar cash price against US futures in US dollars, a bogus "basis". Since 2026-10-28 the
+    # parser converts those to US cents per bushel at the day's USD/CAD (fx_rates.py), so nothing is dropped.
+    _ADM_SKIP: set = set()
+    usdcad = None
+    try:
+        usdcad = usdcad_now()                                         # one Massive call; None = no rate at all, and the Canadian-dollar-against-US-futures bids are then not filed
+    except Exception as exc:
+        log.warning("USD/CAD unavailable (%s): ADM's Canadian-dollar corn / soybean / wheat bids are skipped this run", exc)
+    log.info("ADM: USD/CAD %s", f"{usdcad:.4f}" if usdcad else "unavailable")
 
     _snaps, _metas = [], []
     for item in raw_results:
@@ -269,7 +277,7 @@ def run_adm() -> int:
 
         try:
             snap_req = parse_adm_instruments(
-                market_id, display_name, instruments_data, timestamp
+                market_id, display_name, instruments_data, timestamp, usdcad=usdcad
             )
             if snap_req is None:
                 skipped += 1
@@ -495,7 +503,8 @@ def run_bushelsites() -> int:
                     continue
                 _snaps.append(req)
                 _metas.append({"location": req.location, "state": b.get("state"),
-                               "facility_type": b.get("facility_type")})
+                               "facility_type": b.get("facility_type"),
+                               "lat": b.get("lat"), "lon": b.get("lon")})        # pins only for sites whose pages carry them (Beachner); None keeps what is stored
                 rows += len(req.rows)
                 log.info("  ✓  %-11s %-24s %-8s %d row(s)",
                          prov, req.location, b.get("grain", ""), len(req.rows))
@@ -1014,7 +1023,8 @@ def run_dtn_http() -> int:
     for m in metas:
         by_prov.setdefault(m["provider"], []).append(
             {"location": m["location"], "state": m.get("state"),
-             "facility_type": m.get("facility_type")})
+             "facility_type": m.get("facility_type"),
+             "lat": m.get("lat"), "lon": m.get("lon")})                # pins only for sites that carry them (Ray-Carroll); None keeps what is stored
     for prov, items in by_prov.items():
         try:
             upsert_location_metas(prov, items)

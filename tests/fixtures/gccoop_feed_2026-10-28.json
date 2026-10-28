@@ -1,0 +1,171 @@
+[
+ {
+  "name": "Alamota Elevator",
+  "id": "62850",
+  "city": "Alamota",
+  "state": "KS",
+  "latitude": "38.407685000",
+  "longitude": "-100.319389000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "134849160",
+    "commodity": "147913",
+    "name": "Hard Red Wheat",
+    "symbol": "KEZ26",
+    "delivery_start": "06/02/2026",
+    "delivery_end": "12/01/2026",
+    "basis": -70,
+    "notes": "Old Crop 2026",
+    "active": true
+   },
+   {
+    "id": "134809889",
+    "commodity": "147913",
+    "name": "Hard Red Wheat",
+    "symbol": "KEN27",
+    "delivery_start": "06/01/2027",
+    "delivery_end": "07/15/2027",
+    "basis": -70,
+    "notes": "New Crop 2027",
+    "active": true
+   },
+   {
+    "id": "139694709",
+    "commodity": "148045",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2025",
+    "delivery_end": "12/01/2026",
+    "basis": 0,
+    "notes": "Old Crop.",
+    "active": true
+   },
+   {
+    "id": "138141270",
+    "commodity": "148045",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "12/01/2026",
+    "basis": 0,
+    "notes": "New Crop 2026.",
+    "active": true
+   },
+   {
+    "id": "60735467",
+    "commodity": "147873",
+    "name": "Milo",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2025",
+    "delivery_end": "12/01/2026",
+    "basis": -60,
+    "notes": "Old Crop",
+    "active": true
+   },
+   {
+    "id": "126395375",
+    "commodity": "147873",
+    "name": "Milo",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "12/01/2026",
+    "basis": -60,
+    "notes": "New Crop 2026",
+    "active": true
+   }
+  ]
+ },
+ {
+  "name": "Garden City Elevator",
+  "id": "62859",
+  "city": "Garden City",
+  "state": "KS",
+  "latitude": "37.937393000",
+  "longitude": "-101.258940000",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "active": "1",
+  "cashbids": [
+   {
+    "id": "134849142",
+    "commodity": "147896",
+    "name": "Hard Red Wheat",
+    "symbol": "KEZ26",
+    "delivery_start": "06/02/2026",
+    "delivery_end": "12/01/2026",
+    "basis": -75,
+    "notes": "Old Crop 2026",
+    "active": true
+   },
+   {
+    "id": "134809876",
+    "commodity": "147896",
+    "name": "Hard Red Wheat",
+    "symbol": "KEN27",
+    "delivery_start": "06/01/2027",
+    "delivery_end": "07/15/2027",
+    "basis": -70,
+    "notes": "New Crop 2027",
+    "active": true
+   },
+   {
+    "id": "134851337",
+    "commodity": "147916",
+    "name": "Hard White Wheat",
+    "symbol": "KEZ26",
+    "delivery_start": "06/02/2026",
+    "delivery_end": "12/01/2026",
+    "basis": -85,
+    "notes": "Old Crop 2026",
+    "active": true
+   },
+   {
+    "id": "139694696",
+    "commodity": "147836",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2025",
+    "delivery_end": "12/01/2026",
+    "basis": 10,
+    "notes": "Old Crop.",
+    "active": true
+   },
+   {
+    "id": "126395427",
+    "commodity": "147836",
+    "name": "Corn",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "12/01/2026",
+    "basis": 10,
+    "notes": "New Crop 2026.",
+    "active": true
+   },
+   {
+    "id": "60735449",
+    "commodity": "147856",
+    "name": "Milo",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2025",
+    "delivery_end": "12/01/2026",
+    "basis": -65,
+    "notes": "Old Crop",
+    "active": true
+   },
+   {
+    "id": "126395362",
+    "commodity": "147856",
+    "name": "Milo",
+    "symbol": "ZCZ26",
+    "delivery_start": "09/01/2026",
+    "delivery_end": "12/01/2026",
+    "basis": -65,
+    "notes": "New Crop 2026",
+    "active": true
+   }
+  ]
+ }
+]

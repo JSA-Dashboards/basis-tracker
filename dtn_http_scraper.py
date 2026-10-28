@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import datetime, timezone
 
 import httpx
@@ -26,6 +27,7 @@ log = logging.getLogger(__name__)
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+_UA_ID = "Mozilla/5.0 (compatible; JPSI basis tracker; kpostin@jpsi.com)"       # for a site added with `ua`: says who is asking
 
 # aghost sites (same platform / displayNumber obfuscation) — fully browser-free
 # here. "columnar" sites carry several plants side-by-side (parsed per column).
@@ -64,6 +66,16 @@ SITES: list[dict] = [
       for _town, _st, _id in [
           ("Atwater", "MN", 1), ("Barron", "WI", 2), ("Dawson", "MN", 3),
           ("Faribault", "MN", 4), ("Perham", "MN", 7)]],
+    # Ray-Carroll County Grain Growers (Carrollton MO; ray-carroll.com, aghost "layout 19"), added 2026-10-27. One page per elevator, `theLocation=<id>` (the Location dropdown's value) with
+    # `cmid=all` for every commodity at once (the page shows only the first commodity otherwise): a <table name="cashbids-data-table"> per commodity, read by column NAME (`grid`).
+    # The 'Off Farm' variants of five locations (a separate id each) post deferred monthly bids for grain picked up on the farm: not filed. Wakenda posts nothing. Pins: each
+    # elevator's street address on its own location page (Nominatim 2026-10-27; Brunswick, Corder, Slater are the town: their streets are not in OpenStreetMap).
+    *[{"provider": "Ray-Carroll", "location": f"{_town}, MO", "state": "MO", "facility_type": _ft, "grain": "Corn", "grid": True, "ua": True, "delay": 1.2, "pin": (_lat, _lon),
+       "url": f"https://www.ray-carroll.com/index.cfm?show=11&mid=26&theLocation={_id}&cmid=all&layout=19"}
+      for _town, _id, _ft, _lat, _lon in [
+          ("Carrollton", 1, "Country Elevator", 39.35673, -93.4766), ("Hardin", 18, "Country Elevator", 39.26958, -93.83216), ("Norborne", 7, "Country Elevator", 39.30217, -93.67999),
+          ("Brunswick", 20, "Country Elevator", 39.42336, -93.13048), ("Corder", 10, "Country Elevator", 39.09835, -93.64077), ("Slater", 12, "Country Elevator", 39.22131, -93.0613),
+          ("Sumner", 14, "Country Elevator", 39.65627, -93.24148), ("St. Louis", 15, "River Terminal", 38.63431, -90.24738)]],
 ]
 
 _SYM_RE = re.compile(r"@[A-Z]{1,2}\d[FGHJKMNQUVXZ]")
@@ -266,6 +278,58 @@ def _parse_portal(html: str, cfg: dict) -> NewSnapshotRequest | None:
                               location=cfg["location"], source="web", rows=rows)
 
 
+_GRID_DATE_RE = re.compile(r"([A-Za-z]{3,9})\.?\s+\d{1,2},\s*(20\d\d)")
+
+
+def _parse_cashbid_grid(html: str, cfg: dict) -> NewSnapshotRequest | None:
+    """aghost 'layout 19' location page (Ray-Carroll): one <table name="cashbids-data-table"> per commodity, its columns named in the header row (Delivery | Cash Price | Futures Month |
+    Basis | ...), so each column is found by NAME, never by position or by how big the number is (a basis of -2.50 would fail the |v| < 2 rule the older parsers lean on). The basis is a
+    displayNumber() cell, the futures month the '@S6X' link, the delivery the END date of the window ('Nov 30, 2026'), filed as its month ('Nov 2026'). Grain per row from the symbol's root."""
+    from bs4 import BeautifulSoup
+    decode = _build_decoder(html)
+    if decode is None:
+        log.warning("DTN(grid) %s: no displayNumber decoder found", cfg["location"])
+        return None
+    soup = BeautifulSoup(html, "html.parser")
+    rows: list[SnapshotRow] = []
+    seen: set[str] = set()
+    for table in soup.find_all("table", attrs={"name": "cashbids-data-table"}):
+        trs = table.find_all("tr")
+        head = [re.sub(r"\s+", " ", c.get_text(" ", strip=True)).lower() for c in trs[0].find_all(["th", "td"])] if trs else []
+        try:
+            i_del, i_sym, i_basis = head.index("delivery"), head.index("futures month"), head.index("basis")
+        except ValueError:
+            log.warning("DTN(grid) %s: a table's header is not Delivery / Futures Month / Basis (%s): skipped", cfg["location"], head)
+            continue
+        need = max(i_del, i_sym, i_basis)
+        for tr in trs[1:]:
+            cells = tr.find_all(["td", "th"])
+            if len(cells) <= need:
+                continue
+            md = _GRID_DATE_RE.search(cells[i_del].get_text(" ", strip=True))
+            symm = _SYM_RE.search(cells[i_sym].get_text(" ", strip=True))
+            args = _DN_RE.findall(str(cells[i_basis]))
+            if not md or not symm or not args:
+                continue
+            bv = decode(args[0])
+            cme = _fut_symbol(symm.group(0))
+            basis = _basis_cents(f"{bv:.2f}") if bv is not None else None
+            if not cme or basis is None:
+                continue
+            delivery = f"{md.group(1)[:3].title()} {md.group(2)}"
+            root = cme[:2]
+            grain = _ROOT_GRAIN.get(root, cfg["grain"])
+            row_id = f"{_PFX.get(root, 'XX')}_{cme}_{delivery.upper().replace(' ', '')}"
+            if row_id in seen:
+                continue
+            seen.add(row_id)
+            rows.append(SnapshotRow(id=row_id, grain=grain, deliveryMonth=delivery, futuresSymbol=cme, basisCents=basis, isSpot=False))
+    if not rows:
+        return None
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00Z")
+    return NewSnapshotRequest(timestamp=ts, provider=cfg["provider"], location=cfg["location"], source="web", rows=rows)
+
+
 _COL_DELIV_RE = re.compile(
     r"^(?:By |Balance\b|Split\b|New Crop\b|FH |LH |"
     r"[A-Z][a-z]{2}-[A-Z][a-z]{2}\b|"                              # Oct-Nov, Nov-Dec
@@ -412,10 +476,15 @@ def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[di
     reqs, metas = [], []
     with httpx.Client(headers={"user-agent": _UA}, timeout=timeout,
                       follow_redirects=True) as client:
+        prev_host = None
         for cfg in SITES:
             label = cfg.get("location") or cfg.get("provider")
+            host = cfg["url"].split("/")[2]
+            if cfg.get("delay") and host == prev_host:
+                time.sleep(cfg["delay"])                      # a site with several pages (Ray-Carroll's 8): a pause between its pages, none before the first
+            prev_host = host
             try:
-                html = client.get(cfg["url"]).text
+                html = client.get(cfg["url"], headers={"user-agent": _UA_ID} if cfg.get("ua") else None).text
             except Exception as exc:
                 log.warning("DTN(http) %s fetch failed: %s", label, exc)
                 continue
@@ -426,13 +495,14 @@ def fetch_dtn_http(timeout: int = 25) -> tuple[list[NewSnapshotRequest], list[di
                 reqs.extend(creqs)
                 metas.extend(cmetas)
                 continue
-            req = _parse_portal(html, cfg) if cfg.get("portal") else _parse_site(html, cfg)
+            req = (_parse_cashbid_grid(html, cfg) if cfg.get("grid") else _parse_portal(html, cfg) if cfg.get("portal") else _parse_site(html, cfg))
             if req is None:
                 log.warning("DTN(http): no bids parsed for %s", label)
                 continue
             reqs.append(req)
             metas.append({"provider": cfg["provider"], "location": cfg["location"],
-                          "state": cfg.get("state"), "facility_type": cfg.get("facility_type")})
+                          "state": cfg.get("state"), "facility_type": cfg.get("facility_type"),
+                          **({"lat": cfg["pin"][0], "lon": cfg["pin"][1]} if cfg.get("pin") else {})})
         # DTN content-services JSON API sites (GreenAmerica, …)
         for cfg in API_SITES:
             req = _parse_api_site(cfg, client)

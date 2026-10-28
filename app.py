@@ -4616,6 +4616,11 @@ with tab_bids:
             )
             st.markdown(table_html, unsafe_allow_html=True)
 
+            _ca_states = ("ON", "MB", "SK", "AB", "QC", "BC")                                   # Canadian provinces
+            if provider == "ADM" and grain != "Canola" and ((_cached_get_location_meta(provider).get(loc_key) or {}).get("state") in _ca_states):
+                st.caption("ADM posts its Canadian corn, soybeans and wheat as a Canadian-dollar cash price against US futures, so the tracker converts each bid to a US basis "
+                           "in cents per bushel: the cash price at that day's USD/CAD, minus the futures price. (Canola stays in C$/t against ICE canola futures.)")
+
             # Roll adjustment legend
             roll_parts = " &nbsp;|&nbsp; ".join(
                 f'<span style="color:#0693e3">{r["from"]}->{r["to"]}</span>'

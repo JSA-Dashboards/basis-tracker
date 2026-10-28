@@ -11,6 +11,7 @@ import re
 # Locations whose state / city isn't cleanly encoded in the name
 _STATE_OVERRIDES = {
     "Green Bison Soy Processing": "ND",   # ADM Spiritwood, ND
+    "Bacres Grain": "ON",                 # ADM's Ontario elevator (42.85, -81.87), named without a province: it had no state and no pin until 2026-10-28
 }
 _CITY_OVERRIDES = {
     "Green Bison Soy Processing": "Green Bison",

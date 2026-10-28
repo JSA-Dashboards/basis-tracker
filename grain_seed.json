@@ -2,10 +2,10 @@
   {"raw_grain": "Corn",                                       "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "Yellow Corn",                                "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "Corn (White)",                               "canonical_grain": "Corn (White)",      "wheat_class": null,    "protein": null,   "is_active": 1},
-  {"raw_grain": "Corn (Canadian)",                            "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Corn (Canadian)",                            "canonical_grain": "Corn",              "wheat_class": null,    "protein": null,   "is_active": 1},
 
   {"raw_grain": "Soybeans",                                   "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 1},
-  {"raw_grain": "Soybeans (Canadian)",                        "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Soybeans (Canadian)",                        "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "IP Soybeans",                                "canonical_grain": "Soybeans",          "wheat_class": null,    "protein": null,   "is_active": 0},
   {"raw_grain": "Hi-Oleic Soy",                               "canonical_grain": "Hi-Oleic Soybeans", "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "High Oleic Beans",                           "canonical_grain": "Hi-Oleic Soybeans", "wheat_class": null,    "protein": null,   "is_active": 1},
@@ -56,7 +56,7 @@
   {"raw_grain": "Canola",                                     "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "Canola (Us)",                                "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "Canola Usd/Cwt",                             "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
-  {"raw_grain": "Canola (Canadian)",                          "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 0},
+  {"raw_grain": "Canola (Canadian)",                          "canonical_grain": "Canola",            "wheat_class": null,    "protein": null,   "is_active": 1},
 
   {"raw_grain": "Milo",                                       "canonical_grain": "Sorghum",           "wheat_class": null,    "protein": null,   "is_active": 1},
   {"raw_grain": "Sorghum",                                    "canonical_grain": "Sorghum",           "wheat_class": null,    "protein": null,   "is_active": 1},
