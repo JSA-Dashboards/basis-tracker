@@ -9,6 +9,9 @@ of the tab on the next run.
 Drives the real ADMIN app (app.py) with streamlit.testing.v1.AppTest in total isolation: every Snowflake / Graph setting is blanked, the
 database is a throwaway SQLite file, and the two things that matter are mocked — database.save_rail_fob (nothing is written) and
 rail_report.send_rail_update_email (nothing is sent; it either succeeds or raises the error under test).
+
+app.py's tabs are lazy (07c6a60: st.tabs(on_change="rerun"), only the open tab runs) and AppTest cannot click a tab, so run_in_tab() sends the
+tab strip's widget state on every run, the way the browser does; without it the Rail Entry tab never draws and there is no Save all button.
 """
 import os
 import sys
@@ -58,6 +61,22 @@ STAGED = [{"market": "CSX Columbus", "commodity": "Corn", "period": "Dec", "futu
           {"market": "CSX Freight", "commodity": "Freight", "period": "Return Trip", "futures": None, "bid": 3000, "offer": 3100, "bid_raw": None, "offer_raw": None}]
 
 
+def run_in_tab(at, name):
+    """at.run() with the app's tab whose label contains `name` open. app.py's tabs are lazy (only the open one runs, the first at the start) and
+    AppTest has no tab API: a Tab is not a Widget to it, so no run re-sends the choice and the next one falls back to the first tab. So this is
+    at.run() (= at._run(at._tree.get_widget_states())) plus the tab strip's widget state, as the browser sends it on every rerun. Needs a first
+    at.run() to have drawn the tab strip."""
+    box, label = next(((n, t.label) for n in at.main if getattr(n, "type", None) == "tab_container"
+                       for t in n.children.values() if name in t.label), (None, None))
+    assert box is not None, "the app has no tab labelled *%s*" % name
+    ws = at._tree.get_widget_states()
+    if box.proto.tab_container.id:                            # (st.tabs without on_change has no widget: every tab runs anyway)
+        w = ws.widgets.add()
+        w.id = box.proto.tab_container.id
+        w.string_value = label
+    return at._run(ws)
+
+
 def run_case(label, send_side_effect, staged=STAGED, graph_ok=False, email_on=True, seed_posting=None):
     """Open the admin app with `staged` rundown rows, press Save all; returns (app, saves, sends). `graph_ok` = the Graph secrets are 'set'."""
     saves, sends = [], []
@@ -84,7 +103,8 @@ def run_case(label, send_side_effect, staged=STAGED, graph_ok=False, email_on=Tr
         at.session_state["rail_entry_warn"] = []
         at.session_state["rail_entry_meta"] = (ISO, "Corn")
         t0 = time.time()
-        at.run()
+        at.run()                                              # draws the tab strip, and only the first tab
+        run_in_tab(at, "Rail Entry")
         print("  %s: first run %.0fs; exceptions: %s" % (label, time.time() - t0, [str(e.value)[:160] for e in at.exception] or "none"), flush=True)
         btn = next((b for b in at.button if b.key == "rail_entry_save"), None)
         check("the Save all button is there (admin build, rows staged)", btn is not None)
@@ -96,7 +116,7 @@ def run_case(label, send_side_effect, staged=STAGED, graph_ok=False, email_on=Tr
         if not email_on:
             at.checkbox(key="rail_entry_email").uncheck()
         btn.click()
-        at.run()
+        run_in_tab(at, "Rail Entry")
     finally:
         for p in patches:
             p.stop()
