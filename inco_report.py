@@ -11,7 +11,7 @@ it off, and a send that fails leaves the sheet saved and prints the resend comma
     python inco_report.py --preview [--date YYYY-MM-DD]          # writes _inco_preview.html and _inco_seasonal.png; sends nothing
     python inco_report.py --send [--date D] [--to ADDR] [--force]
 
-Recipients: To soyprocessing@jpsi.com (INCO_EMAIL_TO overrides), no BCC (INCO_EMAIL_BCC). A send to anyone else (--to) is a TEST: it is logged as kind 'test' and does not count as
+Recipients: To kpostin@jpsi.com (INCO_EMAIL_TO overrides) with soyprocessing@jpsi.com on BCC (INCO_EMAIL_BCC overrides) - the rail email's pattern; Kolten 2026-10-29, after the first list send had gone To the list: "We need the Soy Processing email address to be in BCC please". A send to anyone else (--to) is a TEST: it is logged as kind 'test' and does not count as
 the sheet having been emailed. `inco_email_log` remembers each emailed sheet by a signature of its date and rows, so re-running a post does not mail the list twice; a corrected sheet
 (different bids) is a new signature and goes out again.
 
@@ -35,7 +35,8 @@ from inco_bids import CARRY_PREFIX, GRAIN, LOC, PROV, today_ct
 
 log = logging.getLogger(__name__)
 
-DEFAULT_TO = "soyprocessing@jpsi.com"
+DEFAULT_TO = "kpostin@jpsi.com"
+DEFAULT_BCC = "soyprocessing@jpsi.com"          # the Soy Processing list rides on BCC, never on the To line
 SUBJECT = "JSA Inco Bid Update"
 MARKET = "Inco (Gilman, IL)"          # the name rail_report's seasonal chart is handed; it is the chart's title
 SEAS_CID = "inco_seasonal"
@@ -330,10 +331,10 @@ def record(kind: str, D: date, sig: str, to_addr: str, subject: str) -> None:
 
 
 def recipients(to_addr: str | None = None) -> tuple:
-    """(To, BCC) for a send: the configured list, or just `to_addr` for a test."""
+    """(To, BCC) for a send: Kolten on To and the Soy Processing list on BCC, or just `to_addr` (no BCC) for a test."""
     if to_addr:
         return to_addr, None
-    return os.getenv("INCO_EMAIL_TO") or DEFAULT_TO, (os.getenv("INCO_EMAIL_BCC") or None)
+    return os.getenv("INCO_EMAIL_TO") or DEFAULT_TO, (os.getenv("INCO_EMAIL_BCC") or DEFAULT_BCC)
 
 
 def send_inco_update_email(D: date | None = None, to_addr: str | None = None, *, force: bool = False) -> bool:
@@ -357,8 +358,8 @@ def send_inco_update_email(D: date | None = None, to_addr: str | None = None, *,
     subj = f"{SUBJECT} — Gilman, IL · {D.strftime('%b')} {D.day}"
     to, bcc = recipients(to_addr)
     via = send_email(subj, html, to, bcc=bcc, inline_images=imgs or None)
-    log.info("Inco update email for %s sent via %s to %s", D, via, to)
-    record("test" if is_test else "update", D, sig, to, subj)
+    log.info("Inco update email for %s sent via %s to %s%s", D, via, to, " (bcc %s)" % bcc if bcc else "")
+    record("test" if is_test else "update", D, sig, to + ("; bcc " + bcc if bcc else ""), subj)
     return True
 
 

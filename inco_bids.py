@@ -23,7 +23,7 @@ Inco does NOT post daily. They send a sheet and it HOLDS until the next one (Kol
           Sheet lines are  LABEL, FUTURES, BASIS  (basis in cents; "flat" = 0).
 
           A committed sheet is then EMAILED (inco_report: the table with its changes and the
-          seasonal chart, To soyprocessing@jpsi.com) once the write has been read back. --no-email
+          seasonal chart, To kpostin@jpsi.com with soyprocessing@jpsi.com on BCC) once the write has been read back. --no-email
           skips it; --to ADDR sends a test copy to ADDR only; a failed send leaves the sheet
           saved, says so, and exits 3 (resend: python inco_report.py --send --date D).
 

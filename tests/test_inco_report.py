@@ -217,7 +217,8 @@ def ledger():
 with mock.patch.object(ir, "send_email", fake_send):
     check("a test copy (--to) goes to that address only, with no BCC", ir.send_inco_update_email(D26, to_addr="kpostin@jpsi.com") is True and SENT[-1]["to"] == "kpostin@jpsi.com" and SENT[-1]["bcc"] is None)
     check("... and is logged as a test", [r["kind"] for r in ledger()] == ["test"])
-    check("a test does not count as the list's copy: the list still gets the sheet", ir.send_inco_update_email(D26) is True and SENT[-1]["to"] == "soyprocessing@jpsi.com" and SENT[-1]["bcc"] is None)
+    check("a test does not count as the list's copy: the list still gets the sheet", ir.send_inco_update_email(D26) is True and SENT[-1]["to"] == "kpostin@jpsi.com" and SENT[-1]["bcc"] == "soyprocessing@jpsi.com")
+    check("the Soy Processing list rides on BCC only: never on the To line, and a test copy never carries it", "soyprocessing" not in SENT[-1]["to"] and "soyprocessing" not in str(SENT[0]["bcc"]) and "soyprocessing" not in SENT[0]["to"])
     check("the subject names the sheet's day", SENT[-1]["subject"] == "JSA Inco Bid Update — Gilman, IL · Oct 26", SENT[-1]["subject"])
     check("the page and its images went with it", "Inco Bid Update" in SENT[-1]["html"] and "inco_seasonal" in (SENT[-1]["imgs"] or {}), list(SENT[-1]["imgs"] or {}))
     n = len(SENT)
@@ -234,7 +235,14 @@ with mock.patch.object(ir, "send_email", fake_send):
     os.environ["INCO_EMAIL_TO"], os.environ["INCO_EMAIL_BCC"] = "list@example.com", "copy@example.com"
     check("INCO_EMAIL_TO / INCO_EMAIL_BCC override the recipients", ir.recipients() == ("list@example.com", "copy@example.com") and ir.recipients("me@example.com") == ("me@example.com", None))
     del os.environ["INCO_EMAIL_TO"], os.environ["INCO_EMAIL_BCC"]
-    check("the default recipients: soyprocessing@jpsi.com, no BCC", ir.recipients() == ("soyprocessing@jpsi.com", None))
+    check("the default recipients: To kpostin@jpsi.com, BCC soyprocessing@jpsi.com", ir.recipients() == ("kpostin@jpsi.com", "soyprocessing@jpsi.com"))
+    os.environ["INCO_EMAIL_BCC"] = "copy@example.com"
+    check("INCO_EMAIL_BCC alone moves only the BCC", ir.recipients() == ("kpostin@jpsi.com", "copy@example.com"))
+    del os.environ["INCO_EMAIL_BCC"]
+    os.environ["INCO_EMAIL_TO"] = "list@example.com"
+    check("INCO_EMAIL_TO alone moves only the To: the Soy Processing list stays on BCC", ir.recipients() == ("list@example.com", "soyprocessing@jpsi.com"))
+    del os.environ["INCO_EMAIL_TO"]
+    check("the ledger records who got a list send (To and BCC) and a test copy only its address", [r["to_addr"] for r in ledger() if r["kind"] == "update"][0] == "kpostin@jpsi.com; bcc soyprocessing@jpsi.com" and [r["to_addr"] for r in ledger() if r["kind"] == "test"][0] == "kpostin@jpsi.com", ledger())
     with mock.patch.object(ir, "load_snaps", return_value=[]):
         try:
             ir.send_inco_update_email(None)
@@ -282,10 +290,10 @@ sheet_f = Path(tempfile.mkdtemp(prefix="inco_sheet_")) / "sheet.txt"
 sheet_f.write_text("Oct 2026, ZSX26, 30\nNov 2026, ZSX26, 25\nDec 2026, ZSF27, 20\n", encoding="utf-8")
 with mock.patch.object(ir, "send_email", fake_send):
     rc, out = run_post("--date", "2026-10-28", "--file", str(sheet_f), "--today", "2026-10-28")
-    check("a preview writes nothing and sends nothing, and says who it would go to", rc == 0 and not SENT and "To soyprocessing@jpsi.com" in out and "PREVIEW ONLY" in out
+    check("a preview writes nothing and sends nothing, and says who it would go to", rc == 0 and not SENT and "To kpostin@jpsi.com + BCC soyprocessing@jpsi.com" in out and "PREVIEW ONLY" in out
           and not any(ir.day_of(s) == date(2026, 10, 28) for s in ir.load_snaps()), out)
     rc, out = run_post("--date", "2026-10-28", "--file", str(sheet_f), "--today", "2026-10-28", "--commit")
-    check("--commit writes the sheet, reads it back, then emails the list once", rc == 0 and "VERIFIED" in out and "update email sent" in out and len(SENT) == 1 and SENT[0]["to"] == "soyprocessing@jpsi.com", out)
+    check("--commit writes the sheet, reads it back, then emails the list once", rc == 0 and "VERIFIED" in out and "update email sent" in out and len(SENT) == 1 and SENT[0]["to"] == "kpostin@jpsi.com" and SENT[0]["bcc"] == "soyprocessing@jpsi.com", out)
     rc, out = run_post("--date", "2026-10-28", "--file", str(sheet_f), "--today", "2026-10-28", "--commit")
     check("the same sheet committed again is rewritten but NOT emailed twice", rc == 0 and len(SENT) == 1 and "NOT sent" in out and "already emailed" in out, out)
     rc, out = run_post("--date", "2026-10-28", "--file", str(sheet_f), "--today", "2026-10-28", "--commit", "--force-email")
@@ -295,7 +303,7 @@ with mock.patch.object(ir, "send_email", fake_send):
     check("--no-email saves the sheet and sends nothing", rc == 0 and len(SENT) == 2 and "email skipped" in out and any(ir.day_of(s) == date(2026, 10, 29) for s in ir.load_snaps()), out)
     sheet_f.write_text("Oct 2026, ZSX26, 40\nNov 2026, ZSX26, 25\n", encoding="utf-8")
     rc, out = run_post("--date", "2026-10-30", "--file", str(sheet_f), "--today", "2026-10-30", "--commit", "--to", "kpostin@jpsi.com")
-    check("--to sends a test copy to that address only, and the list is not marked as having it", rc == 0 and SENT[-1]["to"] == "kpostin@jpsi.com" and ledger()[-1]["kind"] == "test", out)
+    check("--to sends a test copy to that address only, and the list is not marked as having it", rc == 0 and SENT[-1]["to"] == "kpostin@jpsi.com" and SENT[-1]["bcc"] is None and ledger()[-1]["kind"] == "test", out)
 
     class Down:
         def __call__(self, *a, **k):
