@@ -46,7 +46,7 @@ DEFAULT_TO = "kpostin@jpsi.com"
 SUBJECT    = "JSA Rail Basis Update"
 _SEAS_CID  = "rail_seasonal"
 # Corridors to leave OFF the rail email (kept in the DB, just not reported).
-_EXCLUDE = {"UP Illinois (Dom)"}     # Allen Station (Dom) — dropped 2026-08-24
+_EXCLUDE = {"UP Illinois (Dom)", "BN PNW CP"}     # Allen Station (Dom) — dropped 2026-08-24; CP PNW — dropped 2026-11-02 (Kolten)
 # Corridors to ALWAYS include (user-requested freight series that update less often
 # than the twice-weekly basis rundowns, so the freshness filter shouldn't drop them).
 _ALWAYS  = {"BN Freight", "UP Freight"}
