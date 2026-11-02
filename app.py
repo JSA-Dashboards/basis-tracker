@@ -2962,7 +2962,6 @@ with tab_railfob:
             ("BN Western Rail", [
                 ["BN Hereford", "BN PNW", "BN COBO"],
                 ["BN Freight"],
-                ["BN PNW CP"],   # → "CP PNW", very bottom
             ]),
             ("CPKC Rail", [
                 ["CPKC Freight"],
@@ -2972,7 +2971,8 @@ with tab_railfob:
         # "Other" section kept surfacing (Kolten 2026-10-02). The rail EMAILS already drop it
         # via their 21-day inactivity cutoff; this keeps the on-screen board consistent.
         # Anything NEW that isn't placed above still lands in "Other" on purpose.
-        _MANUAL_HIDE = ("BN COBO Buyers",)
+        # "BN PNW CP" ("CP PNW") is off the board too (Kolten 2026-11-02: "drop the CP PNW from Western Rail"); the market stays in the archive.
+        _MANUAL_HIDE = ("BN COBO Buyers", "BN PNW CP")
         _rail_board("manual", _MANUAL_SECTIONS, "man", hide=_MANUAL_HIDE)
 
         # ── Email the rail board on demand (full build only; sends via local Outlook) ──
