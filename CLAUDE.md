@@ -127,6 +127,14 @@ hidden) and the shipment table's `shipment_quotes` (it already ranks full > wind
 round to a whole cent ('+15' for a 14.5 midpoint). Deploy: the emailed chart runs wherever `rail_report` runs — the droplet (`post_rail.py`, the catch-up
 watcher: `git pull`) and the admin Cloud app (Reboot).
 
+## Rail Entry parser: a "Spot" slot prices vs the nearest futures month (`rail_paste.py`, 2026-11-05)
+
+Kolten, 2026-11-05: "On rail parser for the entry if the slot is 'Spot' just use the nearest by futures month so long as its not past first notice day". A slot named just `Spot` (any case) has no month of its own, so it used to come out with NO futures.
+It now takes `rail_corridors.corn_front_contract(as_of)` (beans: `soy_front_contract`): the nearest contract of the cycle whose First Notice Day has not passed, the FND day itself still counting as everywhere else in the roll. Corn on 2026-11-05 is CZ (`ZCZ26` until Nov 30),
+then CH (`ZCH27`) until late February, then CK, and so on; soybeans are SF on that day (SX's notice day was Oct 30). A cell's own tag still wins (`Spot 10/15h` = CH), the posted number is never touched (no roll), and a label that merely contains Spot plus a month ("Spot Mar") follows that month's own rule.
+Wheat and other commodities stay blank for the reviewer. Freight markets keep no futures: `post_rail.build_corridor_rows` and the Rail Entry save null them after the parse, Spot included. The Rail Entry tab and `post_rail.py` call the same `parse_multi`, so both change at once
+(the Cloud admin app needs a Reboot after a push, the droplet a pull). `tests/test_rail_paste_spot.py`: 34 checks, and 9 deliberate breaks (FND day not counted, next year's contract forgotten, calendar month instead of notice day, tag ignored, beans ignored, case-sensitive, matched by substring, rule off, freight keeping futures) were all caught.
+
 ## The rail seasonal charts' 5-yr average is Olympic, the range is the true range (`seasonal_band.py`)
 
 Kolten 2026-10-20 ("Check the UP Allen station range and average. It seems like they are too high" ... "I think we might have a year thats skewing the data ...

@@ -11,6 +11,9 @@ It encodes the desk conventions (see the feedback-rail-entry memory):
     standard corn cycle via rail_corridors (post-FND roll), with the special rule
     that a **December delivery defaults to CH (March) unless tagged z**, and
     spanning packages (AMJJ, Jan-Jul, …) price vs 'R'.
+  • a slot named "Spot" prices vs the NEAREST futures month that is not past first
+    notice (CZ until Nov 30, then CH; beans likewise) - Kolten, 2026-11-05. A cell
+    tag still wins.
   • futures stored as a full CME symbol (ZCZ26, ZCH27) so the board's roll-adjust
     math works — or 'R' for a spanning package, or None when unknown/pending.
   • desk notations dropped (pk / wtx / mex / dom / KS / MO / center); a FH/LH/MP
@@ -31,7 +34,7 @@ from datetime import date, datetime
 
 from rail_corridors import (RAIL_BY_CORRIDOR, canonical_corridor, corn_futures,
                             corn_fnd, period_start_month, soy_futures_for_period,
-                            soy_fnd)
+                            soy_fnd, corn_front_contract, soy_front_contract)
 
 _TAG2SHORT = {"u": "CU", "z": "CZ", "h": "CH", "k": "CK", "n": "CN"}
 # Soybean tag letters (desk writes them the same way as corn): x=Nov, f=Jan, etc.
@@ -131,6 +134,11 @@ def _soy_to_full(short: str, as_of: date) -> str:
     return f"ZS{short[1]}{y % 100:02d}"
 
 
+def _is_spot(period: str) -> bool:
+    """A slot named just 'Spot' (any case): the board's nearby bid, which has no month of its own."""
+    return period.strip().lower() == "spot"
+
+
 def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
                  commodity: str = "Corn"):
     """Resolve a cell's futures: full symbol (ZCZ26 / ZSX26), 'R' (spanning), or None.
@@ -142,6 +150,8 @@ def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
     if c in _BEAN_WORDS:                               # ── soybeans ──
         if tag and tag.lower() in _SOY_TAG:
             short = _SOY_TAG[tag.lower()]              # explicit bean tag wins
+        elif _is_spot(period):
+            short = soy_front_contract(as_of)          # Spot = the nearest bean month not past first notice
         else:
             short = soy_futures_for_period(period, as_of)
         if not short or short == "R":
@@ -149,7 +159,8 @@ def _futures_for(period: str, rail: str | None, tag: str | None, as_of: date,
         return _soy_to_full(short, as_of)
     if c not in ("corn", "yellow corn", ""):           # wheat / other → blank
         return None
-    short = corn_futures(period, rail, as_of)          # 'CH' / 'CZ' / 'R' / None
+    # 'CH' / 'CZ' / 'R' / None; a Spot slot = the nearest month not past first notice
+    short = corn_front_contract(as_of) if _is_spot(period) else corn_futures(period, rail, as_of)
     # A tag picks the contract for a single-contract cell, but must NOT collapse a
     # spanning package (AMJJ tagged "kn" stays 'R', not CK).
     if tag and tag.lower() in _TAG2SHORT and short != "R":

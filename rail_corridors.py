@@ -233,6 +233,31 @@ def soy_futures_for_period(period: str, as_of=None) -> Optional[str]:
     return base
 
 
+def _front_contract(seq: list, cm: dict, fnd, as_of) -> Optional[str]:
+    """The nearest contract of a cycle, by contract month, whose First Notice Day has not
+    passed (the FND day itself still counts, as in the roll above). None without an as_of."""
+    if as_of is None:
+        return None
+    if hasattr(as_of, "date"):
+        as_of = as_of.date()
+    for y in (as_of.year, as_of.year + 1):
+        for c in sorted(seq, key=cm.__getitem__):
+            if fnd(c, y) >= as_of:
+                return c
+    return None
+
+
+def corn_front_contract(as_of=None) -> Optional[str]:
+    """Corn contract a rail rundown's 'Spot' slot prices against: the nearest futures month
+    that is not past first notice ('CZ' on 2026-11-05, 'CH' from 2026-12-01). Kolten, 2026-11-05."""
+    return _front_contract(_CORN_SEQ, _CORN_CM, corn_fnd, as_of)
+
+
+def soy_front_contract(as_of=None) -> Optional[str]:
+    """The same rule for soybeans ('SF' on 2026-11-05, once SX is past its first notice)."""
+    return _front_contract(_SOY_SEQ, _SOY_CM, soy_fnd, as_of)
+
+
 def period_order(period: str, anchor_month: Optional[int] = None) -> int:
     """Sort key for a period within a posting. Months before `anchor_month` wrap to
     next year so e.g. Jun..Dec then JFM order correctly. Falls back to month number."""
