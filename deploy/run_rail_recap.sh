@@ -6,7 +6,7 @@
 # Microsoft Graph (same as the daily Changes email). flock prevents overlap; output is
 # logged per-run and pruned at 30 days. Mirrors deploy/run_daily.sh.
 #
-# Cron: 0 11 * * 1  (Mon 11:00 AM Central — matches the retired desktop task).
+# Cron: 0 10 * * 2  (Tue 10:00 AM Central; moved from Mon 11:00 AM on 2026-11-09, which had matched the retired desktop task).
 set -uo pipefail
 
 APP_DIR="/opt/basis-tracker"                 # <-- clone path (edit me)

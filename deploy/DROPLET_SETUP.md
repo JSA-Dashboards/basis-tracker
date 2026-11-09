@@ -105,13 +105,13 @@ auto-prune still fires on Mondays). Add it to the user's crontab:
 chmod +x deploy/run_daily.sh deploy/run_rail_recap.sh
 ( crontab -l 2>/dev/null | grep -v -e run_daily.sh -e run_rail_recap.sh
   echo "45 15 * * 1-5 /opt/basis-tracker/deploy/run_daily.sh"
-  echo "0 11 * * 1 /opt/basis-tracker/deploy/run_rail_recap.sh" ) | crontab -
+  echo "0 10 * * 2 /opt/basis-tracker/deploy/run_rail_recap.sh" ) | crontab -
 crontab -l    # verify
 ```
 
 Two jobs: the daily scrape+email (3:45 PM Central, Mon–Fri) and the weekly JSA
-Rail Basis recap (`run_rail_recap.sh`, 11 AM Central Mondays). (For the daily job
-every day including weekends, use `45 15 * * *`.)
+Rail Basis recap (`run_rail_recap.sh`, 10 AM Central Tuesdays; moved from 11 AM Mondays on 2026-11-09). (For the daily job
+every day including weekends, use `45 15 * * *`.) If the recap moves again, keep its `cron-alert` job name ("Basis tracker rail recap") and set the healthchecks.io check `basis-tracker-rail-recap` to the same schedule by hand, or it false-alarms.
 
 ## 5a. Rail email catch-up (every 10 minutes)
 

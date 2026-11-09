@@ -2990,7 +2990,7 @@ with tab_railfob:
                     except Exception as _e:
                         st.error(f"The recap did NOT send: {_e}  — On Streamlit Cloud this app needs the Microsoft "
                                  "Graph secrets (GRAPH_TENANT_ID / GRAPH_CLIENT_ID / GRAPH_CLIENT_SECRET / "
-                                 "GRAPH_SENDER, under Settings → Secrets). The droplet's Monday 11:00 job "
+                                 "GRAPH_SENDER, under Settings → Secrets). The droplet's Tuesday 10:00 job "
                                  "sends the weekly recap on its own.")
             with _re2:
                 if st.button("📧 Email latest update", key="rail_email_update",
