@@ -3,7 +3,7 @@
 # Install with:  pip install -r requirements-dev.txt
 # (also run `playwright install chromium` for the POET / agricharts scrapers)
 -r requirements.txt
-msal==1.28.0
+# msal comes from requirements.txt (pinned there to the Cloud build's version; a second pin here conflicted with it)
 pdfplumber==0.11.0
 shapely>=2.0.0                 # heat_build.py `lattice` (county shapes -> data/heat/county_lattice.csv.gz); the app itself does not need it
 playwright>=1.44.0

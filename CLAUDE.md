@@ -54,6 +54,19 @@ fires, returns `200 OK`, and does nothing.
 To ship: push, then **Manage app → ⋮ → Reboot app** — on *both* apps if the
 change affects both. Allow 2–5 minutes.
 
+## Pinned requirements, and a keep-alive that checks health (2026-11-09)
+
+On 2026-11-09 the admin Cloud app stopped answering (`/~/+/_stcore/health` = 503 "application is down", the wrapper page said "Oh no. Error running app") after 12 days up, seconds after a burst of heavy-tab renders, with no error line in its log (a silent kill: out of memory or a
+native-library crash, unproven). Kolten rebooted it (Manage app is not available on a dead app's page: use share.streamlit.io, the app's three-dot menu, Reboot app; **the admin app `basis-tracker · master · app.py` is in the personal workspace `koltenpostin93-blip`, the view app `basis-tracker · master · view_app.py` in `jsa-dashboards`**), and two follow-ups went in:
+
+- **`requirements.txt` is frozen.** It used to be open ranges (`>=`) and an unpinned `boto3`, so every cold start or Reboot re-resolved to the newest of everything. All 60 packages (14 direct + 46 pulled in) are now `==` the set the admin app was built with that day (Python 3.14, uv; **both Cloud apps run Python 3.14**, checked in their Settings): streamlit 1.67.0,
+  pandas 3.1.1, numpy 2.5.4, snowflake-connector-python 5.2.0 and so on. `pyarrow==24.0.0` on purpose: Streamlit Cloud itself swaps pyarrow 26 for `<25` (a known segfault, apache/arrow#50471), so 24.0.0 is what ran. certifi and pip are not listed (the Cloud manages them). To upgrade on purpose: change a line, build a venv from the file, run the tests, then Reboot.
+  Verified: a fresh venv installs it with `pip check` clean; every pin has a Linux wheel for cp312, cp313 and cp314 (not cp311: numpy 2.5.4 needs 3.12); eight test files, the view app (AppTest on Streamlit 1.67.0, no exception, all ten tabs) and the admin Rail Entry AppTest pass on it. `requirements-dev.txt` lost its own `msal==1.28.0` pin, which conflicted with the new one.
+  A push that changes `requirements.txt` rebuilds the view app by itself (its webhook works) and only the admin app after a Reboot.
+- **The droplet keep-alive checks the app's real health.** `/opt/warm-ping/ping.sh` only loaded each app's wrapper page, which answers 200 while the app behind it is dead (it logged 200 all morning). `deploy/warm-ping/ping.sh` + `health_alert.py` (copies in `/opt/warm-ping/`, setup in `deploy/DROPLET_SETUP.md` 5c) now also GET
+  `https://<app>/~/+/_stcore/health` (must be 200 `ok`; retried twice 40 s apart), and two failing 10-minute runs in a row e-mail `ALERT_TO` through `/opt/alerting/notify.py`, with a reminder every 6 hours and a mail when the app is back; nothing is sent when the droplet itself has no network. Checked: jsa-basis-tracker and river-fob; the long-dead jsa-us-rail-dashboard (404) is only warmed.
+  `tests/test_warm_ping.py`: 34 checks, 17 deliberate breaks caught (a bash stub for curl and for the alert command, `ALERT_DRY_RUN=1` for the mail).
+
 ## Secrets
 
 `USE_SNOWFLAKE=1` plus the `SNOWFLAKE_*` block; `SNOWFLAKE_SCHEMA` is

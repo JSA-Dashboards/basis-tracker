@@ -217,6 +217,34 @@ Test without touching real jobs:
 ALERT_DRY_RUN=1 /opt/alerting/cron-alert "test" "/tmp/none_*.log" /bin/bash -c 'exit 3'
 ```
 
+## 5c. Streamlit keep-alive and health alerts (every 10 minutes)
+
+`/opt/warm-ping/ping.sh` keeps the Community Cloud apps from sleeping and, since 2026-11-09, checks that they are really up.
+Source of truth is `deploy/warm-ping/` in this repo; the box runs copies in `/opt/warm-ping/`.
+
+```bash
+# install (once, as root; ping.sh is safe to replace while cron runs)
+install -m 755 deploy/warm-ping/ping.sh deploy/warm-ping/health_alert.py /opt/warm-ping/
+mkdir -p /opt/warm-ping/state
+# crontab: a plain line ON PURPOSE, not wrapped in cron-alert (a curl blip must not page)
+*/10 * * * * /opt/warm-ping/ping.sh
+```
+
+- **Warm:** a cookie-jar curl of each app's `?view=1` URL (only the wrapper page), logged to `/opt/warm-ping/ping.log` (last 2000 lines).
+  That request answers 200 even when the app behind it is dead, so it proves nothing about the app: on 2026-11-09 the admin app was down
+  for hours while this log said 200.
+- **Health:** `GET https://<app>/~/+/_stcore/health` must answer HTTP 200 with the body `ok`; a dead app answers 503 `application is down`.
+  A failed check is retried twice, 40 s apart; a run that still fails counts once. After two failing runs in a row an alert
+  mail goes to `ALERT_TO` (alert.conf), then a reminder every 6 hours while it stays down, then one mail when it is back. Checked apps:
+  `HEALTH_HOSTS` (jsa-basis-tracker, river-fob). jsa-us-rail-dashboard answers 404 (the app is gone) and is only warmed.
+  Nothing is alerted when the droplet itself has no network (a control request to graph.microsoft.com fails).
+- **Mail:** `health_alert.py` reuses `/opt/alerting/notify.py`, so the recipients, the Graph credentials and the secret redaction are the ones
+  section 5b already proves. Send one real test: `/opt/warm-ping/health_alert.py --state test`. See a mail without sending it:
+  `ALERT_DRY_RUN=1 /opt/warm-ping/health_alert.py --state down --app river-fob.streamlit.app --detail "FAIL 503 application is down"`.
+- **State:** `/opt/warm-ping/state/<app>.fails|since|alerted|detail` (delete them to reset). Tests: `python tests/test_warm_ping.py`.
+- **A dead app cannot be restarted from here.** Reboot it at share.streamlit.io: the app's three-dot menu, Reboot app (the admin app is in
+  the personal workspace `koltenpostin93-blip`, the view app in `jsa-dashboards`). The dead app's own page has no Manage app button.
+
 ## 6. Monitoring
 
 ```bash
