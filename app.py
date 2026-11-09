@@ -3041,7 +3041,7 @@ if tab_railentry is not None:
                        "its name, so you can drop several in at once. Values are stored **exactly as "
                        "posted**; the tag (z/u/h/k/n) only picks the contract, never rolls the number. "
                        "Dec defaults to CH unless tagged z; spanning packages (AMJJ, Jan-Jul) → R. "
-                       "Use `?` for a pending side, `Flat` for 0.")
+                       "Use `?` for a pending side, `Flat` for 0. A block can also be one quote per line, bid first, period in the middle, offer last (`30z Nov 40z`, `25z Nov 1-20 ?`).")
 
             _rc1, _rcC, _rc2 = st.columns([2, 2, 4])
             with _rc1:
