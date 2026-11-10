@@ -41,8 +41,8 @@ ALCIVIA = next((t for t in ag.TENANTS if t["provider"] == "Alcivia"), None)
 print("alcivia: the tenant row and the two helpers")
 check("Alcivia is a multi-location AgriCharts tenant on alciviacoop.agricharts.com, WI, with titlecase and pins on",
       ALCIVIA is not None and (ALCIVIA["host"], ALCIVIA["shape"], ALCIVIA["state"], ALCIVIA.get("titlecase"), ALCIVIA.get("pins")) == ("https://alciviacoop.agricharts.com", "multi", "WI", True, True), ALCIVIA)
-check("no tenant but Alcivia and Ag Partners Coop (added 2026-10-27, see test_agpartners_agricharts.py) has pins or titlecase switched on (the others' stored pins and names are untouched)",
-      [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")] == ["Alcivia", "Ag Partners Coop"], [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")])
+check("no tenant but Alcivia, Ag Partners Coop (added 2026-10-27, see test_agpartners_agricharts.py) and The Equity (added 2026-11-10, see test_theequity_agricharts.py) has pins or titlecase switched on (the others' stored pins and names are untouched)",
+      [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")] == ["Alcivia", "Ag Partners Coop", "The Equity"], [t["provider"] for t in ag.TENANTS if t.get("pins") or t.get("titlecase")])
 for raw, want in (("FALL CREEK", "Fall Creek"), ("BALDWIN", "Baldwin"), ("Four Corners (New Richmond)", "Four Corners (New Richmond)"), ("MENOMONIE FEED MILL", "Menomonie Feed Mill"), ("Kings Valley (Osseo)", "Kings Valley (Osseo)")):
     check("_title_caps(%r) -> %r" % (raw, want), ag._title_caps(raw) == want, ag._title_caps(raw))
 for loc, want in (({"latitude": "44.968448000", "longitude": "-92.374671000"}, {"lat": 44.96845, "lon": -92.37467}), ({"latitude": None, "longitude": None}, {}), ({"latitude": "", "longitude": ""}, {}),

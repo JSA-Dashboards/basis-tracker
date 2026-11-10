@@ -1,0 +1,542 @@
+[
+ {
+  "active": "1",
+  "city": "Effingham",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "53763",
+  "latitude": "39.128480000",
+  "longitude": "-88.543919000",
+  "name": "Effingham",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -23,
+    "commodity": "118979",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140452274",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -17,
+    "commodity": "118979",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137653919",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "118979",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127135211",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "118980",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453288",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "118980",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137653921",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -20,
+    "commodity": "118980",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137691",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -60,
+    "commodity": "118981",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453293",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ },
+ {
+  "active": "1",
+  "city": "Chrisman",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "53764",
+  "latitude": "39.721625000",
+  "longitude": "-87.707292000",
+  "name": "Horace",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -18,
+    "commodity": "118985",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453098",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -5,
+    "commodity": "118985",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137653993",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -15,
+    "commodity": "118985",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137700",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "118986",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453289",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "118986",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137653994",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -20,
+    "commodity": "118986",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137701",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -80,
+    "commodity": "118987",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453295",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ },
+ {
+  "active": "1",
+  "city": "Martinsville",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "85509",
+  "latitude": "39.335109000",
+  "longitude": "-87.881114000",
+  "name": "Martinsville",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -10,
+    "commodity": "158124",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453286",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -10,
+    "commodity": "158124",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654008",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -20,
+    "commodity": "158124",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137713",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "158125",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453291",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "158125",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654009",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -20,
+    "commodity": "158125",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137716",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -70,
+    "commodity": "158126",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453296",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ },
+ {
+  "active": "1",
+  "city": "West Union",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "85511",
+  "latitude": "39.288552900",
+  "longitude": "-87.668243000",
+  "name": "Snyder",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -15,
+    "commodity": "169018",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453287",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -15,
+    "commodity": "169018",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654010",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "169018",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "132482799",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -35,
+    "commodity": "169019",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453292",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "169019",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654011",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "169019",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "132483273",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -70,
+    "commodity": "169020",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453297",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ },
+ {
+  "active": "1",
+  "city": "Strasburg",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "53765",
+  "latitude": "39.349599000",
+  "longitude": "-88.616945000",
+  "name": "Strasburg",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -22,
+    "commodity": "118988",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453285",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -20,
+    "commodity": "118988",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654006",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -27,
+    "commodity": "118988",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137695",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "118989",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453290",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -27,
+    "commodity": "118989",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654007",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -22,
+    "commodity": "118989",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "127137726",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -65,
+    "commodity": "118990",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453294",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ },
+ {
+  "active": "1",
+  "city": "Westfield",
+  "facility_type": "Country Elevator",
+  "hide_on_sites_and_apis": "0",
+  "id": "85510",
+  "latitude": "39.455869000",
+  "longitude": "-87.988462600",
+  "name": "Westfield",
+  "state": "IL",
+  "cashbids": [
+   {
+    "active": true,
+    "basis": -15,
+    "commodity": "169018",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453287",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -15,
+    "commodity": "169018",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654010",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCZ26"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "169018",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "132482799",
+    "name": "Corn",
+    "notes": null,
+    "symbol": "ZCH27"
+   },
+   {
+    "active": true,
+    "basis": -35,
+    "commodity": "169019",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453292",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -30,
+    "commodity": "169019",
+    "delivery_end": "12/31/2026",
+    "delivery_start": "12/01/2026",
+    "id": "137654011",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -25,
+    "commodity": "169019",
+    "delivery_end": "01/31/2027",
+    "delivery_start": "01/01/2027",
+    "id": "132483273",
+    "name": "Soybeans",
+    "notes": null,
+    "symbol": "ZSF27"
+   },
+   {
+    "active": true,
+    "basis": -70,
+    "commodity": "169020",
+    "delivery_end": "11/30/2026",
+    "delivery_start": "11/01/2026",
+    "id": "140453297",
+    "name": "Wheat",
+    "notes": null,
+    "symbol": "ZWZ26"
+   }
+  ]
+ }
+]

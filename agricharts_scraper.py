@@ -69,6 +69,12 @@ TENANTS: list[dict] = [
     # started in an earlier month but has not ended, filed under the current month (the parser's start-month rule alone would drop them from October on; see the parser).
     {"provider": "Ag Partners Coop", "host": "https://agpartners.agricharts.com",
      "shape": "multi", "state": "KS", "pins": True, "skip": ["AGP St Joe"], "grain_alias": {"Red Wheat": "Wheat, Hrw"}, "open_windows": True},
+    # The Equity (Illinois co-op; theequity.com/grain/cash-bids embeds this feed): six sites - Effingham, Horace (city Chrisman), Martinsville, Snyder (West Union), Strasburg and Westfield. The feed labels ALL six 'Country Elevator', but
+    # Effingham and Horace are FEED MILLS (Kolten, 2026-11-10: "note Effingham and Horace are two feed mills"), so `facility_by_name` files those two as 'Feed Mill' (its key is the feed's own site name, upper-cased, as for `want` and `skip`).
+    # Its monthly windows begin on the 1st, so no `open_windows`; each site carries its own latitude / longitude (`pins`). TERMS: The Equity's own Terms of Use bar scraping and commercial use of the site's content without its written
+    # permission; Kolten chose to add it anyway (2026-11-10), see CLAUDE.md 'The Equity'.
+    {"provider": "The Equity", "host": "https://theequity.agricharts.com", "shape": "multi", "state": "IL", "pins": True,
+     "facility_by_name": {"EFFINGHAM": "Feed Mill", "HORACE": "Feed Mill"}},
 ]
 
 
@@ -160,6 +166,7 @@ def fetch_agricharts_bids() -> list[dict]:
                 # City Coop's "River Valley" has no "Elevator" in its name but the
                 # feed labels it Country Elevator); fall back to the name heuristic.
                 facility = (loc.get("facility_type") or "").strip() or _facility_from_name(raw_name)
+                facility = (t.get("facility_by_name") or {}).get(raw_name.strip().upper(), facility)     # a site the feed mislabels (The Equity's two feed mills)
             out.append({
                 "provider": t["provider"], "location_name": location,
                 "state": state, "city": loc.get("city") or "",
