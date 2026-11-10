@@ -2159,8 +2159,18 @@ def get_index_excludes() -> set:
     conn = get_conn()
     c    = conn.cursor()
     try:
-        _ensure_index_excludes(conn, c)
-        c.execute("SELECT provider, location FROM index_excludes")
+        # READ FIRST, create only if that fails. The old code ran CREATE TABLE IF NOT EXISTS before every read, and
+        # a login that can only SELECT (the client portal's CLIENT_PORTAL_ROLE, 2026-11-09) is refused by Snowflake
+        # for that statement even when the table exists, which took the whole Trends tab down for clients.
+        try:
+            c.execute("SELECT provider, location FROM index_excludes")
+        except Exception:
+            try:
+                _ensure_index_excludes(conn, c)      # the table is not there yet (first run on a new database)
+                c.execute("SELECT provider, location FROM index_excludes")
+            except Exception as exc:                 # a read-only login cannot create it: nothing is excluded
+                print(f"get_index_excludes: no outlier list available ({str(exc)[:120]}); excluding nothing")
+                return set()
         return {(r["provider"], r["location"]) for r in c.fetchall()}
     finally:
         conn.close()
