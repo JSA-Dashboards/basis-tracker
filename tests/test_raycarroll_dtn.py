@@ -5,13 +5,14 @@
 Kolten 2026-10-27: "Can we check if we can scrap ray carroll". CLAUDE.md had it as 'Known-unbuilt: a 15-location co-op needing dropdown iteration per location x commodity'; the page turned out to
 take the location in the URL (`theLocation`) and `cmid=all` for every commodity at once, server-rendered with the usual displayNumber() obfuscation, so it is eight GETs and one new parser
 (`_parse_cashbid_grid`, which finds its columns by the header's NAMES). Uses the real markup and the page's own decoder of two locations (tests/fixtures/raycarroll_carrollton_2026-10-27.html and
-raycarroll_stlouis_2026-10-27.html, trimmed to the decoder script and the commodity tables) - no network; the database is a throwaway SQLite.
+raycarroll_stlouis_2026-10-27.html, trimmed to the decoder script and the commodity tables) - no network; the database is a throwaway SQLite. Both clocks the code reads are pinned to 2026-10-27, the day of the
+fixtures (the symbol decoder's year in vistacomm_scraper, the snapshot stamp in dtn_http_scraper), so the result does not depend on the day the test is run.
 """
 import logging
 import os
 import sys
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from unittest import mock
 
@@ -46,6 +47,18 @@ class FakeDate(date):
     @classmethod
     def today(cls):
         return date(2026, 10, 27)          # '@S6X' is 2026 only while the year is 2026: pin the clock the symbol decoder reads
+
+
+class FakeDateTime(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 10, 27, 15, 45, tzinfo=tz)
+
+
+# The fixtures are the 2026-10-27 pages, whose windows are 'Oct 2026' (corn, wheat) and 'Nov 2026' (soybeans). dtn_http_scraper stamps every snapshot with the REAL clock (datetime.now), and
+# database._drop_stale_forward_rows drops a bid whose delivery month is before its own snapshot's month, so from 2026-11-01 on the two 'Oct 2026' bids were dropped on their way into the database and the
+# read-back found 2 rows, not 4 (the two database checks below failed from that day). Pin that clock to the fixtures' day too, once, for the whole run.
+mock.patch.object(dh, "datetime", FakeDateTime).start()
 
 
 def parse(html, cfg=None):
@@ -144,6 +157,7 @@ cl = FakeClient.instances[-1]
 check("eight GETs, each with the identifying user agent (not the browser one the older aghost sites send)", len(cl.requests) == 8 and all(h == {"user-agent": dh._UA_ID} for u, h in cl.requests), cl.requests[:2])
 check("a 1.2 s pause between the pages of the one host, none before the first (7)", sleeps == [1.2] * 7, sleeps)
 check("eight snapshots filed under Ray-Carroll, St. Louis with its wheat", len(reqs) == 8 and {r.provider for r in reqs} == {"Ray-Carroll"} and [r for r in reqs if r.location == "St. Louis, MO"][0].rows[0].grain == "Wheat", [r.location for r in reqs])
+check("every snapshot is stamped 2026-10-27, the fixtures' day, not today (the clock is pinned)", {r.timestamp for r in reqs} == {"2026-10-27T00:00:00Z"}, {r.timestamp for r in reqs})
 check("the metas carry state, type and the pin (the address pin of Hardin, the Mississippi terminal at St. Louis)", {m["location"]: (m["state"], m["facility_type"], m["lat"], m["lon"]) for m in metas}["Hardin, MO"] == ("MO", "Country Elevator", 39.26958, -93.83216)
       and {m["location"]: (m["lat"], m["lon"]) for m in metas}["St. Louis, MO"] == (38.63431, -90.24738), metas[:2])
 bare = {k: v for k, v in RC[0].items() if k != "pin"}
