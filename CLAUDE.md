@@ -54,6 +54,14 @@ fires, returns `200 OK`, and does nothing.
 To ship: push, then **Manage app → ⋮ → Reboot app** — on *both* apps if the
 change affects both. Allow 2–5 minutes.
 
+## Read paths must not run DDL (2026-11-10)
+
+The admin portal's CLIENT portal bundles this app and runs it as a SELECT-only Snowflake role (`CLIENT_PORTAL_ROLE`). `get_index_excludes()` (the Trends tab's outlier
+list) used to `CREATE TABLE IF NOT EXISTS index_excludes` before every read; Snowflake refuses that statement for a role without create rights even when the table exists,
+so Trends failed for clients while the view app (a role with write rights) worked. It now SELECTs first, creates only when the SELECT fails, and returns an empty set when
+creation is refused too (`tests/test_index_excludes_readonly.py`). The same `_ensure_*` pattern is in `get_nightly_overrides` and the client-reports readers, which no client tab
+calls; if a client-facing tab ever does, give it the same read-first shape.
+
 ## Pinned requirements, and a keep-alive that checks health (2026-11-09)
 
 On 2026-11-09 the admin Cloud app stopped answering (`/~/+/_stcore/health` = 503 "application is down", the wrapper page said "Oh no. Error running app") after 12 days up, seconds after a burst of heavy-tab renders, with no error line in its log (a silent kill: out of memory or a
