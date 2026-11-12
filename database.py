@@ -20,6 +20,7 @@ import threading
 import time
 from pathlib import Path
 from models import Snapshot, SnapshotRow
+from typing import NamedTuple, Optional
 try:                                           # canola is stored x100 (C$/t) and read back as quoted; see grain_units.py
     from grain_units import scale_basis as _scale_basis
 except Exception:                              # noqa: BLE001 — a packaged copy without the helper (e.g. a Snowpark proc): rows come back as stored
@@ -1810,11 +1811,87 @@ def get_rail_fob_all(source: str, include_estimates=None) -> list:
         conn.close()
 
 
-def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> dict:
+_BULK_CHUNK = 20000          # rows the compact loader takes off the cursor at a time
+
+
+class _CompactRow(NamedTuple):
+    """One bid row as light as a tuple: models.SnapshotRow's field names, without pydantic's per-instance dict, field set and validation
+    (about a tenth of the memory)."""
+    id: str
+    grain: str
+    deliveryMonth: str
+    futuresSymbol: str
+    basisCents: Optional[int]
+    isSpot: bool
+    spotGrain: Optional[str]
+
+
+class _CompactSnapshot:
+    """A snapshot with the attributes get_snapshots_bulk fills on models.Snapshot; `rows` is a plain list of _CompactRow."""
+    __slots__ = ("id", "timestamp", "provider", "location", "source", "rows")
+    emailSubject = None        # the bulk query never reads these two; they are None on the pydantic Snapshot too
+    emailDate = None
+
+    def __init__(self, id, timestamp, provider, location, source):
+        self.id, self.timestamp, self.provider, self.location, self.source = id, timestamp, provider, location, source
+        self.rows = []
+
+    def __repr__(self):
+        return "_CompactSnapshot(%r, %r, %r, %d rows)" % (self.provider, self.location, self.timestamp, len(self.rows))
+
+
+def _int_like(v):
+    """What a pydantic `Optional[int]` field makes of a value (lax mode): a whole-number float or Decimal becomes an int; None, an int and anything
+    that is not a whole number are kept as they came."""
+    if v is None or type(v) is int:
+        return v
+    try:
+        i = int(v)
+    except (TypeError, ValueError, OverflowError):
+        return v
+    return i if i == v else v
+
+
+def _compact_snapshots(c, chunk: int = 0) -> dict:
+    """Read an executed get_snapshots_bulk query straight off the cursor into compact snapshots, `chunk` rows at a time. The driver's own copy of a
+    whole result (a dict per row, built twice over on Snowflake) is never held, and every repeated string (provider, grain, month, symbol, row id)
+    is one shared object: a 400-day load of one facility type was ~1.3 GB as pydantic models and is a small fraction of that here."""
+    from collections import defaultdict
+    chunk = chunk or _BULK_CHUNK
+    pool: dict = {}
+    snaps_by_id: dict = {}
+    result: dict = defaultdict(list)
+
+    def one(v):                                  # a repeated string is stored once
+        return pool.setdefault(v, v) if type(v) is str else v
+
+    while True:
+        batch = c.fetchmany(chunk)
+        if not batch:
+            break
+        for row in batch:
+            sid  = row["snap_id"]
+            snap = snaps_by_id.get(sid)
+            if snap is None:
+                prov, loc = one(row["provider"]), one(row["location"])
+                snap = snaps_by_id[sid] = _CompactSnapshot(sid, row["timestamp"], prov, loc, one(row["source"]))
+                result[(prov, loc)].append(snap)
+            snap.rows.append(_CompactRow(
+                one(row["row_id"]), one(row["grain"]), one(row["delivery_month"]), one(row["futures_symbol"]),
+                _int_like(_scale_basis(row["grain"], row["basis_cents"])), bool(row["is_spot"]), one(row["spot_grain"])))
+        del batch
+    return dict(result)
+
+
+def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400, compact: bool = False) -> dict:
     """
     Fetch all snapshots (with rows) for multiple (provider, location) pairs
     within the last `since_days` days.
     Returns: {(provider, location): [Snapshot, ...] sorted ascending by timestamp}
+
+    compact=True returns the same data as light, read-only objects with the same attribute names (snapshot.timestamp / .rows, row.grain /
+    .basisCents ...), read off the cursor in chunks: for a report that walks a whole facility type's history and only reads attributes (the daily
+    Changes email, on a 2 GB droplet). The default is the pydantic models, as ever.
     """
     if not pairs:
         return {}
@@ -1838,6 +1915,8 @@ def get_snapshots_bulk(pairs: list[tuple[str, str]], since_days: int = 400) -> d
             WHERE ({pair_conds}) AND s.timestamp >= {ph}
             ORDER BY s.provider, s.location, s.timestamp, r.id
         """, params)
+        if compact:
+            return _compact_snapshots(c)
         db_rows = c.fetchall()
     finally:
         conn.close()

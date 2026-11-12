@@ -147,7 +147,10 @@ def _load_fresh(facility_type: str):
     # in each builder filters within.
     pairs = [(l["provider"], l["location"]) for l in sl if l.get("facility_type") == facility_type]
     pairs = sorted(set(pairs) | (override_pairs_for(facility_type) & set(_meta)))
-    data  = get_snapshots_bulk(pairs, since_days=400) if pairs else {}
+    # compact: this load is a whole facility type's 400 days (~1M bid rows) that is only READ by attribute. As pydantic models the whole email build peaked at
+    # ~1.3 GB, ~1.8 GB once the memo below kept every type's load (measured on live data), which the 2 GB droplet could not give: the 11-12 15:45 run was
+    # OOM-killed building this email. Compact: ~0.38 GB, the same email to the byte.
+    data  = get_snapshots_bulk(pairs, since_days=400, compact=True) if pairs else {}
     today_noon = datetime.utcnow().replace(hour=12, minute=0, second=0, microsecond=0)
     loc_latest = []
     for snaps in data.values():
@@ -1187,6 +1190,17 @@ def send_with_retry(send, waits=(), what: str = "email", sleep=None):
             sleep(waits[i])
 
 
+def _peak_rss_mb():
+    """This process's peak resident memory so far, in MB (Linux / macOS); None where it cannot be told (Windows). Never raises."""
+    try:
+        import resource
+        import sys
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss          # kilobytes on Linux, bytes on macOS
+        return int(peak / (1024 * 1024 if sys.platform == "darwin" else 1024))
+    except Exception:                                                      # noqa: BLE001
+        return None
+
+
 def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
                              mode: str = "spot", retry_waits=()) -> bool:
     """Build the daily Changes report and email it via Outlook. Returns True on success.
@@ -1198,7 +1212,12 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
     to_addr = to_addr or DEFAULT_TO
     if cc is None:
         cc = os.getenv("CHANGES_EMAIL_CC") or None
+    _pk0, _t0 = _peak_rss_mb(), time.time()
     html = build_changes_email_html(mode) + signature_html()
+    # The 2 GB droplet's out-of-memory killer ended the 11-12 15:45 run inside this build (rc=137, no email): the line makes the next run's footprint visible.
+    _pk1 = _peak_rss_mb()
+    log.info("Daily Changes email built in %.0f s (%.0f KB); this process's peak memory: %s MB before the build, %s MB after",
+             time.time() - _t0, len(html.encode("utf-8")) / 1024, "?" if _pk0 is None else _pk0, "?" if _pk1 is None else _pk1)
     subject = f"JSA Daily Basis Changes - {datetime.now():%b %d, %Y}"
     imgs = {_SIG_LOGO_CID: _SIG_LOGO} if os.path.exists(_SIG_LOGO) else {}
     _wm = _table_watermark()
