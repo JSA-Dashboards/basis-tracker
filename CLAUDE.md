@@ -126,6 +126,43 @@ Tests: `tests/test_rail_email_log.py` (decisions, ledger on a throwaway SQLite, 
 simulated clock, the send functions), `tests/test_rail_entry_outcome.py` (the admin app headless),
 `tests/test_send_email_dispatch.py`.
 
+## Daily Changes email: the Trends tab's tables above each section (`changes_report.py`, 2026-11-12)
+
+Kolten, 2026-11-12: "On this email that goes out can we add in the trends table that is on the trends tab. So above each section show the table of trends avg basis changes weekly, monthly and yearly changes
+overall and % east vs west." The "JSA Daily Basis Changes" email (`send_daily_changes_email`, 15:45 CT from `auto_import`; To kpostin@, cc / BCC the groups) has 11 sections (`TREND_CATEGORIES`, the same list as `app.py`'s);
+each now opens with the three small tables of the Trends tab, side by side in one row: **Avg Basis Change (¢)** (All Plants / Firmer only / Weaker only vs LW / LM / LY), **Firmer / Weaker by Region** (East and West: the share of locations
+that moved up / down; a river section shows **Avg Basis & Change by Segment** instead) and **Spot > Next** (the share of locations inverted, by region or segment), then the section's own table as before. One grey legend line at the end explains
+LW / LM / LY, the Mississippi split and the outlier exclusion. A section with no locations shows no tables.
+
+- **Same numbers as the tab, by construction and by check.** `changes_report` has no Streamlit, so it mirrors the app's logic (`build_trend_rows`, `_trend_move`, `get_adj`, `_roll_spread`, `_trend_extract`, `_trend_curve`, `_trend_closest`,
+  `render_trend_cards`): per location the nearest-delivery basis now / ~1 week / ~1 month / ~1 year ago (targets now, -7, -30, -365 days; tolerance 1.6 / 4 / 4 / 4 days, inclusive), each move spread-adjusted across a contract roll (a roll with no spread on
+  file leaves that move out), East / West from the state (`regions.region_from_state`), river sections by `river_segment`, and the locations marked as index outliers on the Trends tab (`database.get_index_excludes`) left out. **If the app's trend logic changes, change
+  `changes_report` with it** (the mirror is `_trend_*`, `build_trend_rows`, `render_trend_cards_email`). Checked 2026-11-12 14:2x CT on live Snowflake data: the real view app's Trends tab (headless AppTest) and `changes_report._trend_cards_html` gave
+  IDENTICAL cell-by-cell output (every label and number) and the same location counts in all 11 categories (135 / 60 / 95 / 56 / 99 / 20 / 14 / 20 / 2 / 76 / 13 locations; no outliers marked at the time).
+- **Email-safe HTML**: plain tables with attributes (`cellpadding`, `align`, `bgcolor`) and a colour on the cell, no CSS grid / flex / classes (Outlook's Word engine). The first version used per-cell CSS and came to 196 KB; this one is 37.7 KB of tables, so the email as sent is **about 111.5 KB**
+  (73.8 KB before). **Gmail clips a message over ~102 KB** (the signature and legend would be cut); everyone on the lists reads on Outlook, but a Gmail recipient would see the clip. Not tried in desktop Outlook (rendered in Chromium).
+- **Never stops the email**: `_trend_cards_html` catches anything and returns '' (a section then just has no tables, logged as a warning); `_index_excludes` returns an empty set if the table cannot be read.
+- **Speed**: the report build went from ~25 s to 30-47 s. The sections and the tables of one facility type share one snapshot load (`_load` is memoised in `_LOAD_MEMO` while `build_changes_email_html` runs and never otherwise) and the futures curve is fetched once per build
+  (`_CURVE_MEMO`: `futures_spread.ensure_curve` keeps nothing while a feed is down, so every rolled location would otherwise retry the network); both are dropped in a `finally`. `app.py`'s own Changes-tab HTML (`app.build_changes_email_html`) is untouched, and so is `client_report.py`
+  (it imports `_trend_extract`, `_trend_closest`, `_trend_ts`, `_curve_map` from here, all unchanged).
+- Tests: `tests/test_changes_trend_cards.py` (76 checks: six synthetic plants with hand-computed answers, the snapshot-matching tolerances on the second, the roll rules, a mixed-grain snapshot, the other delivery modes, the three tables, outliers, the river variant,
+  the email around them, the memos) and 73 deliberate breaks, all caught.
+
+## The daily Changes email waits out a down mail service, and a run that could not send it exits 3 (2026-11-12)
+
+Kolten, 2026-11-12 ~14:00 CT: "Outlook is down and could cause an issue." A read-only probe of the droplet's Graph path (a token is issued; `GET /users/<sender>` answers 403, so Graph itself is up; `GET /users/<sender>/mailFolders/inbox` answered **502 after 21 s, then 503 in 0.1 s**,
+repeatedly from 14:03 to at least 14:21) showed Exchange Online refusing the tracker's mailbox. Until then the 15:45 run sent the email ONCE (`send_via_graph`: one POST, 30 s timeout), logged a warning on failure and went on, and every alert about it (the `cron-alert` email, `/opt/alerting/notify.py`, the scraper alert,
+pull_health's operator mail) goes through the same Graph path, so a mail outage would have lost the email AND the notice. The client reports in the same run fail the same way. (Rail updates already self-heal: the 10-minute catch-up watcher re-sends. An Inco post leaves the sheet saved and prints the resend command.)
+
+- `changes_report.send_with_retry(send, waits, what)` waits and tries again after each of `waits` seconds when the failure is **transient** (`transient_send_error`: a bracketed HTTP 429 / 5xx in the error text, a timeout, a dropped connection); a 4xx (access denied, bad request), a bad secret or missing settings is raised at once;
+  no waits = one try, so every caller that is a person at a button (the Cloud admin app, the CLI) is unchanged.
+- `send_daily_changes_email(retry_waits=...)` builds the report ONCE and sends the same message again; `DAILY_SEND_RETRY_WAITS` = 2, 3, 5, 5, 5, 5, 5, 5 minutes (eight more tries over about 35 minutes: inside `cron-alert`'s 90-minute limit with the ~15-minute run). `auto_import._send_daily_changes_email` passes it, never raises and says
+  whether the email went; the run carries on (client reports, alerts) and **exits 3** after the pull-health exit when it did not, so `cron-alert` and healthchecks.io (an HTTP ping, not mail) see a failed run. A `--no-email` run neither sends nor fails on it.
+- **Not covered:** an outage longer than ~35 minutes still loses that day's email (the log says "Daily Changes email NOT sent"): re-send by hand with `python changes_report.py --send` on the droplet once the service is back (it rebuilds from the same data; ask Kolten first, it is a group broadcast) and `python client_report.py --send-due`
+  for the client reports. A ledger plus a catch-up job like the rail one would cover hours-long outages (Exchange Online had one on 2026-08-31). A timeout AFTER Exchange accepted the message could send it twice (rare; a duplicate beats a lost email). Other droplet jobs share the Graph path (global exports ETL, Yield Portal weekly email, River FOB daily email): not checked.
+- **The probe** (no mail is sent, no secret printed): token with the app's own client credentials, `GET /users/<sender>?$select=id`, `GET /users/<sender>/mailFolders/inbox?$select=displayName`, run through the droplet venv with `/opt/basis-tracker/.env` loaded. A fast 403 on the inbox call is the expected healthy answer for an app without Mail.Read (assumed, not seen on a good day); 502 / 503 is Exchange down.
+- Tests: `tests/test_email_retry.py` (23 checks: which errors count, the loop, the daily email end to end with a flaky sender, the run's side read from the real `auto_import` function) and 26 deliberate breaks, 25 caught (the 26th, one try too many, is unreachable: the last try always raises).
+
 ## Forward curves — one number per delivery month (`forward_month.py`)
 
 A posting quotes a month several ways at once — 'Dec', 'FH Dec', 'LH Dec', and packages that span it ('JFM', 'Nov-Jul'). Every chart that draws a forward

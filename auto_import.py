@@ -2417,6 +2417,19 @@ def run(
     return total
 
 
+def _send_daily_changes_email() -> bool:
+    """The daily Changes email, with the mail-service retry (changes_report.DAILY_SEND_RETRY_WAITS: a down or busy Exchange Online / Graph is waited out for
+    about 35 minutes). True when it went out; False, logged as an error, when it did not (the caller then exits 3 so cron-alert / healthchecks see it:
+    the alert EMAILS go through the same service, so they cannot be what tells anyone). Never raises."""
+    try:
+        from changes_report import send_daily_changes_email, DAILY_SEND_RETRY_WAITS
+        send_daily_changes_email(retry_waits=DAILY_SEND_RETRY_WAITS)
+        return True
+    except Exception as exc:                                  # noqa: BLE001
+        log.error("Daily Changes email NOT sent (scrape unaffected): %s", exc)
+        return False
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Basis Tracker — automated daily web scraper"
@@ -2954,12 +2967,11 @@ if __name__ == "__main__":
         _health_rc, _health_done = _pull_health_check(email=not args.no_email)
 
         # ── Email the daily Changes report via Outlook (full scheduled run) ──
+        # A mail service that is down or busy (Exchange Online / Graph 429, 5xx, timeouts) is waited out (about 35 minutes); if the email still did not go
+        # the run exits 3 below, so cron-alert / healthchecks see it (Kolten 2026-11-12, Outlook down).
+        _email_failed = False
         if not args.no_email:
-            try:
-                from changes_report import send_daily_changes_email
-                send_daily_changes_email()
-            except Exception as exc:
-                log.warning("Daily Changes email failed (scrape unaffected): %s", exc)
+            _email_failed = not _send_daily_changes_email()
 
             # Personalized client basis reports — mail every active client whose
             # cadence (daily/weekly/monthly) matches today. Independent of the
@@ -2983,3 +2995,6 @@ if __name__ == "__main__":
         if _health_rc:
             log.error("Exiting %d: the pull stored under half a normal day, or could not be verified (pull_health).", _health_rc)
             sys.exit(_health_rc)
+        if _email_failed:
+            log.error("Exiting 3: the daily Changes email was not sent (see above), so cron-alert and healthchecks see a failed run.")
+            sys.exit(3)

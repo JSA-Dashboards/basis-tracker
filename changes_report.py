@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import tempfile
-from datetime import datetime
+import time
+from datetime import datetime, timedelta
 
 import delivery_period as _dp
+from regions import region_from_state
 from river_segments import river_segment, SEGMENT_ORDER
 from adm_names import adm_city_from_name
 from database import get_grain_map, get_bids_filter_data, get_snapshots_bulk
@@ -117,7 +120,20 @@ def _trend_closest(snaps, target, maxd):
     return b if abs((_trend_ts(b.timestamp) - target).total_seconds()) / 86400 <= maxd else None
 
 
+_LOAD_MEMO = None        # {facility type: load result} while ONE report is being built (its sections and trend cards of a type share a load); None otherwise
+
+
 def _load(facility_type: str):
+    """_load_fresh, remembered for the length of one report build (build_changes_email_html sets and clears _LOAD_MEMO); a plain call is never cached."""
+    if _LOAD_MEMO is not None and facility_type in _LOAD_MEMO:
+        return _LOAD_MEMO[facility_type]
+    res = _load_fresh(facility_type)
+    if _LOAD_MEMO is not None:
+        _LOAD_MEMO[facility_type] = res
+    return res
+
+
+def _load_fresh(facility_type: str):
     """Snapshot load + 'now' anchor for a facility type (uncached version of app._trend_load)."""
     global _GM
     if not _GM:
@@ -383,6 +399,287 @@ def build_segment_change_rows(facility_type: str, grain: str, mode: str = "spot"
             "rows": rows}
 
 
+# ── Trend cards ───────────────────────────────────────────────────────────────────────────────────────────────
+# Kolten 2026-11-12: "can we add in the trends table that is on the trends tab ... above each section show the table of trends avg basis changes
+# weekly, monthly and yearly changes overall and % east vs west". These are the Trends tab's three small tables (app.render_trend_cards) with the
+# SAME numbers: per location the nearest-delivery basis now / ~1 week / ~1 month / ~1 year ago (app.build_trend_rows), each move spread-adjusted
+# across a contract roll (app._trend_move / get_adj), and the locations marked as index outliers on the Trends tab left out. This module has no
+# Streamlit, so that logic is mirrored here (as _load mirrors app._trend_load); tests/test_changes_trend_cards.py pins it.
+
+_ROLL_ADJ = [{"from": "ZSK26", "to": "ZSN26", "adj": -16}, {"from": "ZCK26", "to": "ZCN26", "adj": -10}]     # manual fallback, as app.ROLL_ADJ
+_FROZEN_SPREAD_MEMO: dict = {}
+_CURVE_MEMO = None       # the futures curve, fetched once for ONE report build (None outside one); see _trend_curve_once
+
+
+def _trend_curve_once() -> dict:
+    """The futures curve for the trend tables' roll adjustments. Inside one report build it is fetched once, an empty answer included: futures_spread.ensure_curve
+    keeps nothing while a feed is down and tries the network again on every call, and every rolled location in every section would pay for that (the Trends tab's
+    st.cache_data holds an empty answer for its TTL the same way). Outside a build it is just _futures_curve()."""
+    global _CURVE_MEMO
+    if _LOAD_MEMO is None:
+        return _futures_curve()
+    if _CURVE_MEMO is None:
+        _CURVE_MEMO = _futures_curve() or {}
+    return _CURVE_MEMO
+
+
+def _roll_spread(from_sym, to_sym):
+    """Futures spread (cents, price(from) - price(to)) for a contract roll: the live curve while both legs trade, else the spread frozen at the
+    last joint close in stored history (mirror of app._roll_spread)."""
+    curve = _trend_curve_once()
+    pf, pt = curve.get(from_sym), curve.get(to_sym)
+    if pf is not None and pt is not None:
+        return pf - pt
+    key = (from_sym, to_sym)
+    if key not in _FROZEN_SPREAD_MEMO:
+        try:
+            from database import get_roll_spread
+            _FROZEN_SPREAD_MEMO[key] = get_roll_spread(from_sym, to_sym)
+        except Exception:                                    # noqa: BLE001
+            _FROZEN_SPREAD_MEMO[key] = None
+    return _FROZEN_SPREAD_MEMO[key]
+
+
+def _trend_adj(from_sym, to_sym):
+    """{'adj': cents or None, 'rolled': bool[, 'unknown': True]} - mirror of app.get_adj: no adjustment inside one contract month (same letter, any
+    year) or between two meal contracts; otherwise the from-to futures spread, else the manual fallback, else unknown."""
+    if not from_sym or not to_sym or from_sym == to_sym:
+        return {"adj": 0, "rolled": False}
+    if from_sym[:2] == "ZM" and to_sym[:2] == "ZM":
+        return {"adj": 0, "rolled": False}
+    if len(from_sym) >= 3 and len(to_sym) >= 3 and from_sym[2] == to_sym[2] and from_sym[:2] == to_sym[:2]:
+        return {"adj": 0, "rolled": False}
+    sp = _roll_spread(from_sym, to_sym)
+    if sp is not None:
+        return {"adj": round(sp), "rolled": True}
+    for r in _ROLL_ADJ:
+        if r["from"] == from_sym and r["to"] == to_sym:
+            return {"adj": r["adj"], "rolled": True}
+    return {"adj": None, "rolled": True, "unknown": True}
+
+
+def _trend_extract_bf(snap, grain, mode="spot"):
+    """(basis, futures symbol) for a grain at delivery `mode` ('spot' = nearest), with the isSpot fallback - mirror of app._trend_extract. The symbol lets
+    a move be spread-adjusted across a contract roll; None for a bare spot row."""
+    if snap is None:
+        return (None, None)
+    if mode == "spot":
+        cands = [r for r in snap.rows
+                 if not r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None and r.futuresSymbol]
+        if cands:
+            r = min(cands, key=lambda r: _dp.deliv_key(r.deliveryMonth, r.futuresSymbol))
+            return (r.basisCents, r.futuresSymbol)
+        row = next((r for r in snap.rows if r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None), None)
+        return (row.basisCents, row.futuresSymbol or None) if row else (None, None)
+    matches = [r for r in snap.rows
+               if not r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None
+               and _dp.label(_dp.canonical(r.deliveryMonth, r.futuresSymbol)) == mode]
+    if matches:
+        r = min(matches, key=lambda r: _dp.slot_key(r.deliveryMonth))
+        return (r.basisCents, r.futuresSymbol)
+    row = next((r for r in snap.rows
+                if r.isSpot and _grain_disp(r.grain) == grain and r.basisCents is not None
+                and _dp.label(_dp.canonical(r.deliveryMonth, r.futuresSymbol)) == mode), None)
+    return (row.basisCents, row.futuresSymbol or None) if row else (None, None)
+
+
+def _trend_curve(snap, grain):
+    """[(year, month, basis)] of a snapshot's forward rows for a grain, by delivery month (mirror of app._trend_curve)."""
+    if snap is None:
+        return []
+    seen: dict = {}
+    for r in snap.rows:
+        if r.isSpot or _grain_disp(r.grain) != grain or r.basisCents is None:
+            continue
+        sym = r.futuresSymbol or ""
+        if len(sym) < 5 or not sym[-2:].isdigit():
+            continue
+        mon = _CME_MONTH_TO_INT.get(sym[-3])
+        if not mon:
+            continue
+        key = (2000 + int(sym[-2:]), mon)
+        if key not in seen:
+            seen[key] = r.basisCents
+    return sorted((y, m, b) for (y, m), b in seen.items())
+
+
+def _trend_spot_gt_next(snap, grain):
+    """True when the nearest delivery month's basis is above the next one's (an inverted curve); None with fewer than two months."""
+    c = _trend_curve(snap, grain)
+    return None if len(c) < 2 else c[0][2] > c[1][2]
+
+
+def build_trend_rows(facility_type: str, grain: str, mode: str = "spot") -> list[dict]:
+    """Per-location current / ~1 week / ~1 month / ~1 year ago basis (and futures symbol) and spot > next, for a type + grain + delivery - mirror of
+    app.build_trend_rows (same targets and tolerances, same grain-override guard, same region and river segment)."""
+    from facility_overrides import effective_ftype
+    pairs, meta, data, now = _load(facility_type)
+    if not pairs:
+        return []
+    targets = {"current": (now, 1.6),
+               "wk_ago":  (now - timedelta(days=7),   4),
+               "mo_ago":  (now - timedelta(days=30),  4),
+               "yr_ago":  (now - timedelta(days=365), 4)}
+    rows = []
+    for key in pairs:
+        snaps = data.get(key, [])
+        m     = meta.get(key, {})
+        if effective_ftype(key[0], key[1], grain, m.get("facility_type")) != facility_type:
+            continue      # this grain belongs to a different (overridden) category
+        stt = m.get("state", "")
+        rd = {"provider": key[0], "location": key[1],
+              "region":  region_from_state(stt) or m.get("region", "") or "",
+              "segment": river_segment(key[1])}
+        for lbl, (tg, md) in targets.items():
+            snap = _trend_closest(snaps, tg, md)
+            rd[f"b_{lbl}"], rd[f"f_{lbl}"] = _trend_extract_bf(snap, grain, mode)
+            if lbl == "current":
+                rd["spot_gt_next"] = _trend_spot_gt_next(snap, grain)
+        rows.append(rd)
+    return [r for r in rows if r.get("b_current") is not None]
+
+
+def _trend_move(r, win):
+    """Current-vs-`win` basis move of a trend row, spread-adjusted if the reference contract rolled between the two (mirror of app._trend_move). None
+    to leave the row out: a missing endpoint, or a roll with no spread on file."""
+    bc, bw = r.get("b_current"), r.get(f"b_{win}")
+    if bc is None or bw is None:
+        return None
+    d = bc - bw
+    fc, fw = r.get("f_current"), r.get(f"f_{win}")
+    if fc and fw and fc != fw:
+        a = _trend_adj(fw, fc)
+        if a.get("adj") is not None:
+            return d - a["adj"]
+        if a.get("unknown"):
+            return None
+    return d
+
+
+def render_trend_cards_email(rows, group_field, groups) -> str:
+    """The Trends tab's three tables for one section (app.render_trend_cards), as email-safe HTML, side by side in one row.
+    Avg Basis Change (All / Firmer only / Weaker only) vs LW / LM / LY; Firmer / Weaker % by region (a river section: Avg Basis & Change by segment);
+    Spot > Next, the % of locations inverted, by region (segment). `rows` are build_trend_rows rows, `groups` the East / West (or segment) names present.
+    Built from table attributes (cellpadding, align, bgcolor) and a colour on the cell, not per-cell CSS: 11 sections of the old markup were 120 KB,
+    and the attributes are what Outlook honours most reliably. The font comes from the table, as in the section tables."""
+    is_river = (group_field == "segment")
+    grp_lbl = "Segment" if is_river else "Region"
+    WINS = [("wk_ago", "VS LW"), ("mo_ago", "VS LM"), ("yr_ago", "VS LY")]
+
+    def _avg(xs):
+        return (sum(xs) / len(xs)) if xs else None
+
+    def _grows(gv):
+        return [r for r in rows if (r.get(group_field) or "") == gv]
+
+    def _moves(rs, win):
+        return [m for r in rs if (m := _trend_move(r, win)) is not None]
+
+    def _fc(v):
+        return "&mdash;" if v is None else f"{'+' if v >= 0 else '&minus;'}{abs(v):.1f}"
+
+    def _fp(v):
+        return "&mdash;" if v is None else f"{round(v)}%"
+
+    def _col(txt, v):               # a change: green up, red down, grey for none / zero
+        if v is None or v == 0:
+            return f'<td align="right" style="color:#64748b">{txt}</td>'
+        return f'<td align="right" style="color:{_GAIN if v > 0 else _LOSS}"><b>{txt}</b></td>'
+
+    def _hd(t, left=False):
+        al = "" if left else ' align="right"'
+        return f'<td{al} style="color:#64748b;font-size:9px"><b>{t}</b></td>'
+
+    def _open(title, first="", extra_col=None):
+        h = (f'<div style="font-size:10px;font-weight:700;color:{JPSI_DARK};padding:0 0 3px 1px">{title}</div>'
+             f'<table cellpadding="4" cellspacing="0" style="font-size:11px"><tr bgcolor="#f1f5f9">{_hd(first, left=True)}')
+        if extra_col:
+            h += _hd(extra_col)
+        for _, lab in WINS:
+            h += _hd(lab)
+        return h + '</tr>'
+
+    # Avg Basis Change - All / Firmer / Weaker
+    a = _open("AVG BASIS CHANGE (&cent;)")
+    for grp, fn in (("All Plants",  lambda m: m),
+                    ("Firmer only", lambda m: [x for x in m if x > 0]),
+                    ("Weaker only", lambda m: [x for x in m if x < 0])):
+        a += f'<tr><td nowrap><b>{grp}</b></td>'
+        for win, _ in WINS:
+            v = _avg(fn(_moves(rows, win)))
+            a += _col(_fc(v), v)
+        a += '</tr>'
+    a += '</table>'
+
+    if is_river:             # Avg Basis & Change by Segment
+        mid = _open("AVG BASIS &amp; CHANGE BY SEGMENT (&cent;)", extra_col="AVG BASIS")
+        for gv in groups:
+            rs = _grows(gv)
+            bl = _avg([r["b_current"] for r in rs if r.get("b_current") is not None])
+            bt = "&mdash;" if bl is None else f"{'+' if bl >= 0 else '&minus;'}{abs(bl):.1f}"
+            mid += f'<tr><td nowrap><b>{gv}</b></td><td align="right"><b>{bt}</b></td>'
+            for win, _ in WINS:
+                v = _avg(_moves(rs, win))
+                mid += _col(_fc(v), v)
+            mid += '</tr>'
+    else:                    # Firmer / Weaker by Region: the share of locations that moved up / down
+        mid = _open(f"FIRMER / WEAKER BY {grp_lbl.upper()}")
+        for gv in groups:
+            rs = _grows(gv)
+            for firmer, lab2 in ((True, "Firmer"), (False, "Weaker")):
+                mid += f'<tr><td nowrap><b>{gv}</b> <span style="color:#64748b">{lab2}</span></td>'
+                for win, _ in WINS:
+                    ms = _moves(rs, win)
+                    pv = None if not ms else 100 * sum(1 for m in ms if (m > 0 if firmer else m < 0)) / len(ms)
+                    mid += ('<td align="right" style="color:#cbd5e1">&mdash;</td>' if pv is None
+                            else f'<td align="right" style="color:{_GAIN if firmer else _LOSS}"><b>{_fp(pv)}</b></td>')
+                mid += '</tr>'
+    mid += '</table>'
+
+    # Spot > Next - the share of locations whose nearest month is above the next (an inverted curve)
+    c = (f'<div style="font-size:10px;font-weight:700;color:{JPSI_DARK};padding:0 0 3px 1px">SPOT &gt; NEXT</div>'
+         f'<table cellpadding="4" cellspacing="0" style="font-size:11px"><tr bgcolor="#f1f5f9">{_hd(grp_lbl.upper(), left=True)}{_hd("% INVERTED")}</tr>')
+    for gv in groups:
+        vs = [r.get("spot_gt_next") for r in _grows(gv) if r.get("spot_gt_next") is not None]
+        iv = None if not vs else 100 * sum(1 for v in vs if v) / len(vs)
+        c += f'<tr><td nowrap><b>{gv}</b></td><td align="right"><b>{_fp(iv)}</b></td></tr>'
+    c += '</table>'
+
+    return ('<table cellpadding="0" cellspacing="0" style="margin:4px 0 10px"><tr>'
+            f'<td valign="top" style="padding-right:18px">{a}</td>'
+            f'<td valign="top" style="padding-right:18px">{mid}</td>'
+            f'<td valign="top">{c}</td></tr></table>')
+
+
+def _index_excludes() -> set:
+    """The locations marked as index outliers on the Trends tab (left out of its averages, so out of these too); an empty set if the list cannot be read."""
+    try:
+        from database import get_index_excludes
+        return set(get_index_excludes() or ())
+    except Exception as exc:                                  # noqa: BLE001
+        log.warning("trend cards: no index-outlier list (%s); excluding nothing", str(exc)[:120])
+        return set()
+
+
+def _trend_cards_html(facility_type: str, grain: str, group_mode: str, mode: str, excluded: set) -> str:
+    """The three trend tables for one section of the email, or '' when it has no locations - or when anything at all goes wrong: a problem in these
+    tables must never stop the daily email."""
+    try:
+        rows = [r for r in build_trend_rows(facility_type, grain, mode) if (r["provider"], r["location"]) not in excluded]
+        if not rows:
+            return ""
+        if group_mode == "segment":
+            groups = [s for s in SEGMENT_ORDER if any((r.get("segment") or "") == s for r in rows)]
+            gf = "segment"
+        else:
+            groups = [g for g in ("East", "West") if any((r.get("region") or "") == g for r in rows)]
+            gf = "region"
+        return render_trend_cards_email(rows, gf, groups)
+    except Exception as exc:                                  # noqa: BLE001
+        log.warning("trend cards skipped for %s / %s: %s", facility_type, grain, exc)
+        return ""
+
+
 def _bcell(b) -> str:
     """Basis cell."""
     td = "padding:3px 6px;text-align:right;white-space:nowrap;border-bottom:1px solid #eef2f6"
@@ -482,8 +779,8 @@ def dashboard_cta_html(label: str = "Open the Basis Tracker",
     )
 
 
-def build_changes_email_html(mode: str = "spot") -> str:
-    """A branded, email-ready HTML report of daily basis changes (JPSI styling)."""
+def _build_changes_email_html(mode: str = "spot") -> str:
+    """The report itself (build_changes_email_html holds the shared snapshot load open around this)."""
     today = datetime.now()
     _ff   = "font-family:Arial,Helvetica,sans-serif"
     _hdr  = ("font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;"
@@ -493,10 +790,15 @@ def build_changes_email_html(mode: str = "spot") -> str:
     _tbl_css = (f"background-image:url('cid:{_TBL_WM_CID}');background-position:center;"
                 f"background-repeat:no-repeat;background-size:contain;") if _wm else ""
 
+    excluded = _index_excludes()         # the Trends tab's index outliers, left out of the trend cards as there
+    _cards_shown = False
     body = ""
     for ttl, ft, gr, gmode in TREND_CATEGORIES:
         body += (f'<div style="margin:16px 0 5px;font-size:13px;font-weight:700;color:{JPSI_BLUE};'
                  f'border-bottom:2px solid {JPSI_BLUE};padding-bottom:3px">{ttl}</div>')
+        _cards = _trend_cards_html(ft, gr, gmode, mode, excluded)       # the Trends tab's tables, above the section's own table
+        _cards_shown = _cards_shown or bool(_cards)
+        body += _cards
         if gmode == "segment":
             result = build_segment_change_rows(ft, gr, mode)
             rows   = result["rows"]
@@ -549,6 +851,11 @@ def build_changes_email_html(mode: str = "spot") -> str:
                          + _bcell(r["b2"]) + _ccell_roll(r["c2"], r["roll2"]) + '</tr>')
             body += '</table>'
 
+    if _cards_shown:
+        body += ('<div style="margin-top:10px;font-size:10px;color:#94a3b8">'
+                 'Trend tables (the Trends tab): each location at its nearest delivery month, now vs about a week (LW), a month (LM) and a year (LY) ago, '
+                 'spread-adjusted across contract rolls; firmer = a higher basis. East / West is split at the Mississippi River and river terminals are '
+                 'grouped by river segment. Locations excluded from the index on the Trends tab are left out.</div>')
     if "&#8635;" in body:
         body += ('<div style="margin-top:10px;font-size:10px;color:#d97706">'
                  '&#8635; = rolled to a new futures contract — the change is spread-adjusted '
@@ -572,6 +879,19 @@ def build_changes_email_html(mode: str = "spot") -> str:
         f'<a href="https://www.jpsi.com" style="color:{JPSI_BLUE};text-decoration:none">jpsi.com</a></div>'
         f'</div>'
     )
+
+
+def build_changes_email_html(mode: str = "spot") -> str:
+    """A branded, email-ready HTML report of daily basis changes (JPSI styling). The sections and the trend tables of one facility type share ONE
+    snapshot load while it is built (_load); the memo is dropped again whatever happens, so a later call never reads this one's data."""
+    global _LOAD_MEMO, _CURVE_MEMO
+    _LOAD_MEMO = {}
+    _CURVE_MEMO = None
+    try:
+        return _build_changes_email_html(mode)
+    finally:
+        _LOAD_MEMO = None
+        _CURVE_MEMO = None
 
 
 _SIG_LOGO     = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -837,12 +1157,44 @@ def send_email(subject: str, html: str, to_addr: str, cc: str | None = None,
             raise RuntimeError("Email send failed — " + "; ".join(errors))
 
 
+# When the mail service itself is down or busy (Exchange Online / Graph: HTTP 429 or 5xx, a timeout, a dropped connection) one try is not enough for the
+# unattended 15:45 run: the email would be lost and, with every alert going through the same service, nobody told. Kolten 2026-11-12: "Outlook is down and
+# could cause an issue" (Graph answered 502 / 503 for the tracker's mailbox that afternoon). The run passes these waits (seconds before each further try:
+# eight more tries over about 35 minutes, well inside cron-alert's 90-minute limit); a person at a button gets one try and the error, as before.
+DAILY_SEND_RETRY_WAITS = (120, 180, 300, 300, 300, 300, 300, 300)
+
+_TRANSIENT_MAIL = re.compile(r"\[(?:429|5\d\d)\]|timed out|timeout|connection (?:aborted|reset|refused|error)|max retries exceeded|remote ?disconnected"
+                             r"|service unavailable|temporarily unavailable", re.I)
+
+
+def transient_send_error(exc) -> bool:
+    """Whether a failed send is worth waiting out: the mail service is busy or unreachable (Graph's HTTP 429 / 5xx, a timeout, a dropped connection).
+    A bad credential, a missing setting or a refused message (4xx) fails the same way later, so it is not."""
+    return bool(_TRANSIENT_MAIL.search(str(exc)))
+
+
+def send_with_retry(send, waits=(), what: str = "email", sleep=None):
+    """send() once; if it fails with a transient mail-service error, wait waits[0] seconds and try again, then waits[1], and so on, and re-raise the last
+    error when the waits run out. Any other error is raised at once. No waits (the default) is exactly one try."""
+    sleep = sleep or time.sleep
+    for i in range(len(waits) + 1):
+        try:
+            return send()
+        except Exception as exc:                              # noqa: BLE001
+            if i >= len(waits) or not transient_send_error(exc):
+                raise
+            log.warning("%s: the mail service is not taking mail (%s); try %d of %d in %d s", what, str(exc)[:200], i + 2, len(waits) + 1, waits[i])
+            sleep(waits[i])
+
+
 def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
-                             mode: str = "spot") -> bool:
+                             mode: str = "spot", retry_waits=()) -> bool:
     """Build the daily Changes report and email it via Outlook. Returns True on success.
 
     `cc` defaults to the CHANGES_EMAIL_CC env var (so a standing copy recipient can
-    be configured for the scheduled daily send)."""
+    be configured for the scheduled daily send). `retry_waits`: seconds to wait before each
+    further try when the mail service is down or busy (DAILY_SEND_RETRY_WAITS); the report is
+    built once and the same message is sent again. Empty = one try."""
     to_addr = to_addr or DEFAULT_TO
     if cc is None:
         cc = os.getenv("CHANGES_EMAIL_CC") or None
@@ -853,7 +1205,8 @@ def send_daily_changes_email(to_addr: str | None = None, cc: str | None = None,
     if _wm:
         imgs[_TBL_WM_CID] = _wm
     bcc = os.getenv("DAILY_BIDS_BCC") or DAILY_BIDS_BCC
-    _via = send_email(subject, html, to_addr, cc=cc, inline_images=imgs or None, bcc=bcc)
+    _via = send_with_retry(lambda: send_email(subject, html, to_addr, cc=cc, inline_images=imgs or None, bcc=bcc),
+                           retry_waits, what="Daily Changes email")
     log.info("Daily Changes email sent via %s to %s (cc %s | bcc %s)",
              _via, to_addr, cc or "—", bcc or "—")
     return True
