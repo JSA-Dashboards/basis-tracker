@@ -303,6 +303,17 @@ are in both pickers, after the locations, labelled `🚂 Rail · UP Allen Statio
   ('JFM' for Jan-Mar, the narrowest first) and a month is ONE value per side (`forward_month`, below: its full-month bid, else the midpoint of its FH and
   LH bids); 'R' (respective-option-month) packages and untagged cells are left out; short tags ('CU', 'SX') take rail_paste's roll. No forward points when the two curves are more than 10 days apart or no common month can be priced — the caption under the chart says which.
 - `apps/basis_tracker` in the admin portal is a generated mirror (`bt_` prefix on every sibling module): the sync renames `rail_spread` by itself.
+- **Highlight a year (Kolten 2026-11-13, with a screenshot of CSX Columbus − CSX Evansville corn: "I want to be able to highlight a year on the chart (i.e. 2025/26 listed on chart)").** A picker beside the Best-fit radio (`spread_hl`, collapsed label,
+  placeholder "Highlight a year on the chart (e.g. 2025/26)") lists every earlier marketing year the pair has weeks for, newest first; the current year is the black line, so it is not offered, and a year older than the 5-yr window can be picked. Up to four
+  (`max_selections`; its "Select all" takes the first four). Each pick is drawn as a 3.5 px line in its own colour (blue, orange, purple, teal, in the order picked: none is a colour the chart already uses) over the range and UNDER the black current-year line, with
+  its year as a bold label at the line's last point like the current year's, and is named in the legend line above the chart ("2025/26 = blue"); a year with a single week of data is a dot. The 75 / 90 / 95 % zoom counts a highlighted year's weeks (once: highlighting
+  one of the five window years leaves the zoom as it was). A prior year ends in August like the "5-yr avg" label, so labels that would sit on each other are nudged apart in 12 px steps, highest first (`spread_highlight.label_offsets`; the avg and current-year labels
+  stay put). **The picker keeps its value from pair to pair**: a keyed widget holds its old state against new options, so `app.py` drops a pick the new pair has no data for (`spread_highlight.clean_selection`) in `st.session_state["spread_hl"]` BEFORE the widget is
+  built (allowed there, not after), instead of folding the pair into the key (that would forget the picks at every change). The PNG / Copy export is the same layered chart, so it carries the highlights. Nothing about the range, the average, the forward points or
+  the chart with nothing picked changes (the layers are identical, checked).
+  `spread_highlight.py` is pure (`tests/test_spread_highlight.py`: 28 checks); `tests/test_spread_highlight_tab.py` (35 checks) drives the REAL tab headless (admin app and `view_app.py`, throwaway SQLite, four locations' weekly history whose spread is known by
+  construction: the picker's years, a pick's line number for number, colours and order, legend, zoom, nudge, four at most, a pair change, "Full" fit, a one-week year); 34 deliberate breaks (18 of the helpers, 16 of the tab), all caught. Seen in a local
+  `view_app.py` run on live data (CSX Columbus − CSX Evansville corn: the same −13¢ latest spread as the screenshot, 2025/26 in blue and up to four years together). Deploy = push, then Reboot BOTH Cloud apps (it is `app.py`).
 
 ## Net Carry tab — modules and data
 

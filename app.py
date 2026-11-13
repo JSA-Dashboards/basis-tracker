@@ -6424,6 +6424,7 @@ with tab_spread:
         import altair as _alt
         import base64 as _b64, pathlib as _pl
         import rail_spread as _rsp
+        import spread_highlight as _shl
 
         st.caption("Seasonal **basis spread** between two locations — **Location A − Location B** "
                    "(front-month spot basis) across the marketing year (Sep–Aug), against the "
@@ -6556,7 +6557,9 @@ with tab_spread:
             else:
                 with _sc3:
                     _sg = st.selectbox("Grain", _common, key="spread_grain")
-                _spfit = _yfit_radio("spread_seas_fit")
+                _spc_fit, _spc_hl = st.columns([4, 7])      # the Best-fit radio, and beside it the Highlight-year picker (filled in below, once the years are known)
+                with _spc_fit:
+                    _spfit = _yfit_radio("spread_seas_fit")
                 _pa = _spread_series(*_a_pair, _sg)
                 _pb = _spread_series(*_b_pair, _sg)
                 if len(_pa) < 2 or len(_pb) < 2:
@@ -6590,6 +6593,17 @@ with tab_spread:
                         _byrs = sorted(_win["MktYear"].unique())
                         _cur = _seas[_seas["MktYearNum"] == _max_yr].copy()
                         _cur_lbl = _cur["MktYear"].iloc[0] if not _cur.empty else ""
+
+                        # Highlight year (spread_highlight): a past marketing year drawn as a coloured line over the range, labelled with its year at its last point.
+                        # The picker keeps its value from the last pair of locations, so a pick this pair has no data for is dropped before the widget is built.
+                        _hl_opts = _shl.year_options(zip(_seas["MktYearNum"], _seas["MktYear"]), _max_yr)
+                        st.session_state["spread_hl"] = _shl.clean_selection(st.session_state.get("spread_hl"), _hl_opts)
+                        _hl_sel = []
+                        if _hl_opts:
+                            with _spc_hl:
+                                _hl_sel = st.multiselect(
+                                    "Highlight year", _hl_opts, key="spread_hl", max_selections=_shl.MAX_HIGHLIGHTS, label_visibility="collapsed",
+                                    placeholder=f"Highlight a year on the chart (e.g. {_hl_opts[0]})")
 
                         # Forward spread (A_fwd − B_fwd) where BOTH locations post a forward curve.
                         _fwd = _pd.DataFrame(columns=["MktYearNum", "MktWeek", "Spread"])
@@ -6626,7 +6640,8 @@ with tab_spread:
                                                      labelExpr=_mlab, labelFontSize=11, grid=True,
                                                      gridColor="#eef2f6", domainColor="#cbd5e1",
                                                      tickColor="#cbd5e1"))
-                        _yvals = list(_seas[_seas["MktYearNum"].isin(_win_yrs + [_max_yr])]["Spread"])
+                        _hl_nums = [int(_n) for _n in _seas[_seas["MktYear"].isin(_hl_sel)]["MktYearNum"].unique()]      # a highlighted year is on the chart, so it is in the zoom
+                        _yvals = list(_seas[_seas["MktYearNum"].isin(_win_yrs + [_max_yr] + _hl_nums)]["Spread"])
                         if not _fwd.empty:
                             _yvals += list(_fwd["Spread"])
                         _yscale = _yfit_scale(_yvals, _spfit, pad_frac=0.10)
@@ -6666,6 +6681,42 @@ with tab_spread:
                                            color="#4b6a4b")
                                 .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("avg:Q", scale=_yscale),
                                         text="_l:N"))
+                        # Highlighted years: a coloured line per pick with its year at the last point, under the current year's black line. The labels are nudged off
+                        # the "5-yr avg" and current-year labels and off each other (a prior year ends in August, like the average).
+                        if _hl_sel:
+                            _dom = getattr(_yscale, "domain", None)
+                            _span = (float(_dom[1]) - float(_dom[0])) if isinstance(_dom, (list, tuple)) and len(_dom) == 2 else (max(_yvals) - min(_yvals) if _yvals else 0.0)
+                            _fixed = []
+                            if not _band.empty:
+                                _bl = _band.nlargest(1, "MktWeek").iloc[0]
+                                _fixed.append((float(_bl["MktWeek"]), float(_bl["avg"])))
+                            if not _cur.empty:
+                                _cl = _cur.nlargest(1, "MktWeek").iloc[0]
+                                _fixed.append((float(_cl["MktWeek"]), float(_cl["Spread"])))
+                            _hl_data = {_y: _seas[_seas["MktYear"] == _y].sort_values("MktWeek") for _y in _hl_sel}
+                            _hl_dy = _shl.label_offsets(
+                                _fixed, [(_y, float(_d["MktWeek"].iloc[-1]), float(_d["Spread"].iloc[-1])) for _y, _d in _hl_data.items() if not _d.empty],
+                                (_SEAS_H / _span) if _span > 0 else 0)
+                            for _i, _y in enumerate(_hl_sel):
+                                _hd = _hl_data[_y]
+                                if _hd.empty:
+                                    continue
+                                _hcol = _shl.colour_for(_i)[0]
+                                _htip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
+                                         _alt.Tooltip("MktWeek:Q", title="Week"),
+                                         _alt.Tooltip("Spread:Q", title=f"Spread ({_basis_unit(_sg)})")]
+                                if len(_hd) >= 2:
+                                    _layers.append(
+                                        _alt.Chart(_hd).mark_line(strokeWidth=3.5, color=_hcol)
+                                        .encode(x=_x_s, y=_alt.Y("Spread:Q", scale=_yscale), tooltip=_htip))
+                                else:                                       # a year with a single week of data is a dot
+                                    _layers.append(
+                                        _alt.Chart(_hd).mark_point(color=_hcol, filled=True, size=60)
+                                        .encode(x=_x_s, y=_alt.Y("Spread:Q", scale=_yscale), tooltip=_htip))
+                                _layers.append(
+                                    _alt.Chart(_hd.nlargest(1, "MktWeek"))
+                                    .mark_text(align="left", dx=6, dy=_hl_dy.get(_y, 0), fontSize=10, fontWeight="bold", color=_hcol)
+                                    .encode(x=_alt.X("MktWeek:Q"), y=_alt.Y("Spread:Q", scale=_yscale), text="MktYear:N"))
                         if not _cur.empty:
                             _tip = [_alt.Tooltip("MktYear:N", title="Mkt Year"),
                                     _alt.Tooltip("MktWeek:Q", title="Week"),
@@ -6709,6 +6760,8 @@ with tab_spread:
                             'text-transform:uppercase;letter-spacing:.1em">' + _sp_sub
                             + '&nbsp;&nbsp;<span style="font-weight:400;text-transform:none">'
                             + (f'<b style="color:#000">{_cur_lbl} = black</b>' if _cur_lbl else '')
+                            + ''.join(f'  ·  <b style="color:{_shl.colour_for(_i)[0]}">{_y} = {_shl.colour_for(_i)[1]}</b>'
+                                      for _i, _y in enumerate(_hl_sel))
                             + '  ·  <b style="color:#4b6a4b">5-yr avg = dashed</b>'
                             + (f'  ·  <b style="color:#8bab7f">5-yr range = shaded ({_rng_txt})</b>'
                                if not _band.empty else '')
